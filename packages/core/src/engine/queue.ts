@@ -15,6 +15,8 @@ export interface RunQueueOptions {
     onError: (error: unknown, run?: Run) => void;
     /** Periodic work run before each poll pass (e.g. expiring approvals). */
     onPoll?: () => Promise<void>;
+    /** A claim renewal was refused: another owner may hold the run now. */
+    onLeaseLost?: (runId: string) => void;
 }
 
 const groupKey = (run: Pick<Run, 'agent' | 'concurrencyKey'>) => `${run.agent}\u0000${run.concurrencyKey}`;
@@ -40,6 +42,8 @@ export class RunQueue {
     protected pollGeneration = 0;
 
     protected poll: { clear(): void } | undefined;
+
+    protected halted = false;
 
     constructor(opts: RunQueueOptions) {
         this.opts = opts;
@@ -75,6 +79,20 @@ export class RunQueue {
         this.poll = undefined;
     }
 
+    /**
+     * Stops polling and starting runs (passes become no-ops) until resume().
+     * Resolves once a pass in progress finished, so no run starts afterwards.
+     */
+    async halt(): Promise<void> {
+        this.halted = true;
+        this.stopPolling();
+        await this.pumping;
+    }
+
+    resume(): void {
+        this.halted = false;
+    }
+
     /** Request a scheduling pass; coalesces overlapping requests. */
     pump(): Promise<void> {
         if (this.pumping) {
@@ -105,11 +123,11 @@ export class RunQueue {
     }
 
     protected async pass(): Promise<void> {
-        if (this.running.size >= this.opts.maxConcurrentRuns) return;
+        if (this.halted || this.running.size >= this.opts.maxConcurrentRuns) return;
         const { store } = this.opts;
         const { data: queued } = await store.listRuns({ status: ['queued'] });
         for (const run of queued) {
-            if (this.running.size >= this.opts.maxConcurrentRuns) return;
+            if (this.halted || this.running.size >= this.opts.maxConcurrentRuns) return;
 
             const started = await this.tryStart(run);
             if (started) this.launch(started);
@@ -196,11 +214,17 @@ export class RunQueue {
         let timer: { clear(): void } | undefined;
         const schedule = () => {
             timer = clock.setTimeout(() => {
-                store.renewClaim(runId, owner, claimTtlMs)
-                    .catch(() => false)
-                    .then((ok) => {
-                        if (ok && !stopped) schedule();
-                    });
+                store.renewClaim(runId, owner, claimTtlMs).then(
+                    (ok) => {
+                        if (stopped) return;
+                        if (ok) schedule();
+                        else this.opts.onLeaseLost?.(runId);
+                    },
+                    // a failed call proves nothing: retry while the lease may still be ours
+                    () => {
+                        if (!stopped) schedule();
+                    },
+                );
             }, Math.max(1, Math.floor(claimTtlMs / 3)));
         };
         schedule();

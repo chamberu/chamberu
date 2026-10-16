@@ -38,8 +38,11 @@ export interface ExecuteContext {
     clock: Clock;
     /** Aborted by engine.cancel(). */
     signal: AbortSignal;
-    /** Settles the run (expects it `running`) and emits `run.updated`. */
-    finish: (patch: Partial<Run>) => Promise<Run>;
+    /**
+     * Settles the run (expects it `running` and claimed by this execution) and
+     * emits `run.updated`; resolves undefined without writing once the lease is lost.
+     */
+    finish: (patch: Partial<Run>) => Promise<Run | undefined>;
     /** Patches the still `running` run and emits `run.updated`. */
     update: (patch: Partial<Run>) => Promise<Run>;
     onStepAppended: (step: Step) => void;
@@ -50,6 +53,11 @@ export interface ExecuteContext {
     pause: (request: ApprovalRequest, usage: Usage) => Promise<void>;
     /** HMAC secret the AI SDK signs approval requests with. */
     toolApprovalSecret?: string;
+    /**
+     * False once another owner took the run over (its lease expired and it was
+     * recovered); checked before every step and checkpoint write.
+     */
+    ownsRun?: () => Promise<boolean>;
 }
 
 /** A tool call waiting for the owner's decision. */
@@ -263,8 +271,10 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const preStepErrors = new Map<string, unknown>();
     let beforeFirstStep = true;
 
-    /** Runs a store write unless the execution was abandoned meanwhile. */
+    /** Runs a store write unless the execution was abandoned meanwhile or lost the run. */
     const guarded = async (write: () => Promise<void>): Promise<boolean> => {
+        if (abandoned || signal.aborted) return false;
+        if (ctx.ownsRun && !await ctx.ownsRun()) return false;
         if (abandoned || signal.aborted) return false;
         await write();
         return true;

@@ -51,6 +51,7 @@ export interface ResumeDecision {
 }
 
 const IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_DRAIN_TIMEOUT_MS = 30_000;
 const DEFAULT_APPROVAL_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 const APPROVAL_TIMED_OUT = 'approval timed out';
 
@@ -75,10 +76,20 @@ export class RunEngine {
 
     protected readonly onError: (error: unknown, run?: Run) => void;
 
-    /** Runs executing in this process, by id. */
-    protected readonly executions = new Map<string, { controller: AbortController; done: Promise<void> }>();
+    /**
+     * Runs executing in this process, by id. `stop` says why the execution was
+     * aborted: cancel settles it `cancelled`, drain `interrupted`, and after a
+     * lost lease it writes nothing at all.
+     */
+    protected readonly executions = new Map<string, {
+        controller: AbortController;
+        done: Promise<void>;
+        stop?: 'cancel' | 'drain' | 'lease-lost';
+    }>();
 
     protected started = false;
+
+    protected draining = false;
 
     protected lastCreatedAt = 0;
 
@@ -107,7 +118,11 @@ export class RunEngine {
             execute: (run) => this.guardedExecute(run),
             onError: (error, run) => this.onError(error, run),
             onRunUpdated: (run) => this.emit({ type: 'run.updated', run }),
-            onPoll: () => this.tick(),
+            onPoll: async () => {
+                await this.tick();
+                await this.recover();
+            },
+            onLeaseLost: (runId) => this.loseLease(runId),
         });
     }
 
@@ -164,9 +179,19 @@ export class RunEngine {
         };
     }
 
+    /** True from drain() until the next start(). */
+    get isDraining(): boolean {
+        return this.draining;
+    }
+
+    /** Recovers abandoned runs, then starts executing queued runs and polling. */
     async start(): Promise<void> {
+        this.draining = false;
         this.started = true;
+        this.queue.resume();
         this.queue.startPolling();
+        // like a failing pass, a failing recovery is reported; the next poll retries it
+        await this.recover().catch((error: unknown) => this.onError(error));
         await this.queue.pump();
     }
 
@@ -174,6 +199,73 @@ export class RunEngine {
     stop(): void {
         this.started = false;
         this.queue.stopPolling();
+    }
+
+    /**
+     * Requeues every `running` or `interrupted` run whose claim expired (or was
+     * released), so its next execution resumes from the latest checkpoint.
+     * Runs executing here and runs with a live claim are left alone. Also runs
+     * on every poll. Resolves the number of runs requeued.
+     */
+    async recover(): Promise<number> {
+        const { data } = await this.store.listRuns({ status: ['running', 'interrupted'] });
+        let requeued = 0;
+        for (const run of data) {
+            if (this.executions.has(run.id)) continue;
+            try {
+                // atomic: fails while another owner's claim is live
+                if (!await this.store.claimRun(run.id, this.owner, this.claimTtlMs)) continue;
+            } catch (error) {
+                this.onError(error, run);
+                continue;
+            }
+            try {
+                const queued = await this.store.updateRun(run.id, {
+                    status: 'queued',
+                    claim: undefined,
+                    updatedAt: this.clock.now(),
+                }, { expectStatus: ['running', 'interrupted'], expectOwner: this.owner });
+                requeued++;
+                this.emit({ type: 'run.updated', run: queued });
+            } catch (error) {
+                // the run settled since it was listed: drop the claim just taken
+                await this.store.updateRun(run.id, { claim: undefined }, { expectOwner: this.owner })
+                    .catch(() => {});
+                if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
+            }
+        }
+        if (requeued > 0 && this.started) void this.queue.pump();
+        return requeued;
+    }
+
+    /**
+     * Graceful shutdown: stops starting runs (dispatch still stores them
+     * `queued`, for another replica), polling and tick; waits up to `timeoutMs`
+     * (default 30 000) for in-flight runs, then aborts the rest and marks them
+     * `interrupted` with their claim released.
+     */
+    async drain(opts: { timeoutMs?: number } = {}): Promise<void> {
+        this.draining = true;
+        this.stop();
+        await this.queue.halt();
+
+        let timer: { clear(): void } | undefined;
+        const timedOut = new Promise<true>((resolve) => {
+            timer = this.clock.setTimeout(() => resolve(true), opts.timeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS);
+        });
+        const settled = await Promise.race([this.queue.idle().then(() => false as const), timedOut]);
+        timer?.clear();
+        if (!settled) return;
+
+        while (this.executions.size > 0) {
+            const pending = this.executions.values().toArray();
+            for (const execution of pending) {
+                execution.stop ??= 'drain';
+                execution.controller.abort();
+            }
+            await Promise.all(pending.map((execution) => execution.done));
+        }
+        await this.queue.idle();
     }
 
     idle(): Promise<void> {
@@ -187,6 +279,7 @@ export class RunEngine {
     async cancel(runId: string): Promise<void> {
         const execution = this.executions.get(runId);
         if (execution) {
+            execution.stop ??= 'cancel';
             execution.controller.abort();
             await execution.done;
             return;
@@ -339,13 +432,14 @@ export class RunEngine {
                 expiresAt: new Date(now.getTime() + (agent.definition.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS)),
                 tokenId: randomUUID(),
             };
-        const updated = await this.store.updateRun(run.id, {
+        const updated = await this.ownedUpdate(run.id, {
             status: 'waiting',
             waiting,
             usage,
             claim: undefined,
             updatedAt: now,
-        }, { expectStatus: ['running'] });
+        });
+        if (!updated) return;
         this.emit({ type: 'run.updated', run: updated });
         await this.notifyApproval(updated, agent, waiting);
     }
@@ -403,13 +497,15 @@ export class RunEngine {
             signal,
             finish: (patch) => this.finish(run.id, patch),
             update: async (patch) => {
-                const updated = await this.store.updateRun(run.id, patch, { expectStatus: ['running'] });
+                const updated = await this.ownedUpdate(run.id, patch);
+                if (!updated) throw new InvalidRunStateError(`Run "${run.id}" was taken over by another owner.`);
                 this.emit({ type: 'run.updated', run: updated });
                 return updated;
             },
             onStepAppended: (step) => this.emit({ type: 'step.appended', step }),
             pause: (request, usage) => this.pause(run, agent, request, usage),
             toolApprovalSecret: this.resumeSecret,
+            ownsRun: () => this.ownsRun(run.id),
         });
     }
 
@@ -420,6 +516,8 @@ export class RunEngine {
             try {
                 await this.execute(run, controller.signal);
             } catch (error) {
+                // the run belongs to another owner now: its failure is not ours to record
+                if (this.executions.get(run.id)?.stop === 'lease-lost') return;
                 await this.finish(run.id, { status: 'failed', error: toRunError(error) });
                 this.onError(error, run);
             } finally {
@@ -430,10 +528,22 @@ export class RunEngine {
         return done;
     }
 
-    protected async finish(id: string, patch: Partial<Run>): Promise<Run> {
+    /**
+     * Settles a `running` run this engine holds the claim of. A run aborted by
+     * drain() is marked `interrupted` (claim released, not finished) instead of
+     * `cancelled`; after a lost lease nothing is written and undefined resolves.
+     */
+    protected async finish(id: string, patch: Partial<Run>): Promise<Run | undefined> {
+        const stop = this.executions.get(id)?.stop;
+        if (stop === 'lease-lost') return undefined;
         const now = this.clock.now();
-        const updated = await this.store.updateRun(
-            id,
+        const settled: Partial<Run> = stop === 'drain' && patch.status === 'cancelled' ?
+            {
+                status: 'interrupted',
+                usage: patch.usage,
+                claim: undefined,
+                updatedAt: now,
+            } :
             {
                 claim: undefined,
                 // a run resumed after a crash may still carry its answered wait point
@@ -441,11 +551,40 @@ export class RunEngine {
                 finishedAt: now,
                 updatedAt: now,
                 ...patch,
-            },
-            { expectStatus: ['running'] },
-        );
-        this.emit({ type: 'run.updated', run: updated });
+            };
+        if (settled.usage === undefined) delete settled.usage;
+        const updated = await this.ownedUpdate(id, settled);
+        if (updated) this.emit({ type: 'run.updated', run: updated });
         return updated;
+    }
+
+    /**
+     * Updates a `running` run only while this engine holds its claim. Resolves
+     * undefined (and aborts the execution) when another owner took it over.
+     */
+    protected async ownedUpdate(id: string, patch: Partial<Run>): Promise<Run | undefined> {
+        try {
+            return await this.store.updateRun(id, patch, { expectStatus: ['running'], expectOwner: this.owner });
+        } catch (error) {
+            if (error instanceof InvalidRunStateError && !await this.ownsRun(id)) return undefined;
+            throw error;
+        }
+    }
+
+    /** Whether this engine still holds the run's claim; aborts its execution when not. */
+    protected async ownsRun(id: string): Promise<boolean> {
+        const run = await this.store.getRun(id);
+        if (run?.claim?.owner === this.owner) return true;
+        this.loseLease(id);
+        return false;
+    }
+
+    /** Aborts the local execution of a run another owner may hold now; it writes nothing more. */
+    protected loseLease(id: string): void {
+        const execution = this.executions.get(id);
+        if (!execution) return;
+        execution.stop = 'lease-lost';
+        execution.controller.abort();
     }
 
     protected emit(event: RunEvent): void {

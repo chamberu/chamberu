@@ -245,6 +245,8 @@ describe('RunEngine.dispatch', () => {
             claimTtlMs: 300,
         });
         const blocker = await engine.dispatch(env({ concurrencyKey: 'c' }));
+        // running on another replica, which holds a live claim (recovery leaves it alone)
+        await store.claimRun(blocker.runId, 'elsewhere', 60_000);
         await store.updateRun(blocker.runId, { status: 'running' });
         await engine.start();
         const { runId } = await engine.dispatch(env({ concurrencyKey: 'c' }));
@@ -331,8 +333,8 @@ describe('RunEngine.dispatch', () => {
         clock.advance(100);
         await flush();
         await flush();
-        // one chain means one scheduling pass (and one approval expiry check) per poll tick
+        // one chain means one approval expiry check, one recovery and one scheduling pass per poll tick
         const statuses = list.mock.calls.map(([q]) => q.status?.join());
-        expect(statuses).toEqual(['waiting', 'queued']);
+        expect(statuses).toEqual(['waiting', 'running,interrupted', 'queued']);
     });
 });

@@ -52,12 +52,21 @@ export class MemoryStore implements Store {
         return run ? copy(run) : undefined;
     }
 
-    async updateRun(id: string, patch: Partial<Run>, opts: { expectStatus?: Run['status'][] } = {}): Promise<Run> {
+    async updateRun(
+        id: string,
+        patch: Partial<Run>,
+        opts: { expectStatus?: Run['status'][]; expectOwner?: string } = {},
+    ): Promise<Run> {
         const run = this.runs.get(id);
         if (!run) throw new RunNotFoundError(id);
         if (opts.expectStatus && !opts.expectStatus.includes(run.status)) {
             throw new InvalidRunStateError(
                 `Run "${id}" is "${run.status}", expected one of: ${opts.expectStatus.join(', ')}.`,
+            );
+        }
+        if (opts.expectOwner !== undefined && run.claim?.owner !== opts.expectOwner) {
+            throw new InvalidRunStateError(
+                `Run "${id}" is not claimed by "${opts.expectOwner}" (claim: ${run.claim?.owner ?? 'none'}).`,
             );
         }
         const next = {

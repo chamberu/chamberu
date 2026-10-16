@@ -16,8 +16,12 @@ import type {
 export interface RunStore {
     createRun(run: Run): Promise<void>;
     getRun(id: string): Promise<Run | undefined>;
-    /** Throws InvalidRunStateError when `expectStatus` does not match the current status. */
-    updateRun(id: string, patch: Partial<Run>, opts?: { expectStatus?: RunStatus[] }): Promise<Run>;
+    /**
+     * Throws InvalidRunStateError when `expectStatus` does not match the current
+     * status, or when `expectOwner` is given and the run's claim is absent or held
+     * by another owner (expiry is not checked: a lease is lost once taken over).
+     */
+    updateRun(id: string, patch: Partial<Run>, opts?: { expectStatus?: RunStatus[]; expectOwner?: string }): Promise<Run>;
     /** Ordered by createdAt ascending, ties broken by id ascending. `total` ignores limit/offset. */
     listRuns(q: {
         agent?: string;

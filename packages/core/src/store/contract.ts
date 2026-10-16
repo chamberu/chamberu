@@ -292,6 +292,31 @@ export function describeStoreContract(
             ).rejects.toBeInstanceOf(InvalidRunStateError);
         });
 
+        it('updateRun enforces expectOwner against the current claim', async () => {
+            const { store, clock } = await setup();
+            await store.createRun(makeRun('r1', { status: 'running' }));
+            await expect(
+                store.updateRun('r1', { status: 'completed' }, { expectOwner: 'w1' }),
+            ).rejects.toBeInstanceOf(InvalidRunStateError);
+            expect(await store.claimRun('r1', 'w1', 1_000)).toBe(true);
+            await expect(
+                store.updateRun('r1', { status: 'completed' }, { expectOwner: 'w2' }),
+            ).rejects.toBeInstanceOf(InvalidRunStateError);
+            clock.advance(1_001);
+            expect(await store.claimRun('r1', 'w2', 1_000)).toBe(true);
+            await expect(
+                store.updateRun('r1', { status: 'completed' }, { expectStatus: ['running'], expectOwner: 'w1' }),
+            ).rejects.toBeInstanceOf(InvalidRunStateError);
+            expect((await store.getRun('r1'))?.status).toBe('running');
+            const updated = await store.updateRun(
+                'r1',
+                { status: 'completed', claim: undefined },
+                { expectStatus: ['running'], expectOwner: 'w2' },
+            );
+            expect(updated.status).toBe('completed');
+            expect(updated.claim).toBeUndefined();
+        });
+
         it('updateRun preserves untouched fields and does not clobber claim', async () => {
             const { store } = await setup();
             await store.createRun(makeRun('r1', {
