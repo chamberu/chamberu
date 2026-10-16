@@ -282,13 +282,15 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
 
     /**
      * Runs a store write unless the execution was abandoned meanwhile or lost
-     * the run. `checkOwner: false` skips the ownership read for writes that are
-     * owner-conditional in the store already (ctx.update).
+     * the run. An abort alone does not stop it: a step that completed before a
+     * drain or cancel still lands whole (its tool rows and checkpoint), so a
+     * recovery does not re-run it. `checkOwner: false` skips the ownership read
+     * for writes that are owner-conditional in the store already (ctx.update).
      */
     const guarded = async (write: () => Promise<void>, { checkOwner = true } = {}): Promise<boolean> => {
-        if (abandoned || signal.aborted) return false;
+        if (abandoned) return false;
         if (checkOwner && ctx.ownsRun && !await ctx.ownsRun()) return false;
-        if (abandoned || signal.aborted) return false;
+        if (abandoned) return false;
         await write();
         return true;
     };
@@ -457,9 +459,13 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         work.catch(() => {});
         result = await untilAborted(work, signal);
     } catch (error) {
+        // the step-end writes in flight land completely before the run settles, never after
+        let settled: Promise<void>;
+        do {
+            settled = pendingStepEnd;
+            await settled;
+        } while (settled !== pendingStepEnd);
         abandoned = true;
-        // a store write already in flight lands before the run settles, never after
-        await pendingStepEnd;
         if (ctx.signal.aborted) {
             await ctx.finish({ status: 'cancelled', usage });
         } else if (timeout?.signal.aborted) {

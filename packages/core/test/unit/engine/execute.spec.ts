@@ -366,7 +366,7 @@ describe('executeRun', () => {
         expect(model.doGenerateCalls).toHaveLength(1);
     });
 
-    it.each(['appendStep', 'saveCheckpoint'] as const)('nothing is written after a cancel while %s is pending', async (method) => {
+    it.each(['appendStep', 'saveCheckpoint'] as const)('a cancel while %s is pending keeps the step whole and writes nothing after', async (method) => {
         const gate = new GatedStore(method);
         const { engine } = make({
             model: mockModel([toolTurn(), { parts: [{ type: 'text', text: 'late' }] }]),
@@ -395,14 +395,9 @@ describe('executeRun', () => {
         for (let i = 0; i < 10; i++) await flush();
 
         expect((await gate.getRun(runId))?.status).toBe('cancelled');
-        if (method === 'appendStep') {
-            // the pending llm step lands; the tool step and checkpoint are skipped
-            expect(steps).toEqual(['llm']);
-            expect(checkpoint).toBeUndefined();
-        } else {
-            expect(steps).toEqual(['llm', 'tool']);
-            expect(checkpoint?.stepIndex).toBe(0);
-        }
+        // the completed step lands with its tool row and checkpoint before the run settles
+        expect(steps).toEqual(['llm', 'tool']);
+        expect(checkpoint?.stepIndex).toBe(0);
         expect((await gate.listSteps(runId)).map((s) => s.kind)).toEqual(steps);
         expect((await gate.latestCheckpoint(runId))?.stepIndex).toBe(checkpoint?.stepIndex);
         expect(events.at(-1)).toBe('run:cancelled');

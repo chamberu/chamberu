@@ -293,6 +293,71 @@ describe('graceful drain', () => {
         expect(b.errors).toEqual([]);
     });
 
+    it('a drain landing during the step-end writes keeps the completed step, so recovery does not redo it', async () => {
+        const calls: LanguageModelV4CallOptions[] = [];
+        const model = new MockLanguageModelV4({
+            doGenerate: async (options) => {
+                if (options.abortSignal?.aborted) throw options.abortSignal.reason;
+                calls.push(options);
+                return mockModel([calls.length === 1 ? toolTurn : text('done')]).doGenerate(options);
+            },
+        });
+        const lookup = vi.fn(async () => 'found');
+        const tools = () => ({
+            lookup: tool({
+                inputSchema: z.object({ q: z.number() }),
+                execute: lookup,
+            }),
+        });
+        const { promise: held, resolve: release } = Promise.withResolvers<void>();
+        let holding = false;
+        const store = new MemoryStore();
+        const append = store.appendStep.bind(store);
+        vi.spyOn(store, 'appendStep').mockImplementation(async (step) => {
+            if (step.kind === 'llm' && step.index === 0) {
+                holding = true;
+                await held;
+            }
+            return append(step);
+        });
+        const clock = new ManualTimers();
+        const a = make(model, {
+            store,
+            tools,
+            owner: 'A',
+            clock,
+        });
+        await a.engine.start();
+        const { runId } = await a.engine.dispatch(env);
+        await vi.waitFor(() => expect(holding).toBe(true));
+
+        // the deadline passes while step 0 (tool already executed) is being written
+        const drained = a.engine.drain({ timeoutMs: 50 });
+        await flush();
+        clock.advance(50);
+        await flush();
+        release();
+        await drained;
+
+        expect((await store.getRun(runId))?.status).toBe('interrupted');
+        expect((await store.listSteps(runId)).map((step) => step.kind)).toEqual(['llm', 'tool']);
+        expect((await store.latestCheckpoint(runId))?.stepIndex).toBe(0);
+
+        const b = make(model, {
+            store,
+            tools,
+            owner: 'B',
+        });
+        await b.engine.start();
+        await b.engine.idle();
+        expect(await store.getRun(runId)).toMatchObject({ status: 'completed', output: 'done' });
+        // one model call per step: step 0 was not asked again, its tool ran once
+        expect(calls).toHaveLength(2);
+        expect(lookup).toHaveBeenCalledTimes(1);
+        expect(a.errors).toEqual([]);
+        expect(b.errors).toEqual([]);
+    });
+
     it('dispatch during drain stores queued run but does not start it', async () => {
         const clock = new ControllableClock();
         const { model, calls } = scripted([text('done')]);
