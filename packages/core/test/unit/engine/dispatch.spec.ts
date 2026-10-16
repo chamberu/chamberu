@@ -331,7 +331,8 @@ describe('RunEngine.dispatch', () => {
         clock.advance(100);
         await flush();
         await flush();
-        // one chain means one pass per poll tick
-        expect(list).toHaveBeenCalledTimes(1);
+        // one chain means one scheduling pass (and one approval expiry check) per poll tick
+        const statuses = list.mock.calls.map(([q]) => q.status?.join());
+        expect(statuses).toEqual(['waiting', 'queued']);
     });
 });

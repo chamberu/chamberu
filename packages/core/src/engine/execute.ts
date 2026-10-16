@@ -1,11 +1,15 @@
 import { ToolLoopAgent, isStepCount } from 'ai';
 import type {
     ModelMessage,
+    PrepareStepFunction,
     StepResult,
     StopCondition,
+    ToolApprovalRequestOutput,
+    ToolApprovalStatus,
+    ToolLoopAgentSettings,
     ToolSet,
 } from 'ai';
-import type { Agent } from '../agent/types.ts';
+import type { Agent, ApprovalPolicy } from '../agent/types.ts';
 import type { Clock } from '../clock.ts';
 import { wrapToolsForRun } from '../effect/wrap.ts';
 import { BudgetExceededError, FatalToolError } from '../errors.ts';
@@ -38,6 +42,20 @@ export interface ExecuteContext {
     /** Patches the still `running` run and emits `run.updated`. */
     update: (patch: Partial<Run>) => Promise<Run>;
     onStepAppended: (step: Step) => void;
+    /**
+     * Moves the still `running` run to `waiting` on `request` (releasing its
+     * claim and slot) and notifies the owner.
+     */
+    pause: (request: ApprovalRequest, usage: Usage) => Promise<void>;
+    /** HMAC secret the AI SDK signs approval requests with. */
+    toolApprovalSecret?: string;
+}
+
+/** A tool call waiting for the owner's decision. */
+export interface ApprovalRequest {
+    approvalId: string;
+    toolName: string;
+    input: unknown;
 }
 
 export function renderTrigger(envelope: TriggerEnvelope): string {
@@ -64,6 +82,76 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): Tool
     if (!factory) return {};
     const tools = factory({ state: createAgentState(ctx.store, ctx.agent.name), run: runContext });
     return wrapToolsForRun(tools, runContext, ctx.store);
+}
+
+function toApprovalStatus(decision: 'user' | 'allow' | 'deny'): ToolApprovalStatus {
+    if (decision === 'user') return 'user-approval';
+    if (decision === 'deny') return { type: 'denied' };
+    return undefined;
+}
+
+/** `def.approvals` as AI SDK toolApproval: 'user' asks the owner, a function decides per call. */
+export function toToolApproval(
+    approvals: Record<string, ApprovalPolicy> | undefined,
+    runContext: RunContext,
+): ToolLoopAgentSettings<never, ToolSet>['toolApproval'] {
+    if (!approvals) return undefined;
+    const config: Record<string, ToolApprovalStatus | ((input: unknown) => ToolApprovalStatus)> = {};
+    for (const [name, policy] of Object.entries(approvals)) {
+        config[name] = policy === 'user' ?
+            'user-approval' :
+            (input: unknown) => toApprovalStatus(policy(input, { runtimeContext: runContext }));
+    }
+    return config;
+}
+
+/**
+ * The first approval request in `messages` that has no response yet: the
+ * checkpoint of a run that paused (or was about to) on it.
+ */
+export function pendingApproval(messages: ModelMessage[]): ApprovalRequest | undefined {
+    const answered = new Set<string>();
+    const calls = new Map<string, { toolName: string; input: unknown }>();
+    for (const message of messages) {
+        if (typeof message.content === 'string') continue;
+        for (const part of message.content) {
+            if (part.type === 'tool-approval-response') answered.add(part.approvalId);
+            if (part.type === 'tool-call') calls.set(part.toolCallId, part);
+        }
+    }
+    for (const message of messages) {
+        if (message.role !== 'assistant' || typeof message.content === 'string') continue;
+        for (const part of message.content) {
+            if (part.type !== 'tool-approval-request' || answered.has(part.approvalId)) continue;
+            const call = calls.get(part.toolCallId);
+            if (call) {
+                return {
+                    approvalId: part.approvalId,
+                    toolName: call.toolName,
+                    input: call.input,
+                };
+            }
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Drops the tool calls (and their approval requests) of `toolCallIds` from
+ * assistant messages: one approval per pause, so the model sees only the
+ * answered call and requests the dropped ones again if it still needs them.
+ */
+function withoutToolCalls(messages: ModelMessage[], toolCallIds: Set<string>): ModelMessage[] {
+    return messages.map((message) => {
+        if (message.role !== 'assistant' || typeof message.content === 'string') return message;
+        return {
+            ...message,
+            content: message.content.filter((part) => !(
+                (part.type === 'tool-call' || part.type === 'tool-approval-request') &&
+                toolCallIds.has(part.toolCallId)
+            )),
+        };
+    });
 }
 
 /** Rejects with the abort reason as soon as `signal` aborts, even if `work` ignores the signal. */
@@ -108,6 +196,13 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     let stepIndex = checkpoint ? checkpoint.stepIndex + 1 : 0;
     let stepSeq = (await store.listSteps(run.id)).length;
 
+    // paused (or about to) on an approval nobody answered yet: wait again, without a model call
+    const unanswered = checkpoint ? pendingApproval(checkpoint.messages) : undefined;
+    if (unanswered) {
+        await ctx.pause(unanswered, usage);
+        return;
+    }
+
     const remainingSteps = budget.maxSteps - stepIndex;
     if (remainingSteps <= 0) {
         // the step limit was reached by an earlier execution that did not settle the run
@@ -135,6 +230,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     let abandoned = false;
     let pendingStepEnd: Promise<void> = Promise.resolve();
     let stepStartedAt = clock.now();
+    // the approval the last step asked for; the loop stops on it
+    let approval: ApprovalRequest | undefined;
 
     /** Runs a store write unless the execution was abandoned meanwhile. */
     const guarded = async (write: () => Promise<void>): Promise<boolean> => {
@@ -198,7 +295,22 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                     if (part.error instanceof FatalToolError) fatal ??= { error: part.error };
                 }
             }
-            responseMessages.push(...step.response.messages);
+            const requests = step.content.filter(
+                (part): part is ToolApprovalRequestOutput<ToolSet> => part.type === 'tool-approval-request' && !part.isAutomatic,
+            );
+            let { messages }: { messages: ModelMessage[] } = step.response;
+            const [first, ...others] = requests;
+            if (first) {
+                approval = {
+                    approvalId: first.approvalId,
+                    toolName: first.toolCall.toolName,
+                    input: first.toolCall.input,
+                };
+                if (others.length > 0) {
+                    messages = withoutToolCalls(messages, new Set(others.map((r) => r.toolCall.toolCallId)));
+                }
+            }
+            responseMessages.push(...messages);
             await guarded(() => store.saveCheckpoint({
                 runId: run.id,
                 stepIndex: stepIndex++,
@@ -217,6 +329,37 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         }
     };
 
+    /**
+     * Before the first model call: the tool messages the AI SDK produced from
+     * an approval response in `initial` (an approved call executed, or denied).
+     * They are no step's response messages, so they are recorded here.
+     */
+    const prepareStep: PrepareStepFunction<ToolSet> = async ({ stepNumber, responseMessages: initialResponses }) => {
+        if (stepNumber !== 0) return undefined;
+        const at = clock.now();
+        const calls = new Map<string, unknown>();
+        for (const message of initial) {
+            if (message.role !== 'assistant' || typeof message.content === 'string') continue;
+            for (const part of message.content) if (part.type === 'tool-call') calls.set(part.toolCallId, part.input);
+        }
+        for (const message of initialResponses) {
+            responseMessages.push(message);
+            if (message.role !== 'tool') continue;
+            for (const part of message.content) {
+                if (part.type !== 'tool-result') continue;
+                await append({
+                    kind: 'tool',
+                    name: part.toolName,
+                    input: calls.get(part.toolCallId),
+                    output: part.output,
+                    startedAt: stepStartedAt,
+                    finishedAt: at,
+                });
+            }
+        }
+        return undefined;
+    };
+
     const onStepEnd = (step: StepResult<ToolSet>): Promise<void> => {
         pendingStepEnd = handleStepEnd(step);
         return pendingStepEnd;
@@ -230,7 +373,10 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         model: agent.definition.model,
         instructions: agent.definition.instructions,
         tools: assembleTools(ctx, runContext),
+        toolApproval: toToolApproval(agent.definition.approvals, runContext),
+        experimental_toolApprovalSecret: ctx.toolApprovalSecret,
         stopWhen,
+        prepareStep,
         onStepEnd,
     });
 
@@ -274,6 +420,10 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     }
     if (ctx.signal.aborted) {
         await ctx.finish({ status: 'cancelled', usage });
+        return;
+    }
+    if (approval) {
+        await ctx.pause(approval, usage);
         return;
     }
 

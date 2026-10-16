@@ -38,6 +38,7 @@ export interface StepStore {
 }
 
 export interface CheckpointStore {
+    /** Keeps the highest stepIndex; an equal stepIndex replaces (approval responses are appended that way). */
     saveCheckpoint(cp: Checkpoint): Promise<void>;
     latestCheckpoint(runId: string): Promise<Checkpoint | undefined>;
 }

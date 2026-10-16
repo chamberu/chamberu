@@ -13,6 +13,8 @@ export interface RunQueueOptions {
     /** Called for every run mutation performed by the queue. */
     onRunUpdated: (run: Run) => void;
     onError: (error: unknown, run?: Run) => void;
+    /** Periodic work run before each poll pass (e.g. expiring approvals). */
+    onPoll?: () => Promise<void>;
 }
 
 const groupKey = (run: Pick<Run, 'agent' | 'concurrencyKey'>) => `${run.agent}\u0000${run.concurrencyKey}`;
@@ -43,16 +45,25 @@ export class RunQueue {
         this.opts = opts;
     }
 
-    /** Re-run scheduling every claimTtlMs/3, so runs unblocked elsewhere (other replicas) get picked up. */
+    /**
+     * Every claimTtlMs/3: run onPoll, then re-run scheduling, so runs unblocked
+     * elsewhere (other replicas) get picked up. idle() waits for a poll in progress.
+     */
     startPolling(): void {
         if (this.poll) return;
         const generation = ++this.pollGeneration;
         const tick = () => {
             this.poll = this.opts.clock.setTimeout(() => {
-                void this.pump().then(() => {
-                    // a stop() (and possibly a new start()) happened meanwhile: this chain is dead
-                    if (generation === this.pollGeneration) tick();
-                });
+                const work: Promise<void> = Promise.resolve()
+                    .then(() => this.opts.onPoll?.())
+                    .catch((error: unknown) => this.opts.onError(error))
+                    .then(() => this.pump())
+                    .finally(() => {
+                        this.inflight.delete(work);
+                        // a stop() (and possibly a new start()) happened meanwhile: this chain is dead
+                        if (generation === this.pollGeneration) tick();
+                    });
+                this.inflight.add(work);
             }, Math.max(1, Math.floor(this.opts.claimTtlMs / 3)));
         };
         tick();

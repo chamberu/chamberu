@@ -19,7 +19,12 @@ export interface AgentDefinition<S extends StateSchema = StateSchema> {
     /** Record<collection, StandardSchemaV1>. */
     state?: S;
     budget?: Partial<Budget>;
-    /** Tool name to policy (maps to AI SDK toolApproval). */
+    /**
+     * Tool name to policy (maps to AI SDK toolApproval). A call needing approval
+     * pauses the run in `waiting`; one approval per pause: when a step asks for
+     * several, the run waits on the first and the other calls are dropped from
+     * the history, so the model requests them again after the resume.
+     */
     approvals?: Record<string, ApprovalPolicy>;
     /** Default 24h; on timeout the call is denied. */
     approvalTimeoutMs?: number;

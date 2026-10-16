@@ -4,12 +4,24 @@ import { pid } from 'node:process';
 import { systemClock } from '../clock.ts';
 import type { Clock } from '../clock.ts';
 import type { Agent } from '../agent/types.ts';
-import { InvalidAgentDefinitionError, InvalidRunStateError, RunNotFoundError } from '../errors.ts';
+import { createResumeToken, verifyResumeToken } from '../approval/token.ts';
+import {
+    InvalidAgentDefinitionError,
+    InvalidResumeTokenError,
+    InvalidRunStateError,
+    RunNotFoundError,
+} from '../errors.ts';
 import type { Notifier } from '../notify/types.ts';
-import type { Run, Step } from '../run/types.ts';
+import type {
+    Run,
+    Step,
+    Usage,
+    WaitPoint,
+} from '../run/types.ts';
 import type { Store } from '../store/types.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 import { executeRun, toRunError } from './execute.ts';
+import type { ApprovalRequest } from './execute.ts';
 import { RunQueue } from './queue.ts';
 
 export type RunEvent = { type: 'run.updated'; run: Run } | { type: 'step.appended'; step: Step };
@@ -33,7 +45,14 @@ export interface RunEngineOptions {
 
 export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt'> & Partial<Pick<TriggerEnvelope, 'id' | 'receivedAt'>>;
 
+export interface ResumeDecision {
+    approved: boolean;
+    reason?: string;
+}
+
 const IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_APPROVAL_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+const APPROVAL_TIMED_OUT = 'approval timed out';
 
 export class RunEngine {
     protected readonly store: Store;
@@ -49,6 +68,8 @@ export class RunEngine {
     protected readonly resumeSecret: string;
 
     protected readonly queue: RunQueue;
+
+    protected readonly claimTtlMs: number;
 
     protected readonly listeners = new Set<(e: RunEvent) => void>();
 
@@ -68,6 +89,13 @@ export class RunEngine {
         this.owner = opts.owner ?? `${hostname()}-${pid}`;
         this.clock = opts.clock ?? systemClock;
         this.resumeSecret = opts.resumeSecret;
+        this.claimTtlMs = opts.claimTtlMs ?? 60_000;
+        for (const agent of opts.agents) {
+            const { notify } = agent.definition;
+            if (notify !== undefined && !this.notifiers[notify]) {
+                throw new InvalidAgentDefinitionError(`Agent "${agent.name}" uses unknown notifier "${notify}".`);
+            }
+        }
         // eslint-disable-next-line no-console
         this.onError = opts.onError ?? ((error) => console.error('[chamberu]', error));
         this.queue = new RunQueue({
@@ -75,10 +103,11 @@ export class RunEngine {
             clock: this.clock,
             owner: this.owner,
             maxConcurrentRuns: opts.maxConcurrentRuns ?? 4,
-            claimTtlMs: opts.claimTtlMs ?? 60_000,
+            claimTtlMs: this.claimTtlMs,
             execute: (run) => this.guardedExecute(run),
             onError: (error, run) => this.onError(error, run),
             onRunUpdated: (run) => this.emit({ type: 'run.updated', run }),
+            onPoll: () => this.tick(),
         });
     }
 
@@ -153,7 +182,7 @@ export class RunEngine {
 
     /**
      * Cancels a run: aborts it when it executes in this process (resolving once
-     * it settled), or marks a queued run cancelled.
+     * it settled), or marks a queued or waiting run cancelled.
      */
     async cancel(runId: string): Promise<void> {
         const execution = this.executions.get(runId);
@@ -164,7 +193,7 @@ export class RunEngine {
         }
         const run = await this.store.getRun(runId);
         if (!run) throw new RunNotFoundError(runId);
-        if (run.status !== 'queued') {
+        if (run.status !== 'queued' && run.status !== 'waiting') {
             throw new InvalidRunStateError(`Run "${runId}" is ${run.status} and not executing here; it cannot be cancelled.`);
         }
         const now = this.clock.now();
@@ -172,12 +201,166 @@ export class RunEngine {
             runId,
             {
                 status: 'cancelled',
+                waiting: undefined,
                 finishedAt: now,
                 updatedAt: now,
             },
-            { expectStatus: ['queued'] },
+            { expectStatus: ['queued', 'waiting'] },
         );
         this.emit({ type: 'run.updated', run: updated });
+    }
+
+    /**
+     * Answers the approval a `waiting` run waits on and requeues it. Single
+     * use: a second resume of the same wait point throws InvalidRunStateError.
+     * Throws InvalidResumeTokenError for a forged, expired or superseded token.
+     */
+    async resume(token: string, decision: ResumeDecision): Promise<void> {
+        const claims = verifyResumeToken(this.resumeSecret, token, this.clock.now());
+        const run = await this.store.getRun(claims.runId);
+        if (!run) throw new RunNotFoundError(claims.runId);
+        if (run.status !== 'waiting' || !run.waiting) {
+            throw new InvalidRunStateError(`Run "${run.id}" is ${run.status} and not waiting for an approval.`);
+        }
+        if (run.waiting.tokenId !== claims.tokenId || run.waiting.approvalId !== claims.approvalId) {
+            throw new InvalidResumeTokenError('The resume token does not belong to the current approval.');
+        }
+        await this.answer(run, run.waiting, decision);
+    }
+
+    /** Denies every approval past its expiresAt ('approval timed out'). Also runs on every poll. */
+    async tick(): Promise<void> {
+        const now = this.clock.now().getTime();
+        const { data } = await this.store.listRuns({ status: ['waiting'] });
+        for (const run of data) {
+            if (!run.waiting || run.waiting.expiresAt.getTime() > now) continue;
+            try {
+                await this.answer(run, run.waiting, { approved: false, reason: APPROVAL_TIMED_OUT });
+            } catch (error) {
+                // answered meanwhile (resume, another replica)
+                if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
+            }
+        }
+    }
+
+    /**
+     * waiting → queued, then the approval response is checkpointed. The
+     * transition comes first and is guarded by expectStatus, so only one answer
+     * ever writes; the run stays claimed by us until the checkpoint landed, so no
+     * pass executes it from the unanswered checkpoint.
+     */
+    protected async answer(run: Run, waiting: WaitPoint, decision: ResumeDecision): Promise<void> {
+        const now = this.clock.now();
+        await this.store.updateRun(run.id, {
+            status: 'queued',
+            waiting: undefined,
+            claim: { owner: this.owner, expiresAt: new Date(now.getTime() + this.claimTtlMs) },
+            updatedAt: now,
+        }, { expectStatus: ['waiting'] });
+
+        let queued: Run;
+        try {
+            const checkpoint = await this.store.latestCheckpoint(run.id);
+            if (!checkpoint) throw new InvalidRunStateError(`Run "${run.id}" has no checkpoint to resume from.`);
+            await this.store.saveCheckpoint({
+                ...checkpoint,
+                messages: [
+                    ...checkpoint.messages,
+                    {
+                        role: 'tool',
+                        content: [{
+                            type: 'tool-approval-response',
+                            approvalId: waiting.approvalId,
+                            approved: decision.approved,
+                            reason: decision.reason,
+                        }],
+                    },
+                ],
+                createdAt: now,
+            });
+            const step: Step = {
+                runId: run.id,
+                index: (await this.store.listSteps(run.id)).length,
+                kind: 'wait',
+                name: waiting.toolName,
+                input: waiting.input,
+                output: {
+                    approvalId: waiting.approvalId,
+                    approved: decision.approved,
+                    reason: decision.reason,
+                },
+                startedAt: run.updatedAt,
+                finishedAt: now,
+            };
+            await this.store.appendStep(step);
+            this.emit({ type: 'step.appended', step });
+            queued = await this.store.updateRun(run.id, { claim: undefined, updatedAt: this.clock.now() }, { expectStatus: ['queued'] });
+        } catch (error) {
+            // undo, so the wait point (and its token) stays answerable
+            await this.store.updateRun(run.id, {
+                status: 'waiting',
+                waiting,
+                claim: undefined,
+                updatedAt: this.clock.now(),
+            }, { expectStatus: ['queued'] }).catch((undoError: unknown) => this.onError(undoError, run));
+            throw error;
+        }
+        this.emit({ type: 'run.updated', run: queued });
+        if (this.started) void this.queue.pump();
+    }
+
+    /**
+     * running → waiting on `request`, releasing claim and slot (a keyed run keeps
+     * its key blocked while waiting). Re-pausing on the same approval keeps the
+     * wait point, so tokens sent earlier stay valid; the owner is notified once.
+     */
+    protected async pause(run: Run, agent: Agent, request: ApprovalRequest, usage: Usage): Promise<void> {
+        const now = this.clock.now();
+        const waiting: WaitPoint = run.waiting?.approvalId === request.approvalId ?
+            run.waiting :
+            {
+                kind: 'approval',
+                ...request,
+                expiresAt: new Date(now.getTime() + (agent.definition.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS)),
+                tokenId: randomUUID(),
+            };
+        const updated = await this.store.updateRun(run.id, {
+            status: 'waiting',
+            waiting,
+            usage,
+            claim: undefined,
+            updatedAt: now,
+        }, { expectStatus: ['running'] });
+        this.emit({ type: 'run.updated', run: updated });
+        await this.notifyApproval(updated, agent, waiting);
+    }
+
+    /** At most once per approval (store-deduped); failures go to onError, the run keeps waiting. */
+    protected async notifyApproval(run: Run, agent: Agent, waiting: WaitPoint): Promise<void> {
+        const name = agent.definition.notify;
+        const notifier = name === undefined ? undefined : this.notifiers[name];
+        if (!notifier) return;
+        const idempotencyKey = `${run.id}:${waiting.approvalId}`;
+        try {
+            const { created } = await this.store.claimKey('notify', idempotencyKey, run.id, IDEMPOTENCY_TTL_MS);
+            if (!created) return;
+            await notifier.notify({
+                kind: 'approval',
+                agent: run.agent,
+                runId: run.id,
+                title: `Approval required: ${waiting.toolName}`,
+                body: `Agent "${run.agent}" wants to call "${waiting.toolName}" with:\n${JSON.stringify(waiting.input, null, 2)}`,
+                resumeToken: createResumeToken(this.resumeSecret, {
+                    runId: run.id,
+                    approvalId: waiting.approvalId,
+                    tokenId: waiting.tokenId,
+                    expiresAt: waiting.expiresAt,
+                }),
+                expiresAt: waiting.expiresAt,
+            }, { idempotencyKey });
+        } catch (error) {
+            this.onError(error, run);
+        }
     }
 
     /**
@@ -200,6 +383,8 @@ export class RunEngine {
                 return updated;
             },
             onStepAppended: (step) => this.emit({ type: 'step.appended', step }),
+            pause: (request, usage) => this.pause(run, agent, request, usage),
+            toolApprovalSecret: this.resumeSecret,
         });
     }
 

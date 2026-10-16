@@ -126,6 +126,24 @@ export function describeStoreContract(
             expect((await store.latestCheckpoint('r1'))?.stepIndex).toBe(5);
         });
 
+        it('saveCheckpoint with an equal stepIndex replaces the latest', async () => {
+            const { store } = await setup();
+            const at = new Date(1_000);
+            await store.saveCheckpoint({
+                runId: 'r1',
+                stepIndex: 2,
+                messages: [],
+                createdAt: at,
+            });
+            await store.saveCheckpoint({
+                runId: 'r1',
+                stepIndex: 2,
+                messages: [{ role: 'user', content: 'again' }],
+                createdAt: at,
+            });
+            expect((await store.latestCheckpoint('r1'))?.messages).toEqual([{ role: 'user', content: 'again' }]);
+        });
+
         it('lock acquire is exclusive and released by owner only', async () => {
             const { store } = await setup();
             expect(await store.acquire('k', 'a', 1_000)).toBe(true);
