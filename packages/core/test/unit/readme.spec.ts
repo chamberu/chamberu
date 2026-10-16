@@ -1,0 +1,33 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { triageIssue } from '../fixtures/readme-example.ts';
+import { mockModel } from '../utils/mock-model.ts';
+
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+
+describe('README example', () => {
+    it('is the code of test/fixtures/readme-example.ts', () => {
+        const readme = read('../../README.md');
+        const blocks = readme.matchAll(/```typescript\n([\s\S]*?)```/g).map((m) => m[1]).toArray();
+        expect(blocks).toContain(read('../fixtures/readme-example.ts'));
+    });
+
+    it('runs the triage agent to completion', async () => {
+        const model = mockModel([
+            {
+                parts: [{
+                    type: 'tool-call',
+                    toolName: 'addLabel',
+                    input: { label: 'bug' },
+                }],
+            },
+            { parts: [{ type: 'text', text: 'Labelled as bug.' }] },
+        ]);
+
+        const { run, labels } = await triageIssue(model);
+
+        expect(run?.status).toBe('completed');
+        expect(run?.output).toBe('Labelled as bug.');
+        expect(labels).toEqual(['bug']);
+    });
+});

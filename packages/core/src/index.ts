@@ -20,3 +20,7 @@ export type * from './notify/types.ts';
 export { EFFECT, defineEffectTool, effectMarker } from './effect/define.ts';
 export type { EffectTool } from './effect/define.ts';
 export { wrapToolsForRun } from './effect/wrap.ts';
+export { MemoryStore } from './store/memory.ts';
+export type * from './store/types.ts';
+export { systemClock } from './clock.ts';
+export type { Clock, ClockTimerOptions } from './clock.ts';
