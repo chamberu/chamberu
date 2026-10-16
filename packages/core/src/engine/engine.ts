@@ -379,12 +379,21 @@ export class RunEngine {
         await this.answer(run, run.waiting, decision);
     }
 
-    /** Denies every approval past its expiresAt ('approval timed out'). Also runs on every poll. */
+    /**
+     * Denies every approval past its expiresAt ('approval timed out') and
+     * re-sends the notification of every other approval not delivered yet
+     * (a failed send, or a crash mid-send). Also runs on every poll.
+     */
     async tick(): Promise<void> {
         const now = this.clock.now().getTime();
         const { data } = await this.store.listRuns({ status: ['waiting'] });
         for (const listed of data) {
-            if (!listed.waiting || listed.waiting.expiresAt.getTime() > now) continue;
+            if (!listed.waiting) continue;
+            if (listed.waiting.expiresAt.getTime() > now) {
+                const agent = this.agents.get(listed.agent);
+                if (!listed.waiting.notifiedAt && agent) await this.notifyApproval(listed, agent, listed.waiting);
+                continue;
+            }
             try {
                 // the listing may be stale by now: the run could wait on a newer approval
                 const run = await this.store.getRun(listed.id);
@@ -510,9 +519,12 @@ export class RunEngine {
     }
 
     /**
-     * Once per approval after a successful send (deduped by a store lock held
-     * for the idempotency TTL). A failed send releases the lock, so the next
-     * re-pause retries; failures go to onError, the run keeps waiting.
+     * Sends the approval notification unless it was delivered already: a
+     * successful send records `waiting.notifiedAt`. A store lock (held for one
+     * attempt, at most claimTtlMs) keeps replicas from sending concurrently;
+     * the notifier's idempotencyKey dedupes a send whose record was lost. A
+     * failed or crashed attempt goes to onError and is retried by tick() on the
+     * next poll; the run keeps waiting.
      */
     protected async notifyApproval(run: Run, agent: Agent, waiting: WaitPoint): Promise<void> {
         const name = agent.definition.notify;
@@ -522,9 +534,14 @@ export class RunEngine {
         const lockKey = `notify:${idempotencyKey}`;
         const attempt = randomUUID();
         let acquired = false;
+        const isCurrent = (current: Run | undefined) => current?.status === 'waiting' &&
+            current.waiting?.tokenId === waiting.tokenId;
         try {
-            acquired = await this.store.acquire(lockKey, attempt, IDEMPOTENCY_TTL_MS);
+            acquired = await this.store.acquire(lockKey, attempt, this.claimTtlMs);
             if (!acquired) return;
+            // another attempt may have delivered it since `run` was read
+            const current = await this.store.getRun(run.id);
+            if (!isCurrent(current) || current?.waiting?.notifiedAt) return;
             await notifier.notify({
                 kind: 'approval',
                 agent: run.agent,
@@ -539,8 +556,17 @@ export class RunEngine {
                 }),
                 expiresAt: waiting.expiresAt,
             }, { idempotencyKey });
+            // answered meanwhile: nothing left to record
+            if (!isCurrent(await this.store.getRun(run.id))) return;
+            const notified = await this.store.updateRun(
+                run.id,
+                { waiting: { ...waiting, notifiedAt: this.clock.now() } },
+                { expectStatus: ['waiting'] },
+            );
+            this.emit({ type: 'run.updated', run: notified });
         } catch (error) {
-            this.onError(error, run);
+            if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
+        } finally {
             if (acquired) {
                 await this.store.release(lockKey, attempt).catch((releaseError: unknown) => this.onError(releaseError, run));
             }

@@ -32,6 +32,8 @@ export interface WaitPoint {
     input: unknown;
     expiresAt: Date;
     tokenId: string;
+    /** Set once the agent's notifier accepted the approval request; tick() re-sends until then. */
+    notifiedAt?: Date;
 }
 
 export interface Run {

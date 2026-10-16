@@ -571,25 +571,52 @@ describe('approvals', () => {
         expect((await ctx.store.getRun(runId))?.status).toBe('completed');
     });
 
-    it('a failing notifier is reported, the run still waits and a later re-pause notifies again', async () => {
+    it('a failing notifier is reported, the run still waits and the next poll notifies again', async () => {
         const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
         ctx.notifier.fail = true;
         const { runId, run } = await dispatchToWaiting(ctx);
         expect(run?.status).toBe('waiting');
+        expect(run?.waiting?.notifiedAt).toBeUndefined();
         expect(ctx.notifier.calls).toHaveLength(1);
         expect(ctx.errors).toHaveLength(1);
         expect(String(ctx.errors[0])).toContain('notifier down');
 
-        // the failed send did not use up the approval's notification
+        // the failed send did not use up the approval's notification: tick() retries it
         ctx.notifier.fail = false;
-        for (let i = 0; i < 2; i++) {
-            await ctx.store.updateRun(runId, { status: 'queued' }, { expectStatus: ['waiting'] });
-            await poll(ctx);
-        }
+        await poll(ctx);
         expect(ctx.notifier.calls).toHaveLength(2);
         expect(ctx.notifier.calls[1]!.opts).toEqual(ctx.notifier.calls[0]!.opts);
         expect(ctx.notifier.calls[1]!.n.resumeToken).toBe(tokenOf(ctx));
+        expect((await ctx.store.getRun(runId))?.waiting?.notifiedAt).toBeInstanceOf(Date);
+
+        // delivered: neither later polls nor a re-pause send it again
+        await poll(ctx);
+        await ctx.store.updateRun(runId, { status: 'queued' }, { expectStatus: ['waiting'] });
+        await poll(ctx);
+        expect((await ctx.store.getRun(runId))?.status).toBe('waiting');
+        expect(ctx.notifier.calls).toHaveLength(2);
         expect(ctx.errors).toHaveLength(1);
+
+        await ctx.engine.resume(tokenOf(ctx, 1), { approved: true });
+        await ctx.engine.idle();
+        expect((await ctx.store.getRun(runId))?.status).toBe('completed');
+    });
+
+    it('a send cut off by a crash is retried once its attempt lock expires', async () => {
+        const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
+        ctx.notifier.fail = true;
+        // the crashed process never released its attempt lock
+        vi.spyOn(ctx.store, 'release').mockResolvedValueOnce(undefined);
+        const { runId } = await dispatchToWaiting(ctx);
+        expect(ctx.notifier.calls).toHaveLength(1);
+        ctx.notifier.fail = false;
+
+        // the lock lives for one attempt (claimTtlMs = 30), not for the idempotency TTL
+        await poll(ctx, 10);
+        expect(ctx.notifier.calls).toHaveLength(1);
+        await poll(ctx, 30);
+        expect(ctx.notifier.calls).toHaveLength(2);
+        expect((await ctx.store.getRun(runId))?.waiting?.notifiedAt).toBeInstanceOf(Date);
 
         await ctx.engine.resume(tokenOf(ctx, 1), { approved: true });
         await ctx.engine.idle();

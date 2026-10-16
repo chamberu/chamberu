@@ -54,10 +54,10 @@ running with an expired claim (crash) -> queued (recover) -> running
 ## Approvals
 
 - A tool call needing approval ends the step; the first unanswered `tool-approval-request` becomes the run's `WaitPoint` (`approvalId`, `toolName`, `input`, `expiresAt`, `tokenId`). Other approval requests from the same step are dropped from the history; the model asks again after the resume (one approval per pause).
-- `running -> waiting` releases claim and slot (a keyed run keeps its key blocked). The notifier named by the agent gets one `approval` notification per wait point (deduped by a store lock), carrying a resume token.
+- `running -> waiting` releases claim and slot (a keyed run keeps its key blocked). The notifier named by the agent gets one `approval` notification per wait point, carrying a resume token; a successful send records `waiting.notifiedAt`. `tick()` re-sends on every poll while `notifiedAt` is missing (a failed send, or a crash mid-send); a store lock `notify:<run>:<approval>` held for one attempt (at most `claimTtlMs`) keeps replicas from sending concurrently, and the notifier's `idempotencyKey` (`<run>:<approval>`) dedupes a send whose record was lost.
 - Resume token: `base64url(JSON { runId, approvalId, tokenId, exp }) + '.' + base64url(HMAC-SHA256(resumeSecret, payload))`, compared in constant time.
 - `resume(token, decision)` verifies the token against the current wait point, moves `waiting -> queued` (guarded by `expectStatus`, so only one answer writes), appends the `tool-approval-response` to the checkpoint and a `wait` step, then clears `waiting`. A failure undoes back to `waiting`, so the token stays valid; a crash in between re-pauses on the same wait point.
-- `tick()` denies approvals past `expiresAt` with reason `approval timed out` (default `approvalTimeoutMs` 24 h). A resumed approval gets one step beyond `maxSteps`, so an approval on the last step is still answered.
+- `tick()` also denies approvals past `expiresAt` with reason `approval timed out` (default `approvalTimeoutMs` 24 h). A resumed approval gets one step beyond `maxSteps`, so an approval on the last step is still answered.
 
 ## Store Contract
 
