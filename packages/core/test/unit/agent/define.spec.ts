@@ -1,11 +1,17 @@
 import type { LanguageModel } from 'ai';
-import { describe, expect, it } from 'vitest';
+import {
+    describe,
+    expect,
+    expectTypeOf,
+    it,
+} from 'vitest';
 import { 
     InvalidAgentDefinitionError, 
     cron, 
     defineAgent, 
     manual, 
 } from '@chamberu/core';
+import type { AgentDefinition, TriggerDefinition } from '@chamberu/core';
 
 const model = {} as LanguageModel;
 const base = { model, instructions: 'do things' };
@@ -53,5 +59,23 @@ describe('defineAgent', () => {
             name: 'a',
             triggers: [cron('*/5 * * * *'), manual()],
         })).not.toThrow();
+    });
+
+    it('accepts a trigger typed by its payload', () => {
+        const webhook: TriggerDefinition<{ repo: string }> = {
+            source: 'github',
+            id: 'github:issues',
+            options: {},
+            concurrencyKey: (payload) => payload.repo,
+            idempotencyKey: (payload) => `${payload.repo}:1`,
+        };
+        expectTypeOf(webhook).toExtend<TriggerDefinition>();
+        const agent = defineAgent({
+            ...base,
+            name: 'a',
+            triggers: [webhook],
+        });
+        expectTypeOf(agent.definition.triggers).toEqualTypeOf<AgentDefinition['triggers']>();
+        expect(agent.definition.triggers?.[0]?.concurrencyKey?.({ repo: 'o/r' })).toBe('o/r');
     });
 });

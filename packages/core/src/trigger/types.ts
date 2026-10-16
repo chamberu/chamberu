@@ -9,8 +9,9 @@ export interface TriggerDefinition<P = unknown> {
     id: string;
     /** Source-specific (cron: { expression, timezone?, overlap }). */
     options: Record<string, unknown>;
-    concurrencyKey?: (payload: P) => string | undefined;
-    idempotencyKey?: (payload: P) => string | undefined;
+    // method signatures (bivariant): a TriggerDefinition<P> fits AgentDefinition.triggers
+    concurrencyKey?(payload: P): string | undefined;
+    idempotencyKey?(payload: P): string | undefined;
 }
 
 export interface TriggerEnvelope<P = unknown> {
