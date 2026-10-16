@@ -17,7 +17,17 @@ export class InvalidResumeTokenError extends ChamberuError {
 
 export class BudgetExceededError extends ChamberuError {
     constructor(message = 'The run budget was exceeded.') {
-        super({ message, code: 'budget_exceeded' });
+        super({ message, code: 'BudgetExceeded' });
+    }
+}
+
+/**
+ * Thrown from a tool's execute to fail the whole run. Any other tool error is
+ * fed back to the model as a tool-error result.
+ */
+export class FatalToolError extends ChamberuError {
+    constructor(message: string, code = 'FatalToolError') {
+        super({ message, code });
     }
 }
 

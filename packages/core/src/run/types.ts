@@ -11,6 +11,10 @@ export interface Usage {
 export interface Budget {
     maxSteps: number;
     maxTokens?: number;
+    /**
+     * Wall-clock limit per execution (not cumulative across resumes): each
+     * execution of the run gets the full timeout again.
+     */
     timeoutMs?: number;
 }
 
@@ -64,5 +68,7 @@ export interface Checkpoint {
     runId: string;
     stepIndex: number;
     messages: ModelMessage[];
+    /** AI SDK finish reason of the step this checkpoint was taken after. */
+    finishReason?: string;
     createdAt: Date;
 }

@@ -194,6 +194,11 @@ export class RunEngine {
             clock: this.clock,
             signal,
             finish: (patch) => this.finish(run.id, patch),
+            update: async (patch) => {
+                const updated = await this.store.updateRun(run.id, patch, { expectStatus: ['running'] });
+                this.emit({ type: 'run.updated', run: updated });
+                return updated;
+            },
             onStepAppended: (step) => this.emit({ type: 'step.appended', step }),
         });
     }

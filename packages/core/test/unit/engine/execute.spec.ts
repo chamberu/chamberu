@@ -10,7 +10,7 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { RunEngine, defineAgent } from '@chamberu/core';
+import { FatalToolError, RunEngine, defineAgent } from '@chamberu/core';
 import type { Budget, RunEngineOptions } from '@chamberu/core';
 import { ControllableClock } from '../../../src/clock.ts';
 import { MemoryStore } from '../../../src/store/memory.ts';
@@ -18,6 +18,42 @@ import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
 const engines: RunEngine[] = [];
+
+/** Lets already-queued microtasks settle; not a sleep. */
+const flush = () => new Promise<void>((resolve) => { setImmediate(resolve); });
+
+/** Holds the first call of `method` until `pending` is called. */
+class GatedStore extends MemoryStore {
+    pending: (() => void) | undefined;
+
+    /** Completed checkpoint writes are logged here, to order them against events. */
+    log: string[] = [];
+
+    protected gated = false;
+
+    constructor(protected readonly method: 'appendStep' | 'saveCheckpoint') {
+        super();
+    }
+
+    protected async gate(): Promise<void> {
+        if (this.gated) return;
+        this.gated = true;
+        await new Promise<void>((resolve) => {
+            this.pending = resolve;
+        });
+    }
+
+    override async appendStep(...args: Parameters<MemoryStore['appendStep']>) {
+        if (this.method === 'appendStep') await this.gate();
+        return super.appendStep(...args);
+    }
+
+    override async saveCheckpoint(...args: Parameters<MemoryStore['saveCheckpoint']>) {
+        if (this.method === 'saveCheckpoint') await this.gate();
+        await super.saveCheckpoint(...args);
+        this.log.push('checkpoint');
+    }
+}
 
 afterEach(() => {
     for (const e of engines) e.stop();
@@ -101,7 +137,11 @@ const budget = (b: Partial<Budget>) => b;
 
 describe('executeRun', () => {
     it('completed run stores output and usage', async () => {
-        const { run } = await runOnce({
+        const {
+            run,
+            store,
+            runId,
+        } = await runOnce({
             model: mockModel([
                 { ...toolTurn(), usage: { inputTokens: 3, outputTokens: 4 } },
                 { parts: [{ type: 'text', text: 'done' }], usage: { inputTokens: 5, outputTokens: 6 } },
@@ -113,6 +153,29 @@ describe('executeRun', () => {
         expect(run?.usage).toEqual({ inputTokens: 8, outputTokens: 10 });
         expect(run?.error).toBeUndefined();
         expect(run?.claim).toBeUndefined();
+        expect(await store.latestCheckpoint(runId)).toMatchObject({ stepIndex: 1, finishReason: 'stop' });
+    });
+
+    it('usage is persisted after every step', async () => {
+        const { engine } = make({
+            model: mockModel([
+                { ...toolTurn(), usage: { inputTokens: 3, outputTokens: 4 } },
+                { parts: [{ type: 'text', text: 'done' }], usage: { inputTokens: 5, outputTokens: 6 } },
+            ]),
+            tools: () => ({ lookup: lookup() }),
+        });
+        const running: unknown[] = [];
+        engine.on('run.updated', (e) => {
+            if (e.type === 'run.updated' && e.run.status === 'running') running.push(e.run.usage);
+        });
+        await engine.start();
+        await engine.dispatch(env);
+        await engine.idle();
+        expect(running).toEqual([
+            { inputTokens: 0, outputTokens: 0 },
+            { inputTokens: 3, outputTokens: 4 },
+            { inputTokens: 8, outputTokens: 10 },
+        ]);
     });
 
     it('starts from a user message rendering the trigger', async () => {
@@ -266,24 +329,111 @@ describe('executeRun', () => {
         await expect(engine.cancel(runId)).rejects.toMatchObject({ code: 'invalid_run_state' });
     });
 
-    it('tool error marks run failed', async () => {
+    it('tool error is fed back to the model', async () => {
+        const model = mockModel([toolTurn(), { parts: [{ type: 'text', text: 'recovered' }] }]);
         const {
             run,
             store,
             runId,
         } = await runOnce({
-            model: mockModel([toolTurn()]),
+            model,
             tools: () => ({
                 lookup: lookup(async () => {
                     throw Object.assign(new Error('kaput'), { code: 'tool_broke' });
                 }),
             }),
         });
-        expect(run?.status).toBe('failed');
-        expect(run?.error).toEqual({ code: 'tool_broke', message: 'kaput' });
+        expect(run?.status).toBe('completed');
+        expect(run?.output).toBe('recovered');
+        expect(JSON.stringify(model.doGenerateCalls[1]?.prompt)).toContain('kaput');
         const steps = await store.listSteps(runId);
-        expect(steps.map((s) => s.kind)).toEqual(['llm', 'tool']);
-        expect(steps[1]?.error).toBeDefined();
+        expect(steps.map((s) => s.kind)).toEqual(['llm', 'tool', 'llm']);
+        expect(steps[1]?.error).toEqual({ code: 'tool_broke', message: 'kaput' });
+    });
+
+    it('FatalToolError marks run failed', async () => {
+        const model = mockModel([toolTurn(), { parts: [{ type: 'text', text: 'never' }] }]);
+        const { run } = await runOnce({
+            model,
+            tools: () => ({
+                lookup: lookup(async () => {
+                    throw new FatalToolError('repository gone', 'RepoGone');
+                }),
+            }),
+        });
+        expect(run?.status).toBe('failed');
+        expect(run?.error).toEqual({ code: 'RepoGone', message: 'repository gone' });
+        expect(model.doGenerateCalls).toHaveLength(1);
+    });
+
+    it.each(['appendStep', 'saveCheckpoint'] as const)('nothing is written after a cancel while %s is pending', async (method) => {
+        const gate = new GatedStore(method);
+        const { engine } = make({
+            model: mockModel([toolTurn(), { parts: [{ type: 'text', text: 'late' }] }]),
+            tools: () => ({ lookup: lookup() }),
+        }, { store: gate });
+        const events = gate.log;
+        engine.on('run.updated', (e) => {
+            if (e.type === 'run.updated') events.push(`run:${e.run.status}`);
+        });
+        engine.on('step.appended', (e) => {
+            if (e.type === 'step.appended') events.push(`step:${e.step.kind}`);
+        });
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await vi.waitFor(() => expect(gate.pending).toBeDefined());
+
+        const cancelled = engine.cancel(runId);
+        await flush();
+        gate.pending?.();
+        await cancelled;
+        await engine.idle();
+
+        const steps = (await gate.listSteps(runId)).map((s) => s.kind);
+        const checkpoint = await gate.latestCheckpoint(runId);
+        // let the abandoned generate run on
+        for (let i = 0; i < 10; i++) await flush();
+
+        expect((await gate.getRun(runId))?.status).toBe('cancelled');
+        if (method === 'appendStep') {
+            // the pending llm step lands; the tool step and checkpoint are skipped
+            expect(steps).toEqual(['llm']);
+            expect(checkpoint).toBeUndefined();
+        } else {
+            expect(steps).toEqual(['llm', 'tool']);
+            expect(checkpoint?.stepIndex).toBe(0);
+        }
+        expect((await gate.listSteps(runId)).map((s) => s.kind)).toEqual(steps);
+        expect((await gate.latestCheckpoint(runId))?.stepIndex).toBe(checkpoint?.stepIndex);
+        expect(events.at(-1)).toBe('run:cancelled');
+        expect(events.filter((e) => e === 'run:cancelled')).toHaveLength(1);
+    });
+
+    it.each([
+        ['stop', 'completed'],
+        ['tool-calls', 'failed'],
+    ])('resuming at the step limit after a %s step settles %s', async (finishReason, status) => {
+        const store = new MemoryStore();
+        const model = mockModel([]);
+        const { engine } = make({ model, budget: budget({ maxSteps: 2 }) }, { store });
+        const { runId } = await engine.dispatch(env);
+        await store.saveCheckpoint({
+            runId,
+            stepIndex: 1,
+            messages: [
+                { role: 'user', content: 'q' },
+                { role: 'assistant', content: [{ type: 'text', text: 'final answer' }] },
+            ],
+            finishReason,
+            createdAt: new Date(),
+        });
+        await engine.start();
+        await engine.idle();
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe(status);
+        if (status === 'completed') expect(run?.output).toBe('final answer');
+        else expect(run?.error?.code).toBe('BudgetExceeded');
+        expect(model.doGenerateCalls).toHaveLength(0);
     });
 
     it('model error marks run failed', async () => {

@@ -7,7 +7,9 @@ import type {
 } from 'ai';
 import type { Agent } from '../agent/types.ts';
 import type { Clock } from '../clock.ts';
+import { BudgetExceededError, FatalToolError } from '../errors.ts';
 import type {
+    Budget,
     Run,
     RunContext,
     Step,
@@ -32,6 +34,8 @@ export interface ExecuteContext {
     signal: AbortSignal;
     /** Settles the run (expects it `running`) and emits `run.updated`. */
     finish: (patch: Partial<Run>) => Promise<Run>;
+    /** Patches the still `running` run and emits `run.updated`. */
+    update: (patch: Partial<Run>) => Promise<Run>;
     onStepAppended: (step: Step) => void;
 }
 
@@ -70,6 +74,20 @@ function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
     });
 }
 
+/** Text of the last assistant message, '' when there is none. */
+function lastAssistantText(messages: ModelMessage[]): string {
+    const last = messages.findLast((m) => m.role === 'assistant');
+    if (!last) return '';
+    if (typeof last.content === 'string') return last.content;
+    return last.content.map((part) => (part.type === 'text' ? part.text : '')).join('');
+}
+
+function budgetExceeded(budget: Budget, kind: 'steps' | 'tokens'): BudgetExceededError {
+    return new BudgetExceededError(kind === 'steps' ?
+        `The run reached its ${budget.maxSteps} step limit.` :
+        `The run reached its ${budget.maxTokens} token limit.`);
+}
+
 /**
  * One execution of a claimed, `running` run: drives a ToolLoopAgent from the
  * latest checkpoint, checkpoints every step and settles the run.
@@ -90,7 +108,12 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
 
     const remainingSteps = budget.maxSteps - stepIndex;
     if (remainingSteps <= 0) {
-        await ctx.finish({ status: 'failed', error: { code: 'BudgetExceeded', message: `The run reached its ${budget.maxSteps} step limit.` } });
+        // the step limit was reached by an earlier execution that did not settle the run
+        if (checkpoint && checkpoint.finishReason !== 'tool-calls') {
+            await ctx.finish({ status: 'completed', output: lastAssistantText(checkpoint.messages) });
+        } else {
+            await ctx.finish({ status: 'failed', error: toRunError(budgetExceeded(budget, 'steps')) });
+        }
         return;
     }
 
@@ -106,32 +129,34 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const responseMessages: ModelMessage[] = [];
     // AI SDK swallows onStepEnd errors; a fatal one is kept here and stops the loop
     let fatal: { error: unknown } | undefined;
+    // set once the run settles on abort; a still running generate must not write anymore
+    let abandoned = false;
+    let pendingStepEnd: Promise<void> = Promise.resolve();
     let stepStartedAt = clock.now();
+
+    /** Runs a store write unless the execution was abandoned meanwhile. */
+    const guarded = async (write: () => Promise<void>): Promise<boolean> => {
+        if (abandoned || signal.aborted) return false;
+        await write();
+        return true;
+    };
 
     const append = async (step: Omit<Step, 'runId' | 'index'>) => {
         const full: Step = {
             ...step,
             runId: run.id,
-            index: stepSeq++,
+            index: stepSeq,
         };
-        await store.appendStep(full);
-        ctx.onStepAppended(full);
+        if (await guarded(() => store.appendStep(full))) {
+            stepSeq++;
+            ctx.onStepAppended(full);
+        }
     };
 
-    const onStepEnd = async (step: StepResult<ToolSet>) => {
+    const handleStepEnd = async (step: StepResult<ToolSet>) => {
         try {
-            if (signal.aborted) return;
             const finishedAt = clock.now();
             const tokens = stepTokens(step);
-            usage.inputTokens += tokens.inputTokens;
-            usage.outputTokens += tokens.outputTokens;
-            responseMessages.push(...step.response.messages);
-            await store.saveCheckpoint({
-                runId: run.id,
-                stepIndex: stepIndex++,
-                messages: [...initial, ...responseMessages],
-                createdAt: finishedAt,
-            });
             await append({
                 kind: 'llm',
                 name: step.model.modelId,
@@ -167,13 +192,32 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                         startedAt: stepStartedAt,
                         finishedAt,
                     });
-                    fatal ??= { error: part.error };
+                    // other tool errors go back to the model as tool-error results
+                    if (part.error instanceof FatalToolError) fatal ??= { error: part.error };
                 }
             }
+            responseMessages.push(...step.response.messages);
+            await guarded(() => store.saveCheckpoint({
+                runId: run.id,
+                stepIndex: stepIndex++,
+                messages: [...initial, ...responseMessages],
+                finishReason: step.finishReason,
+                createdAt: finishedAt,
+            }));
+            usage.inputTokens += tokens.inputTokens;
+            usage.outputTokens += tokens.outputTokens;
+            await guarded(async () => {
+                await ctx.update({ usage: { ...usage }, updatedAt: clock.now() });
+            });
             stepStartedAt = clock.now();
         } catch (error) {
             fatal ??= { error };
         }
+    };
+
+    const onStepEnd = (step: StepResult<ToolSet>): Promise<void> => {
+        pendingStepEnd = handleStepEnd(step);
+        return pendingStepEnd;
     };
 
     const stopWhen: StopCondition<ToolSet>[] = [isStepCount(remainingSteps), () => fatal !== undefined];
@@ -195,6 +239,9 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         work.catch(() => {});
         result = await untilAborted(work, signal);
     } catch (error) {
+        abandoned = true;
+        // a store write already in flight lands before the run settles, never after
+        await pendingStepEnd;
         if (ctx.signal.aborted) {
             await ctx.finish({ status: 'cancelled', usage });
         } else if (timeout?.signal.aborted) {
@@ -235,12 +282,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         await ctx.finish({
             status: 'failed',
             usage,
-            error: {
-                code: 'BudgetExceeded',
-                message: outOfSteps ?
-                    `The run reached its ${budget.maxSteps} step limit.` :
-                    `The run reached its ${budget.maxTokens} token limit.`,
-            },
+            error: toRunError(budgetExceeded(budget, outOfSteps ? 'steps' : 'tokens')),
         });
         return;
     }
