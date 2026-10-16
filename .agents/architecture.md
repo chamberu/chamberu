@@ -56,7 +56,7 @@ The store is a set of small interfaces combined as `Store`:
 | `EffectStore` | Step memoization and effect records keyed by `(runId, stepId)` / `effectKey` |
 | `StateStore` | Agent state (KV plus typed collections) that outlives runs |
 
-Implementations: `MemoryStore` (in `@chamberu/core`, dev and tests) and a planned TypeORM/Postgres store. `describeStoreContract()` is a shared test suite every implementation must pass. Redis is never required.
+Planned (not implemented yet): `MemoryStore` (in `@chamberu/core`, dev and tests) and a TypeORM/Postgres store. `describeStoreContract()` will be a shared test suite every implementation must pass. Redis is never required.
 
 ## Idempotency and Side Effects
 

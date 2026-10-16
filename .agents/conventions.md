@@ -22,7 +22,7 @@
 
 - After changes run `npm run build && npm run test && npm run typecheck && npm run lint`.
 - New package: add `packages/<name>` (copy `packages/core` layout), a path alias in the root `tsconfig.json`, an alias in its `test/vitest.config.ts`, and an entry in `release-please-config.json` and `.release-please-manifest.json`.
-- Errors extend `ChamberuError` (ebec).
+- Errors extend `ChamberuError` (ebec) (planned, not implemented yet).
 
 ## Commits
 
