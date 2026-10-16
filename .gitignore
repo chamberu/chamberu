@@ -1,2 +1,6 @@
 docs/superpowers/
 .agents/plans/
+node_modules
+dist
+coverage
+.nx
