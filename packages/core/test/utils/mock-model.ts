@@ -13,7 +13,7 @@ export type MockPart =    | { type: 'text'; text: string } |
         type: 'tool-call';
         toolName: string;
         input: unknown;
-        toolCallId?: string
+        toolCallId?: string;
     };
 
 export interface MockResponse {

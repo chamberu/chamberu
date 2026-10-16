@@ -18,7 +18,7 @@ export interface RunQueueOptions {
 const groupKey = (run: Pick<Run, 'agent' | 'concurrencyKey'>) => `${run.agent}\u0000${run.concurrencyKey}`;
 
 /**
- * Concurrency-aware scheduler: starts queued runs in FIFO order of createdA
+ * Concurrency-aware scheduler: starts queued runs in FIFO order of createdAt
  * when (a) a local slot is free, (b) no run of the same agent + concurrencyKey
  * is running or waiting (checked in the store, as replicas share it) and
  * (c) the run claim succeeds.
@@ -35,6 +35,8 @@ export class RunQueue {
 
     protected again = false;
 
+    protected pollGeneration = 0;
+
     protected poll: { clear(): void } | undefined;
 
     constructor(opts: RunQueueOptions) {
@@ -44,10 +46,12 @@ export class RunQueue {
     /** Re-run scheduling every claimTtlMs/3, so runs unblocked elsewhere (other replicas) get picked up. */
     startPolling(): void {
         if (this.poll) return;
+        const generation = ++this.pollGeneration;
         const tick = () => {
             this.poll = this.opts.clock.setTimeout(() => {
                 void this.pump().then(() => {
-                    if (this.poll) tick();
+                    // a stop() (and possibly a new start()) happened meanwhile: this chain is dead
+                    if (generation === this.pollGeneration) tick();
                 });
             }, Math.max(1, Math.floor(this.opts.claimTtlMs / 3)));
         };
@@ -55,6 +59,7 @@ export class RunQueue {
     }
 
     stopPolling(): void {
+        this.pollGeneration++;
         this.poll?.clear();
         this.poll = undefined;
     }
@@ -108,13 +113,15 @@ export class RunQueue {
         } = this.opts;
         if (run.concurrencyKey === undefined) return this.transition(run, undefined);
 
-        // keyed runs: check + claim + mark running must be atomic across replicas
+        // keyed runs: check + claim + mark running must be atomic across replicas.
+        // The lock TTL is claimTtlMs: a transition slower than that lets a second replica in.
         const lockKey = `concurrency:${run.agent}:${run.concurrencyKey}`;
         if (!await store.acquire(lockKey, owner, claimTtlMs)) return undefined;
         try {
             return await this.transition(run, groupKey(run));
         } finally {
-            await store.release(lockKey, owner);
+            // a failing release must not strand a run that already transitioned
+            await store.release(lockKey, owner).catch((error: unknown) => this.opts.onError(error, run));
         }
     }
 
@@ -136,7 +143,7 @@ export class RunQueue {
             if (total > 0) return undefined;
         }
         if (!await store.claimRun(run.id, owner, claimTtlMs)) return undefined;
-        // reserve the slot before the next await so concurrent passes cannot overshoo
+        // reserve the slot before the next await so concurrent passes cannot overshoot
         this.running.set(run.id, group);
         try {
             const now = clock.now();

@@ -7,6 +7,8 @@ export const systemClock: Clock = {
     now: () => new Date(),
     setTimeout: (fn, ms) => {
         const handle = setTimeout(fn, ms);
+        // never keep the process alive just for engine timers
+        handle.unref?.();
         return { clear: () => clearTimeout(handle) };
     },
 };

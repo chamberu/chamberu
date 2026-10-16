@@ -137,7 +137,7 @@ export class RunEngine {
         await this.queue.pump();
     }
 
-    /** Stops polling for new work; running runs finish. */
+    /** Stops the poll for newly runnable work only; dispatch and running runs are unaffected. */
     stop(): void {
         this.started = false;
         this.queue.stopPolling();

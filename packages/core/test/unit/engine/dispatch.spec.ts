@@ -298,4 +298,40 @@ describe('RunEngine.dispatch', () => {
         expect(await statusOf(engine, runId)).toBe('queued');
         expect(onError).toHaveBeenCalled();
     });
+
+    it('a throwing lock release does not strand the run', async () => {
+        const store = new MemoryStore();
+        const onError = vi.fn();
+        const { engine } = make({ store, onError });
+        vi.spyOn(store, 'release').mockRejectedValueOnce(new Error('release failed'));
+        await engine.start();
+        const { runId } = await engine.dispatch(env({ concurrencyKey: 'c' }));
+        await engine.release(runId);
+        await engine.idle();
+        expect(await statusOf(engine, runId)).toBe('completed');
+        expect(onError.mock.calls[0]?.[0]).toMatchObject({ message: 'release failed' });
+    });
+
+    it('stop() then start() keeps a single poll chain', async () => {
+        const clock = new ControllableClock();
+        const store = new MemoryStore({ clock });
+        const { engine } = make({
+            store,
+            clock,
+            claimTtlMs: 300,
+        });
+        const list = vi.spyOn(store, 'listRuns');
+        await engine.start();
+        // a poll pass is in flight when the engine is restarted
+        clock.advance(100);
+        engine.stop();
+        await engine.start();
+        await flush();
+        list.mockClear();
+        clock.advance(100);
+        await flush();
+        await flush();
+        // one chain means one pass per poll tick
+        expect(list).toHaveBeenCalledTimes(1);
+    });
 });
