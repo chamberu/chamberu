@@ -190,7 +190,7 @@ const engine = new RunEngine({
 await engine.resume(token, { approved: true });
 ```
 
-- A call that needs approval puts the run in `waiting` and frees its slot. The notifier receives the request once, with a resume token signed with `resumeSecret`.
+- A call that needs approval puts the run in `waiting` and frees its slot. The notifier receives the request once, with a resume token signed with `resumeSecret`; a failed send is retried on every poll until it is delivered.
 - A policy can also be a function that returns `'user'`, `'allow'` or `'deny'` per call.
 - A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
 - An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied, and the model sees the denial.
