@@ -226,7 +226,15 @@ export class RunEngine {
         const { data } = await this.store.listRuns({ status: ['running', 'interrupted'] });
         let requeued = 0;
         for (const run of data) {
-            if (this.executions.has(run.id)) continue;
+            const execution = this.executions.get(run.id);
+            if (execution) {
+                // cancel() was called on a replica that does not execute the run
+                if (run.cancelRequested) {
+                    execution.stop ??= 'cancel';
+                    execution.controller.abort();
+                }
+                continue;
+            }
             try {
                 // atomic: fails while another owner's claim is live
                 if (!await this.store.claimRun(run.id, this.owner, this.claimTtlMs)) continue;
@@ -290,9 +298,13 @@ export class RunEngine {
 
     /**
      * Cancels a run: aborts it when it executes in this process (resolving once
-     * it settled), or marks a queued or waiting run cancelled. Throws
-     * InvalidRunStateError when the local execution lost its lease meanwhile:
-     * the run was not cancelled and may execute on another owner now.
+     * it settled), or marks a queued or waiting run cancelled. A run `running`
+     * on another replica (or `interrupted`) gets `cancelRequested`: its owner
+     * aborts it on the next poll (within claimTtlMs / 3), and a recovered
+     * execution settles it cancelled without a model call. Throws
+     * InvalidRunStateError for a settled run, and when the local execution lost
+     * its lease meanwhile: the run was not cancelled and may execute on another
+     * owner now.
      */
     async cancel(runId: string): Promise<void> {
         const execution = this.executions.get(runId);
@@ -303,13 +315,38 @@ export class RunEngine {
             if (execution.stop === 'lease-lost') {
                 throw new InvalidRunStateError(`Run "${runId}" lost its claim while being cancelled; it is no longer executing here.`);
             }
+            // the abort cannot stop a pause that was already writing: cancel the run it left waiting
+            const run = await this.store.getRun(runId);
+            if (run?.status === 'waiting' || run?.status === 'queued') await this.cancelStored(runId, [run.status]);
             return;
         }
-        const run = await this.store.getRun(runId);
-        if (!run) throw new RunNotFoundError(runId);
-        if (run.status !== 'queued' && run.status !== 'waiting') {
-            throw new InvalidRunStateError(`Run "${runId}" is ${run.status} and not executing here; it cannot be cancelled.`);
+        for (let attempt = 0; ; attempt++) {
+            const run = await this.store.getRun(runId);
+            if (!run) throw new RunNotFoundError(runId);
+            const { status } = run;
+            if (status !== 'queued' && status !== 'waiting' && status !== 'running' && status !== 'interrupted') {
+                throw new InvalidRunStateError(`Run "${runId}" is ${status}; it cannot be cancelled.`);
+            }
+            try {
+                if (status === 'queued' || status === 'waiting') {
+                    await this.cancelStored(runId, [status]);
+                } else {
+                    const updated = await this.store.updateRun(runId, {
+                        cancelRequested: true,
+                        updatedAt: this.clock.now(),
+                    }, { expectStatus: [status] });
+                    this.emit({ type: 'run.updated', run: updated });
+                }
+                return;
+            } catch (error) {
+                // the run moved on since it was read (started, paused, settled): decide again
+                if (!(error instanceof InvalidRunStateError) || attempt >= 2) throw error;
+            }
         }
+    }
+
+    /** Settles a run nobody executes (`expectStatus`) as cancelled. */
+    protected async cancelStored(runId: string, expectStatus: Run['status'][]): Promise<void> {
         const now = this.clock.now();
         const updated = await this.store.updateRun(
             runId,
@@ -319,7 +356,7 @@ export class RunEngine {
                 finishedAt: now,
                 updatedAt: now,
             },
-            { expectStatus: ['queued', 'waiting'] },
+            { expectStatus },
         );
         this.emit({ type: 'run.updated', run: updated });
     }
@@ -462,6 +499,13 @@ export class RunEngine {
         });
         if (!updated) return;
         this.emit({ type: 'run.updated', run: updated });
+        // a cancel arrived while pausing (an abort cannot interrupt this write): settle, do not notify
+        if (updated.cancelRequested || this.executions.get(run.id)?.stop === 'cancel') {
+            await this.cancelStored(run.id, ['waiting']).catch((error: unknown) => {
+                if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
+            });
+            return;
+        }
         await this.notifyApproval(updated, agent, waiting);
     }
 
@@ -510,6 +554,11 @@ export class RunEngine {
     protected async execute(run: Run, signal: AbortSignal): Promise<void> {
         const agent = this.agents.get(run.agent);
         if (!agent) throw new InvalidAgentDefinitionError(`unknown agent: ${run.agent}`);
+        // cancel() asked for it while it ran elsewhere (or was interrupted)
+        if (run.cancelRequested) {
+            await this.finish(run.id, { status: 'cancelled' });
+            return;
+        }
         await executeRun({
             run,
             agent,

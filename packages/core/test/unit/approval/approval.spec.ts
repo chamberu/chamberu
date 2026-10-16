@@ -694,6 +694,33 @@ describe('approvals', () => {
         expect(ctx.executed).toEqual([]);
     });
 
+    it('a cancel racing the pause settles the run cancelled without notifying', async () => {
+        const ctx = setup({ model: mockModel([deployTurn()]) });
+        const { promise: gate, resolve: open } = Promise.withResolvers<void>();
+        let holding = false;
+        const update = ctx.store.updateRun.bind(ctx.store);
+        vi.spyOn(ctx.store, 'updateRun').mockImplementation(async (id, patch, opts) => {
+            if (patch.status === 'waiting') {
+                holding = true;
+                await gate;
+            }
+            return update(id, patch, opts);
+        });
+        await ctx.engine.start();
+        const { runId } = await ctx.engine.dispatch(env());
+        await vi.waitFor(() => expect(holding).toBe(true));
+
+        // the abort cannot interrupt the waiting write already in flight
+        const cancelled = ctx.engine.cancel(runId);
+        open();
+        await cancelled;
+        await ctx.engine.idle();
+
+        expect(await ctx.store.getRun(runId)).toMatchObject({ status: 'cancelled', waiting: undefined });
+        expect(ctx.notifier.calls).toHaveLength(0);
+        expect(ctx.errors).toEqual([]);
+    });
+
     it('resume of an unknown run fails', async () => {
         const ctx = setup({ model: mockModel([]) });
         const token = createResumeToken(SECRET, {

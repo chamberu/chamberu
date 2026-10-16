@@ -46,6 +46,11 @@ export interface Run {
     usage: Usage;
     waiting?: WaitPoint;
     claim?: { owner: string; expiresAt: Date };
+    /**
+     * Set by cancel() on a replica that does not execute the run: the owner
+     * aborts it on its next poll, and a later execution settles it cancelled.
+     */
+    cancelRequested?: boolean;
     createdAt: Date;
     updatedAt: Date;
     startedAt?: Date;

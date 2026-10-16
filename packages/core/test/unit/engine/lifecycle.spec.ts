@@ -569,6 +569,54 @@ describe('recovery', () => {
         expect(errors.every(isLeaseLost)).toBe(true);
     });
 
+    it('cancel on another replica stops a running run on its next poll', async () => {
+        const { model, calls } = scripted(['hang']);
+        const store = new MemoryStore();
+        const clock = new ManualTimers();
+        const a = make(model, {
+            store,
+            owner: 'A',
+            clock,
+            claimTtlMs: 900,
+        });
+        const b = make(model, { store, owner: 'B' });
+        await a.engine.start();
+        const { runId } = await a.engine.dispatch(env);
+        await vi.waitFor(() => expect(calls).toHaveLength(1));
+
+        await b.engine.cancel(runId);
+        expect(await store.getRun(runId)).toMatchObject({ status: 'running', cancelRequested: true });
+
+        clock.advance(300);
+        await flush();
+        await a.engine.idle();
+        const run = await store.getRun(runId);
+        expect(run).toMatchObject({ status: 'cancelled', claim: undefined });
+        expect(run?.finishedAt).toBeInstanceOf(Date);
+        expect(calls[0]?.abortSignal?.aborted).toBe(true);
+        expect(a.errors).toEqual([]);
+        expect(b.errors).toEqual([]);
+    });
+
+    it('a cancel requested for an interrupted run settles it on recovery without a model call', async () => {
+        const { model, calls } = scripted([text('never')]);
+        const {
+            engine,
+            store,
+            errors,
+        } = make(model);
+        await store.createRun(makeRun('r1', { status: 'interrupted' }));
+
+        await engine.cancel('r1');
+        expect(await store.getRun('r1')).toMatchObject({ status: 'interrupted', cancelRequested: true });
+        await engine.start();
+        await engine.idle();
+
+        expect((await store.getRun('r1'))?.status).toBe('cancelled');
+        expect(calls).toHaveLength(0);
+        expect(errors).toEqual([]);
+    });
+
     it('cancel throws when the execution loses its lease while being cancelled', async () => {
         const store = new TakeoverStore();
         const { model, calls } = scripted(['hang']);
