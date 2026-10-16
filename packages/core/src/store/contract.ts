@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ControllableClock } from '../clock.ts';
-import { InvalidRunStateError } from '../errors.ts';
-import type { Run } from '../run/types.ts';
+import { InvalidRunStateError, RunNotFoundError } from '../errors.ts';
+import type { Checkpoint, Run, Step } from '../run/types.ts';
 import type { Store } from './types.ts';
 
 function makeRun(id: string, overrides: Partial<Run> = {}): Run {
@@ -30,14 +30,12 @@ function makeRun(id: string, overrides: Partial<Run> = {}): Run {
  *
  * @param create Factory for a fresh, empty store. It MUST use the given clock for all
  *               TTL/expiry decisions (e.g. `(clock) => new MemoryStore({ clock })`).
- * @param opts.clock Optional clock to drive; a new ControllableClock is created per test otherwise.
  */
 export function describeStoreContract(
     create: (clock: ControllableClock) => Store | Promise<Store>,
-    opts: { clock?: ControllableClock } = {},
 ): void {
     const setup = async () => {
-        const clock = opts.clock ?? new ControllableClock();
+        const clock = new ControllableClock();
         const store = await create(clock);
         return { clock, store };
     };
@@ -49,7 +47,9 @@ export function describeStoreContract(
                 Array.from({ length: 20 }, (_, i) => store.claimKey('github', 'd1', `run-${i}`, 60_000)),
             );
             expect(results.filter((r) => r.created)).toHaveLength(1);
-            expect(new Set(results.map((r) => r.runId)).size).toBe(1);
+            const winner = results.find((r) => r.created)!;
+            expect(winner.runId).toMatch(/^run-\d+$/);
+            expect(results.every((r) => r.runId === winner.runId)).toBe(true);
         });
 
         it('claimKey expires after ttl', async () => {
@@ -141,8 +141,8 @@ export function describeStoreContract(
             expect(await store.getEffect('e1')).toBeUndefined();
             await store.putEffect('e1', { ok: true });
             expect(await store.getEffect('e1')).toEqual({ result: { ok: true } });
-            await store.putEffect('e2', undefined);
-            expect(await store.getEffect('e2')).toEqual({ result: undefined });
+            await store.putEffect('e2', null);
+            expect(await store.getEffect('e2')).toEqual({ result: null });
         });
 
         it('state kv and docs roundtrip, docList where filters by top-level equality', async () => {
@@ -209,6 +209,173 @@ export function describeStoreContract(
             });
             expect(page.total).toBe(3);
             expect(page.data.map((r) => r.id)).toEqual(['r3']);
+        });
+
+        it('claimRun is atomic under concurrency', async () => {
+            const { store } = await setup();
+            await store.createRun(makeRun('r1'));
+            const results = await Promise.all(
+                Array.from({ length: 20 }, (_, i) => store.claimRun('r1', `w${i}`, 1_000)),
+            );
+            expect(results.filter(Boolean)).toHaveLength(1);
+        });
+
+        it('acquire is atomic under concurrency', async () => {
+            const { store } = await setup();
+            const results = await Promise.all(
+                Array.from({ length: 20 }, (_, i) => store.acquire('k', `o${i}`, 1_000)),
+            );
+            expect(results.filter(Boolean)).toHaveLength(1);
+        });
+
+        it('lock expires after ttl and can be taken over', async () => {
+            const { store, clock } = await setup();
+            expect(await store.acquire('k', 'a', 1_000)).toBe(true);
+            clock.advance(999);
+            expect(await store.acquire('k', 'b', 1_000)).toBe(false);
+            clock.advance(1);
+            expect(await store.acquire('k', 'b', 1_000)).toBe(true);
+            await store.release('k', 'a');
+            expect(await store.acquire('k', 'c', 1_000)).toBe(false);
+        });
+
+        it('expiry boundary: exactly at expiresAt counts as expired', async () => {
+            const { store, clock } = await setup();
+            await store.createRun(makeRun('r1'));
+            expect(await store.claimRun('r1', 'w1', 1_000)).toBe(true);
+            await store.claimKey('s', 'k', 'run-1', 1_000);
+            clock.advance(999);
+            expect(await store.claimRun('r1', 'w2', 1_000)).toBe(false);
+            expect((await store.claimKey('s', 'k', 'run-2', 1_000)).created).toBe(false);
+            clock.advance(1);
+            expect(await store.renewClaim('r1', 'w1', 1_000)).toBe(false);
+            expect(await store.claimRun('r1', 'w2', 1_000)).toBe(true);
+            expect((await store.claimKey('s', 'k', 'run-2', 1_000)).created).toBe(true);
+        });
+
+        it('updateRun on a missing run throws RunNotFoundError', async () => {
+            const { store } = await setup();
+            await expect(store.updateRun('nope', { status: 'running' })).rejects.toBeInstanceOf(RunNotFoundError);
+        });
+
+        it('claimRun and renewClaim on a missing run return false', async () => {
+            const { store } = await setup();
+            expect(await store.claimRun('nope', 'w', 1_000)).toBe(false);
+            expect(await store.renewClaim('nope', 'w', 1_000)).toBe(false);
+        });
+
+        it('updateRun accepts several allowed statuses', async () => {
+            const { store } = await setup();
+            await store.createRun(makeRun('r1', { status: 'waiting' }));
+            const run = await store.updateRun('r1', { status: 'running' }, { expectStatus: ['queued', 'waiting'] });
+            expect(run.status).toBe('running');
+            await expect(
+                store.updateRun('r1', { status: 'failed' }, { expectStatus: ['queued', 'waiting'] }),
+            ).rejects.toBeInstanceOf(InvalidRunStateError);
+        });
+
+        it('updateRun preserves untouched fields and does not clobber claim', async () => {
+            const { store } = await setup();
+            await store.createRun(makeRun('r1', {
+                concurrencyKey: 'k', 
+                thread: 't', 
+                usage: { inputTokens: 3, outputTokens: 4 }, 
+            }));
+            await store.claimRun('r1', 'w1', 1_000);
+            const before = await store.getRun('r1');
+            const updated = await store.updateRun('r1', { status: 'running' });
+            expect(updated.claim).toEqual(before?.claim);
+            expect(updated.concurrencyKey).toBe('k');
+            expect(updated.thread).toBe('t');
+            expect(updated.usage).toEqual({ inputTokens: 3, outputTokens: 4 });
+            expect(updated.agent).toBe('a');
+            expect(updated.createdAt).toEqual(before?.createdAt);
+            expect((await store.getRun('r1'))?.claim).toEqual(before?.claim);
+        });
+
+        it('listRuns breaks createdAt ties by id ascending', async () => {
+            const { store } = await setup();
+            for (const id of ['b', 'c', 'a']) {
+                await store.createRun(makeRun(id));
+            }
+            expect((await store.listRuns({})).data.map((r) => r.id)).toEqual(['a', 'b', 'c']);
+        });
+
+        it('does not alias values passed in or returned', async () => {
+            const { store } = await setup();
+            const at = new Date(1_000);
+
+            // run
+            const run = makeRun('r1');
+            await store.createRun(run);
+            run.usage.inputTokens = 99;
+            run.trigger.payload = { changed: true };
+            const got = (await store.getRun('r1'))!;
+            expect(got.usage.inputTokens).toBe(0);
+            expect(got.trigger.payload).toEqual({});
+            got.usage.inputTokens = 77;
+            expect((await store.getRun('r1'))?.usage.inputTokens).toBe(0);
+            await store.claimRun('r1', 'w', 1_000);
+            const claimed = (await store.getRun('r1'))!;
+            claimed.claim!.owner = 'evil';
+            expect((await store.getRun('r1'))?.claim?.owner).toBe('w');
+
+            // checkpoint
+            const messages = [{ role: 'user', content: 'hi' }] as Checkpoint['messages'];
+            await store.saveCheckpoint({
+                runId: 'r1', 
+                stepIndex: 1, 
+                messages, 
+                createdAt: at, 
+            });
+            messages.push({ role: 'user', content: 'later' });
+            const cp = (await store.latestCheckpoint('r1'))!;
+            expect(cp.messages).toHaveLength(1);
+            cp.messages.push({ role: 'user', content: 'x' });
+            expect((await store.latestCheckpoint('r1'))?.messages).toHaveLength(1);
+
+            // step
+            const step: Step = {
+                runId: 'r1', 
+                index: 0, 
+                kind: 'tool', 
+                input: { a: 1 }, 
+                startedAt: at, 
+                finishedAt: at, 
+            };
+            await store.appendStep(step);
+            (step.input as { a: number }).a = 2;
+            const steps = await store.listSteps('r1');
+            expect(steps[0]!.input).toEqual({ a: 1 });
+            (steps[0]!.input as { a: number }).a = 3;
+            expect((await store.listSteps('r1'))[0]!.input).toEqual({ a: 1 });
+
+            // effect
+            const result = { list: [1] };
+            await store.putEffect('e', result);
+            result.list.push(2);
+            const effect = (await store.getEffect('e'))!;
+            expect(effect.result).toEqual({ list: [1] });
+            (effect.result as { list: number[] }).list.push(3);
+            expect(await store.getEffect('e')).toEqual({ result: { list: [1] } });
+
+            // doc
+            const doc = { n: [1] };
+            await store.docUpsert('a', 'c', '1', doc);
+            doc.n.push(2);
+            const docs = await store.docList('a', 'c');
+            expect(docs[0]!.doc).toEqual({ n: [1] });
+            (docs[0]!.doc as { n: number[] }).n.push(3);
+            expect((await store.docList('a', 'c'))[0]!.doc).toEqual({ n: [1] });
+
+            // kv
+            const value = { n: [1] };
+            await store.kvSet('a', 'k', value);
+            value.n.push(2);
+            const stored = (await store.kvGet('a', 'k')) as { n: number[] };
+            expect(stored).toEqual({ n: [1] });
+            stored.n.push(3);
+            expect(await store.kvGet('a', 'k')).toEqual({ n: [1] });
         });
     });
 }

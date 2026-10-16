@@ -4,6 +4,8 @@ import { InvalidRunStateError, RunNotFoundError } from '../errors.ts';
 import type { Checkpoint, Run, Step } from '../run/types.ts';
 import type { Store } from './types.ts';
 
+const copy = <T>(value: T): T => structuredClone(value);
+
 interface Expiring {
     expiresAt: number;
 }
@@ -42,12 +44,12 @@ export class MemoryStore implements Store {
     // RunStore
 
     async createRun(run: Run): Promise<void> {
-        this.runs.set(run.id, { ...run });
+        this.runs.set(run.id, copy(run));
     }
 
     async getRun(id: string): Promise<Run | undefined> {
         const run = this.runs.get(id);
-        return run ? { ...run } : undefined;
+        return run ? copy(run) : undefined;
     }
 
     async updateRun(id: string, patch: Partial<Run>, opts: { expectStatus?: Run['status'][] } = {}): Promise<Run> {
@@ -59,13 +61,13 @@ export class MemoryStore implements Store {
             );
         }
         const next = {
-            ...run, 
-            ...patch, 
-            id, 
-            updatedAt: patch.updatedAt ?? this.clock.now(), 
+            ...run,
+            ...copy(patch),
+            id,
+            updatedAt: patch.updatedAt ? copy(patch.updatedAt) : this.clock.now(),
         };
         this.runs.set(id, next);
-        return { ...next };
+        return copy(next);
     }
 
     async listRuns(q: {
@@ -79,10 +81,10 @@ export class MemoryStore implements Store {
             .filter((r) => (q.agent === undefined || r.agent === q.agent) &&
                 (q.status === undefined || q.status.includes(r.status)) &&
                 (q.concurrencyKey === undefined || r.concurrencyKey === q.concurrencyKey))
-            .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+            .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id, 'en'));
         const offset = q.offset ?? 0;
         const end = q.limit === undefined ? undefined : offset + q.limit;
-        return { data: matched.slice(offset, end).map((r) => ({ ...r })), total: matched.length };
+        return { data: matched.slice(offset, end).map((r) => copy(r)), total: matched.length };
     }
 
     async claimRun(id: string, owner: string, ttlMs: number): Promise<boolean> {
@@ -106,12 +108,12 @@ export class MemoryStore implements Store {
 
     async appendStep(step: Step): Promise<void> {
         const list = this.steps.get(step.runId) ?? [];
-        list.push(step);
+        list.push(copy(step));
         this.steps.set(step.runId, list);
     }
 
     async listSteps(runId: string): Promise<Step[]> {
-        return [...(this.steps.get(runId) ?? [])].sort((a, b) => a.index - b.index);
+        return copy([...(this.steps.get(runId) ?? [])].sort((a, b) => a.index - b.index));
     }
 
     // CheckpointStore
@@ -119,12 +121,13 @@ export class MemoryStore implements Store {
     async saveCheckpoint(cp: Checkpoint): Promise<void> {
         const current = this.checkpoints.get(cp.runId);
         if (!current || cp.stepIndex >= current.stepIndex) {
-            this.checkpoints.set(cp.runId, cp);
+            this.checkpoints.set(cp.runId, copy(cp));
         }
     }
 
     async latestCheckpoint(runId: string): Promise<Checkpoint | undefined> {
-        return this.checkpoints.get(runId);
+        const cp = this.checkpoints.get(runId);
+        return cp ? copy(cp) : undefined;
     }
 
     // IdempotencyStore
@@ -157,21 +160,22 @@ export class MemoryStore implements Store {
     // EffectStore
 
     async getEffect(key: string): Promise<{ result: unknown } | undefined> {
-        return this.effects.get(key);
+        const effect = this.effects.get(key);
+        return effect ? copy(effect) : undefined;
     }
 
     async putEffect(key: string, result: unknown): Promise<void> {
-        this.effects.set(key, { result });
+        this.effects.set(key, { result: copy(result) });
     }
 
     // StateStore
 
     async kvGet(agent: string, key: string): Promise<unknown> {
-        return this.kv.get(`${agent}\u0000${key}`);
+        return copy(this.kv.get(`${agent}\u0000${key}`));
     }
 
     async kvSet(agent: string, key: string, value: unknown): Promise<void> {
-        this.kv.set(`${agent}\u0000${key}`, value);
+        this.kv.set(`${agent}\u0000${key}`, copy(value));
     }
 
     async docList(
@@ -184,13 +188,13 @@ export class MemoryStore implements Store {
             .filter(({ doc }) => Object.entries(q.where ?? {}).every(
                 ([k, v]) => typeof doc === 'object' && doc !== null && (doc as Record<string, unknown>)[k] === v,
             ));
-        return q.limit === undefined ? entries : entries.slice(0, q.limit);
+        return copy(q.limit === undefined ? entries : entries.slice(0, q.limit));
     }
 
     async docUpsert(agent: string, coll: string, id: string, doc: unknown): Promise<void> {
         const name = `${agent}\u0000${coll}`;
         const collection = this.docs.get(name) ?? new Map<string, unknown>();
-        collection.set(id, doc);
+        collection.set(id, copy(doc));
         this.docs.set(name, collection);
     }
 
