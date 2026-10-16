@@ -40,13 +40,20 @@ export function wrapToolsForRun(tools: ToolSet, ctx: RunContext, store: EffectSt
                 for await (const chunk of result as AsyncIterable<unknown>) last = chunk;
                 result = last;
             }
-            await store.putEffect(key, result);
+            // The effect already happened: a failing write must not fail the call.
+            // `alreadyApplied` is what guards this window on a later retry.
+            try {
+                await store.putEffect(key, result);
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error(`chamberu: failed to record effect ${key}`, error);
+            }
             return result;
         };
 
         wrapped[name] = {
             ...def,
-            execute: (input: unknown, options: unknown) => {
+            execute: async (input: unknown, options: unknown) => {
                 const key = hooks?.effectKey ?
                     hooks.effectKey(input, ctx) :
                     `${ctx.runId}:${name}:${stableHash(input)}`;

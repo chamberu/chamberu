@@ -15,6 +15,9 @@ export interface EffectHooks {
 }
 
 function canonical(value: unknown): unknown {
+    if (value !== null && typeof value === 'object' && typeof (value as { toJSON?: unknown }).toJSON === 'function') {
+        return canonical((value as { toJSON: () => unknown }).toJSON());
+    }
     if (Array.isArray(value)) return value.map((v) => canonical(v));
     if (value !== null && typeof value === 'object') {
         const out: Record<string, unknown> = {};
@@ -26,7 +29,11 @@ function canonical(value: unknown): unknown {
     return value;
 }
 
-/** sha256 hex of the canonical JSON (recursively sorted keys; undefined dropped). */
+/**
+ * sha256 hex of the canonical JSON (recursively sorted keys; undefined dropped;
+ * toJSON values such as Date are serialized via toJSON). BigInt and cyclic
+ * inputs are unsupported and throw.
+ */
 export function stableHash(value: unknown): string {
     return createHash('sha256').update(JSON.stringify(canonical(value)) ?? 'undefined').digest('hex');
 }

@@ -5,6 +5,7 @@ import {
     describe,
     expect,
     it,
+    vi,
 } from 'vitest';
 import { z } from 'zod';
 import { RunEngine, defineAgent } from '@chamberu/core';
@@ -68,12 +69,8 @@ describe('effect tools', () => {
             execute: async () => ({ id: ++runs }),
         });
         // a crash before the checkpoint lands: the resumed run starts from scratch
-        class NoCheckpointStore extends MemoryStore {
-            override async saveCheckpoint(): Promise<void> {
-                await Promise.resolve();
-            }
-        }
-        const store = new NoCheckpointStore();
+        const store = new MemoryStore();
+        vi.spyOn(store, 'saveCheckpoint').mockResolvedValue(undefined);
         const turn = {
             parts: [{
                 type: 'tool-call' as const,
@@ -118,6 +115,10 @@ describe('effect tools', () => {
 
         expect((await store.getRun(runId))?.status).toBe('completed');
         expect(runs).toBe(1);
+        // the replayed call was re-issued and answered from the stored effect
+        const toolSteps = (await store.listSteps(runId)).filter((st) => st.kind === 'tool');
+        expect(toolSteps).toHaveLength(2);
+        expect(toolSteps.map((st) => st.output)).toEqual([{ id: 1 }, { id: 1 }]);
     });
 
     it('alreadyApplied short-circuits execute', async () => {
@@ -187,5 +188,63 @@ describe('effect tools', () => {
         expect(stableHash({ a: 1, b: { c: 2, d: 3 } })).toBe(stableHash({ b: { d: 3, c: 2 }, a: 1 }));
         expect(stableHash({ a: 1, b: undefined })).toBe(stableHash({ a: 1 }));
         expect(stableHash([1, 2])).not.toBe(stableHash([2, 1]));
+    });
+
+    it('stableHash distinguishes Dates', () => {
+        expect(stableHash({ at: new Date('2026-01-01') })).not.toBe(stableHash({ at: new Date('2026-01-02') }));
+    });
+
+    it('identical parallel calls execute once', async () => {
+        let runs = 0;
+        const post = defineEffectTool({
+            inputSchema: schema,
+            execute: async () => {
+                await new Promise((r) => { setImmediate(r); });
+                return ++runs;
+            },
+        });
+        const tools = wrapToolsForRun({ post }, ctx, new MemoryStore());
+        const out = await Promise.all([call(tools, 'post', { body: 'hi' }), call(tools, 'post', { body: 'hi' })]);
+        expect(out).toEqual([1, 1]);
+        expect(runs).toBe(1);
+    });
+
+    it('a stored effect skips alreadyApplied', async () => {
+        let checks = 0;
+        const post = defineEffectTool({
+            inputSchema: schema,
+            execute: async () => 'x',
+            alreadyApplied: async () => {
+                checks++;
+                return undefined;
+            },
+        });
+        const tools = wrapToolsForRun({ post }, ctx, new MemoryStore());
+        await call(tools, 'post', { body: 'hi' });
+        await call(tools, 'post', { body: 'hi' });
+        expect(checks).toBe(1);
+    });
+
+    it('returns the result when putEffect fails', async () => {
+        const broken = new MemoryStore();
+        vi.spyOn(broken, 'putEffect').mockRejectedValue(new Error('disk full'));
+        const post = defineEffectTool({ inputSchema: schema, execute: async () => 'sent' });
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const tools = wrapToolsForRun({ post }, ctx, broken);
+        expect(await call(tools, 'post', { body: 'hi' })).toBe('sent');
+        expect(spy).toHaveBeenCalled();
+        spy.mockRestore();
+    });
+
+    it('a throwing effectKey becomes a rejection', async () => {
+        const post = defineEffectTool({
+            inputSchema: schema,
+            effectKey: () => {
+                throw new Error('bad key');
+            },
+            execute: async () => 'x',
+        });
+        const tools = wrapToolsForRun({ post }, ctx, new MemoryStore());
+        await expect(call(tools, 'post', { body: 'hi' })).rejects.toThrow('bad key');
     });
 });
