@@ -232,13 +232,18 @@ export class RunEngine {
     async tick(): Promise<void> {
         const now = this.clock.now().getTime();
         const { data } = await this.store.listRuns({ status: ['waiting'] });
-        for (const run of data) {
-            if (!run.waiting || run.waiting.expiresAt.getTime() > now) continue;
+        for (const listed of data) {
+            if (!listed.waiting || listed.waiting.expiresAt.getTime() > now) continue;
             try {
+                // the listing may be stale by now: the run could wait on a newer approval
+                const run = await this.store.getRun(listed.id);
+                if (run?.status !== 'waiting' || !run.waiting || run.waiting.expiresAt.getTime() > now) continue;
                 await this.answer(run, run.waiting, { approved: false, reason: APPROVAL_TIMED_OUT });
             } catch (error) {
                 // answered meanwhile (resume, another replica)
-                if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
+                if (!(error instanceof InvalidRunStateError) && !(error instanceof InvalidResumeTokenError)) {
+                    this.onError(error, listed);
+                }
             }
         }
     }
@@ -248,18 +253,25 @@ export class RunEngine {
      * transition comes first and is guarded by expectStatus, so only one answer
      * ever writes; the run stays claimed by us until the checkpoint landed, so no
      * pass executes it from the unanswered checkpoint.
+     *
+     * `waiting` survives the transition and is cleared only after the response
+     * landed: if we die in between, the run re-pauses on the same wait point, so
+     * the token the owner already holds stays valid.
      */
     protected async answer(run: Run, waiting: WaitPoint, decision: ResumeDecision): Promise<void> {
         const now = this.clock.now();
-        await this.store.updateRun(run.id, {
+        const transitioned = await this.store.updateRun(run.id, {
             status: 'queued',
-            waiting: undefined,
             claim: { owner: this.owner, expiresAt: new Date(now.getTime() + this.claimTtlMs) },
             updatedAt: now,
         }, { expectStatus: ['waiting'] });
 
         let queued: Run;
         try {
+            // the run may have moved on to another approval since `waiting` was read
+            if (transitioned.waiting?.tokenId !== waiting.tokenId) {
+                throw new InvalidResumeTokenError('The resume token does not belong to the current approval.');
+            }
             const checkpoint = await this.store.latestCheckpoint(run.id);
             if (!checkpoint) throw new InvalidRunStateError(`Run "${run.id}" has no checkpoint to resume from.`);
             await this.store.saveCheckpoint({
@@ -294,12 +306,15 @@ export class RunEngine {
             };
             await this.store.appendStep(step);
             this.emit({ type: 'step.appended', step });
-            queued = await this.store.updateRun(run.id, { claim: undefined, updatedAt: this.clock.now() }, { expectStatus: ['queued'] });
+            queued = await this.store.updateRun(run.id, {
+                waiting: undefined,
+                claim: undefined,
+                updatedAt: this.clock.now(),
+            }, { expectStatus: ['queued'] });
         } catch (error) {
-            // undo, so the wait point (and its token) stays answerable
+            // undo, so the wait point (still on the run) and its token stay answerable
             await this.store.updateRun(run.id, {
                 status: 'waiting',
-                waiting,
                 claim: undefined,
                 updatedAt: this.clock.now(),
             }, { expectStatus: ['queued'] }).catch((undoError: unknown) => this.onError(undoError, run));
@@ -335,15 +350,22 @@ export class RunEngine {
         await this.notifyApproval(updated, agent, waiting);
     }
 
-    /** At most once per approval (store-deduped); failures go to onError, the run keeps waiting. */
+    /**
+     * Once per approval after a successful send (deduped by a store lock held
+     * for the idempotency TTL). A failed send releases the lock, so the next
+     * re-pause retries; failures go to onError, the run keeps waiting.
+     */
     protected async notifyApproval(run: Run, agent: Agent, waiting: WaitPoint): Promise<void> {
         const name = agent.definition.notify;
         const notifier = name === undefined ? undefined : this.notifiers[name];
         if (!notifier) return;
         const idempotencyKey = `${run.id}:${waiting.approvalId}`;
+        const lockKey = `notify:${idempotencyKey}`;
+        const attempt = randomUUID();
+        let acquired = false;
         try {
-            const { created } = await this.store.claimKey('notify', idempotencyKey, run.id, IDEMPOTENCY_TTL_MS);
-            if (!created) return;
+            acquired = await this.store.acquire(lockKey, attempt, IDEMPOTENCY_TTL_MS);
+            if (!acquired) return;
             await notifier.notify({
                 kind: 'approval',
                 agent: run.agent,
@@ -360,6 +382,9 @@ export class RunEngine {
             }, { idempotencyKey });
         } catch (error) {
             this.onError(error, run);
+            if (acquired) {
+                await this.store.release(lockKey, attempt).catch((releaseError: unknown) => this.onError(releaseError, run));
+            }
         }
     }
 
@@ -411,6 +436,8 @@ export class RunEngine {
             id,
             {
                 claim: undefined,
+                // a run resumed after a crash may still carry its answered wait point
+                waiting: undefined,
                 finishedAt: now,
                 updatedAt: now,
                 ...patch,

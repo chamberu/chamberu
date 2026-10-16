@@ -6,6 +6,7 @@ import type {
     StopCondition,
     ToolApprovalRequestOutput,
     ToolApprovalStatus,
+    ToolExecutionEndEvent,
     ToolLoopAgentSettings,
     ToolSet,
 } from 'ai';
@@ -137,6 +138,29 @@ export function pendingApproval(messages: ModelMessage[]): ApprovalRequest | und
 }
 
 /**
+ * True when `messages` end on an approval response whose tool call has no
+ * result yet: the AI SDK executes (or denies) that call before the first model
+ * call, which the step budget does not count.
+ */
+export function endsOnApprovalResponse(messages: ModelMessage[]): boolean {
+    const last = messages.at(-1);
+    if (last?.role !== 'tool') return false;
+    const answered = new Set<string>();
+    for (const part of last.content) if (part.type === 'tool-approval-response') answered.add(part.approvalId);
+    if (answered.size === 0) return false;
+    const calls = new Set<string>();
+    const results = new Set<string>();
+    for (const message of messages) {
+        if (typeof message.content === 'string') continue;
+        for (const part of message.content) {
+            if (part.type === 'tool-approval-request' && answered.has(part.approvalId)) calls.add(part.toolCallId);
+            if (part.type === 'tool-result') results.add(part.toolCallId);
+        }
+    }
+    return calls.values().some((id) => !results.has(id));
+}
+
+/**
  * Drops the tool calls (and their approval requests) of `toolCallIds` from
  * assistant messages: one approval per pause, so the model sees only the
  * answered call and requests the dropped ones again if it still needs them.
@@ -203,7 +227,10 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         return;
     }
 
-    const remainingSteps = budget.maxSteps - stepIndex;
+    // a resumed approval gets exactly one step beyond maxSteps, so an approval
+    // granted (or denied) on the last allowed step still runs and is answered
+    const extraSteps = checkpoint && endsOnApprovalResponse(checkpoint.messages) ? 1 : 0;
+    const remainingSteps = budget.maxSteps + extraSteps - stepIndex;
     if (remainingSteps <= 0) {
         // the step limit was reached by an earlier execution that did not settle the run
         if (checkpoint && checkpoint.finishReason !== 'tool-calls') {
@@ -232,6 +259,9 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     let stepStartedAt = clock.now();
     // the approval the last step asked for; the loop stops on it
     let approval: ApprovalRequest | undefined;
+    // errors of approved calls the AI SDK executes before the first model call, by toolCallId
+    const preStepErrors = new Map<string, unknown>();
+    let beforeFirstStep = true;
 
     /** Runs a store write unless the execution was abandoned meanwhile. */
     const guarded = async (write: () => Promise<void>): Promise<boolean> => {
@@ -336,6 +366,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
      */
     const prepareStep: PrepareStepFunction<ToolSet> = async ({ stepNumber, responseMessages: initialResponses }) => {
         if (stepNumber !== 0) return undefined;
+        beforeFirstStep = false;
         const at = clock.now();
         const calls = new Map<string, unknown>();
         for (const message of initial) {
@@ -347,17 +378,29 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
             if (message.role !== 'tool') continue;
             for (const part of message.content) {
                 if (part.type !== 'tool-result') continue;
+                // the AI SDK turns a thrown error into an error-text result; record the error itself
+                const failed = preStepErrors.has(part.toolCallId);
+                const error = preStepErrors.get(part.toolCallId);
                 await append({
                     kind: 'tool',
                     name: part.toolName,
                     input: calls.get(part.toolCallId),
-                    output: part.output,
+                    ...(failed ? { error: toRunError(error) } : { output: part.output }),
                     startedAt: stepStartedAt,
                     finishedAt: at,
                 });
+                if (error instanceof FatalToolError) fatal ??= { error };
             }
         }
+        // stopWhen only runs after a model call: fail before making one
+        if (fatal) throw fatal.error;
         return undefined;
+    };
+
+    const onToolExecutionEnd = (event: ToolExecutionEndEvent): void => {
+        if (beforeFirstStep && event.toolOutput.type === 'tool-error') {
+            preStepErrors.set(event.toolOutput.toolCallId, event.toolOutput.error);
+        }
     };
 
     const onStepEnd = (step: StepResult<ToolSet>): Promise<void> => {
@@ -382,7 +425,11 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
 
     let result: Awaited<ReturnType<typeof loop.generate>>;
     try {
-        const work = loop.generate({ messages: initial, abortSignal: signal });
+        const work = loop.generate({
+            messages: initial,
+            abortSignal: signal,
+            onToolExecutionEnd,
+        });
         // the agent may keep running after an abort; never leak its rejection
         work.catch(() => {});
         result = await untilAborted(work, signal);
