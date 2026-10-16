@@ -4,11 +4,12 @@ import { pid } from 'node:process';
 import { systemClock } from '../clock.ts';
 import type { Clock } from '../clock.ts';
 import type { Agent } from '../agent/types.ts';
-import { InvalidAgentDefinitionError } from '../errors.ts';
+import { InvalidAgentDefinitionError, InvalidRunStateError, RunNotFoundError } from '../errors.ts';
 import type { Notifier } from '../notify/types.ts';
 import type { Run, Step } from '../run/types.ts';
 import type { Store } from '../store/types.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
+import { executeRun, toRunError } from './execute.ts';
 import { RunQueue } from './queue.ts';
 
 export type RunEvent = { type: 'run.updated'; run: Run } | { type: 'step.appended'; step: Step };
@@ -52,6 +53,9 @@ export class RunEngine {
     protected readonly listeners = new Set<(e: RunEvent) => void>();
 
     protected readonly onError: (error: unknown, run?: Run) => void;
+
+    /** Runs executing in this process, by id. */
+    protected readonly executions = new Map<string, { controller: AbortController; done: Promise<void> }>();
 
     protected started = false;
 
@@ -148,28 +152,67 @@ export class RunEngine {
     }
 
     /**
-     * The single execution seam: runs one claimed, `running` run to a settled
-     * state. Stub for now; replaced by real AI SDK runs.
+     * Cancels a run: aborts it when it executes in this process (resolving once
+     * it settled), or marks a queued run cancelled.
      */
-    protected async execute(run: Run): Promise<void> {
-        await this.finish(run.id, { status: 'completed' });
+    async cancel(runId: string): Promise<void> {
+        const execution = this.executions.get(runId);
+        if (execution) {
+            execution.controller.abort();
+            await execution.done;
+            return;
+        }
+        const run = await this.store.getRun(runId);
+        if (!run) throw new RunNotFoundError(runId);
+        if (run.status !== 'queued') {
+            throw new InvalidRunStateError(`Run "${runId}" is ${run.status} and not executing here; it cannot be cancelled.`);
+        }
+        const now = this.clock.now();
+        const updated = await this.store.updateRun(
+            runId,
+            {
+                status: 'cancelled',
+                finishedAt: now,
+                updatedAt: now,
+            },
+            { expectStatus: ['queued'] },
+        );
+        this.emit({ type: 'run.updated', run: updated });
+    }
+
+    /**
+     * The single execution seam: runs one claimed, `running` run to a settled
+     * state. `signal` aborts on cancel.
+     */
+    protected async execute(run: Run, signal: AbortSignal): Promise<void> {
+        const agent = this.agents.get(run.agent);
+        if (!agent) throw new InvalidAgentDefinitionError(`unknown agent: ${run.agent}`);
+        await executeRun({
+            run,
+            agent,
+            store: this.store,
+            clock: this.clock,
+            signal,
+            finish: (patch) => this.finish(run.id, patch),
+            onStepAppended: (step) => this.emit({ type: 'step.appended', step }),
+        });
     }
 
     /** A throwing execution fails the run (and releases its claim) instead of leaking. */
-    protected async guardedExecute(run: Run): Promise<void> {
-        try {
-            await this.execute(run);
-        } catch (error) {
-            const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-            await this.finish(run.id, {
-                status: 'failed',
-                error: {
-                    code: typeof code === 'string' ? code : 'Error',
-                    message: error instanceof Error ? error.message : String(error),
-                },
-            });
-            this.onError(error, run);
-        }
+    protected guardedExecute(run: Run): Promise<void> {
+        const controller = new AbortController();
+        const done = (async () => {
+            try {
+                await this.execute(run, controller.signal);
+            } catch (error) {
+                await this.finish(run.id, { status: 'failed', error: toRunError(error) });
+                this.onError(error, run);
+            } finally {
+                this.executions.delete(run.id);
+            }
+        })();
+        this.executions.set(run.id, { controller, done: done.catch(() => {}) });
+        return done;
     }
 
     protected async finish(id: string, patch: Partial<Run>): Promise<Run> {

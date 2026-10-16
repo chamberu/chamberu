@@ -50,7 +50,7 @@ class GatedEngine extends RunEngine {
             await new Promise<void>((resolve) => {
                 this.gates.set(run.id, resolve);
             });
-            await super.execute(run);
+            await this.finish(run.id, { status: 'completed' });
         } finally {
             this.tracker.active--;
         }
