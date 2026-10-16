@@ -44,5 +44,7 @@ jobs:
             - name: Publish
               if: steps.release.outputs.releases_created == 'true'
               uses: tada5hi/monoship@v2
+              env:
+                  NPM_CONFIG_PROVENANCE: 'true'
               with:
                   token: ${{ secrets.NPM_TOKEN }}
