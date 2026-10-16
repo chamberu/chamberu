@@ -2,7 +2,8 @@
     "extends": "./tsconfig.build.json",
     "compilerOptions": {
         "paths": {
-            "@chamberu/core": ["./packages/core/src/index.ts"]
+            "@chamberu/core": ["./packages/core/src/index.ts"],
+            "@chamberu/core/testing": ["./packages/core/src/testing.ts"]
         }
     }
 }
