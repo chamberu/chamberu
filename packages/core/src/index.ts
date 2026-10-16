@@ -8,3 +8,6 @@ export type * from './trigger/types.ts';
 export { RunEngine } from './engine/engine.ts';
 export type { DispatchEnvelope, RunEngineOptions, RunEvent } from './engine/engine.ts';
 export type * from './notify/types.ts';
+export { EFFECT, defineEffectTool, effectMarker } from './effect/define.ts';
+export type { EffectTool } from './effect/define.ts';
+export { wrapToolsForRun } from './effect/wrap.ts';

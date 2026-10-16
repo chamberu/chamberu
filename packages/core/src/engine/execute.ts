@@ -7,6 +7,7 @@ import type {
 } from 'ai';
 import type { Agent } from '../agent/types.ts';
 import type { Clock } from '../clock.ts';
+import { wrapToolsForRun } from '../effect/wrap.ts';
 import { BudgetExceededError, FatalToolError } from '../errors.ts';
 import type {
     Budget,
@@ -61,7 +62,8 @@ export function toRunError(error: unknown): { code: string; message: string } {
 export function assembleTools(ctx: ExecuteContext, runContext: RunContext): ToolSet {
     const factory = ctx.agent.definition.tools;
     if (!factory) return {};
-    return factory({ state: createAgentState(ctx.store, ctx.agent.name), run: runContext });
+    const tools = factory({ state: createAgentState(ctx.store, ctx.agent.name), run: runContext });
+    return wrapToolsForRun(tools, runContext, ctx.store);
 }
 
 /** Rejects with the abort reason as soon as `signal` aborts, even if `work` ignores the signal. */
