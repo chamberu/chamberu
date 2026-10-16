@@ -155,6 +155,31 @@ describe('RunEngine.dispatch', () => {
         })).toThrow(InvalidAgentDefinitionError);
     });
 
+    it('a redelivery heals an idempotency key whose run was never created', async () => {
+        const { engine, store } = make();
+        vi.spyOn(store, 'createRun').mockRejectedValueOnce(new Error('store down'));
+        await expect(engine.dispatch(env({ idempotencyKey: 'k' }))).rejects.toThrow('store down');
+        expect((await store.listRuns({})).total).toBe(0);
+
+        const retried = await engine.dispatch(env({ idempotencyKey: 'k' }));
+        expect(retried.deduplicated).toBe(false);
+        expect((await engine.getRun(retried.runId))?.status).toBe('queued');
+        expect(await engine.dispatch(env({ idempotencyKey: 'k' }))).toEqual({ runId: retried.runId, deduplicated: true });
+        expect((await store.listRuns({})).total).toBe(1);
+    });
+
+    it('concurrent healers of a lost run create it once', async () => {
+        const { engine, store } = make();
+        vi.spyOn(store, 'createRun').mockRejectedValueOnce(new Error('store down'));
+        await expect(engine.dispatch(env({ idempotencyKey: 'k' }))).rejects.toThrow('store down');
+        const results = await Promise.all(
+            Array.from({ length: 5 }, () => engine.dispatch(env({ idempotencyKey: 'k' }))),
+        );
+        expect(new Set(results.map((r) => r.runId)).size).toBe(1);
+        expect(results.filter((r) => !r.deduplicated)).toHaveLength(1);
+        expect((await store.listRuns({})).total).toBe(1);
+    });
+
     it('dispatch rejects unknown agent', async () => {
         const { engine, store } = make();
         await expect(engine.dispatch(env({ agent: 'nope' }))).rejects.toThrow(InvalidAgentDefinitionError);

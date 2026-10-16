@@ -146,7 +146,7 @@ export class RunEngine {
             id: envelope.id ?? randomUUID(),
             receivedAt: envelope.receivedAt ?? now,
         };
-        const runId = randomUUID();
+        let runId: string = randomUUID();
 
         if (trigger.idempotencyKey !== undefined) {
             const claimed = await this.store.claimKey(
@@ -155,7 +155,12 @@ export class RunEngine {
                 runId,
                 IDEMPOTENCY_TTL_MS,
             );
-            if (!claimed.created) return { runId: claimed.runId, deduplicated: true };
+            if (!claimed.created) {
+                if (await this.store.getRun(claimed.runId)) return { runId: claimed.runId, deduplicated: true };
+                // the key's run was never created (createRun failed after the claim, or is
+                // still in flight): create it under the reserved id; createRun decides the race
+                runId = claimed.runId;
+            }
         }
 
         const run: Run = {
@@ -169,7 +174,7 @@ export class RunEngine {
             createdAt: now,
             updatedAt: now,
         };
-        await this.store.createRun(run);
+        if (!await this.store.createRun(run)) return { runId, deduplicated: true };
         this.emit({ type: 'run.updated', run });
         if (this.started) void this.queue.pump();
         return { runId, deduplicated: false };

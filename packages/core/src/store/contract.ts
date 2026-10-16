@@ -344,6 +344,20 @@ export function describeStoreContract(
             expect((await store.listRuns({})).data.map((r) => r.id)).toEqual(['a', 'b', 'c']);
         });
 
+        it('createRun inserts only when the id is absent, also under concurrency', async () => {
+            const { store } = await setup();
+            const results = await Promise.all(
+                Array.from({ length: 5 }, (_, i) => store.createRun(makeRun('r1', { thread: `t${i}` }))),
+            );
+            expect(results.filter(Boolean)).toHaveLength(1);
+            const winner = results.indexOf(true);
+            expect((await store.getRun('r1'))?.thread).toBe(`t${winner}`);
+            await store.updateRun('r1', { status: 'running' });
+            expect(await store.createRun(makeRun('r1'))).toBe(false);
+            expect((await store.getRun('r1'))?.status).toBe('running');
+            expect((await store.listRuns({})).total).toBe(1);
+        });
+
         it('does not alias values passed in or returned', async () => {
             const { store } = await setup();
             const at = new Date(1_000);

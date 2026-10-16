@@ -14,7 +14,11 @@ import type {
  * or a value returned from the store, must never change what the store holds.
  */
 export interface RunStore {
-    createRun(run: Run): Promise<void>;
+    /**
+     * Atomic insert-if-absent: resolves false and keeps the stored run when a run
+     * with that id exists (two dispatches may create the run an idempotency key names).
+     */
+    createRun(run: Run): Promise<boolean>;
     getRun(id: string): Promise<Run | undefined>;
     /**
      * Throws InvalidRunStateError when `expectStatus` does not match the current

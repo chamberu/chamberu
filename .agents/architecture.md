@@ -41,7 +41,7 @@ running -> interrupted (drain) -> queued (recover) -> running
 running with an expired claim (crash) -> queued (recover) -> running
 ```
 
-- **Intake**: with an `idempotencyKey`, `dispatch` claims `(agent:source, key)` in the `IdempotencyStore` (TTL 7 days); a duplicate returns the existing run id with `deduplicated: true`.
+- **Intake**: with an `idempotencyKey`, `dispatch` claims `(agent:source, key)` in the `IdempotencyStore` (TTL 7 days); a duplicate returns the existing run id with `deduplicated: true`. A key whose run was never created (createRun failed after the claim) is healed by the next dispatch, which creates the run under the reserved id; `createRun` is insert-if-absent, so concurrent healers create it once.
 - **Scheduling** (`engine/queue.ts`): a pass lists `queued` runs FIFO (createdAt, then id) and starts them up to `maxConcurrentRuns`. A keyed run starts only when no other run of the same agent and `concurrencyKey` is `running`, `waiting` or `interrupted`; check, claim and transition happen under a store lock `concurrency:<agent>:<key>` so it holds across replicas.
 - **Claims**: `claimRun(id, owner, claimTtlMs)` is a lease, renewed every `claimTtlMs / 3`. The poll runs on the same interval and calls `tick()` (approval expiry) and `recover()`. Every write of a running run is conditional on status and owner; an engine that loses its lease aborts the execution, writes nothing more and reports a `LeaseLostError` to `onError`.
 - **Execution** (`engine/execute.ts`): one `ToolLoopAgent` call per execution, starting from the latest checkpoint. After every step the engine appends the steps and saves a checkpoint (messages plus the step's `finishReason`). An abandon guard stops a still-running generate from writing after the run settled.

@@ -43,8 +43,10 @@ export class MemoryStore implements Store {
 
     // RunStore
 
-    async createRun(run: Run): Promise<void> {
+    async createRun(run: Run): Promise<boolean> {
+        if (this.runs.has(run.id)) return false;
         this.runs.set(run.id, copy(run));
+        return true;
     }
 
     async getRun(id: string): Promise<Run | undefined> {
