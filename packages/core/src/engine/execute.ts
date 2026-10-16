@@ -22,6 +22,7 @@ import type {
     Usage,
 } from '../run/types.ts';
 import { createAgentState } from '../state/api.ts';
+import { createStateTools } from '../state/tools.ts';
 import type { Store } from '../store/types.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 import {
@@ -85,11 +86,19 @@ export function toRunError(error: unknown): { code: string; message: string } {
     };
 }
 
-/** The tools handed to the agent. Seam for effect memoization (wrapToolsForRun). */
+/**
+ * The tools handed to the agent: generated state tools (when the agent declares
+ * `state`) merged with the user's tools, which win on a name clash. Seam for
+ * effect memoization (wrapToolsForRun).
+ */
 export function assembleTools(ctx: ExecuteContext, runContext: RunContext): ToolSet {
-    const factory = ctx.agent.definition.tools;
-    if (!factory) return {};
-    const tools = factory({ state: createAgentState(ctx.store, ctx.agent.name), run: runContext });
+    const { tools: factory, state: schema } = ctx.agent.definition;
+    if (!factory && !schema) return {};
+    const state = createAgentState(ctx.agent.name, schema, ctx.store);
+    const tools: ToolSet = {
+        ...(schema ? createStateTools(state, schema) : {}),
+        ...factory?.({ state, run: runContext }),
+    };
     return wrapToolsForRun(tools, runContext, ctx.store);
 }
 

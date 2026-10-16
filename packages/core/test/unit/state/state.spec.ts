@@ -1,0 +1,225 @@
+import { tool } from 'ai';
+import type { ToolSet } from 'ai';
+import {
+    afterEach,
+    describe,
+    expect,
+    it,
+} from 'vitest';
+import { z } from 'zod';
+import { RunEngine, ValidationError, defineAgent } from '@chamberu/core';
+import { EFFECT } from '../../../src/effect/define.ts';
+import { wrapToolsForRun } from '../../../src/effect/wrap.ts';
+import type { RunContext } from '../../../src/run/types.ts';
+import { createAgentState } from '../../../src/state/api.ts';
+import { createStateTools } from '../../../src/state/tools.ts';
+import { MemoryStore } from '../../../src/store/memory.ts';
+import { mockModel } from '../../utils/mock-model.ts';
+
+const schema = {
+    items: z.object({ title: z.string(), done: z.boolean() }),
+    notes: z.object({ body: z.string() }),
+};
+
+const callOpts = { toolCallId: 'c', messages: [] };
+
+async function call(tools: ToolSet, name: string, input: unknown) {
+    const t = tools[name];
+    return (t?.execute as (i: unknown, o: unknown) => Promise<unknown>)(input, callOpts);
+}
+
+const engines: RunEngine[] = [];
+afterEach(() => {
+    for (const e of engines) e.stop();
+    engines.length = 0;
+});
+
+async function runOnce(store: MemoryStore, agent: Parameters<typeof defineAgent>[0]) {
+    const engine = new RunEngine({
+        store,
+        agents: [defineAgent(agent)],
+        resumeSecret: 's',
+        onError: () => {},
+    });
+    engines.push(engine);
+    await engine.start();
+    const { runId } = await engine.dispatch({
+        agent: agent.name,
+        trigger: 'manual',
+        source: 'manual',
+        payload: {},
+    });
+    await engine.idle();
+    return runId;
+}
+
+describe('agent state', () => {
+    it('kv roundtrip is scoped per agent', async () => {
+        const store = new MemoryStore();
+        const a = createAgentState('alpha', schema, store);
+        const b = createAgentState('beta', schema, store);
+
+        await a.set('cursor', { page: 2 });
+        expect(await a.get('cursor')).toEqual({ page: 2 });
+        expect(await b.get('cursor')).toBeUndefined();
+
+        await b.set('cursor', 'other');
+        expect(await a.get('cursor')).toEqual({ page: 2 });
+        expect(await b.get('cursor')).toBe('other');
+    });
+
+    it('upsert validates against schema', async () => {
+        const store = new MemoryStore();
+        const state = createAgentState('alpha', schema, store);
+        const items = state.collection('items');
+
+        await expect(items.upsert('a', { title: 1 } as never)).rejects.toBeInstanceOf(ValidationError);
+        expect(await items.list()).toEqual([]);
+        expect(await store.docList('alpha', 'items')).toEqual([]);
+
+        await items.upsert('a', { title: 'ok', done: false });
+        expect(await items.list()).toEqual([{
+            id: 'a',
+            title: 'ok',
+            done: false,
+        }]);
+    });
+
+    it('list filters by where', async () => {
+        const state = createAgentState('alpha', schema, new MemoryStore());
+        const items = state.collection('items');
+        await items.upsert('a', { title: 'one', done: true });
+        await items.upsert('b', { title: 'two', done: false });
+        await items.upsert('c', { title: 'three', done: true });
+
+        const done = await items.list({ where: { done: true } });
+        expect(done.map((d) => d.id).sort()).toEqual(['a', 'c']);
+        expect(await items.list({ where: { done: true }, limit: 1 })).toHaveLength(1);
+        expect(await items.list({ where: { title: 'two' } })).toEqual([{
+            id: 'b',
+            title: 'two',
+            done: false,
+        }]);
+    });
+
+    it('state tools are generated per collection with expected names', async () => {
+        const store = new MemoryStore();
+        const state = createAgentState('alpha', schema, store);
+        const tools = createStateTools(state, schema);
+
+        expect(Object.keys(tools).sort()).toEqual([
+            'state_items_list',
+            'state_items_remove',
+            'state_items_upsert',
+            'state_notes_list',
+            'state_notes_remove',
+            'state_notes_upsert',
+        ]);
+        expect(EFFECT in (tools.state_items_upsert as object)).toBe(true);
+        expect(EFFECT in (tools.state_items_remove as object)).toBe(true);
+        expect(EFFECT in (tools.state_items_list as object)).toBe(false);
+
+        await call(tools, 'state_items_upsert', { id: 'a', doc: { title: 'x', done: false } });
+        expect(await call(tools, 'state_items_list', { where: { done: false } }))
+            .toEqual([{
+                id: 'a',
+                title: 'x',
+                done: false,
+            }]);
+        await call(tools, 'state_items_remove', { id: 'a' });
+        expect(await call(tools, 'state_items_list', {})).toEqual([]);
+        await expect(call(tools, 'state_items_upsert', { id: 'b', doc: { title: 'x' } }))
+            .rejects.toBeInstanceOf(ValidationError);
+    });
+
+    it('repeated writes within a run are not memoized away', async () => {
+        const store = new MemoryStore();
+        const runContext: RunContext = {
+            runId: 'r1',
+            agent: 'alpha',
+            trigger: {
+                agent: 'alpha',
+                trigger: 'manual',
+                source: 'manual',
+                payload: {},
+            } as RunContext['trigger'],
+            signal: new AbortController().signal,
+        };
+        const tools = wrapToolsForRun(createStateTools(createAgentState('alpha', schema, store), schema), runContext, store);
+        const a = { id: 'x', doc: { title: 'a', done: false } };
+        const b = { id: 'x', doc: { title: 'b', done: false } };
+
+        await call(tools, 'state_items_upsert', a);
+        await call(tools, 'state_items_upsert', b);
+        await call(tools, 'state_items_upsert', a);
+        expect(await store.docList('alpha', 'items')).toEqual([{ id: 'x', doc: a.doc }]);
+
+        await call(tools, 'state_items_remove', { id: 'x' });
+        await call(tools, 'state_items_upsert', b);
+        await call(tools, 'state_items_remove', { id: 'x' });
+        expect(await store.docList('alpha', 'items')).toEqual([]);
+    });
+
+    it('model can upsert via generated tool', async () => {
+        const store = new MemoryStore();
+        const runId = await runOnce(store, {
+            name: 'todo',
+            instructions: 'x',
+            state: schema,
+            model: mockModel([
+                {
+                    parts: [{
+                        type: 'tool-call',
+                        toolName: 'state_items_upsert',
+                        input: { id: 'a', doc: { title: 'buy milk', done: false } },
+                    }],
+                },
+                { parts: [{ type: 'text', text: 'done' }] },
+            ]),
+        });
+
+        expect((await store.getRun(runId))?.status).toBe('completed');
+        expect(await store.docList('todo', 'items')).toEqual([
+            { id: 'a', doc: { title: 'buy milk', done: false } },
+        ]);
+    });
+
+    it('user tools win on a name clash', async () => {
+        const store = new MemoryStore();
+        let userCalls = 0;
+        const runId = await runOnce(store, {
+            name: 'todo',
+            instructions: 'x',
+            state: schema,
+            tools: () => ({
+                state_items_upsert: tool({
+                    inputSchema: z.object({ id: z.string() }).passthrough(),
+                    execute: async () => ++userCalls,
+                }),
+            }),
+            model: mockModel([
+                {
+                    parts: [{
+                        type: 'tool-call',
+                        toolName: 'state_items_upsert',
+                        input: { id: 'a', doc: { title: 'buy milk', done: false } },
+                    }],
+                },
+                {
+                    parts: [{
+                        type: 'tool-call',
+                        toolName: 'state_notes_upsert',
+                        input: { id: 'n', doc: { body: 'hi' } },
+                    }],
+                },
+                { parts: [{ type: 'text', text: 'done' }] },
+            ]),
+        });
+
+        expect((await store.getRun(runId))?.status).toBe('completed');
+        expect(userCalls).toBe(1);
+        expect(await store.docList('todo', 'items')).toEqual([]);
+        // the other generated tools are still there
+        expect(await store.docList('todo', 'notes')).toEqual([{ id: 'n', doc: { body: 'hi' } }]);
+    });
+});

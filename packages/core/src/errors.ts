@@ -57,3 +57,14 @@ export class LeaseLostError extends ChamberuError {
         this.runId = runId;
     }
 }
+
+/** A value failed its Standard Schema validation (e.g. a state document on upsert). */
+export class ValidationError extends ChamberuError {
+    /** The Standard Schema issues, with path segments flattened to keys. */
+    readonly validationIssues: ReadonlyArray<{ message: string; path?: ReadonlyArray<PropertyKey> }>;
+
+    constructor(message: string, validationIssues: ReadonlyArray<{ message: string; path?: ReadonlyArray<PropertyKey> }> = []) {
+        super({ message, code: 'validation_error' });
+        this.validationIssues = validationIssues;
+    }
+}
