@@ -175,11 +175,15 @@ const deployer = defineAgent({
     notify: 'owner',
 });
 
+// fail fast: the engine rejects an empty secret, which would let anyone mint tokens
+const resumeSecret = process.env.RESUME_SECRET;
+if (!resumeSecret) throw new Error('RESUME_SECRET is not set');
+
 const engine = new RunEngine({
     store,
     agents: [deployer],
     notifiers: { owner: notifier },
-    resumeSecret: process.env.RESUME_SECRET ?? '',
+    resumeSecret,
 });
 
 // later, with the token the notifier delivered
@@ -231,7 +235,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 |---|---|---|---|
 | `store` | `Store` | required | Where runs, steps, checkpoints and state live |
 | `agents` | `Agent[]` | required | The agents this engine runs |
-| `resumeSecret` | `string` | required | HMAC secret for resume tokens and AI SDK approval signatures |
+| `resumeSecret` | `string` | required | HMAC secret for resume tokens and AI SDK approval signatures; must not be empty |
 | `notifiers` | `Record<string, Notifier>` | `{}` | Notifiers by name, referenced by an agent's `notify` |
 | `maxConcurrentRuns` | `number` | `4` | Runs executing at once in this process |
 | `claimTtlMs` | `number` | `60_000` | Lease on a running run, renewed every `claimTtlMs / 3`; the poll for new work, expired approvals and abandoned runs uses the same interval |

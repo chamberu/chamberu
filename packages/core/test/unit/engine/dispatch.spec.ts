@@ -134,6 +134,27 @@ describe('RunEngine.dispatch', () => {
         expect((await store.listRuns({})).total).toBe(1);
     });
 
+    it('rejects two agents with the same name', () => {
+        const other = defineAgent({
+            name: 'triage',
+            model,
+            instructions: 'y',
+        });
+        expect(() => new RunEngine({
+            store: new MemoryStore(),
+            agents: [agent, other],
+            resumeSecret: 's',
+        })).toThrow(/"triage" is used more than once/);
+    });
+
+    it('rejects an empty resumeSecret', () => {
+        expect(() => new RunEngine({
+            store: new MemoryStore(),
+            agents: [agent],
+            resumeSecret: '',
+        })).toThrow(InvalidAgentDefinitionError);
+    });
+
     it('dispatch rejects unknown agent', async () => {
         const { engine, store } = make();
         await expect(engine.dispatch(env({ agent: 'nope' }))).rejects.toThrow(InvalidAgentDefinitionError);

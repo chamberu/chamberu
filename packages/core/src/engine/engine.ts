@@ -37,7 +37,7 @@ export interface RunEngineOptions {
     maxConcurrentRuns?: number;
     /** Default 60_000, renewed every ttl/3 while running. */
     claimTtlMs?: number;
-    /** HMAC secret for resume tokens. */
+    /** HMAC secret for resume tokens; must not be empty. */
     resumeSecret: string;
     clock?: Clock;
     /** Receives errors that have no caller to throw to. Default console.error. */
@@ -102,6 +102,15 @@ export class RunEngine {
         this.clock = opts.clock ?? systemClock;
         this.resumeSecret = opts.resumeSecret;
         this.claimTtlMs = opts.claimTtlMs ?? 60_000;
+        if (!this.resumeSecret) {
+            // an empty HMAC key would let anyone mint valid resume tokens
+            throw new InvalidAgentDefinitionError('The engine needs a non-empty resumeSecret.');
+        }
+        if (this.agents.size !== opts.agents.length) {
+            const seen = new Set<string>();
+            const duplicate = opts.agents.find((a) => seen.size === seen.add(a.name).size);
+            throw new InvalidAgentDefinitionError(`Agent name "${duplicate?.name}" is used more than once.`);
+        }
         for (const agent of opts.agents) {
             const { notify } = agent.definition;
             if (notify !== undefined && !this.notifiers[notify]) {
