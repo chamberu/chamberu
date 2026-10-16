@@ -1,22 +1,45 @@
-import { generateText } from 'ai';
+import { generateText, streamText } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { mockModel } from '../../utils/mock-model.ts';
 
 describe('mockModel', () => {
-    it('replays scripted responses with usage', async () => {
+    it('replays scripted turns with usage, parallel tool calls and mixed parts', async () => {
         const model = mockModel([
             {
-                type: 'tool-call', 
-                toolName: 'lookup', 
-                input: { q: 1 }, 
-                usage: { inputTokens: 3, outputTokens: 4 }, 
+                parts: [
+                    { type: 'text', text: 'thinking' },
+                    {
+                        type: 'tool-call',
+                        toolName: 'a',
+                        input: { q: 1 },
+                    },
+                    {
+                        type: 'tool-call',
+                        toolName: 'b',
+                        input: {},
+                    },
+                ],
+                usage: { inputTokens: 3, outputTokens: 4 },
             },
-            { type: 'text', text: 'done' },
+            { parts: [{ type: 'text', text: 'done' }] },
         ]);
         const first = await generateText({ model, prompt: 'hi' });
-        expect(first.toolCalls[0]?.toolName).toBe('lookup');
+        expect(first.toolCalls.map((c) => c.toolName)).toEqual(['a', 'b']);
+        expect(first.text).toBe('thinking');
         expect(first.usage.inputTokens).toBe(3);
-        const second = await generateText({ model, prompt: 'hi' });
-        expect(second.text).toBe('done');
+
+        // the counter is shared between generate and stream
+        const second = streamText({ model, prompt: 'hi' });
+        expect(await second.text).toBe('done');
+    });
+
+    it('throws when the script is exhausted', async () => {
+        const model = mockModel([{ parts: [{ type: 'text', text: 'only' }] }]);
+        await generateText({ model, prompt: 'hi' });
+        await expect(generateText({
+            model,
+            prompt: 'hi',
+            maxRetries: 0,
+        })).rejects.toThrow('mock script exhausted');
     });
 });

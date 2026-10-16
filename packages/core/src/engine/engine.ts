@@ -26,6 +26,8 @@ export interface RunEngineOptions {
     /** HMAC secret for resume tokens. */
     resumeSecret: string;
     clock?: Clock;
+    /** Receives errors that have no caller to throw to. Default console.error. */
+    onError?: (error: unknown, run?: Run) => void;
 }
 
 export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt'> & Partial<Pick<TriggerEnvelope, 'id' | 'receivedAt'>>;
@@ -49,6 +51,8 @@ export class RunEngine {
 
     protected readonly listeners = new Set<(e: RunEvent) => void>();
 
+    protected readonly onError: (error: unknown, run?: Run) => void;
+
     protected started = false;
 
     protected lastCreatedAt = 0;
@@ -60,13 +64,16 @@ export class RunEngine {
         this.owner = opts.owner ?? `${hostname()}-${pid}`;
         this.clock = opts.clock ?? systemClock;
         this.resumeSecret = opts.resumeSecret;
+        // eslint-disable-next-line no-console
+        this.onError = opts.onError ?? ((error) => console.error('[chamberu]', error));
         this.queue = new RunQueue({
             store: this.store,
             clock: this.clock,
             owner: this.owner,
             maxConcurrentRuns: opts.maxConcurrentRuns ?? 4,
             claimTtlMs: opts.claimTtlMs ?? 60_000,
-            execute: (run) => this.execute(run),
+            execute: (run) => this.guardedExecute(run),
+            onError: (error, run) => this.onError(error, run),
             onRunUpdated: (run) => this.emit({ type: 'run.updated', run }),
         });
     }
@@ -126,7 +133,14 @@ export class RunEngine {
 
     async start(): Promise<void> {
         this.started = true;
+        this.queue.startPolling();
         await this.queue.pump();
+    }
+
+    /** Stops polling for new work; running runs finish. */
+    stop(): void {
+        this.started = false;
+        this.queue.stopPolling();
     }
 
     idle(): Promise<void> {
@@ -141,15 +155,32 @@ export class RunEngine {
         await this.finish(run.id, { status: 'completed' });
     }
 
+    /** A throwing execution fails the run (and releases its claim) instead of leaking. */
+    protected async guardedExecute(run: Run): Promise<void> {
+        try {
+            await this.execute(run);
+        } catch (error) {
+            const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+            await this.finish(run.id, {
+                status: 'failed',
+                error: {
+                    code: typeof code === 'string' ? code : 'Error',
+                    message: error instanceof Error ? error.message : String(error),
+                },
+            });
+            this.onError(error, run);
+        }
+    }
+
     protected async finish(id: string, patch: Partial<Run>): Promise<Run> {
         const now = this.clock.now();
         const updated = await this.store.updateRun(
             id,
             {
-                claim: undefined, 
-                finishedAt: now, 
-                updatedAt: now, 
-                ...patch, 
+                claim: undefined,
+                finishedAt: now,
+                updatedAt: now,
+                ...patch,
             },
             { expectStatus: ['running'] },
         );
@@ -158,7 +189,13 @@ export class RunEngine {
     }
 
     protected emit(event: RunEvent): void {
-        for (const listener of this.listeners) listener(event);
+        for (const listener of this.listeners) {
+            try {
+                listener(event);
+            } catch (error) {
+                this.onError(error);
+            }
+        }
     }
 
     /** Strictly increasing per process, so FIFO order survives identical clock readings. */
