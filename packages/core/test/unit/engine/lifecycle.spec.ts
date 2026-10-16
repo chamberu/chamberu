@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 import type { LanguageModelV4CallOptions } from '@ai-sdk/provider';
 import { tool } from 'ai';
 import type { LanguageModel, ToolSet } from 'ai';
@@ -10,9 +11,15 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { RunEngine, defineAgent } from '@chamberu/core';
+import {
+    InvalidRunStateError,
+    LeaseLostError,
+    RunEngine,
+    defineAgent,
+} from '@chamberu/core';
 import type { Run, RunEngineOptions, RunEvent } from '@chamberu/core';
-import { ControllableClock } from '../../../src/clock.ts';
+import type { Clock } from '../../../src/clock.ts';
+import { ControllableClock, systemClock } from '../../../src/clock.ts';
 import { MemoryStore } from '../../../src/store/memory.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
@@ -27,6 +34,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolv
 afterEach(() => {
     for (const e of engines) e.stop();
     engines.length = 0;
+    vi.restoreAllMocks();
 });
 
 /** One model turn: a response, optionally held until `before` resolves, or a call that only settles by aborting. */
@@ -109,6 +117,36 @@ const env = {
     payload: { issue: 42 },
 };
 
+const lookupTools = () => ({
+    lookup: tool({
+        inputSchema: z.object({ q: z.number() }),
+        execute: async () => 'found',
+    }),
+});
+
+/** Real time for timestamps, manually fired timers (polls, renewals). */
+class ManualTimers extends ControllableClock {
+    override now(): Date {
+        return new Date();
+    }
+}
+
+/** Hands the run's claim to owner 'B' right before the first write that sets `status` to `on`. */
+class TakeoverStore extends MemoryStore {
+    takeoverOn: Run['status'] | undefined;
+
+    override async updateRun(...args: Parameters<MemoryStore['updateRun']>) {
+        const [id, patch] = args;
+        if (this.takeoverOn !== undefined && patch.status === this.takeoverOn) {
+            this.takeoverOn = undefined;
+            await super.updateRun(id, { claim: { owner: 'B', expiresAt: new Date(Date.now() + 60_000) } });
+        }
+        return super.updateRun(...args);
+    }
+}
+
+const isLeaseLost = (error: unknown) => error instanceof LeaseLostError;
+
 function makeRun(id: string, overrides: Partial<Run> = {}): Run {
     const createdAt = new Date(1_000);
     return {
@@ -171,9 +209,12 @@ describe('graceful drain', () => {
         await engine.start();
         const { runId } = await engine.dispatch(env);
         await vi.waitFor(() => expect(calls).toHaveLength(2));
+        const timers = vi.spyOn(systemClock, 'setTimeout');
 
         await engine.drain({ timeoutMs: 50 });
 
+        // the deadline keeps the process alive, so the run is marked before exit
+        expect(timers).toHaveBeenCalledWith(expect.any(Function), 50, { keepAlive: true });
         const run = await store.getRun(runId);
         expect(run?.status).toBe('interrupted');
         expect(run?.claim).toBeUndefined();
@@ -181,6 +222,75 @@ describe('graceful drain', () => {
         expect(run?.error).toBeUndefined();
         expect((await store.latestCheckpoint(runId))?.stepIndex).toBe(0);
         expect(errors).toEqual([]);
+    });
+
+    it('only the drain deadline holds the event loop open', () => {
+        const native = vi.spyOn(globalThis, 'setTimeout');
+        const kept = systemClock.setTimeout(() => {}, 10_000, { keepAlive: true });
+        const unref = systemClock.setTimeout(() => {}, 10_000);
+        const [keptHandle, unrefHandle] = native.mock.results.map((r) => r.value as NodeJS.Timeout);
+        expect(keptHandle?.hasRef()).toBe(true);
+        expect(unrefHandle?.hasRef()).toBe(false);
+        kept.clear();
+        unref.clear();
+        const manual = new ControllableClock();
+        const asClock: Clock = manual;
+        let fired = false;
+        asClock.setTimeout(() => {
+            fired = true;
+        }, 10, { keepAlive: true });
+        manual.advance(10);
+        expect(fired).toBe(true);
+    });
+
+    it('an interrupted keyed run blocks its key until it is recovered and completed', async () => {
+        const { model, calls } = scripted([toolTurn, 'hang', text('first done'), text('second done')]);
+        const store = new MemoryStore();
+        const keyed = { ...env, concurrencyKey: 'issue-42' };
+        const a = make(model, {
+            store,
+            tools: lookupTools,
+            owner: 'A',
+        });
+        const bClock = new ManualTimers();
+        const b = make(model, {
+            store,
+            tools: lookupTools,
+            owner: 'B',
+            clock: bClock,
+            claimTtlMs: 900,
+        });
+        await b.engine.start();
+        await a.engine.start();
+        const { runId: first } = await a.engine.dispatch(keyed);
+        await vi.waitFor(() => expect(calls).toHaveLength(2));
+        await a.engine.drain({ timeoutMs: 50 });
+        expect((await store.getRun(first))?.status).toBe('interrupted');
+
+        // a redelivery on the live replica waits behind the interrupted first pass
+        const { runId: second } = await b.engine.dispatch(keyed);
+        await b.engine.idle();
+        expect((await store.getRun(second))?.status).toBe('queued');
+        expect(calls).toHaveLength(2);
+
+        // the next poll recovers the first run; it completes before the second starts
+        bClock.advance(300);
+        await flush();
+        await b.engine.idle();
+
+        const firstRun = await store.getRun(first);
+        const secondRun = await store.getRun(second);
+        expect(firstRun).toMatchObject({ status: 'completed', output: 'first done' });
+        expect(secondRun).toMatchObject({ status: 'completed', output: 'second done' });
+        expect(secondRun!.startedAt!.getTime()).toBeGreaterThanOrEqual(firstRun!.finishedAt!.getTime());
+        expect(calls).toHaveLength(4);
+        const hasLookupResult = (i: number) => calls[i]!.prompt.some((m) => m.role === 'tool' &&
+            m.content.some((p) => p.type === 'tool-result' && p.toolName === 'lookup'));
+        // the model sees the interrupted run's resumed prompt first
+        expect(hasLookupResult(2)).toBe(true);
+        expect(hasLookupResult(3)).toBe(false);
+        expect(a.errors).toEqual([]);
+        expect(b.errors).toEqual([]);
     });
 
     it('dispatch during drain stores queued run but does not start it', async () => {
@@ -248,6 +358,10 @@ describe('recovery', () => {
         const resumedPrompt = calls[2]!.prompt;
         expect(resumedPrompt.some((m) => m.role === 'tool' &&
             m.content.some((p) => p.type === 'tool-result' && p.toolName === 'lookup'))).toBe(true);
+        // the restored history holds A's tool call, not a fresh start from the trigger
+        expect(resumedPrompt.some((m) => m.role === 'assistant' && Array.isArray(m.content) &&
+            m.content.some((p) => p.type === 'tool-call' && p.toolName === 'lookup'))).toBe(true);
+        expect((await store.latestCheckpoint(runId))?.stepIndex).toBe(1);
         const steps = await store.listSteps(runId);
         expect(steps.map((s) => s.kind)).toEqual(['llm', 'tool', 'llm']);
         expect(steps.map((s) => s.index)).toEqual([0, 1, 2]);
@@ -317,7 +431,10 @@ describe('recovery', () => {
         expect(JSON.stringify(checkpoint?.messages)).toContain('B done');
         expect(JSON.stringify(checkpoint?.messages)).not.toContain('A late');
         expect(a.events.slice(before)).toEqual([]);
-        expect(a.errors).toEqual([]);
+        // the lost lease is reported once, typed, with the run id
+        expect(a.errors).toHaveLength(1);
+        expect(a.errors[0]).toBeInstanceOf(LeaseLostError);
+        expect((a.errors[0] as LeaseLostError).runId).toBe(runId);
     });
 
     it('an execution that fails to renew its lease stops without writing, and is recovered after expiry', async () => {
@@ -361,6 +478,46 @@ describe('recovery', () => {
         await engine.idle();
         expect(await store.getRun(runId)).toMatchObject({ status: 'completed', output: 'again' });
         expect(calls).toHaveLength(2);
-        expect(errors).toEqual([]);
+        expect(errors).toHaveLength(1);
+        expect(errors.every(isLeaseLost)).toBe(true);
+    });
+
+    it('finish writes nothing when the claim is taken over after the last ownership check', async () => {
+        const store = new TakeoverStore();
+        store.takeoverOn = 'completed';
+        const { model } = scripted([text('late')]);
+        const {
+            engine,
+            errors,
+            events,
+        } = make(model, { store, owner: 'A' });
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await engine.idle();
+
+        // the atomic expectOwner check in the store rejected the settle
+        const run = await store.getRun(runId);
+        expect(run).toMatchObject({ status: 'running', claim: { owner: 'B' } });
+        expect(run?.output).toBeUndefined();
+        expect(events.some((e) => e.type === 'run.updated' && e.run.status === 'completed')).toBe(false);
+        expect(errors).toHaveLength(1);
+        expect(errors.every(isLeaseLost)).toBe(true);
+    });
+
+    it('cancel throws when the execution loses its lease while being cancelled', async () => {
+        const store = new TakeoverStore();
+        const { model, calls } = scripted(['hang']);
+        const { engine, errors } = make(model, { store, owner: 'A' });
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await vi.waitFor(() => expect(calls).toHaveLength(1));
+
+        store.takeoverOn = 'cancelled';
+        await expect(engine.cancel(runId)).rejects.toBeInstanceOf(InvalidRunStateError);
+        await engine.idle();
+
+        expect(await store.getRun(runId)).toMatchObject({ status: 'running', claim: { owner: 'B' } });
+        expect(errors).toHaveLength(1);
+        expect(errors.every(isLeaseLost)).toBe(true);
     });
 });

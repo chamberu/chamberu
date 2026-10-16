@@ -271,10 +271,14 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const preStepErrors = new Map<string, unknown>();
     let beforeFirstStep = true;
 
-    /** Runs a store write unless the execution was abandoned meanwhile or lost the run. */
-    const guarded = async (write: () => Promise<void>): Promise<boolean> => {
+    /**
+     * Runs a store write unless the execution was abandoned meanwhile or lost
+     * the run. `checkOwner: false` skips the ownership read for writes that are
+     * owner-conditional in the store already (ctx.update).
+     */
+    const guarded = async (write: () => Promise<void>, { checkOwner = true } = {}): Promise<boolean> => {
         if (abandoned || signal.aborted) return false;
-        if (ctx.ownsRun && !await ctx.ownsRun()) return false;
+        if (checkOwner && ctx.ownsRun && !await ctx.ownsRun()) return false;
         if (abandoned || signal.aborted) return false;
         await write();
         return true;
@@ -362,7 +366,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
             usage.outputTokens += tokens.outputTokens;
             await guarded(async () => {
                 await ctx.update({ usage: { ...usage }, updatedAt: clock.now() });
-            });
+            }, { checkOwner: false });
             stepStartedAt = clock.now();
         } catch (error) {
             fatal ??= { error };

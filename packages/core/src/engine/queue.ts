@@ -24,7 +24,7 @@ const groupKey = (run: Pick<Run, 'agent' | 'concurrencyKey'>) => `${run.agent}\u
 /**
  * Concurrency-aware scheduler: starts queued runs in FIFO order of createdAt
  * when (a) a local slot is free, (b) no run of the same agent + concurrencyKey
- * is running or waiting (checked in the store, as replicas share it) and
+ * is running, waiting or interrupted (checked in the store, as replicas share it) and
  * (c) the run claim succeeds.
  */
 export class RunQueue {
@@ -165,7 +165,8 @@ export class RunQueue {
             if (this.running.values().toArray().includes(group)) return undefined;
             const { total } = await store.listRuns({
                 agent: run.agent,
-                status: ['running', 'waiting'],
+                // an interrupted run is unfinished and keeps its key until recovery requeues it
+                status: ['running', 'waiting', 'interrupted'],
                 concurrencyKey: run.concurrencyKey,
                 limit: 1,
             });

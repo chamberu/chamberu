@@ -42,3 +42,18 @@ export class InvalidRunStateError extends ChamberuError {
         super({ message, code: 'invalid_run_state' });
     }
 }
+
+/**
+ * Reported to onError when this engine stops executing a run because its
+ * claim was lost (renewal refused, or another owner took the run over). The
+ * run is not failed: its current owner, or recovery after the claim expired,
+ * carries it on.
+ */
+export class LeaseLostError extends ChamberuError {
+    readonly runId: string;
+
+    constructor(runId: string) {
+        super({ message: `Lost the claim of run "${runId}"; it is no longer executed here.`, code: 'lease_lost' });
+        this.runId = runId;
+    }
+}

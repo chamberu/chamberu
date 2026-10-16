@@ -9,6 +9,7 @@ import {
     InvalidAgentDefinitionError,
     InvalidResumeTokenError,
     InvalidRunStateError,
+    LeaseLostError,
     RunNotFoundError,
 } from '../errors.ts';
 import type { Notifier } from '../notify/types.ts';
@@ -251,7 +252,8 @@ export class RunEngine {
 
         let timer: { clear(): void } | undefined;
         const timedOut = new Promise<true>((resolve) => {
-            timer = this.clock.setTimeout(() => resolve(true), opts.timeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS);
+            // keepAlive: the process must not exit before the leftovers are marked interrupted
+            timer = this.clock.setTimeout(() => resolve(true), opts.timeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS, { keepAlive: true });
         });
         const settled = await Promise.race([this.queue.idle().then(() => false as const), timedOut]);
         timer?.clear();
@@ -274,7 +276,9 @@ export class RunEngine {
 
     /**
      * Cancels a run: aborts it when it executes in this process (resolving once
-     * it settled), or marks a queued or waiting run cancelled.
+     * it settled), or marks a queued or waiting run cancelled. Throws
+     * InvalidRunStateError when the local execution lost its lease meanwhile:
+     * the run was not cancelled and may execute on another owner now.
      */
     async cancel(runId: string): Promise<void> {
         const execution = this.executions.get(runId);
@@ -282,6 +286,9 @@ export class RunEngine {
             execution.stop ??= 'cancel';
             execution.controller.abort();
             await execution.done;
+            if (execution.stop === 'lease-lost') {
+                throw new InvalidRunStateError(`Run "${runId}" lost its claim while being cancelled; it is no longer executing here.`);
+            }
             return;
         }
         const run = await this.store.getRun(runId);
@@ -579,12 +586,16 @@ export class RunEngine {
         return false;
     }
 
-    /** Aborts the local execution of a run another owner may hold now; it writes nothing more. */
+    /**
+     * Aborts the local execution of a run another owner may hold now; it writes
+     * nothing more. Reported once per execution as a LeaseLostError.
+     */
     protected loseLease(id: string): void {
         const execution = this.executions.get(id);
-        if (!execution) return;
+        if (!execution || execution.stop === 'lease-lost') return;
         execution.stop = 'lease-lost';
         execution.controller.abort();
+        this.onError(new LeaseLostError(id));
     }
 
     protected emit(event: RunEvent): void {

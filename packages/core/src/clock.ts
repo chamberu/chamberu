@@ -1,14 +1,22 @@
+export interface ClockTimerOptions {
+    /**
+     * Keep the process alive until the timer fires (default false: engine
+     * timers never hold the event loop open). Test clocks ignore it.
+     */
+    keepAlive?: boolean;
+}
+
 export interface Clock {
     now(): Date;
-    setTimeout(fn: () => void, ms: number): { clear(): void };
+    setTimeout(fn: () => void, ms: number, opts?: ClockTimerOptions): { clear(): void };
 }
 
 export const systemClock: Clock = {
     now: () => new Date(),
-    setTimeout: (fn, ms) => {
+    setTimeout: (fn, ms, opts) => {
         const handle = setTimeout(fn, ms);
-        // never keep the process alive just for engine timers
-        handle.unref?.();
+        // never keep the process alive just for engine timers, unless asked to
+        if (!opts?.keepAlive) handle.unref?.();
         return { clear: () => clearTimeout(handle) };
     },
 };
@@ -37,6 +45,7 @@ export class ControllableClock implements Clock {
         return new Date(this.current);
     }
 
+    /** Clock options (keepAlive) have no meaning without a real event loop and are ignored. */
     setTimeout(fn: () => void, ms: number): { clear(): void } {
         const timer: Timer = {
             at: this.current + ms, 
