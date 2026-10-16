@@ -2,68 +2,89 @@
 
 ## Core Concepts
 
-App, Agent, Trigger, Run, Step, State, Tool, Workspace, Notifier, Store. Keep the concept surface at about ten. chamberu never wraps the AI SDK: models, messages and tool sets are passed through as-is.
+App, Agent, Trigger, Run, Step, State, Tool, Workspace, Notifier, Store. Keep the concept surface at about ten. chamberu never wraps the AI SDK: models (`LanguageModel`), messages (`ModelMessage`) and tool sets (`ToolSet`) are passed through as-is.
+
+`@chamberu/core` (as built in plan 001) holds: agent and trigger definitions, the `RunEngine`, step checkpoints, budgets, effect tools, approvals with signed resume tokens, recovery and drain, agent state, the `Store`/`Notifier` interfaces, `MemoryStore` and the store contract suite. Everything time-based goes through an injectable `Clock` (`systemClock`, `ControllableClock` in tests). The public surface is `src/index.ts`; `@chamberu/core/testing` exports `describeStoreContract` and `ControllableClock`.
 
 ## Agents
 
-`defineAgent({...})` takes a typed config object. Agent names match `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 chars, unique per app.
+`defineAgent({...})` takes a typed config object and returns `{ name, definition }` with the budget defaults applied (`maxSteps: 20`, `timeoutMs: 15 min`). Agent names match `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 chars, unique per app; trigger ids must be unique per agent (`InvalidAgentDefinitionError` otherwise). `tools` is a factory `({ state, run }) => ToolSet`, called per execution. `approvals` maps tool names to `'user'` or a policy function (`'user' | 'allow' | 'deny'`), translated to the AI SDK's `toolApproval`. `notify` names a notifier registered on the engine (checked in the `RunEngine` constructor).
 
 ## Triggers and the Envelope
 
-Every trigger is normalized into one envelope, then becomes a Run:
+`cron()`, `http()` and `manual()` build `TriggerDefinition`s (`{ source, id, options, concurrencyKey?, idempotencyKey? }`). `cron()` validates the expression with cron-parser and stores the overlap policy (default `skip`; others `queue-one`, `allow`), enforced in a later plan. Firing cron and HTTP triggers is not part of core: `engine.dispatch(envelope)` is the only intake.
 
 ```ts
 interface TriggerEnvelope {
-    id: string;
+    id: string;              // defaults to a UUID
     agent: string;
+    trigger: string;         // trigger id, e.g. 'manual'
     source: 'cron' | 'http' | 'github' | 'mcp' | 'manual';
     payload: unknown;
-    idempotencyKey: string;
-    receivedAt: Date;
+    idempotencyKey?: string;
+    concurrencyKey?: string;
+    thread?: string;
+    receivedAt: Date;        // defaults to now
 }
 ```
 
-Trigger sources are exactly `cron | http | github | mcp | manual`. The cron overlap policy is stored on the trigger definition and defaults to `skip` (others: `queue-one`, `allow`); enforcement comes later.
+The envelope (source, trigger, payload) is rendered as a JSON block and becomes the run's first user message.
 
 ## Run Lifecycle
 
-Envelope -> Run -> Steps (llm | tool | wait | sandbox).
-
-Run statuses are exactly `queued | running | waiting | completed | failed | cancelled | interrupted`.
+Run statuses are exactly `queued | running | waiting | completed | failed | cancelled | interrupted`. Steps are `llm | tool | wait`.
 
 ```
-queued -> running -> waiting (approval/input) -> running
-running -> completed | failed | cancelled
-running -> interrupted (process restart) -> resumed from last checkpoint
+dispatch -> queued -> running -> completed | failed | cancelled
+running -> waiting (approval) -> queued (resume or timeout answers it) -> running
+running -> interrupted (drain) -> queued (recover) -> running
+running with an expired claim (crash) -> queued (recover) -> running
 ```
 
-- A checkpoint (messages + tool results) is written after every step. On restart, `interrupted` runs resume from the last checkpoint.
-- `waiting` runs carry a signed resume token; resume via REST, UI or MCP, with a timeout and a default action.
-- Concurrency: a per-agent `concurrencyKey` allows one run at a time per key.
-- Budgets (steps, tokens, timeout) are enforced as stop conditions and an abort signal.
+- **Intake**: with an `idempotencyKey`, `dispatch` claims `(agent:source, key)` in the `IdempotencyStore` (TTL 7 days); a duplicate returns the existing run id with `deduplicated: true`.
+- **Scheduling** (`engine/queue.ts`): a pass lists `queued` runs FIFO (createdAt, then id) and starts them up to `maxConcurrentRuns`. A keyed run starts only when no other run of the same agent and `concurrencyKey` is `running`, `waiting` or `interrupted`; check, claim and transition happen under a store lock `concurrency:<agent>:<key>` so it holds across replicas.
+- **Claims**: `claimRun(id, owner, claimTtlMs)` is a lease, renewed every `claimTtlMs / 3`. The poll runs on the same interval and calls `tick()` (approval expiry) and `recover()`. Every write of a running run is conditional on status and owner; an engine that loses its lease aborts the execution, writes nothing more and reports a `LeaseLostError` to `onError`.
+- **Execution** (`engine/execute.ts`): one `ToolLoopAgent` call per execution, starting from the latest checkpoint. After every step the engine appends the steps and saves a checkpoint (messages plus the step's `finishReason`). An abandon guard stops a still-running generate from writing after the run settled.
+- **Budgets** (`engine/budget.ts`): `maxSteps` and `maxTokens` are stop conditions, `timeoutMs` an abort signal per execution (built on the `Clock`). Stopped by a budget while the last step asked for tool calls: `failed` with `BudgetExceeded`; otherwise `completed`. Timeout: `failed` with `Timeout`.
+- **Tool errors** go back to the model as tool-error results; only `FatalToolError` (and infrastructure or store failures) fail the run.
+- **Cancel**: aborts a local execution (`cancelled`), or marks a `queued`/`waiting` run cancelled.
+- **Drain**: `drain({ timeoutMs })` stops polling and starting runs, waits for in-flight runs (default 30 s), then aborts the rest and marks them `interrupted` with the claim released. `stop()` only stops polling.
+- **Recovery**: `recover()` (on `start()` and every poll) claims each `running` or `interrupted` run whose claim expired or was released and requeues it; the next execution continues from the latest checkpoint. A step whose checkpoint never landed runs again.
+
+## Approvals
+
+- A tool call needing approval ends the step; the first unanswered `tool-approval-request` becomes the run's `WaitPoint` (`approvalId`, `toolName`, `input`, `expiresAt`, `tokenId`). Other approval requests from the same step are dropped from the history; the model asks again after the resume (one approval per pause).
+- `running -> waiting` releases claim and slot (a keyed run keeps its key blocked). The notifier named by the agent gets one `approval` notification per wait point (deduped by a store lock), carrying a resume token.
+- Resume token: `base64url(JSON { runId, approvalId, tokenId, exp }) + '.' + base64url(HMAC-SHA256(resumeSecret, payload))`, compared in constant time.
+- `resume(token, decision)` verifies the token against the current wait point, moves `waiting -> queued` (guarded by `expectStatus`, so only one answer writes), appends the `tool-approval-response` to the checkpoint and a `wait` step, then clears `waiting`. A failure undoes back to `waiting`, so the token stays valid; a crash in between re-pauses on the same wait point.
+- `tick()` denies approvals past `expiresAt` with reason `approval timed out` (default `approvalTimeoutMs` 24 h). A resumed approval gets one step beyond `maxSteps`, so an approval on the last step is still answered.
 
 ## Store Contract
 
-The store is a set of small interfaces combined as `Store`:
+The store is a set of small interfaces combined as `Store` (`src/store/types.ts`):
 
 | Interface | Holds |
 |-----------|-------|
-| `RunStore` | Runs and their status transitions |
-| `StepStore` | Steps per run |
-| `CheckpointStore` | Latest checkpoint per run |
-| `IdempotencyStore` | Trigger dedupe keys (GitHub delivery id, cron `(job, scheduledAt)`, client key) |
-| `LockStore` | Leases and per-tick locks (safe with replicas > 1) |
-| `EffectStore` | Step memoization and effect records keyed by `(runId, stepId)` / `effectKey` |
-| `StateStore` | Agent state (KV plus typed collections) that outlives runs |
+| `RunStore` | Runs; `updateRun` with `expectStatus`/`expectOwner` guards; `listRuns` ordered by createdAt then id; `claimRun`/`renewClaim` leases |
+| `StepStore` | Append-only steps per run |
+| `CheckpointStore` | Latest checkpoint per run (highest `stepIndex`; equal index replaces) |
+| `IdempotencyStore` | `claimKey(scope, key, runId, ttl)`: first caller wins |
+| `LockStore` | `acquire`/`release` of keyed leases |
+| `EffectStore` | Recorded effect results by effect key |
+| `StateStore` | Per-agent KV and document collections (`where` = top-level equality) |
 
-Planned (not implemented yet): `MemoryStore` (in `@chamberu/core`, dev and tests) and a TypeORM/Postgres store. `describeStoreContract()` will be a shared test suite every implementation must pass. Redis is never required.
+Rules every implementation must keep: a TTL created at T with `ttlMs` is expired at exactly `T + ttlMs`; values are copied in and out (no aliasing); atomic operations are atomic across callers. `MemoryStore` implements it in-process (structured clones, no await between check and write). `describeStoreContract((clock) => store)` from `@chamberu/core/testing` is the shared Vitest suite every store must pass; the factory must use the given `ControllableClock` for expiry. Redis is never required; a TypeORM/Postgres store is planned.
 
 ## Idempotency and Side Effects
 
 1. Trigger dedupe at intake via `IdempotencyStore`.
-2. Step memoization by `(runId, stepId)`, so a resumed run does not repeat a tool call.
-3. Side-effecting tools use `defineEffectTool()` with an `effectKey` per call and an optional `alreadyApplied(effectKey)` check, reconciling before acting. The goal is effectively-once for external effects.
+2. Completed steps are never repeated: execution resumes from the latest checkpoint.
+3. Side-effecting tools use `defineEffectTool()`. Per call the wrapper (`wrapToolsForRun`) returns the recorded result for the effect key, else asks `alreadyApplied(effectKey, input, ctx)`, else executes and records the result. The default key is `${runId}:${toolName}:${sha256(canonical JSON of input)}`. A throwing execute records nothing; a crash between the effect and the record repeats it unless `alreadyApplied` finds it (`effectMarker(key)` is the hidden marker to embed). Parallel identical calls in one step share one application.
 
 ## Agent State
 
-KV (`state.get/set`) plus typed collections declared in `defineAgent`, exposed to the model as generated tools and to code.
+`createAgentState(agent, schema, store)`: KV (`state.get/set`) plus typed collections declared as `state: Record<name, StandardSchemaV1>` in `defineAgent`. `upsert` validates with the collection's Standard Schema (`ValidationError` on failure, nothing stored). With a schema, the model also gets `state_<coll>_list`, `state_<coll>_upsert` and `state_<coll>_remove` tools (upsert and remove are effect tools); user tools win on a name clash.
+
+## Errors
+
+All errors extend `ChamberuError` (ebec `BaseError`) with a `code`: `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `BudgetExceededError` (`BudgetExceeded`), `FatalToolError`, `RunNotFoundError`, `InvalidRunStateError`, `LeaseLostError`, `ValidationError`. A failed run stores `{ code, message }` in `run.error`.

@@ -9,11 +9,14 @@ chamberu/
 │       ├── src/                     # Library source (entry: src/index.ts)
 │       ├── test/
 │       │   ├── vitest.config.ts     # Aliases @chamberu/core to ../src/index.ts
-│       │   └── unit/                # *.spec.ts files
+│       │   ├── unit/                # *.spec.ts files
+│       │   ├── fixtures/            # readme-example.ts (the README example, run as a test)
+│       │   └── utils/               # mock-model.ts
 │       ├── tsdown.config.ts         # Builds dist/index.mjs + dist/index.d.mts
 │       ├── tsconfig.json            # src + test (typecheck)
 │       └── tsconfig.build.json      # src only (build:types)
 ├── .github/
+│   ├── assets/                      # README diagrams (theme-aware SVGs)
 │   ├── actions/{install,build}/     # Composite actions
 │   └── workflows/{ci,release}.yml   # CI (Node 22, 24) and release-please + npm publish
 ├── nx.json                          # Task orchestration and caching
@@ -60,4 +63,4 @@ The memory store lives inside `@chamberu/core` (no separate `store-memory` packa
 | `state/{api,tools}.ts` | Agent state API and generated tools |
 | `clock.ts` | Injectable `Clock` for tests |
 
-Modules are added incrementally; check `src/` for what exists now.
+`testing.ts` is the `@chamberu/core/testing` entry (`describeStoreContract`, `ControllableClock`).

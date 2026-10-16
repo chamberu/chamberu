@@ -14,9 +14,8 @@ npx nx run @chamberu/core:test                     # one package
 ## Conventions
 
 - Tests import the package by name (`@chamberu/core`); `vitest.config.ts` aliases it to `src/index.ts`, so tests run against sources, not `dist`.
-Planned (these land in later tasks of plan 001 and do not exist yet):
-
 - Use `MemoryStore` and a mock model (`test/utils/mock-model.ts`) instead of mocking internals. Prefer fakes over `vi.mock()`.
 - Time goes through the injectable `Clock`, never real timers.
 - Every store implementation runs `describeStoreContract()` from `@chamberu/core/testing`.
 - `test/unit/smoke.spec.ts` checks that the package entry resolves.
+- `test/unit/exports.spec.ts` pins the public exports; `test/unit/readme.spec.ts` runs `test/fixtures/readme-example.ts` and checks that `README.md` contains that file verbatim. Change the example in the fixture, then copy it into the README.
