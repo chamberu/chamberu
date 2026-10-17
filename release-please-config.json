@@ -4,7 +4,8 @@
     "bump-patch-for-minor-pre-major": true,
     "initial-version": "0.1.0",
     "packages": {
-        "packages/core": {"component": "core"}
+        "packages/core": {"component": "core"},
+        "packages/test-kit": {"component": "test-kit"}
     },
     "plugins": [
         {
