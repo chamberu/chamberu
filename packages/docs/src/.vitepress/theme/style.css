@@ -17,3 +17,9 @@
 .vp-doc .figure img {
     width: 100%;
 }
+
+/* Images that ship a light and a dark variant follow the site toggle, not the OS setting. */
+html:not(.dark) .only-dark,
+html.dark .only-light {
+    display: none;
+}
