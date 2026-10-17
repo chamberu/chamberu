@@ -6,12 +6,14 @@
  */
 
 import type {
+    Checkpoint,
     Run,
     RunStatusLiteral,
+    Step,
     TriggerEnvelope,
     WaitPoint,
 } from '@chamberu/core';
-import type { RunRow } from './types.ts';
+import type { CheckpointRow, RunRow, StepRow } from './types.ts';
 
 /** Run properties stored in a column of their own, by column name. */
 const RUN_COLUMNS: Record<string, string> = {
@@ -133,4 +135,34 @@ export function toRun(row: RunRow): Run {
     if (row.finished_at !== null) run.finishedAt = row.finished_at;
 
     return run;
+}
+
+/** Map a chamberu_steps row to a Step: null name/input/output/error become absent. */
+export function toStep(row: StepRow): Step {
+    const step: Step = {
+        runId: row.run_id,
+        index: row.step_index,
+        kind: row.kind as Step['kind'],
+        startedAt: row.started_at,
+        finishedAt: row.finished_at,
+    };
+    if (row.name !== null) step.name = row.name;
+    if (row.input !== null) step.input = row.input;
+    if (row.output !== null) step.output = row.output;
+    if (row.error !== null) step.error = row.error;
+
+    return step;
+}
+
+/** Map a chamberu_checkpoints row to a Checkpoint: a null finish reason becomes absent. */
+export function toCheckpoint(row: CheckpointRow): Checkpoint {
+    const checkpoint: Checkpoint = {
+        runId: row.run_id,
+        stepIndex: row.step_index,
+        messages: row.messages as Checkpoint['messages'],
+        createdAt: row.created_at,
+    };
+    if (row.finish_reason !== null) checkpoint.finishReason = row.finish_reason;
+
+    return checkpoint;
 }
