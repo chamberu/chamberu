@@ -65,6 +65,15 @@ The `@tada5hi/*` config packages are the source of truth for lint, TS and commit
 - Errors extend `ChamberuError` (`@ebec/core` `BaseError`) and live in `src/errors/`, one file each (see File Organization); never throw a bare `Error` from library code.
 - A new public export goes through its folder's `index.ts` (reached from `src/index.ts`) and must be added to the package's `test/unit/exports.spec.ts`.
 
+## Planning and Delivery
+
+- Plans and specs stay local (gitignored): the design spec and research notes in `docs/superpowers/specs/`, plans in `.agents/plans/` with `000-roadmap.md` as the living index (open work only, next free plan number at the top). A finished plan is deleted; its outcome moves into `.agents/architecture.md` or `.agents/design.md`.
+- Before building, turn the next plan into TDD tasks (superpowers `writing-plans`), then execute subagent-driven in a git worktree under `/opt/projects/chamberu/worktrees/<name>`; keep `master` checked out in the main clone.
+- For larger work, orchestrate with workflows: Opus implementers, Fable reviewers, a per-task review and fix loop, and an adversarial whole-branch review with one fix wave before merge.
+- Every change lands through a pull request with a Conventional Commit title and an evidence-based body (what changed, what was run). The repo squash-merges with the PR title as the commit message and deletes merged branches.
+- Ask before pushing to `master`, publishing to npm or merging release PRs. Settle visual choices (brand, layouts) with rendered previews before implementing.
+- Keep status updates short; lead with the result and the decisions taken on the owner's behalf.
+
 ## Commits
 
 Conventional Commits: `<type>(scope): <description>`, e.g. `feat(core): add run engine`. No AI-attribution trailers. release-please derives versions and changelogs from them.
