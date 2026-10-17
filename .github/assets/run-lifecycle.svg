@@ -42,19 +42,19 @@
     <text class="label" x="36" y="42">run lifecycle · RunEngine + Store</text>
 
     <!-- intake -->
-    <rect class="card" x="36" y="56" width="170" height="84" rx="12" stroke="#B45309" stroke-width="1.5"/>
+    <rect class="card" x="36" y="56" width="170" height="84" rx="12" stroke="#A8692E" stroke-width="1.5"/>
     <text class="title" x="52" y="84">dispatch()</text>
     <text class="code muted" x="52" y="106" font-size="12">trigger envelope</text>
     <text class="code muted" x="52" y="124" font-size="12">idempotencyKey</text>
 
     <!-- queued -->
-    <rect class="card" x="250" y="56" width="170" height="84" rx="12" stroke="#B45309" stroke-width="1.5"/>
+    <rect class="card" x="250" y="56" width="170" height="84" rx="12" stroke="#A8692E" stroke-width="1.5"/>
     <text class="title" x="266" y="84">queued</text>
     <text class="code muted" x="266" y="106" font-size="12">FIFO, one run</text>
     <text class="code muted" x="266" y="124" font-size="12">per concurrencyKey</text>
 
     <!-- running -->
-    <rect class="card" x="464" y="56" width="220" height="84" rx="12" stroke="#B45309" stroke-width="2"/>
+    <rect class="card" x="464" y="56" width="220" height="84" rx="12" stroke="#A8692E" stroke-width="2"/>
     <text class="title" x="480" y="84">running</text>
     <text class="code muted" x="480" y="106" font-size="12">llm | tool step</text>
     <text class="code muted" x="480" y="124" font-size="12">→ checkpoint, budget</text>
@@ -66,7 +66,7 @@
     <text class="code muted" x="744" y="124" font-size="12">cancelled</text>
 
     <!-- waiting -->
-    <rect class="card" x="464" y="196" width="220" height="84" rx="12" stroke="#2563EB" stroke-width="1.5"/>
+    <rect class="card" x="464" y="196" width="220" height="84" rx="12" stroke="#4A7F98" stroke-width="1.5"/>
     <text class="title" x="480" y="224">waiting</text>
     <text class="code muted" x="480" y="246" font-size="12">approval request</text>
     <text class="code muted" x="480" y="264" font-size="12">signed resume token</text>
@@ -83,8 +83,8 @@
     <path class="rail" d="M684 98 H724" stroke-width="2" marker-end="url(#rl-head)"/>
 
     <!-- pause and resume -->
-    <path d="M540 140 V192" stroke="#2563EB" stroke-width="2" marker-end="url(#rl-head)"/>
-    <path d="M464 238 H380 V144" stroke="#2563EB" stroke-width="2" marker-end="url(#rl-head)"/>
+    <path d="M540 140 V192" stroke="#4A7F98" stroke-width="2" marker-end="url(#rl-head)"/>
+    <path d="M464 238 H380 V144" stroke="#4A7F98" stroke-width="2" marker-end="url(#rl-head)"/>
     <rect class="chip" x="388" y="154" width="64" height="20" rx="10"/>
     <text class="code" x="420" y="168" font-size="11" text-anchor="middle">resume()</text>
 
@@ -96,8 +96,8 @@
 
     <!-- a run travelling queued → running → completed: one pass, then hidden -->
     <g opacity="0">
-        <circle r="9" fill="#B45309" fill-opacity="0.25"/>
-        <circle r="4.5" fill="#B45309"/>
+        <circle r="9" fill="#A8692E" fill-opacity="0.25"/>
+        <circle r="4.5" fill="#A8692E"/>
         <animateMotion dur="3s" repeatCount="1" fill="freeze" path="M206 98 H728"/>
         <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="3s" repeatCount="1" fill="freeze"/>
     </g>

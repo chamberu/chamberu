@@ -1,3 +1,7 @@
+<p align="center">
+    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo-test-kit.svg" alt="@chamberu/test-kit" width="128" height="128" />
+</p>
+
 <h1 align="center">@chamberu/test-kit</h1>
 
 <p align="center">

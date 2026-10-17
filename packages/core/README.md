@@ -1,3 +1,7 @@
+<p align="center">
+    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo.svg" alt="@chamberu/core" width="128" height="128" />
+</p>
+
 <h1 align="center">@chamberu/core</h1>
 
 <p align="center">
@@ -263,10 +267,12 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | Export | Kind | Purpose |
 |---|---|---|
 | `defineAgent` | function | Validates an agent definition and applies defaults |
+| `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
 | `cron`, `http`, `manual` | function | Trigger definitions |
 | `RunEngine` | class | `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |
+| `EFFECT` | symbol | Marks a tool created by `defineEffectTool()` |
 | `wrapToolsForRun` | function | Applies effect recording to a `ToolSet` outside the engine |
 | `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API and generated state tools over a store |

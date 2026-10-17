@@ -1,0 +1,40 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ca-title">
+    <title id="ca-title">chamberu organisation avatar: three arched chambers, one per agent, each holding the steps its run has checkpointed; the middle one is running</title>
+    <defs>
+        <linearGradient id="ca-tile" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#F6EEE4"/>
+            <stop offset="1" stop-color="#DCE6EA"/>
+        </linearGradient>
+        <linearGradient id="ca-edge" x1="24" y1="24" x2="232" y2="232" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#D4A373"/>
+            <stop offset="1" stop-color="#2E5566"/>
+        </linearGradient>
+        <linearGradient id="ca-stone" x1="128" y1="58" x2="128" y2="206" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#D9A66E"/>
+            <stop offset="1" stop-color="#3B6A7E"/>
+        </linearGradient>
+    </defs>
+    <rect width="256" height="256" fill="url(#ca-tile)"/>
+    <g transform="translate(128 131) scale(1.18) translate(-128 -131)">
+
+    <!-- the running chamber is lit -->
+    <path d="M103 200 V92 A25 25 0 0 1 153 92 V200 Z" fill="#D9A66E" fill-opacity="0.24"/>
+
+    <!-- three chambers on one floor -->
+    <g stroke="url(#ca-stone)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M48 200 V122 A19 19 0 0 1 86 122 V200"/>
+        <path d="M103 200 V92 A25 25 0 0 1 153 92 V200"/>
+        <path d="M170 200 V122 A19 19 0 0 1 208 122 V200"/>
+        <path d="M36 204 H220"/>
+    </g>
+
+    <!-- checkpointed steps, stacked bottom up -->
+    <rect x="58" y="178" width="18" height="12" rx="6" fill="#3B6A7E"/>
+    <rect x="114" y="178" width="28" height="12" rx="6" fill="#3B6A7E"/>
+    <rect x="114" y="160" width="28" height="12" rx="6" fill="#8A8A72"/>
+    <rect x="114" y="142" width="28" height="12" rx="6" fill="#D9A66E">
+    </rect>
+    <rect x="180" y="178" width="18" height="12" rx="6" fill="#3B6A7E"/>
+    <rect x="180" y="160" width="18" height="12" rx="6" fill="#8A8A72"/>
+    </g>
+</svg>

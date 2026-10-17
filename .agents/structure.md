@@ -18,7 +18,7 @@ chamberu/
 │   │   └── tsconfig.build.json      # src only (build:types)
 │   └── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
 ├── .github/
-│   ├── assets/                      # README diagrams (theme-aware SVGs)
+│   ├── assets/                      # logo.svg (+ test-kit and organisation variants), run-lifecycle.svg
 │   ├── actions/{install,build}/     # Composite actions
 │   ├── workflows/{ci,release}.yml   # CI (Node 22, 24) and release-please + npm publish
 │   ├── ISSUE_TEMPLATE/              # Bug report and feature request templates
