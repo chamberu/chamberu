@@ -6,7 +6,7 @@
  */
 
 export * from './checkpoint.ts';
-export * from './constants.ts';
+export { TableName } from './constants.ts';
 export * from './doc.ts';
 export * from './effect.ts';
 export * from './idempotency-key.ts';

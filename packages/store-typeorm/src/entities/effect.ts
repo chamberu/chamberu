@@ -10,7 +10,7 @@ import {
     Entity,
     PrimaryColumn,
 } from 'typeorm';
-import { TableName } from './constants.ts';
+import { JSON_VALUE_TRANSFORMER, TableName } from './constants.ts';
 
 @Entity({ name: TableName.EFFECTS })
 export class EffectEntity {
@@ -23,8 +23,9 @@ export class EffectEntity {
 
     @Column({
         name: 'result', 
-        type: 'jsonb', 
-        nullable: true, 
+        type: 'jsonb',
+        nullable: true,
+        transformer: JSON_VALUE_TRANSFORMER,
     })
     result!: unknown;
 }

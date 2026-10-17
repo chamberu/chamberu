@@ -10,7 +10,7 @@ import {
     Entity,
     PrimaryColumn,
 } from 'typeorm';
-import { TableName } from './constants.ts';
+import { JSON_VALUE_TRANSFORMER, TableName } from './constants.ts';
 
 @Entity({ name: TableName.KV })
 export class KvEntity {
@@ -28,6 +28,10 @@ export class KvEntity {
     })
     key!: string;
 
-    @Column({ name: 'value', type: 'jsonb' })
+    @Column({
+        name: 'value',
+        type: 'jsonb',
+        transformer: JSON_VALUE_TRANSFORMER,
+    })
     value!: unknown;
 }

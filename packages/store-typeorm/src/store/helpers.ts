@@ -8,99 +8,116 @@
 import type {
     Checkpoint,
     Run,
-    RunStatusLiteral,
     Step,
     TriggerEnvelope,
     WaitPoint,
 } from '@chamberu/core';
-import type { CheckpointRow, RunRow, StepRow } from './types.ts';
+import type {
+    DataSource,
+    EntityTarget,
+    ObjectLiteral,
+    QueryDeepPartialEntity,
+} from 'typeorm';
+import type {
+    CheckpointEntity,
+    RunEntity,
+    StepEntity,
+} from '../entities/index.ts';
 
-/** Run properties stored in a column of their own, by column name. */
-const RUN_COLUMNS: Record<string, string> = {
-    agent: 'agent',
-    status: 'status',
-    trigger: 'trigger',
-    concurrencyKey: 'concurrency_key',
-    thread: 'thread',
-    output: 'output',
-    error: 'error',
-    usage: 'usage',
-    waiting: 'waiting',
-    cancelRequested: 'cancel_requested',
-    createdAt: 'created_at',
-    updatedAt: 'updated_at',
-    startedAt: 'started_at',
-    finishedAt: 'finished_at',
-};
-
-/** Columns whose parameter is serialized JSON and needs a ::jsonb cast. */
-const JSONB_RUN_COLUMNS: ReadonlySet<string> = new Set([
+/** Run properties that map one to one onto a RunEntity property. */
+const RUN_PROPERTIES: ReadonlySet<string> = new Set([
+    'agent',
+    'status',
     'trigger',
+    'concurrencyKey',
+    'thread',
     'output',
     'error',
     'usage',
     'waiting',
+    'cancelRequested',
+    'createdAt',
+    'updatedAt',
+    'startedAt',
+    'finishedAt',
 ]);
 
 /**
- * A \u escape that Postgres jsonb rejects: NUL, or a surrogate. JSON.stringify
- * writes surrogate pairs as raw characters, so an escaped surrogate is always
- * a lone one. The leading group keeps an escaped backslash (`\\u0000` is the
- * text "\u0000", not a NUL) out of the match.
+ * RunEntity values for the keys present in a run patch (id excluded). A key
+ * set to undefined clears its column (null), an absent key is not touched.
  */
-const UNSUPPORTED_JSONB_ESCAPE = /(?<!\\)((?:\\\\)*)\\u(?:0000|d[89a-f][0-9a-f]{2})/g;
-
-/**
- * JSON parameter for a jsonb column: SQL NULL for undefined, JSON otherwise
- * (null -> 'null'). NUL characters and lone surrogates, which jsonb cannot
- * hold, become U+FFFD.
- */
-export function json(value: unknown): string | null {
-    if (value === undefined) {
-        return null;
-    }
-
-    return JSON.stringify(value).replace(UNSUPPORTED_JSONB_ESCAPE, '$1\\ufffd');
-}
-
-/**
- * Column values for the keys present in a run patch (id excluded). A key set
- * to undefined clears its column, an absent key is not touched.
- */
-export function toRunColumns(patch: Partial<Run>): Record<string, unknown> {
-    const columns: Record<string, unknown> = {};
+export function toRunValues(patch: Partial<Run>): QueryDeepPartialEntity<RunEntity> {
+    const values: Record<string, unknown> = {};
 
     for (const key of Object.keys(patch)) {
-        if (key === 'id') {
-            continue;
-        }
-
         const value = patch[key as keyof Run];
         if (key === 'claim') {
             const claim = value as Run['claim'];
-            columns.claim_owner = claim ? claim.owner : null;
-            columns.claim_expires_at = claim ? claim.expiresAt : null;
-            continue;
-        }
-
-        if (!Object.hasOwn(RUN_COLUMNS, key)) {
-            continue;
-        }
-
-        const column = RUN_COLUMNS[key]!;
-        if (JSONB_RUN_COLUMNS.has(column)) {
-            columns[column] = json(value);
-        } else {
-            columns[column] = value ?? null;
+            values.claimOwner = claim ? claim.owner : null;
+            values.claimExpiresAt = claim ? claim.expiresAt : null;
+        } else if (RUN_PROPERTIES.has(key)) {
+            values[key] = value ?? null;
         }
     }
 
-    return columns;
+    return values as QueryDeepPartialEntity<RunEntity>;
 }
 
-/** SQL placeholder for a run column: jsonb columns get a cast. */
-export function runPlaceholder(column: string, index: number): string {
-    return JSONB_RUN_COLUMNS.has(column) ? `$${index}::jsonb` : `$${index}`;
+/**
+ * Entity values for an insert or upsert. QueryDeepPartialEntity recurses into
+ * property types, which rejects the unknown of jsonb properties; the values
+ * are checked against the entity instead.
+ */
+export function asValues<T extends ObjectLiteral>(values: Partial<T>): QueryDeepPartialEntity<T> {
+    return values as QueryDeepPartialEntity<T>;
+}
+
+/** StepEntity values for a new step (seq is generated). */
+export function toStepValues(step: Step): QueryDeepPartialEntity<StepEntity> {
+    const values: Omit<StepEntity, 'seq'> = {
+        runId: step.runId,
+        index: step.index,
+        kind: step.kind,
+        name: step.name ?? null,
+        input: step.input,
+        output: step.output,
+        error: step.error,
+        startedAt: step.startedAt,
+        finishedAt: step.finishedAt,
+    };
+
+    return asValues<StepEntity>(values);
+}
+
+/** CheckpointEntity values for a checkpoint. */
+export function toCheckpointValues(cp: Checkpoint): QueryDeepPartialEntity<CheckpointEntity> {
+    const values: CheckpointEntity = {
+        runId: cp.runId,
+        stepIndex: cp.stepIndex,
+        messages: cp.messages,
+        finishReason: cp.finishReason ?? null,
+        createdAt: cp.createdAt,
+    };
+
+    return asValues<CheckpointEntity>(values);
+}
+
+/**
+ * Hydrate an entity from a row a RETURNING clause produced, the way TypeORM
+ * hydrates selected rows (column metadata and the driver's value preparation).
+ */
+export function toEntity<T extends ObjectLiteral>(
+    dataSource: DataSource,
+    target: EntityTarget<T>,
+    row: ObjectLiteral,
+): T {
+    const metadata = dataSource.getMetadata(target);
+    const entity = metadata.create() as T;
+    for (const column of metadata.columns) {
+        column.setEntityValue(entity, dataSource.driver.prepareHydratedValue(row[column.databaseName], column));
+    }
+
+    return entity;
 }
 
 function reviveTrigger(trigger: Record<string, unknown>): TriggerEnvelope {
@@ -122,59 +139,59 @@ function reviveWaiting(waiting: Record<string, unknown>): WaitPoint {
     return output;
 }
 
-/** Map a chamberu_runs row to a Run: SQL NULL columns become absent properties. */
-export function toRun(row: RunRow): Run {
+/** Map a RunEntity to a Run: null columns become absent properties. */
+export function toRun(entity: RunEntity): Run {
     const run: Run = {
-        id: row.id,
-        agent: row.agent,
-        status: row.status as RunStatusLiteral,
-        trigger: reviveTrigger(row.trigger),
-        usage: row.usage,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        id: entity.id,
+        agent: entity.agent,
+        status: entity.status,
+        trigger: reviveTrigger(entity.trigger),
+        usage: entity.usage,
+        createdAt: entity.createdAt,
+        updatedAt: entity.updatedAt,
     };
 
-    if (row.concurrency_key !== null) run.concurrencyKey = row.concurrency_key;
-    if (row.thread !== null) run.thread = row.thread;
-    if (row.output !== null) run.output = row.output;
-    if (row.error !== null) run.error = row.error;
-    if (row.waiting !== null) run.waiting = reviveWaiting(row.waiting);
-    if (row.claim_owner !== null) {
-        run.claim = { owner: row.claim_owner, expiresAt: row.claim_expires_at as Date };
+    if (entity.concurrencyKey !== null) run.concurrencyKey = entity.concurrencyKey;
+    if (entity.thread !== null) run.thread = entity.thread;
+    if (entity.output !== null) run.output = entity.output;
+    if (entity.error !== null) run.error = entity.error;
+    if (entity.waiting !== null) run.waiting = reviveWaiting(entity.waiting);
+    if (entity.claimOwner !== null) {
+        run.claim = { owner: entity.claimOwner, expiresAt: entity.claimExpiresAt as Date };
     }
-    if (row.cancel_requested !== null) run.cancelRequested = row.cancel_requested;
-    if (row.started_at !== null) run.startedAt = row.started_at;
-    if (row.finished_at !== null) run.finishedAt = row.finished_at;
+    if (entity.cancelRequested !== null) run.cancelRequested = entity.cancelRequested;
+    if (entity.startedAt !== null) run.startedAt = entity.startedAt;
+    if (entity.finishedAt !== null) run.finishedAt = entity.finishedAt;
 
     return run;
 }
 
-/** Map a chamberu_steps row to a Step: null name/input/output/error become absent. */
-export function toStep(row: StepRow): Step {
+/** Map a StepEntity to a Step: null name/input/output/error become absent. */
+export function toStep(entity: StepEntity): Step {
     const step: Step = {
-        runId: row.run_id,
-        index: row.step_index,
-        kind: row.kind as Step['kind'],
-        startedAt: row.started_at,
-        finishedAt: row.finished_at,
+        runId: entity.runId,
+        index: entity.index,
+        kind: entity.kind,
+        startedAt: entity.startedAt,
+        finishedAt: entity.finishedAt,
     };
-    if (row.name !== null) step.name = row.name;
-    if (row.input !== null) step.input = row.input;
-    if (row.output !== null) step.output = row.output;
-    if (row.error !== null) step.error = row.error;
+    if (entity.name !== null) step.name = entity.name;
+    if (entity.input !== null) step.input = entity.input;
+    if (entity.output !== null) step.output = entity.output;
+    if (entity.error !== null) step.error = entity.error;
 
     return step;
 }
 
-/** Map a chamberu_checkpoints row to a Checkpoint: a null finish reason becomes absent. */
-export function toCheckpoint(row: CheckpointRow): Checkpoint {
+/** Map a CheckpointEntity to a Checkpoint: a null finish reason becomes absent. */
+export function toCheckpoint(entity: CheckpointEntity): Checkpoint {
     const checkpoint: Checkpoint = {
-        runId: row.run_id,
-        stepIndex: row.step_index,
-        messages: row.messages as Checkpoint['messages'],
-        createdAt: row.created_at,
+        runId: entity.runId,
+        stepIndex: entity.stepIndex,
+        messages: entity.messages,
+        createdAt: entity.createdAt,
     };
-    if (row.finish_reason !== null) checkpoint.finishReason = row.finish_reason;
+    if (entity.finishReason !== null) checkpoint.finishReason = entity.finishReason;
 
     return checkpoint;
 }

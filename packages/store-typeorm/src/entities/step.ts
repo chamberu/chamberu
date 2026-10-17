@@ -11,7 +11,8 @@ import {
     Index,
     PrimaryGeneratedColumn,
 } from 'typeorm';
-import { TableName } from './constants.ts';
+import type { Step } from '@chamberu/core';
+import { OPTIONAL_JSON_TRANSFORMER, TableName } from './constants.ts';
 
 @Index(['runId', 'index'])
 @Entity({ name: TableName.STEPS })
@@ -34,7 +35,7 @@ export class StepEntity {
         type: 'varchar', 
         length: 8, 
     })
-    kind!: string;
+    kind!: Step['kind'];
 
     @Column({
         name: 'name',
@@ -46,22 +47,25 @@ export class StepEntity {
 
     @Column({
         name: 'input', 
-        type: 'jsonb', 
-        nullable: true, 
+        type: 'jsonb',
+        nullable: true,
+        transformer: OPTIONAL_JSON_TRANSFORMER,
     })
     input!: unknown;
 
     @Column({
         name: 'output', 
-        type: 'jsonb', 
-        nullable: true, 
+        type: 'jsonb',
+        nullable: true,
+        transformer: OPTIONAL_JSON_TRANSFORMER,
     })
     output!: unknown;
 
     @Column({
         name: 'error', 
-        type: 'jsonb', 
-        nullable: true, 
+        type: 'jsonb',
+        nullable: true,
+        transformer: OPTIONAL_JSON_TRANSFORMER,
     })
     error!: unknown;
 

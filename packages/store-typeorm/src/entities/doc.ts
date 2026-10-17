@@ -11,7 +11,7 @@ import {
     Index,
     PrimaryColumn,
 } from 'typeorm';
-import { TableName } from './constants.ts';
+import { JSON_VALUE_TRANSFORMER, TableName } from './constants.ts';
 
 @Index('IDX_chamberu_docs_doc_gin', ['doc'], { type: 'gin' })
 @Entity({ name: TableName.DOCS })
@@ -37,6 +37,10 @@ export class DocEntity {
     })
     id!: string;
 
-    @Column({ name: 'doc', type: 'jsonb' })
+    @Column({
+        name: 'doc',
+        type: 'jsonb',
+        transformer: JSON_VALUE_TRANSFORMER,
+    })
     doc!: unknown;
 }

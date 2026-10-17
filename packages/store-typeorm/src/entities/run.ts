@@ -11,7 +11,8 @@ import {
     Index,
     PrimaryColumn,
 } from 'typeorm';
-import { TableName } from './constants.ts';
+import type { Run, RunStatusLiteral, Usage } from '@chamberu/core';
+import { OPTIONAL_JSON_TRANSFORMER, TableName } from './constants.ts';
 
 @Index(['agent', 'status', 'concurrencyKey'])
 @Index(['status', 'createdAt', 'id'])
@@ -37,9 +38,13 @@ export class RunEntity {
         type: 'varchar', 
         length: 16, 
     })
-    status!: string;
+    status!: RunStatusLiteral;
 
-    @Column({ name: 'trigger', type: 'jsonb' })
+    @Column({
+        name: 'trigger',
+        type: 'jsonb',
+        transformer: OPTIONAL_JSON_TRANSFORMER,
+    })
     trigger!: Record<string, unknown>;
 
     @Column({
@@ -60,25 +65,32 @@ export class RunEntity {
 
     @Column({
         name: 'output', 
-        type: 'jsonb', 
-        nullable: true, 
+        type: 'jsonb',
+        nullable: true,
+        transformer: OPTIONAL_JSON_TRANSFORMER,
     })
     output!: unknown;
 
     @Column({
         name: 'error', 
-        type: 'jsonb', 
-        nullable: true, 
+        type: 'jsonb',
+        nullable: true,
+        transformer: OPTIONAL_JSON_TRANSFORMER,
     })
-    error!: Record<string, unknown> | null;
+    error!: Run['error'] | null;
 
-    @Column({ name: 'usage', type: 'jsonb' })
-    usage!: Record<string, unknown>;
+    @Column({
+        name: 'usage',
+        type: 'jsonb',
+        transformer: OPTIONAL_JSON_TRANSFORMER,
+    })
+    usage!: Usage;
 
     @Column({
         name: 'waiting', 
-        type: 'jsonb', 
-        nullable: true, 
+        type: 'jsonb',
+        nullable: true,
+        transformer: OPTIONAL_JSON_TRANSFORMER,
     })
     waiting!: Record<string, unknown> | null;
 

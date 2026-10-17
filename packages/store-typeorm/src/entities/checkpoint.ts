@@ -10,7 +10,8 @@ import {
     Entity,
     PrimaryColumn,
 } from 'typeorm';
-import { TableName } from './constants.ts';
+import type { Checkpoint } from '@chamberu/core';
+import { JSON_VALUE_TRANSFORMER, TableName } from './constants.ts';
 
 @Entity({ name: TableName.CHECKPOINTS })
 export class CheckpointEntity {
@@ -24,8 +25,12 @@ export class CheckpointEntity {
     @Column({ name: 'step_index', type: 'integer' })
     stepIndex!: number;
 
-    @Column({ name: 'messages', type: 'jsonb' })
-    messages!: unknown;
+    @Column({
+        name: 'messages',
+        type: 'jsonb',
+        transformer: JSON_VALUE_TRANSFORMER,
+    })
+    messages!: Checkpoint['messages'];
 
     @Column({
         name: 'finish_reason',
@@ -33,7 +38,7 @@ export class CheckpointEntity {
         length: 64,
         nullable: true,
     })
-    finishReason!: string | null;
+    finishReason!: Checkpoint['finishReason'] | null;
 
     @Column({ name: 'created_at', type: 'timestamp with time zone' })
     createdAt!: Date;
