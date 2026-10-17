@@ -26,6 +26,7 @@ export default defineConfig({
         ],
     },
     test: {
+        globalSetup: ['test/global-setup.ts'],
         include: ['test/unit/**/*.{test,spec}.{js,ts}'],
         passWithNoTests: false,
         testTimeout: 30_000,
