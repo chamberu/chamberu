@@ -133,19 +133,20 @@ const { exitCode } = await runJob({ engine, store, agent: sweep });
 process.exitCode = exitCode;
 ```
 
-It dispatches the tick at the current time (the overlap policy applies), starts the engine, waits until the run is `completed`, `failed`, `cancelled` or `waiting`, then calls `engine.drain()`.
+It dispatches the tick at the current time (the overlap policy applies), starts the engine and runs one approval tick (also when the tick is skipped), waits until the run is `completed`, `failed`, `cancelled` or `waiting`, or `queued` behind a run of the same trigger that waits for an approval, then calls `engine.drain()`.
 
 | Outcome | `status` | `exitCode` |
 |---|---|---|
 | The run completed | `completed` | `0` |
 | The run waits for an approval | `waiting` | `0` |
+| The run waits behind a run paused for an approval (`queue-one`) | `queued` | `0` |
 | The overlap policy skipped the tick | `skipped` | `0` |
 | The run failed or was cancelled | `failed`, `cancelled` | `1` |
 
-A run that pauses for an approval does not hold the pod: the job returns and the run is resumed later by whatever answers the approval. Caveats:
+A run that pauses for an approval does not hold the pod: the job returns, the approval is answered through `engine.resume()` (or times out), and the answered run is executed by a long-lived replica or by the next job pod, which starts the engine even when its own tick is skipped. That pod also recovers a run whose pod was killed and denies approvals past their timeout. Caveats:
 
 - `engine.start()` recovers and executes **every** queued run of **every** agent in the shared store, not only the cron run.
-- `drain()` interrupts whatever still runs after `drainTimeoutMs`. `runJob` waits only for the run it dispatched, so an interrupted run is finished by a long-lived replica, or by a later job pod only if that pod outlives it.
+- `drain()` interrupts whatever still runs after `drainTimeoutMs`. `runJob` waits only for the run it dispatched, so a leftover run is finished by a long-lived replica or by a later job pod, within that pod's `drainTimeoutMs`.
 - Size `drainTimeoutMs` to the job's runs, and prefer a long-lived deployment with `createScheduler()` when runs are long.
 
 ## Options
@@ -165,7 +166,7 @@ A run that pauses for an approval does not hold the pod: the job returns and the
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Not started yet; started and drained by the job |
+| `engine` | `RunEngine` | required | Not started yet; started and drained by the job, also when the tick is skipped |
 | `store` | `IStore` | required | The store the engine uses |
 | `agent` | `Agent` | required | The agent to fire |
 | `trigger` | `string` | the only cron trigger | Cron trigger id; required when the agent has several |

@@ -86,4 +86,4 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `lock/` | `createStoreScheduleLock()`: hubwire `IScheduleLock` over core's `ILockStore` |
 | `tick/` | `fireCronTrigger()` (overlap check, envelope, dispatch), `readCronOptions()`; overlap check in `helpers.ts` |
 | `scheduler/` | `createScheduler()`, `SCHEDULE_LOCK_TTL_MS`; `buildComponentOptions()` (`helpers.ts`, internal) |
-| `run-job/` | `runJob()`; `resolveCronTrigger()` (`helpers.ts`, internal) |
+| `run-job/` | `runJob()`; `resolveCronTrigger()`, `isQueuedBehindApproval()` (`helpers.ts`), `SETTLING` (`constants.ts`), both internal |

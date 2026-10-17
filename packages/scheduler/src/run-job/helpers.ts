@@ -5,7 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Agent, TriggerDefinition } from '@chamberu/core';
+import type {
+    Agent,
+    IRunStore,
+    Run,
+    TriggerDefinition,
+} from '@chamberu/core';
 import { InvalidAgentDefinitionError } from '@chamberu/core';
 
 /**
@@ -27,4 +32,20 @@ export function resolveCronTrigger(agent: Agent, triggerId?: string): TriggerDef
         );
     }
     return crons[0] as TriggerDefinition;
+}
+
+/**
+ * Whether a queued run is held back by a run of its concurrency key that waits
+ * for an approval: it starts only once a human answers (or the approval times
+ * out), so a job must not wait for it.
+ */
+export async function isQueuedBehindApproval(store: Pick<IRunStore, 'listRuns'>, run: Run): Promise<boolean> {
+    if (run.status !== 'queued' || run.concurrencyKey === undefined) return false;
+    const { total } = await store.listRuns({
+        agent: run.agent,
+        status: ['waiting'],
+        concurrencyKey: run.concurrencyKey,
+        limit: 1,
+    });
+    return total > 0;
 }

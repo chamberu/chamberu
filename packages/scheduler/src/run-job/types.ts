@@ -14,7 +14,7 @@ import type {
 } from '@chamberu/core';
 
 export type RunJobOptions = {
-    /** Not started yet; runJob starts and drains it. */
+    /** Not started yet; runJob starts and drains it, also when the tick is skipped. */
     engine: RunEngine;
     store: IStore;
     agent: Agent;
@@ -30,8 +30,12 @@ export type RunJobOptions = {
 
 export type RunJobResult = {
     runId?: string;
-    /** The run's status when the job returned, or 'skipped' (overlap). */
+    /**
+     * The run's status when the job returned: `completed`, `failed`,
+     * `cancelled`, `waiting`, `queued` (behind a run of its concurrency key
+     * that waits for an approval), or 'skipped' (overlap).
+     */
     status: RunStatusLiteral | 'skipped';
-    /** 0 for completed, waiting and skipped; 1 for failed and cancelled. */
+    /** 0 for completed, waiting, queued and skipped; 1 for failed and cancelled. */
     exitCode: 0 | 1;
 };

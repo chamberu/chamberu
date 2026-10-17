@@ -118,7 +118,7 @@ describe('runJob', () => {
         expect((await store.getRun(result.runId as string))?.status).toBe('waiting');
     });
 
-    it('skips under the overlap policy', async () => {
+    it('skips under the overlap policy, still running the engine once', async () => {
         const {
             clock,
             store,
@@ -145,8 +145,122 @@ describe('runJob', () => {
 
         expect(result).toEqual({ status: 'skipped', exitCode: 0 });
         expect(result.runId).toBeUndefined();
-        expect(start).not.toHaveBeenCalled();
-        expect(drain).not.toHaveBeenCalled();
+        expect(start).toHaveBeenCalledTimes(1);
+        expect(drain).toHaveBeenCalledWith({ timeoutMs: 30_000 });
+    });
+
+    it('recovers a run left running by a killed job pod when it skips', async () => {
+        const {
+            clock,
+            store,
+            agent,
+            engine,
+        } = setup(textModel());
+        const trigger = agent.definition.triggers?.[0] as TriggerDefinition;
+        const tick = await fireCronTrigger({
+            engine,
+            store,
+            agent,
+            trigger,
+            scheduledAt: T,
+        });
+        const { runId } = tick as { runId: string };
+        expect(await store.claimRun(runId, 'pod-1', 60_000)).toBe(true);
+        await store.updateRun(runId, { status: 'running' });
+        clock.advance(15 * 60_000);
+
+        const pod2 = new RunEngine({
+            store,
+            agents: [agent],
+            resumeSecret: 's',
+            clock,
+            owner: 'pod-2',
+        });
+        const result = await runJob({
+            engine: pod2,
+            store,
+            agent,
+            clock,
+        });
+
+        expect(result).toEqual({ status: 'skipped', exitCode: 0 });
+        expect((await store.getRun(runId))?.status).toBe('completed');
+    });
+
+    it('times out an expired approval left by an earlier job when it skips', async () => {
+        const {
+            clock,
+            store,
+            agent,
+            engine,
+        } = setup(approvalModel('deploy'), undefined, {
+            tools: () => ({ deploy: tool({ inputSchema: z.object({}), execute: async () => 'deployed' }) }),
+            approvals: { deploy: 'user' },
+        });
+        const first = await runJob({
+            engine,
+            store,
+            agent,
+            clock,
+        });
+        expect(first.status).toBe('waiting');
+        clock.advance(25 * 60 * 60_000);
+
+        const pod2 = new RunEngine({
+            store,
+            agents: [agent],
+            resumeSecret: 's',
+            clock,
+        });
+        const second = await runJob({
+            engine: pod2,
+            store,
+            agent,
+            clock,
+        });
+
+        expect(second).toEqual({ status: 'skipped', exitCode: 0 });
+        expect((await store.getRun(first.runId as string))?.status).toBe('completed');
+    });
+
+    it('returns queued when its run waits behind a run paused for an approval', async () => {
+        const {
+            clock,
+            store,
+            agent,
+            engine,
+        } = setup(approvalModel('deploy'), [cron('*/5 * * * *', { overlap: 'queue-one' })], {
+            tools: () => ({ deploy: tool({ inputSchema: z.object({}), execute: async () => 'deployed' }) }),
+            approvals: { deploy: 'user' },
+        });
+        const first = await runJob({
+            engine,
+            store,
+            agent,
+            clock,
+        });
+        expect(first.status).toBe('waiting');
+        clock.advance(300_000);
+
+        const pod2 = new RunEngine({
+            store,
+            agents: [agent],
+            resumeSecret: 's',
+            clock,
+        });
+        const drain = vi.spyOn(pod2, 'drain');
+        const second = await runJob({
+            engine: pod2,
+            store,
+            agent,
+            clock,
+        });
+
+        expect(second).toMatchObject({ status: 'queued', exitCode: 0 });
+        expect(second.runId).not.toBe(first.runId);
+        expect((await store.getRun(second.runId as string))?.status).toBe('queued');
+        expect((await store.getRun(first.runId as string))?.status).toBe('waiting');
+        expect(drain).toHaveBeenCalledTimes(1);
     });
 
     it('resolves a run finished by another replica', async () => {
