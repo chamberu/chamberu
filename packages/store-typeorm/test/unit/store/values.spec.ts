@@ -177,4 +177,17 @@ describePostgres('TypeormStore values', () => {
         expect(run?.trigger.payload).toEqual(clean);
         expect(run?.output).toEqual(clean);
     });
+
+    it('docList where with an undefined value matches object documents lacking the key, as MemoryStore does', async () => {
+        await store.docUpsert('a', 'c', '1', { a: 1 });
+        await store.docUpsert('a', 'c', '2', { b: 1 });
+        await store.docUpsert('a', 'c', '3', [1]);
+        await store.docUpsert('a', 'c', '4', { a: 2, b: 1 });
+        await store.docUpsert('a', 'c', '5', null);
+
+        const ids = async (where: Record<string, unknown>) => (await store.docList('a', 'c', { where })).map((d) => d.id);
+        await expect(ids({ a: undefined })).resolves.toEqual(['2']);
+        await expect(ids({ a: undefined, b: 1 })).resolves.toEqual(['2']);
+        await expect(ids({ b: 1 })).resolves.toEqual(['2', '4']);
+    });
 });

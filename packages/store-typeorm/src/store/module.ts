@@ -364,7 +364,19 @@ export class TypeormStore implements IStore {
         const params: unknown[] = [agent, coll];
         let sql = `SELECT id, doc FROM ${DOCS} WHERE agent = $1 AND collection = $2`;
         if (q.where && Object.keys(q.where).length > 0) {
-            params.push(json(q.where));
+            // Containment with the defined values (an empty object still
+            // restricts to object documents); a key whose value is undefined
+            // matches documents lacking it, as in MemoryStore.
+            const defined: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(q.where)) {
+                if (value === undefined) {
+                    params.push(key);
+                    sql += ` AND NOT (doc ? $${params.length})`;
+                } else {
+                    defined[key] = value;
+                }
+            }
+            params.push(json(defined));
             sql += ` AND doc @> $${params.length}::jsonb`;
         }
         sql += ' ORDER BY id ASC';
