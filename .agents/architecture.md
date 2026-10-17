@@ -69,7 +69,7 @@ The store is a set of small interfaces combined as `IStore` (`src/store/types.ts
 
 | Interface | Holds |
 |-----------|-------|
-| `IRunStore` | Runs; `updateRun` with `expectStatus`/`expectOwner` guards; `listRuns` ordered by createdAt then id; `claimRun`/`renewClaim` leases |
+| `IRunStore` | Runs; `updateRun` with `expectStatus`/`expectOwner` guards; `listRuns` ordered by createdAt then id, unbounded without `limit`; `claimRun`/`renewClaim` leases |
 | `IStepStore` | Append-only steps per run |
 | `ICheckpointStore` | Latest checkpoint per run (highest `stepIndex`; equal index replaces) |
 | `IIdempotencyStore` | `claimKey(scope, key, runId, ttl)`: first caller wins |
