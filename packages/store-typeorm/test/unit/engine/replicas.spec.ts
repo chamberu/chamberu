@@ -94,7 +94,9 @@ describePostgres('two engines on one Postgres store', () => {
             store,
             agents: [agent],
             resumeSecret: 's',
-            claimTtlMs: 600,
+            // Real time: renewal runs every claimTtlMs / 3, so the lease must
+            // survive a delayed renewal on a loaded machine.
+            claimTtlMs: 3_000,
             onError: (error) => {
                 errors.push(error);
             },
