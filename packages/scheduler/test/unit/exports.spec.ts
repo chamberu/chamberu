@@ -11,6 +11,8 @@ import * as scheduler from '@chamberu/scheduler';
 describe('public api', () => {
     it.each([
         'createStoreScheduleLock',
+        'fireCronTrigger',
+        'readCronOptions',
     ])('exports %s', (name) => {
         expect(scheduler).toHaveProperty(name);
         expect(scheduler[name as keyof typeof scheduler]).toBeTypeOf('function');

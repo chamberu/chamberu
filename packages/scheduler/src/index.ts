@@ -6,3 +6,4 @@
  */
 
 export * from './lock/index.ts';
+export * from './tick/index.ts';
