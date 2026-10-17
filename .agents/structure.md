@@ -16,10 +16,11 @@ chamberu/
 │   │   ├── tsdown.config.ts         # Builds dist/index.mjs + .d.mts
 │   │   ├── tsconfig.json            # src + test (typecheck)
 │   │   └── tsconfig.build.json      # src only (build:types)
-│   └── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
-├── docs/                            # @chamberu/docs: VitePress site (npm run docs:dev / docs:build)
-│   ├── src/.vitepress/              # config.mts, theme/ (default theme)
-│   └── src/snippets/                # Code samples included via <<<, type-checked by the docs typecheck
+│   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
+│   └── docs/                        # @chamberu/docs (private, not released): VitePress site (npm run docs:dev / docs:build)
+│       ├── src/.vitepress/          # config.mts, theme/ (default theme)
+│       ├── src/public/              # logo.svg (favicon), run-lifecycle.svg
+│       └── src/snippets/            # Code samples included via <<<, type-checked by the docs typecheck
 ├── .github/
 │   ├── assets/                      # logo.svg (+ test-kit and organisation variants), run-lifecycle.svg
 │   ├── actions/{install,build}/     # Composite actions

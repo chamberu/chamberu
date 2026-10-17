@@ -5,14 +5,12 @@ on:
         branches:
             - master
         paths:
-            - 'docs/**'
             - 'packages/**'
             - '.github/workflows/docs.yml'
     pull_request:
         branches:
             - master
         paths:
-            - 'docs/**'
             - 'packages/**'
             - '.github/workflows/docs.yml'
 
@@ -46,11 +44,11 @@ jobs:
                 run: npm run docs:build
 
             # Custom domain: TBD. Once it is chosen, write it to
-            # ./docs/src/.vitepress/dist/CNAME before the deploy step.
+            # ./packages/docs/src/.vitepress/dist/CNAME before the deploy step.
 
             -   name: Deploy
                 if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
                 uses: peaceiris/actions-gh-pages@v4
                 with:
                     github_token: ${{ secrets.GITHUB_TOKEN }}
-                    publish_dir: ./docs/src/.vitepress/dist
+                    publish_dir: ./packages/docs/src/.vitepress/dist

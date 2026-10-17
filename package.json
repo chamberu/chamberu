@@ -14,8 +14,7 @@
         "url": "https://github.com/chamberu/chamberu.git"
     },
     "workspaces": [
-        "packages/*",
-        "docs"
+        "packages/*"
     ],
     "engines": {
         "node": ">=22.0.0"

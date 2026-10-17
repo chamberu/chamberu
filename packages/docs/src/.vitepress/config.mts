@@ -145,7 +145,7 @@ export default defineConfig({
         ],
 
         editLink: {
-            pattern: 'https://github.com/chamberu/chamberu/edit/master/docs/src/:path',
+            pattern: 'https://github.com/chamberu/chamberu/edit/master/packages/docs/src/:path',
             text: 'Edit this page on GitHub',
         },
 

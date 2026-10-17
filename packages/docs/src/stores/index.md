@@ -27,7 +27,7 @@ Everything the engine persists goes through one interface, `IStore`. It is a set
 
 ## The interfaces
 
-<<< ../../../packages/core/src/store/types.ts{ts}
+<<< ../../../core/src/store/types.ts{ts}
 
 ## Stores
 

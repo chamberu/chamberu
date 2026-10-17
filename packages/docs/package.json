@@ -13,7 +13,7 @@
     "repository": {
         "type": "git",
         "url": "git+https://github.com/chamberu/chamberu.git",
-        "directory": "docs"
+        "directory": "packages/docs"
     },
     "scripts": {
         "dev": "vitepress dev src",

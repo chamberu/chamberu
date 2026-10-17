@@ -16,7 +16,7 @@ One execution is one call of an AI SDK `ToolLoopAgent` for one claimed, `running
 
 A `Checkpoint` holds the full message history after a step, the step index and the AI SDK finish reason of that step.
 
-<<< ../../../packages/core/src/run/types.ts{ts}
+<<< ../../../core/src/run/types.ts{ts}
 
 The store keeps the checkpoint with the highest `stepIndex` per run; saving one with an equal index replaces it. That is how an approval response is appended to the history of the step that asked for it.
 

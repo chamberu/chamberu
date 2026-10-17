@@ -19,7 +19,7 @@ const DEFAULT_TIMEOUT_MS: 900_000; // 15 minutes
 
 Throws `InvalidAgentDefinitionError` for an invalid name or duplicate trigger ids. See [Agents](/guide/agents).
 
-<<< ../../../packages/core/src/agent/types.ts{ts}
+<<< ../../../core/src/agent/types.ts{ts}
 
 ## Triggers
 
@@ -31,15 +31,15 @@ function manual(opts?: ManualTriggerOptions): TriggerDefinition;
 
 `TriggerSource`, `TriggerDefinition` and `TriggerEnvelope`:
 
-<<< ../../../packages/core/src/trigger/types.ts{ts}
+<<< ../../../core/src/trigger/types.ts{ts}
 
 `CronOptions` and `OverlapPolicy`, `HttpTriggerOptions`, `ManualTriggerOptions`:
 
-<<< ../../../packages/core/src/trigger/cron/types.ts{ts}
+<<< ../../../core/src/trigger/cron/types.ts{ts}
 
-<<< ../../../packages/core/src/trigger/http/types.ts{ts}
+<<< ../../../core/src/trigger/http/types.ts{ts}
 
-<<< ../../../packages/core/src/trigger/manual/types.ts{ts}
+<<< ../../../core/src/trigger/manual/types.ts{ts}
 
 See [Triggers & the Envelope](/guide/triggers).
 
@@ -80,7 +80,7 @@ class RunEngine {
 | `tick` | Denies expired approvals and re-sends undelivered notifications; runs every poll | [Approvals](/guide/approvals) |
 | `recover` | Requeues abandoned runs; runs on start and every poll | [Recovery](/guide/recovery#recovery) |
 
-<<< ../../../packages/core/src/engine/types.ts{ts}
+<<< ../../../core/src/engine/types.ts{ts}
 
 | Option | Default |
 |---|---|
@@ -97,7 +97,7 @@ class RunEngine {
 
 `Run`, `RunStatus`, `RunContext`, `Step`, `Checkpoint`, `WaitPoint`, `Budget` and `Usage`:
 
-<<< ../../../packages/core/src/run/types.ts{ts}
+<<< ../../../core/src/run/types.ts{ts}
 
 ## Stores
 
@@ -149,7 +149,7 @@ function createAgentState<S extends StateSchema = StateSchema>(
 function createStateTools<S extends StateSchema>(state: IAgentState<S>, schema: S): ToolSet;
 ```
 
-<<< ../../../packages/core/src/state/types.ts{ts}
+<<< ../../../core/src/state/types.ts{ts}
 
 See [Agent State](/guide/state).
 
@@ -157,7 +157,7 @@ See [Agent State](/guide/state).
 
 `INotifier` and `Notification`:
 
-<<< ../../../packages/core/src/notify/types.ts{ts}
+<<< ../../../core/src/notify/types.ts{ts}
 
 See [Notifiers](/guide/notifiers).
 
@@ -167,7 +167,7 @@ See [Notifiers](/guide/notifiers).
 const systemClock: IClock;
 ```
 
-<<< ../../../packages/core/src/clock/types.ts{ts}
+<<< ../../../core/src/clock/types.ts{ts}
 
 `systemClock` timers never keep the process alive unless `keepAlive` is set; only the drain deadline sets it.
 
@@ -175,6 +175,6 @@ const systemClock: IClock;
 
 `ChamberuError`, `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `LeaseLostError`, `ValidationError` and `ErrorCode`:
 
-<<< ../../../packages/core/src/errors/constants.ts{ts}
+<<< ../../../core/src/errors/constants.ts{ts}
 
 See [Errors](/guide/errors) for when each is thrown.

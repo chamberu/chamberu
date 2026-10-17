@@ -22,7 +22,7 @@ In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigg
 
 ## The envelope
 
-<<< ../../../packages/core/src/trigger/types.ts{ts}
+<<< ../../../core/src/trigger/types.ts{ts}
 
 `dispatch()` takes the envelope without `id` and `receivedAt`; it fills in a random UUID and the current time. `trigger` is the trigger id (`'manual'`, `'http:/issues'`, ...). `source` is one of `cron`, `http`, `github`, `mcp` or `manual`.
 

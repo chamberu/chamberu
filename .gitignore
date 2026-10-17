@@ -16,5 +16,5 @@ docs/superpowers/
 .agents/plans/
 
 # VitePress
-docs/src/.vitepress/cache
-docs/src/.vitepress/dist
+packages/docs/src/.vitepress/cache
+packages/docs/src/.vitepress/dist

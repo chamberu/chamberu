@@ -2,7 +2,7 @@
 
 A notifier delivers messages from the engine to the owner: today approval requests, later "stuck" pings and results. It is a small interface you implement or install.
 
-<<< ../../../packages/core/src/notify/types.ts{ts}
+<<< ../../../core/src/notify/types.ts{ts}
 
 | `Notification` field | Description |
 |---|---|
