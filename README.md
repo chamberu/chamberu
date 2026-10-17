@@ -28,7 +28,7 @@
 
 ---
 
-> chamberu is at an early stage. `@chamberu/core` and `@chamberu/test-kit` exist; the HTTP, scheduler, Postgres store, sandbox, GitHub and dashboard packages are planned.
+> chamberu is at an early stage. `@chamberu/core`, `@chamberu/scheduler` and `@chamberu/test-kit` exist; the HTTP, Postgres store, sandbox, GitHub and dashboard packages are planned.
 
 ## Why chamberu?
 
@@ -59,6 +59,7 @@ A run moves from `queued` to `running` and settles `completed`, `failed` or `can
 | Package | Version | Description |
 |---|---|---|
 | [`@chamberu/core`](./packages/core) | [![npm](https://img.shields.io/npm/v/@chamberu/core)](https://www.npmjs.com/package/@chamberu/core) | Agents, triggers, the run engine, checkpoints, effect tools, approvals, agent state and the in-memory store |
+| [`@chamberu/scheduler`](./packages/scheduler) | [![npm](https://img.shields.io/npm/v/@chamberu/scheduler)](https://www.npmjs.com/package/@chamberu/scheduler) | Fires `cron()` triggers once per tick across replicas, with overlap policies, timezones and one-shot jobs |
 | [`@chamberu/test-kit`](./packages/test-kit) | [![npm](https://img.shields.io/npm/v/@chamberu/test-kit)](https://www.npmjs.com/package/@chamberu/test-kit) | `ControllableClock` and the store contract suite every `IStore` implementation must pass |
 
 ## Quick start

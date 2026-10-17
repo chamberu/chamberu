@@ -16,7 +16,7 @@ App, Agent, Trigger, Run, Step, State, Tool, Workspace, Notifier, Store. Keep th
 
 ## Triggers and the Envelope
 
-`cron()`, `http()` and `manual()` build `TriggerDefinition`s (`{ source, id, options, concurrencyKey?, idempotencyKey? }`). `cron()` validates the expression with cron-parser and stores the overlap policy (default `skip`; others `queue-one`, `allow`), enforced in a later plan. Firing cron and HTTP triggers is not part of core: `engine.dispatch(envelope)` is the only intake.
+`cron()`, `http()` and `manual()` build `TriggerDefinition`s (`{ source, id, options, concurrencyKey?, idempotencyKey? }`). `cron()` validates the expression with cron-parser and stores the overlap policy (default `skip`; others `queue-one`, `allow`), enforced by `@chamberu/scheduler` (see [Scheduler](#scheduler)). Firing cron and HTTP triggers is not part of core: `engine.dispatch(envelope)` is the only intake.
 
 ```ts
 interface TriggerEnvelope {
@@ -88,6 +88,17 @@ Rules every implementation must keep: a TTL created at T with `ttlMs` is expired
 ## Agent State
 
 `createAgentState(agent, schema, store)`: KV (`state.get/set`) plus typed collections declared as `state: Record<name, StandardSchemaV1>` in `defineAgent`. `upsert` validates with the collection's Standard Schema, mapped through `@validup/standard-schema` (`ValidationError` with the validup `issues` on failure, nothing stored). With a schema, the model also gets `state_<coll>_list`, `state_<coll>_upsert` and `state_<coll>_remove` tools (upsert and remove are effect tools); user tools win on a name clash.
+
+## Scheduler
+
+`@chamberu/scheduler` fires `cron()` triggers; it depends on `hubwire` (croner inside) and is a peer of core.
+
+- `createScheduler({ engine, agents, store, owner?, lockTtlMs?, onError? })` builds one hubwire `defineScheduledComponent` per cron trigger, named `cron:<agent>:<triggerId>`, with `lock: createStoreScheduleLock(store, owner)` (`ILockStore.acquire`, never released) and `lockTtlMs` default `SCHEDULE_LOCK_TTL_MS` (10 min). hubwire's tick key is `${name}:${scheduledAt ISO}`. Duplicate agent names and every hubwire definition error (expression croner rejects, timezone, `lockTtlMs`) throw `InvalidAgentDefinitionError` from `createScheduler`, before `start()`.
+- `runOnStart: false` always: a start pass never takes hubwire's lock and would fire on every replica. hubwire skips a locked tick fired `lockTtlMs` or more late; `onSkip` is not wired (N - 1 replicas skip every tick). Lock, overlap and dispatch failures reach `onError(error, { agent, trigger })`.
+- `fireCronTrigger({ engine, store, agent, trigger, scheduledAt })` is one tick: overlap check, then `dispatch` with source `cron`, payload `options.payload ?? { scheduledAt: ISO }`, idempotency key `<triggerId>@<scheduledAt ISO>` (the trigger's own `idempotencyKey()` is ignored), `concurrencyKey = trigger.concurrencyKey?.(payload) ?? (overlap === 'allow' ? undefined : trigger.id)`.
+- Overlap: active runs are `queued | running | waiting | interrupted` of the agent filtered by `run.trigger.trigger`. `skip` skips while any is active, `queue-one` while one is `queued`, `allow` never. The check-then-dispatch race is made harmless by the default concurrency key (the extra run waits).
+- Shutdown order: `await scheduler.stop()` (stop, then `settled()` per component), then `await engine.drain()`.
+- `runJob({ engine, store, agent, trigger?, clock?, pollMs?, drainTimeoutMs? })` fires once at `clock.now()`, starts the engine, waits via `run.updated` plus an `engine.getRun` poll (`pollMs`, default 1 s, covers another replica) for `completed | failed | cancelled | waiting`, then `drain({ timeoutMs })` (default 30 s). Exit code 1 for `failed`/`cancelled`, else 0; an overlap skip returns `skipped` without starting the engine. It starts a full engine over the shared store (every queued run of every agent), so size the drain timeout.
 
 ## Errors
 

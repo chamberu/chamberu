@@ -27,6 +27,7 @@
     },
     "devDependencies": {
         "@chamberu/core": "*",
+        "@chamberu/scheduler": "*",
         "@chamberu/test-kit": "*",
         "@tailwindcss/vite": "^4.3.3",
         "ai": "^7.0.143",
