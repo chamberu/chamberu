@@ -16,11 +16,15 @@ chamberu/
 │   │   ├── tsdown.config.ts         # Builds dist/index.mjs + .d.mts
 │   │   ├── tsconfig.json            # src + test (typecheck)
 │   │   └── tsconfig.build.json      # src only (build:types)
-│   └── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
+│   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
+│   └── docs/                        # @chamberu/docs (private, not released): VitePress site (npm run docs:dev / docs:build)
+│       ├── src/.vitepress/          # config.mts, theme/ (Tailwind v4 tokens, Layout.vue), components/{home,layout}/
+│       ├── src/public/              # logo.svg (favicon), fixed light/dark logo and run-lifecycle copies
+│       └── src/snippets/            # Code samples included via <<<, type-checked by the docs typecheck
 ├── .github/
 │   ├── assets/                      # logo.svg (+ test-kit and organisation variants), run-lifecycle.svg
 │   ├── actions/{install,build}/     # Composite actions
-│   ├── workflows/{ci,release}.yml   # CI (Node 22, 24) and release-please + npm publish
+│   ├── workflows/{ci,release,docs}.yml # CI (Node 22, 24), release-please + npm publish, docs to GitHub Pages
 │   ├── ISSUE_TEMPLATE/              # Bug report and feature request templates
 │   ├── FUNDING.yml                  # GitHub Sponsors
 │   └── dependabot.yml               # Daily npm + github-actions updates

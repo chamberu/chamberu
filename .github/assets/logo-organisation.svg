@@ -1,24 +1,50 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ca-title">
     <title id="ca-title">chamberu organisation avatar: three arched chambers, one per agent, each holding the steps its run has checkpointed; the middle one is running</title>
+    <style>
+        :root {
+            --accent: #C8303B;
+            --ink: #1B1A1C;
+            --grey: #9A9396;
+            --tile-a: #FFFFFF;
+            --tile-b: #E6E6E9;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --accent: #E04652;
+                --ink: #EDE6E3;
+                --grey: #7D7375;
+                --tile-a: #201D1F;
+                --tile-b: #19171A;
+            }
+        }
+        .accent { fill: var(--accent); }
+        .ink { fill: var(--ink); }
+        .grey { fill: var(--grey); }
+        .accent-line { stroke: var(--accent); }
+        .accent-stop { stop-color: var(--accent); }
+        .ink-stop { stop-color: var(--ink); }
+        .tile-a { stop-color: var(--tile-a); }
+        .tile-b { stop-color: var(--tile-b); }
+    </style>
     <defs>
         <linearGradient id="ca-tile" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#F6EEE4"/>
-            <stop offset="1" stop-color="#DCE6EA"/>
+            <stop class="tile-a" stop-color="#FFFFFF"/>
+            <stop offset="1" class="tile-b" stop-color="#E6E6E9"/>
         </linearGradient>
         <linearGradient id="ca-edge" x1="24" y1="24" x2="232" y2="232" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#D4A373"/>
-            <stop offset="1" stop-color="#2E5566"/>
+            <stop class="accent-stop" stop-color="#C8303B"/>
+            <stop offset="1" class="ink-stop" stop-color="#1B1A1C"/>
         </linearGradient>
         <linearGradient id="ca-stone" x1="128" y1="58" x2="128" y2="206" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#D9A66E"/>
-            <stop offset="1" stop-color="#3B6A7E"/>
+            <stop class="accent-stop" stop-color="#C8303B"/>
+            <stop offset="1" class="ink-stop" stop-color="#1B1A1C"/>
         </linearGradient>
     </defs>
     <rect width="256" height="256" fill="url(#ca-tile)"/>
     <g transform="translate(128 131) scale(1.18) translate(-128 -131)">
 
     <!-- the running chamber is lit -->
-    <path d="M103 200 V92 A25 25 0 0 1 153 92 V200 Z" fill="#D9A66E" fill-opacity="0.24"/>
+    <path d="M103 200 V92 A25 25 0 0 1 153 92 V200 Z" class="accent" fill="#C8303B" fill-opacity="0.24"/>
 
     <!-- three chambers on one floor -->
     <g stroke="url(#ca-stone)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
@@ -29,12 +55,12 @@
     </g>
 
     <!-- checkpointed steps, stacked bottom up -->
-    <rect x="58" y="178" width="18" height="12" rx="6" fill="#3B6A7E"/>
-    <rect x="114" y="178" width="28" height="12" rx="6" fill="#3B6A7E"/>
-    <rect x="114" y="160" width="28" height="12" rx="6" fill="#8A8A72"/>
-    <rect x="114" y="142" width="28" height="12" rx="6" fill="#D9A66E">
+    <rect x="58" y="178" width="18" height="12" rx="6" class="ink" fill="#1B1A1C"/>
+    <rect x="114" y="178" width="28" height="12" rx="6" class="ink" fill="#1B1A1C"/>
+    <rect x="114" y="160" width="28" height="12" rx="6" class="grey" fill="#9A9396"/>
+    <rect x="114" y="142" width="28" height="12" rx="6" class="accent" fill="#C8303B">
     </rect>
-    <rect x="180" y="178" width="18" height="12" rx="6" fill="#3B6A7E"/>
-    <rect x="180" y="160" width="18" height="12" rx="6" fill="#8A8A72"/>
+    <rect x="180" y="178" width="18" height="12" rx="6" class="ink" fill="#1B1A1C"/>
+    <rect x="180" y="160" width="18" height="12" rx="6" class="grey" fill="#9A9396"/>
     </g>
 </svg>

@@ -1,24 +1,50 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ct-title">
     <title id="ct-title">@chamberu/test-kit logo: the chamberu chambers, the middle one holding a check mark for a passed store contract</title>
+    <style>
+        :root {
+            --accent: #C8303B;
+            --ink: #1B1A1C;
+            --grey: #9A9396;
+            --tile-a: #FFFFFF;
+            --tile-b: #E6E6E9;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --accent: #E04652;
+                --ink: #EDE6E3;
+                --grey: #7D7375;
+                --tile-a: #201D1F;
+                --tile-b: #19171A;
+            }
+        }
+        .accent { fill: var(--accent); }
+        .ink { fill: var(--ink); }
+        .grey { fill: var(--grey); }
+        .accent-line { stroke: var(--accent); }
+        .accent-stop { stop-color: var(--accent); }
+        .ink-stop { stop-color: var(--ink); }
+        .tile-a { stop-color: var(--tile-a); }
+        .tile-b { stop-color: var(--tile-b); }
+    </style>
     <defs>
         <linearGradient id="ct-tile" x1="24" y1="24" x2="232" y2="232" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#D4A373" stop-opacity="0.18"/>
-            <stop offset="1" stop-color="#2E5566" stop-opacity="0.18"/>
+            <stop class="accent-stop" stop-color="#C8303B" stop-opacity="0.18"/>
+            <stop offset="1" class="ink-stop" stop-color="#1B1A1C" stop-opacity="0.18"/>
         </linearGradient>
         <linearGradient id="ct-edge" x1="24" y1="24" x2="232" y2="232" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#D4A373"/>
-            <stop offset="1" stop-color="#2E5566"/>
+            <stop class="accent-stop" stop-color="#C8303B"/>
+            <stop offset="1" class="ink-stop" stop-color="#1B1A1C"/>
         </linearGradient>
         <linearGradient id="ct-stone" x1="128" y1="58" x2="128" y2="206" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#D9A66E"/>
-            <stop offset="1" stop-color="#3B6A7E"/>
+            <stop class="accent-stop" stop-color="#C8303B"/>
+            <stop offset="1" class="ink-stop" stop-color="#1B1A1C"/>
         </linearGradient>
     </defs>
     <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#ct-tile)"/>
     <rect x="8.75" y="8.75" width="238.5" height="238.5" rx="55.25" stroke="url(#ct-edge)" stroke-opacity="0.35" stroke-width="1.5"/>
 
     <!-- the running chamber is lit -->
-    <path d="M103 200 V92 A25 25 0 0 1 153 92 V200 Z" fill="#D9A66E" fill-opacity="0.24"/>
+    <path d="M103 200 V92 A25 25 0 0 1 153 92 V200 Z" class="accent" fill="#C8303B" fill-opacity="0.24"/>
 
     <!-- three chambers on one floor -->
     <g stroke="url(#ct-stone)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
@@ -29,10 +55,10 @@
     </g>
 
     <!-- checkpointed steps, stacked bottom up -->
-    <rect x="58" y="178" width="18" height="12" rx="6" fill="#3B6A7E"/>
-    <path d="M114 166 L124 177 L144 148" stroke="#D9A66E" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="0">
+    <rect x="58" y="178" width="18" height="12" rx="6" class="ink" fill="#1B1A1C"/>
+    <path d="M114 166 L124 177 L144 148" class="accent-line" stroke="#C8303B" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="0">
         <animate attributeName="stroke-dashoffset" values="1;1;0" keyTimes="0;0.4;1" dur="1.6s" repeatCount="1" fill="freeze"/>
     </path>
-    <rect x="180" y="178" width="18" height="12" rx="6" fill="#3B6A7E"/>
-    <rect x="180" y="160" width="18" height="12" rx="6" fill="#8A8A72"/>
+    <rect x="180" y="178" width="18" height="12" rx="6" class="ink" fill="#1B1A1C"/>
+    <rect x="180" y="160" width="18" height="12" rx="6" class="grey" fill="#9A9396"/>
 </svg>

@@ -1,0 +1,384 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+/*
+ * Tailwind v4 entry and design tokens ("M1 crimson": a wax-seal crimson on
+ * charcoal, crimson on cool white in light mode). Decisions: plan 015.
+ *
+ * VitePress ships its base and doc styles unlayered, so they would win over
+ * every Tailwind utility. The landing page and the footer therefore render
+ * inside `.vp-raw`, which `postcssIsolateStyles()` (see config.mts) excludes
+ * from those styles.
+ */
+@layer theme, base, components, utilities;
+
+@import "tailwindcss" source(none);
+
+/* VitePress toggles `.dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tailwind only generates classes it can see. The components live beside the
+ * theme directory (`.vitepress/components`), not inside it. */
+@source "../components";
+
+@theme inline {
+    --font-sans: var(--vp-font-family-base);
+    --font-mono: var(--vp-font-family-mono);
+    --font-display: var(--ch-font-display);
+
+    --color-paper: var(--ch-paper);
+    --color-ink: var(--ch-ink);
+    --color-muted: var(--ch-muted);
+    --color-line: var(--ch-line);
+    --color-chip: var(--ch-chip);
+    --color-accent: var(--ch-accent);
+    --color-accent-text: var(--ch-accent-text);
+    --color-hero: var(--ch-hero-bg);
+
+    /* Surfaces that stay dark in both color modes: footer and code. */
+    --color-night: var(--ch-night-bg);
+    --color-night-fg: var(--ch-night-fg);
+    --color-night-muted: var(--ch-night-muted);
+    --color-night-line: var(--ch-night-line);
+    --color-code: var(--ch-code-bg);
+    --color-code-ink: var(--ch-code-ink);
+}
+
+/* VitePress's own 960px breakpoint (fixed nav, sidebar), as a named variant. */
+@theme {
+    --breakpoint-vp: 960px;
+}
+
+@layer base {
+    :root {
+        --ch-font-display: "Bricolage Grotesque", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+        --ch-hero-bg: #f4f4f5;
+        --ch-paper: #ffffff;
+        --ch-ink: #1b1a1c;
+        --ch-muted: #5c5b60;
+        --ch-line: #e6e6e9;
+        --ch-chip: #f0f0f2;
+        --ch-accent: #c8303b;
+        --ch-accent-text: #b02a34;
+
+        /* Primary buttons keep the light accent in dark mode too: white text
+         * on #e04652 is only 4.1:1, on #c8303b 5.3:1. */
+        --ch-button-bg: #c8303b;
+
+        /* Fixed-dark: the footer and code blocks stay dark in light mode too. */
+        --ch-night-bg: #19171a;
+        --ch-night-fg: #efe8e6;
+        --ch-night-muted: #b0a5a4;
+        --ch-night-line: #332e30;
+
+        --ch-code-bg: #19171a;
+        --ch-code-ink: #e6dfde;
+        --ch-code-line: #332e30;
+
+        --ch-radius: 4px;
+    }
+
+    .dark {
+        --ch-hero-bg: #19171a;
+        --ch-paper: #201d1f;
+        --ch-ink: #efe8e6;
+        --ch-muted: #b0a5a4;
+        --ch-line: #332e30;
+        --ch-chip: #2c2729;
+        --ch-accent: #e04652;
+        --ch-accent-text: #ff7b84;
+
+        --ch-code-bg: #121012;
+        --ch-code-line: #2c2729;
+    }
+
+    /* Tailwind's preflight resets headings; keep them tight inside `.vp-raw`. */
+    .vp-raw :where(h1, h2, h3, h4) {
+        @apply m-0 leading-tight;
+    }
+
+    .vp-raw :where(b, strong) {
+        @apply font-semibold;
+    }
+}
+
+@layer components {
+    .ch-section {
+        @apply py-16 md:py-24;
+    }
+
+    .ch-section-alt {
+        background-color: var(--ch-hero-bg);
+    }
+
+    /* Centered content column. Not `container`: that class belongs to VitePress. */
+    .ch-wrap {
+        @apply mx-auto w-full max-w-[1152px] px-4 sm:px-6 lg:px-8;
+    }
+
+    .ch-eyebrow {
+        @apply m-0 mb-3 inline-flex items-center gap-2 text-xs font-semibold tracking-[0.14em] uppercase;
+        color: var(--ch-accent-text);
+    }
+
+    /* A square accent mark: the lit chamber of the logo. */
+    .ch-eyebrow::before {
+        content: "";
+        @apply inline-block size-2;
+        background-color: var(--ch-accent);
+    }
+
+    .ch-display {
+        font-family: var(--ch-font-display);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+    }
+
+    .ch-heading {
+        @apply m-0 text-3xl leading-[1.1] md:text-[2.5rem];
+        font-family: var(--ch-font-display);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        color: var(--ch-ink);
+    }
+
+    .ch-lede {
+        @apply m-0 mt-4 max-w-[60ch] text-lg leading-relaxed;
+        color: var(--ch-muted);
+    }
+
+    .ch-card {
+        @apply rounded-sm border;
+        border-color: var(--ch-line);
+        background-color: var(--ch-paper);
+    }
+
+    .ch-button {
+        @apply inline-flex items-center justify-center gap-2 rounded-sm border px-5 py-2.5 text-[0.95rem] font-semibold no-underline transition-colors duration-150;
+    }
+
+    .ch-button-primary {
+        @apply border-transparent text-white;
+        background-color: var(--ch-button-bg);
+    }
+
+    .ch-button-primary:hover {
+        background-color: color-mix(in srgb, var(--ch-button-bg) 86%, black);
+    }
+
+    .ch-button-secondary {
+        border-color: color-mix(in srgb, var(--ch-ink) 24%, transparent);
+        color: var(--ch-ink);
+    }
+
+    .ch-button-secondary:hover {
+        border-color: var(--ch-ink);
+    }
+
+    /* Status chips and "signed" callouts are the only square shapes. */
+    .ch-chip {
+        @apply inline-flex items-center gap-1.5 rounded-none border px-2 py-0.5 font-mono text-xs leading-5;
+        border-color: var(--ch-line);
+        background-color: var(--ch-chip);
+        color: var(--ch-ink);
+    }
+
+    .ch-chip-accent {
+        @apply border-transparent text-white;
+        background-color: var(--ch-accent);
+    }
+
+    .ch-link {
+        @apply inline-flex items-center gap-1 font-semibold no-underline;
+        color: var(--ch-accent-text);
+    }
+
+    .ch-link:hover {
+        @apply underline underline-offset-4;
+    }
+
+    /* Code rendered by VitePress (shiki) inside a `.vp-raw` landing section. */
+    .ch-code {
+        @apply overflow-hidden rounded-sm border;
+        border-color: var(--ch-code-line);
+        background-color: var(--ch-code-bg);
+        color: var(--ch-code-ink);
+    }
+
+    .ch-code :where(div[class*="language-"]) {
+        @apply relative m-0;
+    }
+
+    .ch-code :where(button.copy, span.lang) {
+        display: none;
+    }
+
+    .ch-code pre {
+        @apply m-0 overflow-x-auto px-5 py-4 font-mono text-[0.8125rem] leading-[1.7];
+        background-color: transparent !important;
+    }
+
+    .ch-code code {
+        @apply block w-fit min-w-full;
+    }
+
+    /* Site-wide footer: fixed dark, full width, above the desktop sidebar
+     * (`--vp-z-index-sidebar` is 25 from 960px up) and below the mobile
+     * drawer (60). `--vp-z-index-footer` (10) is too low. */
+    .ch-footer {
+        @apply relative;
+        z-index: 26;
+        background-color: var(--ch-night-bg);
+        color: var(--ch-night-muted);
+    }
+}
+
+/*
+ * Unlayered: VitePress defines its variables and component styles unlayered,
+ * so overrides of them must stay outside of every @layer to win.
+ */
+
+:root {
+    --vp-font-family-base: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --vp-font-family-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+
+    --vp-c-bg: var(--ch-paper);
+    --vp-c-bg-alt: var(--ch-hero-bg);
+    --vp-c-bg-elv: var(--ch-paper);
+    --vp-c-bg-soft: var(--ch-chip);
+    --vp-c-text-1: var(--ch-ink);
+    --vp-c-text-2: var(--ch-muted);
+    --vp-c-divider: var(--ch-line);
+    --vp-c-gutter: var(--ch-line);
+
+    /* The sidebar sits on the page color: a tinted panel would stop at the
+     * viewport height in full-page captures and print. */
+    --vp-sidebar-bg-color: var(--ch-paper);
+    --vp-c-border: color-mix(in srgb, var(--ch-ink) 18%, transparent);
+
+    --vp-c-brand-1: var(--ch-accent-text);
+    --vp-c-brand-2: var(--ch-accent);
+    --vp-c-brand-3: var(--ch-accent);
+    --vp-c-brand-soft: color-mix(in srgb, var(--ch-accent) 12%, transparent);
+
+    --vp-button-brand-bg: var(--ch-button-bg);
+    --vp-button-brand-hover-bg: color-mix(in srgb, var(--ch-button-bg) 86%, black);
+    --vp-button-brand-active-bg: color-mix(in srgb, var(--ch-button-bg) 78%, black);
+    --vp-button-brand-text: #ffffff;
+    --vp-button-brand-hover-text: #ffffff;
+    --vp-button-brand-active-text: #ffffff;
+
+    /* Inline code on paper; code blocks on the fixed-dark code surface. */
+    --vp-code-color: var(--ch-ink);
+    --vp-code-bg: var(--ch-chip);
+    --vp-code-block-bg: var(--ch-code-bg);
+    --vp-code-block-color: var(--ch-code-ink);
+    --vp-code-block-divider-color: var(--ch-code-line);
+    --vp-code-lang-color: #958a8b;
+    --vp-code-line-highlight-color: rgb(255 255 255 / 0.06);
+    --vp-code-line-number-color: #958a8b;
+    --vp-code-copy-code-border-color: var(--ch-night-line);
+    --vp-code-copy-code-bg: #2c2729;
+    --vp-code-copy-code-hover-border-color: #4a4245;
+    --vp-code-copy-code-hover-bg: #2c2729;
+    --vp-code-copy-code-active-text: var(--ch-night-muted);
+    --vp-code-tab-divider: var(--ch-code-line);
+    --vp-code-tab-text-color: var(--ch-night-muted);
+    --vp-code-tab-hover-text-color: var(--ch-night-fg);
+    --vp-code-tab-active-text-color: var(--ch-night-fg);
+    --vp-code-tab-active-bar-color: var(--ch-accent);
+}
+
+.dark {
+    --vp-c-text-3: #8a7f80;
+}
+
+/* Display face on document headings. */
+.vp-doc h1,
+.vp-doc h2 {
+    font-family: var(--ch-font-display);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+/* 4px radius on the default theme's rounded chrome. */
+.vp-doc div[class*="language-"],
+.vp-doc .custom-block,
+.VPButton,
+.VPFlyout .VPMenu,
+.VPDocFooter .pager-link,
+.VPLocalSearchBox .shell,
+.VPNavBarSearch .DocSearch-Button,
+.VPSidebarItem .link {
+    border-radius: var(--ch-radius);
+}
+
+.vp-doc .vp-code-group .tabs {
+    border-radius: var(--ch-radius) var(--ch-radius) 0 0;
+}
+
+.vp-doc .vp-code-group div[class*="language-"] {
+    border-radius: 0 0 var(--ch-radius) var(--ch-radius);
+}
+
+/* Badges are status chips: square. */
+.VPBadge {
+    border-radius: 0;
+    font-family: var(--vp-font-family-mono);
+}
+
+/* Figures (diagrams) in documentation pages. */
+.vp-doc .figure {
+    margin: 24px 0;
+}
+
+.vp-doc .figure img {
+    width: 100%;
+}
+
+/* Images that ship a light and a dark variant follow the site toggle, not the OS setting. */
+html:not(.dark) .only-dark,
+html.dark .only-light {
+    display: none;
+}
+
+/*
+ * Landing page chrome (`pageClass: ch-home`): the nav sits transparently on
+ * the hero while scrolled to the top (`.VPNavBar.top`). The hero follows the
+ * color mode (cool white in light, charcoal in dark), so the nav keeps its
+ * normal text colors and only loses its background and divider.
+ */
+@media (min-width: 960px) {
+    .Layout.ch-home .VPContent {
+        padding-top: 0;
+    }
+
+    .Layout.ch-home .ch-hero {
+        padding-top: calc(var(--vp-nav-height) + 4.5rem);
+    }
+}
+
+/* Below 960px the nav is not fixed and sits above the hero: same background. */
+@media (max-width: 959px) {
+    .Layout.ch-home .VPNav {
+        background-color: var(--ch-hero-bg);
+    }
+}
+
+.Layout.ch-home .VPNavBar.top:not(.screen-open) {
+    --vp-nav-bg-color: transparent;
+    --vp-c-gutter: transparent;
+}
+
+/* The footer runs full width above the fixed desktop sidebar; give the
+ * sidebar room to scroll its last links clear of it. */
+@media (min-width: 960px) {
+    .VPSidebar .nav {
+        padding-bottom: 20rem;
+    }
+}
