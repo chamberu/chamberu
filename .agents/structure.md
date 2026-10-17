@@ -95,7 +95,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 
 | Path | Purpose |
 |------|---------|
-| `entities/` | One TypeORM entity per table (`TableName` in `constants.ts`); internal, they describe the schema for the migration and the drift check only |
+| `entities/` | One TypeORM entity per table, the repositories the store queries through; `TableName` and the jsonb transformers (`JSON_VALUE_TRANSFORMER`, `OPTIONAL_JSON_TRANSFORMER`) in `constants.ts`, `toJsonParameter()` (jsonb sanitizing) in `helpers.ts` |
 | `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), generated from the entities |
 | `schema/` | `migrateStore()` (`module.ts`), `STORE_ENTITIES`, `STORE_MIGRATIONS`, `MIGRATION_LOCK_NAME` |
-| `store/` | `TypeormStore` (`module.ts`), row mapping (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |
+| `store/` | `TypeormStore` (`module.ts`), entity to domain mapping, value builders and `RETURNING` row hydration (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |
