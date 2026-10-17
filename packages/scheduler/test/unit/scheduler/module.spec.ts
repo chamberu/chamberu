@@ -171,9 +171,9 @@ describe('createScheduler', () => {
         expect(() => make(store, [divergent])).toThrow(/sweep.*cron:0 0 \* \* 1\/2/);
 
         const malformed = agentWith([{
-            source: 'cron', 
-            id: 'bad', 
-            options: { expression: 'not a cron', overlap: 'skip' }, 
+            source: 'cron',
+            id: 'bad',
+            options: { expression: 'not a cron', overlap: 'skip' },
         }]);
         expect(() => make(store, [malformed])).toThrow(InvalidAgentDefinitionError);
         expect(() => make(store, [malformed])).toThrow(/sweep.*bad/);
@@ -195,14 +195,14 @@ describe('createScheduler', () => {
         const agents = [agentWith([cron('* * * * *')]), agentWith([cron('0 * * * *')])];
 
         expect(() => createScheduler({
-            engine, 
-            agents, 
-            store, 
+            engine,
+            agents,
+            store,
         })).toThrow(InvalidAgentDefinitionError);
         expect(() => createScheduler({
-            engine, 
-            agents, 
-            store, 
+            engine,
+            agents,
+            store,
         })).toThrow('"sweep" is used more than once');
     });
 });

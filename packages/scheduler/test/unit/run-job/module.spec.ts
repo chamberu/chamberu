@@ -7,11 +7,11 @@
 
 import type { LanguageModel } from 'ai';
 import { tool } from 'ai';
-import { 
-    describe, 
-    expect, 
-    it, 
-    vi, 
+import {
+    describe,
+    expect,
+    it,
+    vi,
 } from 'vitest';
 import { z } from 'zod';
 import type { AgentDefinition, TriggerDefinition } from '@chamberu/core';
@@ -60,10 +60,10 @@ function setup(
 describe('runJob', () => {
     it('returns 0 for a completed run', async () => {
         const {
-            clock, 
-            store, 
-            agent, 
-            engine, 
+            clock,
+            store,
+            agent,
+            engine,
         } = setup(textModel());
 
         const result = await runJob({
@@ -80,10 +80,10 @@ describe('runJob', () => {
 
     it('returns 1 for a failed run', async () => {
         const {
-            clock, 
-            store, 
-            agent, 
-            engine, 
+            clock,
+            store,
+            agent,
+            engine,
         } = setup(failingModel());
 
         const result = await runJob({
@@ -98,10 +98,10 @@ describe('runJob', () => {
 
     it('returns when the run waits for an approval', async () => {
         const {
-            clock, 
-            store, 
-            agent, 
-            engine, 
+            clock,
+            store,
+            agent,
+            engine,
         } = setup(approvalModel('deploy'), undefined, {
             tools: () => ({ deploy: tool({ inputSchema: z.object({}), execute: async () => 'deployed' }) }),
             approvals: { deploy: 'user' },
@@ -120,10 +120,10 @@ describe('runJob', () => {
 
     it('skips under the overlap policy', async () => {
         const {
-            clock, 
-            store, 
-            agent, 
-            engine, 
+            clock,
+            store,
+            agent,
+            engine,
         } = setup(textModel());
         const trigger = agent.definition.triggers?.[0] as TriggerDefinition;
         await fireCronTrigger({
@@ -151,9 +151,9 @@ describe('runJob', () => {
 
     it('resolves a run finished by another replica', async () => {
         const {
-            clock, 
-            store, 
-            agent, 
+            clock,
+            store,
+            agent,
         } = setup(textModel());
         const a = new RunEngine({
             store,
@@ -189,10 +189,10 @@ describe('runJob', () => {
 
     it('stops polling once it returned', async () => {
         const {
-            clock, 
-            store, 
-            agent, 
-            engine, 
+            clock,
+            store,
+            agent,
+            engine,
         } = setup(textModel());
         const getRun = vi.spyOn(engine, 'getRun');
         // the run settles while a poll is in flight
@@ -228,10 +228,10 @@ describe('runJob', () => {
 
     it('drains the engine when waiting for the run fails', async () => {
         const {
-            clock, 
-            store, 
-            agent, 
-            engine, 
+            clock,
+            store,
+            agent,
+            engine,
         } = setup(textModel());
         const error = new Error('store down');
         vi.spyOn(engine, 'getRun').mockRejectedValue(error);
@@ -249,10 +249,10 @@ describe('runJob', () => {
 
     it('drains the engine before returning', async () => {
         const {
-            clock, 
-            store, 
-            agent, 
-            engine, 
+            clock,
+            store,
+            agent,
+            engine,
         } = setup(textModel());
         const drain = vi.spyOn(engine, 'drain');
 

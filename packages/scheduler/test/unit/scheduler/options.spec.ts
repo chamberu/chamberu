@@ -6,11 +6,11 @@
  */
 
 import { MemoryScheduleLock } from '@hubwire/test';
-import { 
-    describe, 
-    expect, 
-    it, 
-    vi, 
+import {
+    describe,
+    expect,
+    it,
+    vi,
 } from 'vitest';
 import {
     MemoryStore,

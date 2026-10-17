@@ -160,15 +160,15 @@ describe('readCronOptions', () => {
         const { agent } = setup();
 
         expect(() => readCronOptions(agent, {
-            source: 'cron', 
-            id: 'x', 
-            options: {}, 
+            source: 'cron',
+            id: 'x',
+            options: {},
         }))
             .toThrow(InvalidAgentDefinitionError);
         expect(() => readCronOptions(agent, {
-            source: 'cron', 
-            id: 'x', 
-            options: {}, 
+            source: 'cron',
+            id: 'x',
+            options: {},
         }))
             .toThrow(/sweep.*x/);
         expect(() => readCronOptions(agent, {

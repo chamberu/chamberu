@@ -106,10 +106,10 @@ describe('overlap', () => {
 
     it('queue-one: the queued run waits for the running one', async () => {
         const {
-            clock, 
-            store, 
-            engine, 
-            fire, 
+            clock,
+            store,
+            engine,
+            fire,
         } = setup([cron('*/5 * * * *', { overlap: 'queue-one' })]);
         const run1 = idOf(await fire(0));
         // running on another replica, which holds a live claim (recovery leaves it alone)
