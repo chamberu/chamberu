@@ -58,6 +58,7 @@ Expired idempotency keys and locks never block anyone, but they stay in their ta
 ## Differences from MemoryStore
 
 - **Opaque values are JSON.** A run's `output`, step `input`/`output`/`error`, checkpoint messages, effect results and state lose `Date`, `undefined` and `Map` fidelity.
+- **NUL characters and lone surrogates become U+FFFD** in opaque values, keys and strings alike, because `jsonb` cannot hold them.
 - **A JSON `null` in a nullable column reads back as absent:** a run `output` of `null`, and a step `input`, `output` or `error` of `null`. `putEffect(key, undefined)` reads back `{ result: null }`.
 - **`docList` `where` uses `jsonb` containment (`@>`).** Primitive values match by top-level equality; a nested object or array matches by containment, where `MemoryStore` never matches. Documents come back ordered by `id`, not by insertion.
 - **`listRuns` ties** on `createdAt` are broken by the byte order of `id` (`COLLATE "C"`, so `'B' < 'a'`); identical to `MemoryStore` for lowercase ids and UUIDs.

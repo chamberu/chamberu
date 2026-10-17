@@ -256,7 +256,7 @@ export class TypeormStore implements IStore {
             [
                 cp.runId,
                 cp.stepIndex,
-                JSON.stringify(cp.messages),
+                json(cp.messages),
                 cp.finishReason ?? null,
                 cp.createdAt,
             ],
@@ -329,7 +329,7 @@ export class TypeormStore implements IStore {
         await this.query(
             `INSERT INTO ${EFFECTS} (key, result) VALUES ($1, $2::jsonb) ` +
             'ON CONFLICT (key) DO UPDATE SET result = EXCLUDED.result',
-            [key, JSON.stringify(result ?? null)],
+            [key, json(result ?? null)],
         );
     }
 
@@ -352,7 +352,7 @@ export class TypeormStore implements IStore {
         await this.query(
             `INSERT INTO ${KV} (agent, key, value) VALUES ($1, $2, $3::jsonb) ` +
             'ON CONFLICT (agent, key) DO UPDATE SET value = EXCLUDED.value',
-            [agent, key, JSON.stringify(value)],
+            [agent, key, json(value)],
         );
     }
 
@@ -364,7 +364,7 @@ export class TypeormStore implements IStore {
         const params: unknown[] = [agent, coll];
         let sql = `SELECT id, doc FROM ${DOCS} WHERE agent = $1 AND collection = $2`;
         if (q.where && Object.keys(q.where).length > 0) {
-            params.push(JSON.stringify(q.where));
+            params.push(json(q.where));
             sql += ` AND doc @> $${params.length}::jsonb`;
         }
         sql += ' ORDER BY id ASC';
@@ -381,7 +381,7 @@ export class TypeormStore implements IStore {
         await this.query(
             `INSERT INTO ${DOCS} (agent, collection, id, doc) VALUES ($1, $2, $3, $4::jsonb) ` +
             'ON CONFLICT (agent, collection, id) DO UPDATE SET doc = EXCLUDED.doc',
-            [agent, coll, id, JSON.stringify(doc ?? null)],
+            [agent, coll, id, json(doc ?? null)],
         );
     }
 

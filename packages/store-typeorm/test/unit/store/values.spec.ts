@@ -107,4 +107,74 @@ describePostgres('TypeormStore values', () => {
         const steps = await store.listSteps('r1');
         expect(steps.map((s) => s.name)).toEqual(['zero', 'one-a', 'one-b', 'two']);
     });
+
+    it('stores NUL characters and lone surrogates as U+FFFD, keeping escaped text and surrogate pairs', async () => {
+        const raw = {
+            nul: 'a\u0000b',
+            ['k\u0000']: 1,
+            lone: 'x\uD800y\uDC00z',
+            pair: 'emoji 😀',
+            literal: '\\u0000 and \\\u0000 and \\uD800',
+        };
+        const clean = {
+            nul: 'a�b',
+            ['k�']: 1,
+            lone: 'x�y�z',
+            pair: 'emoji 😀',
+            literal: '\\u0000 and \\� and \\uD800',
+        };
+
+        await store.kvSet('a', 'k', raw);
+        await expect(store.kvGet('a', 'k')).resolves.toEqual(clean);
+
+        await store.putEffect('e', raw);
+        await expect(store.getEffect('e')).resolves.toEqual({ result: clean });
+
+        await store.docUpsert('a', 'c', '1', raw);
+        await expect(store.docList('a', 'c', { where: { nul: 'a\u0000b' } }))
+            .resolves.toEqual([{ id: '1', doc: clean }]);
+
+        const at = new Date(1_000);
+        await store.appendStep({
+            runId: 'r1',
+            index: 0,
+            kind: 'tool',
+            input: raw,
+            output: raw,
+            error: raw,
+            startedAt: at,
+            finishedAt: at,
+        });
+        const [step] = await store.listSteps('r1');
+        expect(step).toMatchObject({ input: clean, output: clean, error: clean });
+
+        await store.saveCheckpoint({
+            runId: 'r1',
+            stepIndex: 0,
+            messages: [{ role: 'user', content: raw.nul }],
+            createdAt: at,
+        });
+        expect((await store.latestCheckpoint('r1'))?.messages).toEqual([{ role: 'user', content: clean.nul }]);
+
+        await store.createRun({
+            id: 'r1',
+            agent: 'a',
+            status: 'queued',
+            trigger: {
+                id: 't1',
+                agent: 'a',
+                trigger: 'manual',
+                source: 'manual',
+                payload: raw,
+                receivedAt: at,
+            },
+            usage: { inputTokens: 0, outputTokens: 0 },
+            createdAt: at,
+            updatedAt: at,
+        });
+        await store.updateRun('r1', { output: raw });
+        const run = await store.getRun('r1');
+        expect(run?.trigger.payload).toEqual(clean);
+        expect(run?.output).toEqual(clean);
+    });
 });

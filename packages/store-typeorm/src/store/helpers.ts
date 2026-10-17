@@ -42,13 +42,25 @@ const JSONB_RUN_COLUMNS: ReadonlySet<string> = new Set([
     'waiting',
 ]);
 
-/** JSON parameter for a jsonb column: SQL NULL for undefined, JSON otherwise (null -> 'null'). */
+/**
+ * A \u escape that Postgres jsonb rejects: NUL, or a surrogate. JSON.stringify
+ * writes surrogate pairs as raw characters, so an escaped surrogate is always
+ * a lone one. The leading group keeps an escaped backslash (`\\u0000` is the
+ * text "\u0000", not a NUL) out of the match.
+ */
+const UNSUPPORTED_JSONB_ESCAPE = /(?<!\\)((?:\\\\)*)\\u(?:0000|d[89a-f][0-9a-f]{2})/g;
+
+/**
+ * JSON parameter for a jsonb column: SQL NULL for undefined, JSON otherwise
+ * (null -> 'null'). NUL characters and lone surrogates, which jsonb cannot
+ * hold, become U+FFFD.
+ */
 export function json(value: unknown): string | null {
     if (value === undefined) {
         return null;
     }
 
-    return JSON.stringify(value);
+    return JSON.stringify(value).replace(UNSUPPORTED_JSONB_ESCAPE, '$1\\ufffd');
 }
 
 /**
