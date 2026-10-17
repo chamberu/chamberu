@@ -29,6 +29,7 @@ Packages live in `packages/*`. `@chamberu/core` and `@chamberu/test-kit` exist t
 - **[Architecture](.agents/architecture.md)**: Run lifecycle and statuses, trigger envelope, store contract, idempotency and effects
 - **[Testing](.agents/testing.md)**: Vitest setup, source aliasing, in-memory store, store contract suite
 - **[Conventions](.agents/conventions.md)**: Tooling, naming rules, commits, release flow
+- **[Design](.agents/design.md)**: Brand direction, colour tokens, type, logo and docs landing page rules
 
 ## Plans
 
