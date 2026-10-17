@@ -62,13 +62,15 @@ export async function startScheduling(model: LanguageModel) {
     });
 
     const agents = [sweep];
+    // MemoryStore is per process; with several replicas, pass one shared store
+    // (e.g. TypeormStore) so its lock fires each tick once across them
     const store = new MemoryStore();
     const engine = new RunEngine({
         store,
         agents,
         resumeSecret: 'change-me',
     });
-    // every replica runs the same scheduler: a lock in the store fires each tick once
+    // every replica runs the same scheduler against that store
     const scheduler = createScheduler({
         engine,
         agents,
