@@ -22,11 +22,11 @@ env:
     PRIMARY_NODE_VERSION: 24
 
 jobs:
-    docs:
-        name: Build & deploy docs
+    build:
+        name: Build docs
         runs-on: ubuntu-latest
         permissions:
-            contents: write
+            contents: read
         steps:
             -   name: Checkout
                 uses: actions/checkout@v7
@@ -43,12 +43,39 @@ jobs:
             -   name: Build docs
                 run: npm run docs:build
 
-            # Custom domain: TBD. Once it is chosen, write it to
-            # ./packages/docs/src/.vitepress/dist/CNAME before the deploy step.
+            -   name: Upload artifact
+                if: ${{ github.event_name == 'push' }}
+                uses: actions/upload-artifact@v7
+                with:
+                    name: docs-dist
+                    path: ./packages/docs/src/.vitepress/dist
+
+    deploy:
+        name: Deploy to chamberu.dev
+        if: ${{ github.event_name == 'push' }}
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v7
+                with:
+                    sparse-checkout: packages/docs/CNAME
+                    sparse-checkout-cone-mode: false
+
+            -   name: Download artifact
+                uses: actions/download-artifact@v8
+                with:
+                    name: docs-dist
+                    path: ./dist
+
+            # GitHub Pages reads the custom domain from a CNAME file in the published root
+            -   name: CNAME
+                run: cp ./packages/docs/CNAME ./dist/CNAME
 
             -   name: Deploy
-                if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
                 uses: peaceiris/actions-gh-pages@v4
                 with:
                     github_token: ${{ secrets.GITHUB_TOKEN }}
-                    publish_dir: ./packages/docs/src/.vitepress/dist
+                    publish_dir: ./dist
