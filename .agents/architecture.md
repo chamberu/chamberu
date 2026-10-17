@@ -6,6 +6,10 @@ App, Agent, Trigger, Run, Step, State, Tool, Workspace, Notifier, Store. Keep th
 
 `@chamberu/core` (as built in plan 001) holds: agent and trigger definitions, the `RunEngine`, step checkpoints, budgets, effect tools, approvals with signed resume tokens, recovery and drain, agent state, the `Store`/`Notifier` interfaces, `MemoryStore` and the store contract suite. Everything time-based goes through an injectable `Clock` (`systemClock`, `ControllableClock` in tests). The public surface is `src/index.ts`; `@chamberu/core/testing` exports `describeStoreContract` and `ControllableClock`.
 
+## Engine
+
+`new RunEngine({ store, agents, resumeSecret, ... })` validates at construction (`InvalidAgentDefinitionError`): `resumeSecret` must be non-empty, agent names unique, every `notify` must name a key of `notifiers`. Defaults: `claimTtlMs` 60 s, `maxConcurrentRuns` 4, `owner` `${hostname}-${pid}`, `clock` `systemClock`, `onError` logs to `console.error`. `start()` recovers and begins polling; `dispatch`, `cancel`, `resume`, `tick`, `recover` and `drain` are the operations.
+
 ## Agents
 
 `defineAgent({...})` takes a typed config object and returns `{ name, definition }` with the budget defaults applied (`maxSteps: 20`, `timeoutMs: 15 min`). Agent names match `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 chars, unique per app; trigger ids must be unique per agent (`InvalidAgentDefinitionError` otherwise). `tools` is a factory `({ state, run }) => ToolSet`, called per execution. `approvals` maps tool names to `'user'` or a policy function (`'user' | 'allow' | 'deny'`), translated to the AI SDK's `toolApproval`. `notify` names a notifier registered on the engine (checked in the `RunEngine` constructor).

@@ -6,21 +6,27 @@
 chamberu/
 ├── packages/
 │   └── core/                        # @chamberu/core
-│       ├── src/                     # Library source (entry: src/index.ts)
+│       ├── src/                     # Library source (entries: src/index.ts, src/testing.ts)
 │       ├── test/
-│       │   ├── vitest.config.ts     # Aliases @chamberu/core to ../src/index.ts
-│       │   ├── unit/                # *.spec.ts files
+│       │   ├── vitest.config.ts     # Aliases @chamberu/core{,/testing} to ../src/{index,testing}.ts
+│       │   ├── unit/                # *.spec.ts, one folder per src module (agent/, engine/, store/, ...)
 │       │   ├── fixtures/            # readme-example.ts (the README example, run as a test)
 │       │   └── utils/               # mock-model.ts
-│       ├── tsdown.config.ts         # Builds dist/index.mjs + dist/index.d.mts
+│       ├── README.md                # Package README (must contain the fixture verbatim)
+│       ├── tsdown.config.ts         # Builds dist/{index,testing}.mjs + .d.mts
 │       ├── tsconfig.json            # src + test (typecheck)
 │       └── tsconfig.build.json      # src only (build:types)
 ├── .github/
 │   ├── assets/                      # README diagrams (theme-aware SVGs)
 │   ├── actions/{install,build}/     # Composite actions
-│   └── workflows/{ci,release}.yml   # CI (Node 22, 24) and release-please + npm publish
+│   ├── workflows/{ci,release}.yml   # CI (Node 22, 24) and release-please + npm publish
+│   ├── ISSUE_TEMPLATE/              # Bug report and feature request templates
+│   ├── FUNDING.yml                  # GitHub Sponsors
+│   └── dependabot.yml               # Daily npm + github-actions updates
+├── .husky/commit-msg                # Runs commitlint
+├── CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md
 ├── nx.json                          # Task orchestration and caching
-├── tsconfig.json                    # Root config, path alias @chamberu/core -> packages/core/src/index.ts
+├── tsconfig.json                    # Root config, path aliases @chamberu/core{,/testing} -> packages/core/src
 ├── tsconfig.build.json              # Shared compiler options
 ├── eslint.config.js                 # @tada5hi/eslint-config flat config
 ├── commitlint.config.mjs            # Conventional Commits
@@ -45,7 +51,7 @@ chamberu/
 
 The memory store lives inside `@chamberu/core` (no separate `store-memory` package), because every test needs it.
 
-## Core Module Map (target layout of `packages/core/src`)
+## Core Module Map (`packages/core/src`)
 
 | Path | Purpose |
 |------|---------|
@@ -57,10 +63,10 @@ The memory store lives inside `@chamberu/core` (no separate `store-memory` packa
 | `store/memory.ts` | `MemoryStore` |
 | `store/contract.ts` | `describeStoreContract()`, exported via `@chamberu/core/testing` |
 | `engine/{engine,queue,execute,budget}.ts` | `RunEngine`, scheduler, one execution, stop conditions |
-| `effect/{define,wrap}.ts` | `defineEffectTool()`, `wrapToolsForRun()` |
+| `effect/{define,wrap}.ts` | `defineEffectTool()`, `effectMarker()`, `wrapToolsForRun()` (`effect/index.ts` re-exports both) |
 | `approval/token.ts` | Signed resume tokens |
 | `notify/types.ts` | `Notifier`, `Notification` |
 | `state/{api,tools}.ts` | Agent state API and generated tools |
-| `clock.ts` | Injectable `Clock` for tests |
+| `clock.ts` | `Clock` interface, `systemClock`, `ControllableClock` |
 
 `testing.ts` is the `@chamberu/core/testing` entry (`describeStoreContract`, `ControllableClock`).
