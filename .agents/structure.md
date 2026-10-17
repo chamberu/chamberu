@@ -18,8 +18,8 @@ chamberu/
 │   │   └── tsconfig.build.json      # src only (build:types)
 │   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
 │   └── docs/                        # @chamberu/docs (private, not released): VitePress site (npm run docs:dev / docs:build)
-│       ├── src/.vitepress/          # config.mts, theme/ (default theme)
-│       ├── src/public/              # logo.svg (favicon), run-lifecycle.svg
+│       ├── src/.vitepress/          # config.mts, theme/ (Tailwind v4 tokens, Layout.vue), components/{home,layout}/
+│       ├── src/public/              # logo.svg (favicon), fixed light/dark logo and run-lifecycle copies
 │       └── src/snippets/            # Code samples included via <<<, type-checked by the docs typecheck
 ├── .github/
 │   ├── assets/                      # logo.svg (+ test-kit and organisation variants), run-lifecycle.svg

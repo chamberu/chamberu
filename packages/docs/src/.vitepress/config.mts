@@ -5,7 +5,13 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { defineConfig } from 'vitepress';
+import tailwindcss from '@tailwindcss/vite';
+import type { UserConfig } from 'vitepress';
+import { defineConfig, postcssIsolateStyles } from 'vitepress';
+import { chamberuCodeTheme } from './shiki-theme';
+
+// a plugin as the vite bundled with VitePress types it
+type VitePressVitePlugin = NonNullable<NonNullable<UserConfig['vite']>['plugins']>[number];
 
 export default defineConfig({
     title: 'chamberu',
@@ -14,12 +20,43 @@ export default defineConfig({
     cleanUrls: true,
     lastUpdated: true,
 
+    vite: {
+        // @tailwindcss/vite is typed against the workspace's newer vite (via
+        // vitest), VitePress bundles vite 5; the plugin supports both at runtime.
+        plugins: [tailwindcss() as unknown as VitePressVitePlugin],
+        css: {
+            postcss: {
+                plugins: [
+                    // VitePress base + doc styles are unlayered and would override
+                    // Tailwind utilities, so exclude them inside `.vp-raw` subtrees.
+                    postcssIsolateStyles({ includeFiles: [/base\.css/, /vp-doc\.css/] }),
+                ],
+            },
+        },
+    },
+
+    markdown: {
+        // code blocks sit on a fixed-dark surface in both color modes
+        theme: chamberuCodeTheme,
+    },
+
     head: [
         ['link', {
             rel: 'icon',
             type: 'image/svg+xml',
             href: '/logo.svg',
         }],
+        ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+        ['link', {
+            rel: 'preconnect', 
+            href: 'https://fonts.gstatic.com', 
+            crossorigin: '', 
+        }],
+        ['link', {
+            rel: 'stylesheet',
+            href: 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap',
+        }],
+        ['meta', { name: 'theme-color', content: '#19171a' }],
         ['meta', { property: 'og:type', content: 'website' }],
         ['meta', { property: 'og:title', content: 'chamberu' }],
         ['meta', {
@@ -29,7 +66,11 @@ export default defineConfig({
     ],
 
     themeConfig: {
-        logo: { light: '/logo-light.svg', dark: '/logo-dark.svg', alt: 'chamberu' },
+        logo: {
+            light: '/logo-light.svg', 
+            dark: '/logo-dark.svg', 
+            alt: 'chamberu', 
+        },
 
         nav: [
             {
@@ -150,10 +191,5 @@ export default defineConfig({
         },
 
         search: { provider: 'local' },
-
-        footer: {
-            message: 'Released under the MIT License.',
-            copyright: 'Copyright © 2026-present Peter Placzek',
-        },
     },
 });
