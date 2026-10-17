@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import type { 
     Checkpoint, 
     Run, 
@@ -13,7 +20,7 @@ import type {
  * Implementations must return copies: mutating a value passed in after the call,
  * or a value returned from the store, must never change what the store holds.
  */
-export interface RunStore {
+export interface IRunStore {
     /**
      * Atomic insert-if-absent: resolves false and keeps the stored run when a run
      * with that id exists (two dispatches may create the run an idempotency key names).
@@ -40,33 +47,33 @@ export interface RunStore {
     renewClaim(id: string, owner: string, ttlMs: number): Promise<boolean>;
 }
 
-export interface StepStore {
+export interface IStepStore {
     appendStep(step: Step): Promise<void>;
     listSteps(runId: string): Promise<Step[]>;
 }
 
-export interface CheckpointStore {
+export interface ICheckpointStore {
     /** Keeps the highest stepIndex; an equal stepIndex replaces (approval responses are appended that way). */
     saveCheckpoint(cp: Checkpoint): Promise<void>;
     latestCheckpoint(runId: string): Promise<Checkpoint | undefined>;
 }
 
-export interface IdempotencyStore {
+export interface IIdempotencyStore {
     /** Atomic: the first caller per (scope, key) creates; others get the winner's runId. */
     claimKey(scope: string, key: string, runId: string, ttlMs: number): Promise<{ created: boolean; runId: string }>;
 }
 
-export interface LockStore {
+export interface ILockStore {
     acquire(key: string, owner: string, ttlMs: number): Promise<boolean>;
     release(key: string, owner: string): Promise<void>;
 }
 
-export interface EffectStore {
+export interface IEffectStore {
     getEffect(key: string): Promise<{ result: unknown } | undefined>;
     putEffect(key: string, result: unknown): Promise<void>;
 }
 
-export interface StateStore {
+export interface IStateStore {
     kvGet(agent: string, key: string): Promise<unknown>;
     kvSet(agent: string, key: string, value: unknown): Promise<void>;
     /** `where` matches by top-level equality. */
@@ -79,4 +86,4 @@ export interface StateStore {
     docDelete(agent: string, coll: string, id: string): Promise<void>;
 }
 
-export interface Store extends RunStore, StepStore, CheckpointStore, IdempotencyStore, LockStore, EffectStore, StateStore {}
+export interface IStore extends IRunStore, IStepStore, ICheckpointStore, IIdempotencyStore, ILockStore, IEffectStore, IStateStore {}

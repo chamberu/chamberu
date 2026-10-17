@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import { tool } from 'ai';
 import type { ToolSet } from 'ai';
 import {
@@ -8,12 +15,12 @@ import {
 } from 'vitest';
 import { z } from 'zod';
 import { RunEngine, ValidationError, defineAgent } from '@chamberu/core';
-import { EFFECT } from '../../../src/effect/define.ts';
+import { EFFECT } from '../../../src/effect/constants.ts';
 import { wrapToolsForRun } from '../../../src/effect/wrap.ts';
 import type { RunContext } from '../../../src/run/types.ts';
-import { createAgentState } from '../../../src/state/api.ts';
+import { createAgentState } from '../../../src/state/module.ts';
 import { createStateTools } from '../../../src/state/tools.ts';
-import { MemoryStore } from '../../../src/store/memory.ts';
+import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 
 const schema = {

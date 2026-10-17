@@ -1,32 +1,15 @@
-import { randomUUID } from 'node:crypto';
-import type { StandardJSONSchemaV1 } from '@standard-schema/spec';
-import { jsonSchema, tool } from 'ai';
-import type { JSONSchema7, ToolSet } from 'ai';
-import { defineEffectTool } from '../effect/define.ts';
-import type { AgentState, StateSchema } from './api.ts';
-
-/** The collection's JSON Schema when its Standard Schema can produce one, else any object. */
-function docJsonSchema(schema: StateSchema[string]): JSONSchema7 {
-    const converter = (schema['~standard'] as Partial<StandardJSONSchemaV1.Props>).jsonSchema;
-    if (converter) {
-        try {
-            const converted = { ...converter.input({ target: 'draft-07' }) } as JSONSchema7;
-            delete converted.$schema;
-            return converted;
-        } catch {
-            // not representable as JSON Schema: fall through
-        }
-    }
-    return { type: 'object' };
-}
-
-/**
- * State writes are idempotent but not commutative: memoizing them by input
- * would drop the last write of upsert A, upsert B, upsert A (in a run or its
- * replay). Every invocation therefore gets its own effect key, so a write is
- * always applied.
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
  */
-const perCallKey = (tool: string) => (_input: unknown, ctx: { runId: string }) => `${ctx.runId}:${tool}:${randomUUID()}`;
+
+import { jsonSchema, tool } from 'ai';
+import type { ToolSet } from 'ai';
+import { defineEffectTool } from '../effect/define.ts';
+import { docJsonSchema, perCallKey } from './helpers.ts';
+import type { IAgentState, StateSchema } from './types.ts';
 
 /**
  * Tools exposing the agent's state collections to the model:
@@ -34,7 +17,7 @@ const perCallKey = (tool: string) => (_input: unknown, ctx: { runId: string }) =
  * (the latter two are effect tools). Upsert validates via the state API, so an
  * invalid document becomes a tool error the model can correct.
  */
-export function createStateTools<S extends StateSchema>(state: AgentState<S>, schema: S): ToolSet {
+export function createStateTools<S extends StateSchema>(state: IAgentState<S>, schema: S): ToolSet {
     const tools: ToolSet = {};
     for (const coll of Object.keys(schema) as Array<keyof S & string>) {
         const collection = state.collection(coll);

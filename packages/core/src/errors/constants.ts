@@ -1,0 +1,20 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+export const ErrorCode = {
+    BUDGET_EXCEEDED: 'BudgetExceeded',
+    FATAL_TOOL: 'FatalToolError',
+    INVALID_AGENT_DEFINITION: 'invalid_agent_definition',
+    INVALID_RESUME_TOKEN: 'invalid_resume_token',
+    INVALID_RUN_STATE: 'invalid_run_state',
+    LEASE_LOST: 'lease_lost',
+    RUN_NOT_FOUND: 'run_not_found',
+    TIMEOUT: 'Timeout',
+    VALIDATION: 'validation_error',
+} as const;
+
+export type ErrorCode = typeof ErrorCode[keyof typeof ErrorCode];

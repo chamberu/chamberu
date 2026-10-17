@@ -1,21 +1,25 @@
-import { systemClock } from '../clock.ts';
-import type { Clock } from '../clock.ts';
-import { InvalidRunStateError, RunNotFoundError } from '../errors.ts';
-import type { Checkpoint, Run, Step } from '../run/types.ts';
-import type { Store } from './types.ts';
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
 
-const copy = <T>(value: T): T => structuredClone(value);
-
-interface Expiring {
-    expiresAt: number;
-}
+import { isObject } from 'smob';
+import { systemClock } from '../../clock/index.ts';
+import type { IClock } from '../../clock/index.ts';
+import { InvalidRunStateError, RunNotFoundError } from '../../errors/index.ts';
+import type { Checkpoint, Run, Step } from '../../run/types.ts';
+import type { IStore } from '../types.ts';
+import { copy } from './helpers.ts';
+import type { Expiring } from './types.ts';
 
 /**
  * In-memory Store. Methods are single-threaded and never await between a
  * check and the matching write, which makes the atomic operations atomic.
  */
-export class MemoryStore implements Store {
-    protected clock: Clock;
+export class MemoryStore implements IStore {
+    protected clock: IClock;
 
     protected runs = new Map<string, Run>();
 
@@ -33,7 +37,7 @@ export class MemoryStore implements Store {
 
     protected docs = new Map<string, Map<string, unknown>>();
 
-    constructor(opts: { clock?: Clock } = {}) {
+    constructor(opts: { clock?: IClock } = {}) {
         this.clock = opts.clock ?? systemClock;
     }
 
@@ -41,7 +45,7 @@ export class MemoryStore implements Store {
         return this.clock.now().getTime();
     }
 
-    // RunStore
+    // IRunStore
 
     async createRun(run: Run): Promise<boolean> {
         if (this.runs.has(run.id)) return false;
@@ -115,7 +119,7 @@ export class MemoryStore implements Store {
         return true;
     }
 
-    // StepStore
+    // IStepStore
 
     async appendStep(step: Step): Promise<void> {
         const list = this.steps.get(step.runId) ?? [];
@@ -127,7 +131,7 @@ export class MemoryStore implements Store {
         return copy([...(this.steps.get(runId) ?? [])].sort((a, b) => a.index - b.index));
     }
 
-    // CheckpointStore
+    // ICheckpointStore
 
     async saveCheckpoint(cp: Checkpoint): Promise<void> {
         const current = this.checkpoints.get(cp.runId);
@@ -141,7 +145,7 @@ export class MemoryStore implements Store {
         return cp ? copy(cp) : undefined;
     }
 
-    // IdempotencyStore
+    // IIdempotencyStore
 
     async claimKey(scope: string, key: string, runId: string, ttlMs: number): Promise<{ created: boolean; runId: string }> {
         const id = `${scope}\u0000${key}`;
@@ -154,7 +158,7 @@ export class MemoryStore implements Store {
         return { created: true, runId };
     }
 
-    // LockStore
+    // ILockStore
 
     async acquire(key: string, owner: string, ttlMs: number): Promise<boolean> {
         const now = this.now();
@@ -168,7 +172,7 @@ export class MemoryStore implements Store {
         if (this.locks.get(key)?.owner === owner) this.locks.delete(key);
     }
 
-    // EffectStore
+    // IEffectStore
 
     async getEffect(key: string): Promise<{ result: unknown } | undefined> {
         const effect = this.effects.get(key);
@@ -179,7 +183,7 @@ export class MemoryStore implements Store {
         this.effects.set(key, { result: copy(result) });
     }
 
-    // StateStore
+    // IStateStore
 
     async kvGet(agent: string, key: string): Promise<unknown> {
         return copy(this.kv.get(`${agent}\u0000${key}`));
@@ -197,7 +201,7 @@ export class MemoryStore implements Store {
         const entries = (this.docs.get(`${agent}\u0000${coll}`) ?? new Map()).entries().toArray()
             .map(([id, doc]) => ({ id, doc }))
             .filter(({ doc }) => Object.entries(q.where ?? {}).every(
-                ([k, v]) => typeof doc === 'object' && doc !== null && (doc as Record<string, unknown>)[k] === v,
+                ([k, v]) => isObject(doc) && doc[k] === v,
             ));
         return copy(q.limit === undefined ? entries : entries.slice(0, q.limit));
     }

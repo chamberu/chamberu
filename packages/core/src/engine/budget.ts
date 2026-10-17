@@ -1,7 +1,15 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import type { StepResult, StopCondition, ToolSet } from 'ai';
-import { DEFAULT_MAX_STEPS } from '../agent/define.ts';
+import { DEFAULT_MAX_STEPS } from '../agent/constants.ts';
 import type { Agent } from '../agent/types.ts';
-import type { Clock } from '../clock.ts';
+import type { IClock } from '../clock/index.ts';
+import { TimeoutError } from '../errors/index.ts';
 import type { Budget, Usage } from '../run/types.ts';
 
 export function resolveBudget(agent: Agent): Budget {
@@ -28,17 +36,8 @@ export function tokensExceeded(maxTokens: number, spent = 0): StopCondition<Tool
     }, spent) >= maxTokens;
 }
 
-export class TimeoutError extends Error {
-    readonly code = 'Timeout';
-
-    constructor(ms: number) {
-        super(`The run exceeded its ${ms}ms timeout.`);
-        this.name = 'TimeoutError';
-    }
-}
-
 /** Aborts after `ms` on the given clock (so tests can drive it); call `clear` when done. */
-export function timeoutSignal(clock: Clock, ms: number): { signal: AbortSignal; clear(): void } {
+export function timeoutSignal(clock: IClock, ms: number): { signal: AbortSignal; clear(): void } {
     const controller = new AbortController();
     const timer = clock.setTimeout(() => controller.abort(new TimeoutError(ms)), ms);
     return { signal: controller.signal, clear: () => timer.clear() };

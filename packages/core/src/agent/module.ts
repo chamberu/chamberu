@@ -1,12 +1,19 @@
-import { InvalidAgentDefinitionError } from '../errors.ts';
-import type { StateSchema } from '../state/api.ts';
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { InvalidAgentDefinitionError } from '../errors/index.ts';
+import type { StateSchema } from '../state/types.ts';
+import {
+    DEFAULT_MAX_STEPS,
+    DEFAULT_TIMEOUT_MS,
+    NAME_MAX_LENGTH,
+    NAME_PATTERN,
+} from './constants.ts';
 import type { Agent, AgentDefinition } from './types.ts';
-
-const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const NAME_MAX_LENGTH = 64;
-
-export const DEFAULT_MAX_STEPS = 20;
-export const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 
 export function defineAgent<S extends StateSchema = StateSchema>(def: AgentDefinition<S>): Agent<S> {
     if (

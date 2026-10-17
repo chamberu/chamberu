@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import type {
     LanguageModelV4Content,
     LanguageModelV4FinishReason,
@@ -16,11 +23,11 @@ export type MockPart =    | { type: 'text'; text: string } |
         toolCallId?: string;
     };
 
-export interface MockResponse {
+export type MockResponse = {
     /** One model turn: any mix of text and (parallel) tool calls. */
     parts: MockPart[];
     usage?: { inputTokens: number; outputTokens: number };
-}
+};
 
 const DEFAULT_USAGE = { inputTokens: 1, outputTokens: 1 };
 

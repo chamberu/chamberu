@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 /* eslint-disable max-classes-per-file */
 import type { LanguageModel } from 'ai';
 import {
@@ -13,8 +20,8 @@ import {
     defineAgent,
 } from '@chamberu/core';
 import type { Run, RunEngineOptions, RunEvent } from '@chamberu/core';
-import { ControllableClock } from '../../../src/clock.ts';
-import { MemoryStore } from '../../../src/store/memory.ts';
+import { ControllableClock } from '../../utils/clock.ts';
+import { MemoryStore } from '../../../src/store/index.ts';
 
 const model = {} as LanguageModel;
 const agent = defineAgent({

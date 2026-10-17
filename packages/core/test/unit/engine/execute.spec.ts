@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import type { LanguageModelV4CallOptions } from '@ai-sdk/provider';
 import { tool } from 'ai';
 import type { LanguageModel, Tool, ToolSet } from 'ai';
@@ -12,8 +19,8 @@ import {
 import { z } from 'zod';
 import { FatalToolError, RunEngine, defineAgent } from '@chamberu/core';
 import type { Budget, RunEngineOptions } from '@chamberu/core';
-import { ControllableClock } from '../../../src/clock.ts';
-import { MemoryStore } from '../../../src/store/memory.ts';
+import { ControllableClock } from '../../utils/clock.ts';
+import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
@@ -65,11 +72,11 @@ const lookup = (execute: () => Promise<unknown> = async () => 'found'): Tool => 
     execute,
 });
 
-interface TestAgent {
+type TestAgent = {
     model: LanguageModel;
     tools?: () => ToolSet;
     budget?: Partial<Budget>;
-}
+};
 
 function make(def: TestAgent, opts: Partial<RunEngineOptions> & { store?: MemoryStore } = {}) {
     const store = opts.store ?? new MemoryStore({ clock: opts.clock });

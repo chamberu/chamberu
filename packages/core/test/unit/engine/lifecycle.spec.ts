@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 /* eslint-disable max-classes-per-file */
 import type { LanguageModelV4CallOptions } from '@ai-sdk/provider';
 import { tool } from 'ai';
@@ -18,9 +25,10 @@ import {
     defineAgent,
 } from '@chamberu/core';
 import type { Run, RunEngineOptions, RunEvent } from '@chamberu/core';
-import type { Clock } from '../../../src/clock.ts';
-import { ControllableClock, systemClock } from '../../../src/clock.ts';
-import { MemoryStore } from '../../../src/store/memory.ts';
+import type { IClock } from '../../../src/clock/index.ts';
+import { systemClock } from '../../../src/clock/index.ts';
+import { ControllableClock } from '../../utils/clock.ts';
+import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
@@ -234,7 +242,7 @@ describe('graceful drain', () => {
         kept.clear();
         unref.clear();
         const manual = new ControllableClock();
-        const asClock: Clock = manual;
+        const asClock: IClock = manual;
         let fired = false;
         asClock.setTimeout(() => {
             fired = true;

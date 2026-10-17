@@ -1,7 +1,7 @@
 <h1 align="center">@chamberu/core</h1>
 
 <p align="center">
-    <b>Core engine for self-hosted, trigger-driven AI agents: agents, triggers, durable runs and the store contract.</b><br>
+    <b>Core engine for self-hosted, trigger-driven AI agents: agents, triggers and durable runs.</b><br>
     You write the agent with the AI SDK. The engine queues its runs, checkpoints every step,<br>
     pauses for approvals and picks interrupted runs up again, in a plain Node process.
 </p>
@@ -217,15 +217,15 @@ const digest = defineAgent({
 
 ### Stores
 
-`MemoryStore` keeps everything in process memory, for development and tests. A store implements the `Store` interface (runs, steps, checkpoints, idempotency keys, locks, effects, state) and proves it with the shared contract suite:
+`MemoryStore` keeps everything in process memory, for development and tests. A store implements the `IStore` interface (runs, steps, checkpoints, idempotency keys, locks, effects, state) and proves it with the shared contract suite from [`@chamberu/test-kit`](../test-kit):
 
 ```typescript
-import { describeStoreContract } from '@chamberu/core/testing';
+import { describeStoreContract } from '@chamberu/test-kit';
 
 describeStoreContract((clock) => new MemoryStore({ clock }));
 ```
 
-The factory receives a `ControllableClock` and must use it for every expiry decision. The suite runs on Vitest, an optional peer dependency.
+The factory receives a `ControllableClock` and must use it for every expiry decision. The suite runs on Vitest.
 
 ## Options
 
@@ -233,14 +233,14 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `store` | `Store` | required | Where runs, steps, checkpoints and state live |
+| `store` | `IStore` | required | Where runs, steps, checkpoints and state live |
 | `agents` | `Agent[]` | required | The agents this engine runs |
 | `resumeSecret` | `string` | required | HMAC secret for resume tokens and AI SDK approval signatures; must not be empty |
-| `notifiers` | `Record<string, Notifier>` | `{}` | Notifiers by name, referenced by an agent's `notify` |
+| `notifiers` | `Record<string, INotifier>` | `{}` | Notifiers by name, referenced by an agent's `notify` |
 | `maxConcurrentRuns` | `number` | `4` | Runs executing at once in this process |
 | `claimTtlMs` | `number` | `60_000` | Lease on a running run, renewed every `claimTtlMs / 3`; the poll for new work, expired approvals and abandoned runs uses the same interval |
 | `owner` | `string` | `` `${hostname}-${pid}` `` | Identity of this replica in claims |
-| `clock` | `Clock` | `systemClock` | Time source, replaceable in tests |
+| `clock` | `IClock` | `systemClock` | Time source, replaceable in tests |
 | `onError` | `(error, run?) => void` | `console.error` | Errors with no caller to throw to, such as a lost lease |
 
 `defineAgent(definition)`:
@@ -265,18 +265,20 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `cron`, `http`, `manual` | function | Trigger definitions |
 | `RunEngine` | class | `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
-| `MemoryStore` | class | In-memory `Store` |
+| `MemoryStore` | class | In-memory `IStore` |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |
 | `wrapToolsForRun` | function | Applies effect recording to a `ToolSet` outside the engine |
 | `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API and generated state tools over a store |
 | `ChamberuError` | class | Base class of every error below |
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError` | class | Rejections of definitions and engine calls |
-| `BudgetExceededError`, `FatalToolError`, `LeaseLostError`, `ValidationError` | class | Run failures and reported conditions |
-| `ControllableClock`, `systemClock` | class, object | Clocks |
-| `describeStoreContract` | function | Store contract suite, from `@chamberu/core/testing` |
+| `BudgetExceededError`, `FatalToolError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
+| `ErrorCode` | object | The `code` of every error above |
+| `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `TriggerDefinition`, `TriggerEnvelope`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `Store` and its parts, `Notifier`, `Notification`, `RunEvent`, `RunEngineOptions`, `Clock`.
+Types: `Agent`, `AgentDefinition`, `TriggerDefinition`, `TriggerEnvelope`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `RunEngineOptions`, `IClock`.
+
+Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamberu/test-kit`](../test-kit).
 
 ## Notes
 

@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import { tool } from 'ai';
 import type { LanguageModel, ModelMessage } from 'ai';
 import {
@@ -19,12 +26,12 @@ import {
 } from '@chamberu/core';
 import type {
     AgentDefinition,
+    INotifier,
     Notification,
-    Notifier,
     RunEngineOptions,
 } from '@chamberu/core';
-import { ControllableClock } from '../../../src/clock.ts';
-import { MemoryStore } from '../../../src/store/memory.ts';
+import { ControllableClock } from '../../utils/clock.ts';
+import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockPart, MockResponse } from '../../utils/mock-model.ts';
 
@@ -56,7 +63,7 @@ const call = (env: string, toolCallId: string): MockPart => ({
 
 const text = (t: string): MockResponse => ({ parts: [{ type: 'text', text: t }] });
 
-class RecordingNotifier implements Notifier {
+class RecordingNotifier implements INotifier {
     readonly name = 'owner';
 
     calls: Array<{ n: Notification; opts: { idempotencyKey: string } }> = [];
@@ -69,14 +76,14 @@ class RecordingNotifier implements Notifier {
     }
 }
 
-interface Setup {
+type Setup = {
     model: LanguageModel;
     approvals?: AgentDefinition['approvals'];
     budget?: AgentDefinition['budget'];
     /** Replaces the deploy tool's body (after recording the call). */
     deploy?: (input: { env: string }) => Promise<string>;
     engine?: Partial<RunEngineOptions>;
-}
+};
 
 function setup(s: Setup) {
     const clock = new ControllableClock(new Date(1_000_000));

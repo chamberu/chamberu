@@ -1,14 +1,21 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import type { ModelMessage } from 'ai';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 
 export type RunStatus =    'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
 
-export interface Usage {
+export type Usage = {
     inputTokens: number;
     outputTokens: number;
-}
+};
 
-export interface Budget {
+export type Budget = {
     maxSteps: number;
     maxTokens?: number;
     /**
@@ -16,16 +23,16 @@ export interface Budget {
      * execution of the run gets the full timeout again.
      */
     timeoutMs?: number;
-}
+};
 
-export interface RunContext {
+export type RunContext = {
     runId: string;
     agent: string;
     trigger: TriggerEnvelope;
     signal: AbortSignal;
-}
+};
 
-export interface WaitPoint {
+export type WaitPoint = {
     kind: 'approval';
     approvalId: string;
     toolName: string;
@@ -34,9 +41,9 @@ export interface WaitPoint {
     tokenId: string;
     /** Set once the agent's notifier accepted the approval request; tick() re-sends until then. */
     notifiedAt?: Date;
-}
+};
 
-export interface Run {
+export type Run = {
     id: string;
     agent: string;
     status: RunStatus;
@@ -57,9 +64,9 @@ export interface Run {
     updatedAt: Date;
     startedAt?: Date;
     finishedAt?: Date;
-}
+};
 
-export interface Step {
+export type Step = {
     runId: string;
     index: number;
     kind: 'llm' | 'tool' | 'wait';
@@ -69,13 +76,13 @@ export interface Step {
     error?: unknown;
     startedAt: Date;
     finishedAt: Date;
-}
+};
 
-export interface Checkpoint {
+export type Checkpoint = {
     runId: string;
     stepIndex: number;
     messages: ModelMessage[];
     /** AI SDK finish reason of the step this checkpoint was taken after. */
     finishReason?: string;
     createdAt: Date;
-}
+};

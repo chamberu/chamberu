@@ -1,4 +1,11 @@
-export interface Notification {
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+export type Notification = {
     kind: 'approval' | 'stuck' | 'result' | 'info';
     agent: string;
     runId: string;
@@ -7,9 +14,9 @@ export interface Notification {
     /** Signed token resuming the run (kind 'approval'). */
     resumeToken?: string;
     expiresAt?: Date;
-}
+};
 
-export interface Notifier {
+export interface INotifier {
     readonly name: string;
     /**
      * Delivers a notification. `idempotencyKey` is stable per logical

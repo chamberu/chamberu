@@ -1,8 +1,17 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import type { ToolSet } from 'ai';
+import { isObject } from 'smob';
 import type { RunContext } from '../run/types.ts';
-import type { EffectStore } from '../store/types.ts';
-import { EFFECT, EFFECT_HOOKS, stableHash } from './define.ts';
-import type { EffectHooks } from './define.ts';
+import type { IEffectStore } from '../store/types.ts';
+import { EFFECT, EFFECT_HOOKS } from './constants.ts';
+import { stableHash } from './helpers.ts';
+import type { EffectHooks } from './types.ts';
 
 type Execute = (input: unknown, options: any) => unknown;
 
@@ -11,7 +20,7 @@ type Execute = (input: unknown, options: any) => unknown;
  * stored result, then remote reconciliation, then execute. Other tools pass through.
  * A throwing execute (or alreadyApplied) records nothing, so a retry can still apply.
  */
-export function wrapToolsForRun(tools: ToolSet, ctx: RunContext, store: EffectStore): ToolSet {
+export function wrapToolsForRun(tools: ToolSet, ctx: RunContext, store: IEffectStore): ToolSet {
     const inflight = new Map<string, Promise<unknown>>();
     const wrapped: ToolSet = {};
 
@@ -35,7 +44,7 @@ export function wrapToolsForRun(tools: ToolSet, ctx: RunContext, store: EffectSt
 
             // streaming tools yield; the effect's result is the last value
             let result: unknown = await execute.call(def, input, options);
-            if (result !== null && typeof result === 'object' && Symbol.asyncIterator in result) {
+            if (isObject(result) && Symbol.asyncIterator in result) {
                 let last: unknown;
                 for await (const chunk of result as AsyncIterable<unknown>) last = chunk;
                 result = last;

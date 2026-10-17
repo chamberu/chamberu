@@ -1,52 +1,20 @@
-import { createHash } from 'node:crypto';
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { RunContext } from '../run/types.ts';
-
-/** Marks a tool as a side-effecting tool that must apply at most once per run. */
-export const EFFECT: unique symbol = Symbol.for('chamberu.effect');
-
-/** Key under which the effectKey/alreadyApplied hooks hang off an effect tool. */
-export const EFFECT_HOOKS: unique symbol = Symbol.for('chamberu.effect.hooks');
-
-export interface EffectHooks {
-    effectKey?: (input: any, ctx: RunContext) => string;
-    alreadyApplied?: (effectKey: string, input: any, ctx: RunContext) => Promise<any>;
-}
-
-function canonical(value: unknown): unknown {
-    if (value !== null && typeof value === 'object' && typeof (value as { toJSON?: unknown }).toJSON === 'function') {
-        return canonical((value as { toJSON: () => unknown }).toJSON());
-    }
-    if (Array.isArray(value)) return value.map((v) => canonical(v));
-    if (value !== null && typeof value === 'object') {
-        const out: Record<string, unknown> = {};
-        for (const key of Object.keys(value).sort()) {
-            out[key] = canonical((value as Record<string, unknown>)[key]);
-        }
-        return out;
-    }
-    return value;
-}
-
-/**
- * sha256 hex of the canonical JSON (recursively sorted keys; undefined dropped;
- * toJSON values such as Date are serialized via toJSON). BigInt and cyclic
- * inputs are unsupported and throw.
- */
-export function stableHash(value: unknown): string {
-    return createHash('sha256').update(JSON.stringify(canonical(value)) ?? 'undefined').digest('hex');
-}
+import { EFFECT, EFFECT_HOOKS } from './constants.ts';
+import type { EffectHooks, EffectTool } from './types.ts';
 
 /** Hidden marker tools embed in remote artifacts so `alreadyApplied` can find them again. */
 export function effectMarker(effectKey: string): string {
     return `<!-- chamberu:effect=${effectKey} -->`;
 }
-
-export type EffectTool<I, O> = Tool<I, O> & {
-    [EFFECT]: true;
-    [EFFECT_HOOKS]: EffectHooks;
-};
 
 export function defineEffectTool<I, O>(def: Tool<I, O> & {
     /** Default: `${runId}:${toolName}:${stableHash(input)}`. */

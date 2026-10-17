@@ -1,36 +1,23 @@
-export interface ClockTimerOptions {
-    /**
-     * Keep the process alive until the timer fires (default false: engine
-     * timers never hold the event loop open). Test clocks ignore it.
-     */
-    keepAlive?: boolean;
-}
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
 
-export interface Clock {
-    now(): Date;
-    setTimeout(fn: () => void, ms: number, opts?: ClockTimerOptions): { clear(): void };
-}
+import type { IClock } from '@chamberu/core';
 
-export const systemClock: Clock = {
-    now: () => new Date(),
-    setTimeout: (fn, ms, opts) => {
-        const handle = setTimeout(fn, ms);
-        // never keep the process alive just for engine timers, unless asked to
-        if (!opts?.keepAlive) handle.unref?.();
-        return { clear: () => clearTimeout(handle) };
-    },
-};
-
-interface Timer {
+type Timer = {
     at: number;
     seq: number;
     fn: () => void;
-}
+};
 
 /**
- * Manually advanced clock for tests.
+ * Manually advanced clock for core's own tests. `@chamberu/test-kit` ships
+ * the public one; core cannot depend on the kit, which depends on core.
  */
-export class ControllableClock implements Clock {
+export class ControllableClock implements IClock {
     protected current: number;
 
     protected timers: Timer[] = [];

@@ -1,71 +1,60 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { pid } from 'node:process';
-import { systemClock } from '../clock.ts';
-import type { Clock } from '../clock.ts';
 import type { Agent } from '../agent/types.ts';
-import { createResumeToken, verifyResumeToken } from '../approval/token.ts';
+import { createResumeToken, verifyResumeToken } from '../approval/module.ts';
+import { systemClock } from '../clock/index.ts';
+import type { IClock } from '../clock/index.ts';
 import {
     InvalidAgentDefinitionError,
     InvalidResumeTokenError,
     InvalidRunStateError,
     LeaseLostError,
     RunNotFoundError,
-} from '../errors.ts';
-import type { Notifier } from '../notify/types.ts';
+} from '../errors/index.ts';
+import type { INotifier } from '../notify/types.ts';
 import type {
     Run,
     Step,
     Usage,
     WaitPoint,
 } from '../run/types.ts';
-import type { Store } from '../store/types.ts';
+import type { IStore } from '../store/types.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
-import { executeRun, toRunError } from './execute.ts';
-import type { ApprovalRequest } from './execute.ts';
-import { RunQueue } from './queue.ts';
-
-export type RunEvent = { type: 'run.updated'; run: Run } | { type: 'step.appended'; step: Step };
-
-export interface RunEngineOptions {
-    store: Store;
-    agents: Agent[];
-    notifiers?: Record<string, Notifier>;
-    /** Default `${hostname}-${pid}`. */
-    owner?: string;
-    /** Default 4. */
-    maxConcurrentRuns?: number;
-    /** Default 60_000, renewed every ttl/3 while running. */
-    claimTtlMs?: number;
-    /** HMAC secret for resume tokens; must not be empty. */
-    resumeSecret: string;
-    clock?: Clock;
-    /** Receives errors that have no caller to throw to. Default console.error. */
-    onError?: (error: unknown, run?: Run) => void;
-}
-
-export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt'> & Partial<Pick<TriggerEnvelope, 'id' | 'receivedAt'>>;
-
-export interface ResumeDecision {
-    approved: boolean;
-    reason?: string;
-}
-
-const IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const DEFAULT_DRAIN_TIMEOUT_MS = 30_000;
-const DEFAULT_APPROVAL_TIMEOUT_MS = 24 * 60 * 60 * 1000;
-const APPROVAL_TIMED_OUT = 'approval timed out';
+import {
+    APPROVAL_TIMED_OUT,
+    DEFAULT_APPROVAL_TIMEOUT_MS,
+    DEFAULT_DRAIN_TIMEOUT_MS,
+    IDEMPOTENCY_TTL_MS,
+} from './constants.ts';
+import { toRunError } from './execute/helpers.ts';
+import { executeRun } from './execute/module.ts';
+import type { ApprovalRequest } from './execute/types.ts';
+import { RunQueue } from './queue/module.ts';
+import type {
+    DispatchEnvelope,
+    ResumeDecision,
+    RunEngineOptions,
+    RunEvent,
+} from './types.ts';
 
 export class RunEngine {
-    protected readonly store: Store;
+    protected readonly store: IStore;
 
     protected readonly agents: Map<string, Agent>;
 
-    protected readonly notifiers: Record<string, Notifier>;
+    protected readonly notifiers: Record<string, INotifier>;
 
     protected readonly owner: string;
 
-    protected readonly clock: Clock;
+    protected readonly clock: IClock;
 
     protected readonly resumeSecret: string;
 

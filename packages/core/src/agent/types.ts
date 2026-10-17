@@ -1,16 +1,23 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import type { LanguageModel, ToolSet } from 'ai';
 import type { Budget, RunContext } from '../run/types.ts';
-import type { AgentState, StateSchema } from '../state/api.ts';
+import type { IAgentState, StateSchema } from '../state/types.ts';
 import type { TriggerDefinition } from '../trigger/types.ts';
 
-export interface ToolFactoryContext<S extends StateSchema = StateSchema> {
-    state: AgentState<S>;
+export type ToolFactoryContext<S extends StateSchema = StateSchema> = {
+    state: IAgentState<S>;
     run: RunContext;
-}
+};
 
-export type ApprovalPolicy =    'user' | ((input: unknown, ctx: { runtimeContext: RunContext }) => 'user' | 'allow' | 'deny');
+export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: RunContext }) => 'user' | 'allow' | 'deny');
 
-export interface AgentDefinition<S extends StateSchema = StateSchema> {
+export type AgentDefinition<S extends StateSchema = StateSchema> = {
     name: string;
     model: LanguageModel;
     instructions: string;
@@ -30,9 +37,9 @@ export interface AgentDefinition<S extends StateSchema = StateSchema> {
     approvalTimeoutMs?: number;
     /** Notifier name registered on the engine. */
     notify?: string;
-}
+};
 
-export interface Agent<S extends StateSchema = StateSchema> {
+export type Agent<S extends StateSchema = StateSchema> = {
     readonly name: string;
     readonly definition: Required<Pick<AgentDefinition<S>, 'budget'>> & AgentDefinition<S>;
-}
+};
