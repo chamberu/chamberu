@@ -20,6 +20,7 @@ import {
     RunNotFoundError,
 } from '../errors/index.ts';
 import type { INotifier } from '../notify/types.ts';
+import { RunStatus } from '../run/constants.ts';
 import type {
     Run,
     Step,
@@ -155,7 +156,7 @@ export class RunEngine {
         const run: Run = {
             id: runId,
             agent: trigger.agent,
-            status: 'queued',
+            status: RunStatus.QUEUED,
             trigger,
             concurrencyKey: trigger.concurrencyKey,
             thread: trigger.thread,
@@ -212,7 +213,7 @@ export class RunEngine {
      * on every poll. Resolves the number of runs requeued.
      */
     async recover(): Promise<number> {
-        const { data } = await this.store.listRuns({ status: ['running', 'interrupted'] });
+        const { data } = await this.store.listRuns({ status: [RunStatus.RUNNING, RunStatus.INTERRUPTED] });
         let requeued = 0;
         for (const run of data) {
             const execution = this.executions.get(run.id);
@@ -233,10 +234,10 @@ export class RunEngine {
             }
             try {
                 const queued = await this.store.updateRun(run.id, {
-                    status: 'queued',
+                    status: RunStatus.QUEUED,
                     claim: undefined,
                     updatedAt: this.clock.now(),
-                }, { expectStatus: ['running', 'interrupted'], expectOwner: this.owner });
+                }, { expectStatus: [RunStatus.RUNNING, RunStatus.INTERRUPTED], expectOwner: this.owner });
                 requeued++;
                 this.emit({ type: 'run.updated', run: queued });
             } catch (error) {
@@ -306,18 +307,19 @@ export class RunEngine {
             }
             // the abort cannot stop a pause that was already writing: cancel the run it left waiting
             const run = await this.store.getRun(runId);
-            if (run?.status === 'waiting' || run?.status === 'queued') await this.cancelStored(runId, [run.status]);
+            if (run?.status === RunStatus.WAITING || run?.status === RunStatus.QUEUED) await this.cancelStored(runId, [run.status]);
             return;
         }
         for (let attempt = 0; ; attempt++) {
             const run = await this.store.getRun(runId);
             if (!run) throw new RunNotFoundError(runId);
+
             const { status } = run;
-            if (status !== 'queued' && status !== 'waiting' && status !== 'running' && status !== 'interrupted') {
+            if (status !== RunStatus.QUEUED && status !== RunStatus.WAITING && status !== RunStatus.RUNNING && status !== RunStatus.INTERRUPTED) {
                 throw new InvalidRunStateError(`Run "${runId}" is ${status}; it cannot be cancelled.`);
             }
             try {
-                if (status === 'queued' || status === 'waiting') {
+                if (status === RunStatus.QUEUED || status === RunStatus.WAITING) {
                     await this.cancelStored(runId, [status]);
                 } else {
                     const updated = await this.store.updateRun(runId, {
@@ -340,7 +342,7 @@ export class RunEngine {
         const updated = await this.store.updateRun(
             runId,
             {
-                status: 'cancelled',
+                status: RunStatus.CANCELLED,
                 waiting: undefined,
                 finishedAt: now,
                 updatedAt: now,
@@ -359,7 +361,7 @@ export class RunEngine {
         const claims = verifyResumeToken(this.resumeSecret, token, this.clock.now());
         const run = await this.store.getRun(claims.runId);
         if (!run) throw new RunNotFoundError(claims.runId);
-        if (run.status !== 'waiting' || !run.waiting) {
+        if (run.status !== RunStatus.WAITING || !run.waiting) {
             throw new InvalidRunStateError(`Run "${run.id}" is ${run.status} and not waiting for an approval.`);
         }
         if (run.waiting.tokenId !== claims.tokenId || run.waiting.approvalId !== claims.approvalId) {
@@ -375,7 +377,7 @@ export class RunEngine {
      */
     async tick(): Promise<void> {
         const now = this.clock.now().getTime();
-        const { data } = await this.store.listRuns({ status: ['waiting'] });
+        const { data } = await this.store.listRuns({ status: [RunStatus.WAITING] });
         for (const listed of data) {
             if (!listed.waiting) continue;
             if (listed.waiting.expiresAt.getTime() > now) {
@@ -386,7 +388,7 @@ export class RunEngine {
             try {
                 // the listing may be stale by now: the run could wait on a newer approval
                 const run = await this.store.getRun(listed.id);
-                if (run?.status !== 'waiting' || !run.waiting || run.waiting.expiresAt.getTime() > now) continue;
+                if (run?.status !== RunStatus.WAITING || !run.waiting || run.waiting.expiresAt.getTime() > now) continue;
                 await this.answer(run, run.waiting, { approved: false, reason: APPROVAL_TIMED_OUT });
             } catch (error) {
                 // answered meanwhile (resume, another replica)
@@ -410,10 +412,10 @@ export class RunEngine {
     protected async answer(run: Run, waiting: WaitPoint, decision: ResumeDecision): Promise<void> {
         const now = this.clock.now();
         const transitioned = await this.store.updateRun(run.id, {
-            status: 'queued',
+            status: RunStatus.QUEUED,
             claim: { owner: this.owner, expiresAt: new Date(now.getTime() + this.claimTtlMs) },
             updatedAt: now,
-        }, { expectStatus: ['waiting'] });
+        }, { expectStatus: [RunStatus.WAITING] });
 
         let queued: Run;
         try {
@@ -459,14 +461,14 @@ export class RunEngine {
                 waiting: undefined,
                 claim: undefined,
                 updatedAt: this.clock.now(),
-            }, { expectStatus: ['queued'] });
+            }, { expectStatus: [RunStatus.QUEUED] });
         } catch (error) {
             // undo, so the wait point (still on the run) and its token stay answerable
             await this.store.updateRun(run.id, {
-                status: 'waiting',
+                status: RunStatus.WAITING,
                 claim: undefined,
                 updatedAt: this.clock.now(),
-            }, { expectStatus: ['queued'] }).catch((undoError: unknown) => this.onError(undoError, run));
+            }, { expectStatus: [RunStatus.QUEUED] }).catch((undoError: unknown) => this.onError(undoError, run));
             throw error;
         }
         this.emit({ type: 'run.updated', run: queued });
@@ -489,7 +491,7 @@ export class RunEngine {
                 tokenId: randomUUID(),
             };
         const updated = await this.ownedUpdate(run.id, {
-            status: 'waiting',
+            status: RunStatus.WAITING,
             waiting,
             usage,
             claim: undefined,
@@ -499,7 +501,7 @@ export class RunEngine {
         this.emit({ type: 'run.updated', run: updated });
         // a cancel arrived while pausing (an abort cannot interrupt this write): settle, do not notify
         if (updated.cancelRequested || this.executions.get(run.id)?.stop === 'cancel') {
-            await this.cancelStored(run.id, ['waiting']).catch((error: unknown) => {
+            await this.cancelStored(run.id, [RunStatus.WAITING]).catch((error: unknown) => {
                 if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
             });
             return;
@@ -523,7 +525,7 @@ export class RunEngine {
         const lockKey = `notify:${idempotencyKey}`;
         const attempt = randomUUID();
         let acquired = false;
-        const isCurrent = (current: Run | undefined) => current?.status === 'waiting' &&
+        const isCurrent = (current: Run | undefined) => current?.status === RunStatus.WAITING &&
             current.waiting?.tokenId === waiting.tokenId;
         try {
             acquired = await this.store.acquire(lockKey, attempt, this.claimTtlMs);
@@ -550,7 +552,7 @@ export class RunEngine {
             const notified = await this.store.updateRun(
                 run.id,
                 { waiting: { ...waiting, notifiedAt: this.clock.now() } },
-                { expectStatus: ['waiting'] },
+                { expectStatus: [RunStatus.WAITING] },
             );
             this.emit({ type: 'run.updated', run: notified });
         } catch (error) {
@@ -571,7 +573,7 @@ export class RunEngine {
         if (!agent) throw new InvalidAgentDefinitionError(`unknown agent: ${run.agent}`);
         // cancel() asked for it while it ran elsewhere (or was interrupted)
         if (run.cancelRequested) {
-            await this.finish(run.id, { status: 'cancelled' });
+            await this.finish(run.id, { status: RunStatus.CANCELLED });
             return;
         }
         await executeRun({
@@ -603,7 +605,7 @@ export class RunEngine {
             } catch (error) {
                 // the run belongs to another owner now: its failure is not ours to record
                 if (this.executions.get(run.id)?.stop === 'lease-lost') return;
-                await this.finish(run.id, { status: 'failed', error: toRunError(error) });
+                await this.finish(run.id, { status: RunStatus.FAILED, error: toRunError(error) });
                 this.onError(error, run);
             } finally {
                 this.executions.delete(run.id);
@@ -622,9 +624,9 @@ export class RunEngine {
         const stop = this.executions.get(id)?.stop;
         if (stop === 'lease-lost') return undefined;
         const now = this.clock.now();
-        const settled: Partial<Run> = stop === 'drain' && patch.status === 'cancelled' ?
+        const settled: Partial<Run> = stop === 'drain' && patch.status === RunStatus.CANCELLED ?
             {
-                status: 'interrupted',
+                status: RunStatus.INTERRUPTED,
                 usage: patch.usage,
                 claim: undefined,
                 updatedAt: now,
@@ -649,7 +651,7 @@ export class RunEngine {
      */
     protected async ownedUpdate(id: string, patch: Partial<Run>): Promise<Run | undefined> {
         try {
-            return await this.store.updateRun(id, patch, { expectStatus: ['running'], expectOwner: this.owner });
+            return await this.store.updateRun(id, patch, { expectStatus: [RunStatus.RUNNING], expectOwner: this.owner });
         } catch (error) {
             if (error instanceof InvalidRunStateError && !await this.ownsRun(id)) return undefined;
             throw error;

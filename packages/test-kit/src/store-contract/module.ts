@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { InvalidRunStateError, RunNotFoundError } from '@chamberu/core';
+import { InvalidRunStateError, RunNotFoundError, RunStatus } from '@chamberu/core';
 import type {
     Checkpoint,
     IStore,
@@ -55,12 +55,12 @@ export function describeStoreContract(
             const { store } = await setup();
             await store.createRun(makeRun('r1'));
             await expect(
-                store.updateRun('r1', { status: 'running' }, { expectStatus: ['waiting'] }),
+                store.updateRun('r1', { status: RunStatus.RUNNING }, { expectStatus: [RunStatus.WAITING] }),
             ).rejects.toBeInstanceOf(InvalidRunStateError);
-            expect((await store.getRun('r1'))?.status).toBe('queued');
-            const updated = await store.updateRun('r1', { status: 'running' }, { expectStatus: ['queued'] });
-            expect(updated.status).toBe('running');
-            expect((await store.getRun('r1'))?.status).toBe('running');
+            expect((await store.getRun('r1'))?.status).toBe(RunStatus.QUEUED);
+            const updated = await store.updateRun('r1', { status: RunStatus.RUNNING }, { expectStatus: [RunStatus.QUEUED] });
+            expect(updated.status).toBe(RunStatus.RUNNING);
+            expect((await store.getRun('r1'))?.status).toBe(RunStatus.RUNNING);
         });
 
         it('claimRun grants a single owner until expiry', async () => {
@@ -180,24 +180,24 @@ export function describeStoreContract(
             const { store } = await setup();
             await store.createRun(makeRun('r3', {
                 agent: 'a', 
-                status: 'running', 
+                status: RunStatus.RUNNING, 
                 concurrencyKey: 'k1', 
                 createdAt: new Date(3_000), 
             }));
             await store.createRun(makeRun('r1', {
                 agent: 'a', 
-                status: 'queued', 
+                status: RunStatus.QUEUED, 
                 concurrencyKey: 'k1', 
                 createdAt: new Date(1_000), 
             }));
             await store.createRun(makeRun('r2', {
                 agent: 'b', 
-                status: 'queued', 
+                status: RunStatus.QUEUED, 
                 createdAt: new Date(2_000), 
             }));
             await store.createRun(makeRun('r4', {
                 agent: 'a', 
-                status: 'completed', 
+                status: RunStatus.COMPLETED, 
                 concurrencyKey: 'k2', 
                 createdAt: new Date(4_000), 
             }));
@@ -207,7 +207,7 @@ export function describeStoreContract(
             expect(all.data.map((r) => r.id)).toEqual(['r1', 'r2', 'r3', 'r4']);
 
             expect((await store.listRuns({ agent: 'a' })).data.map((r) => r.id)).toEqual(['r1', 'r3', 'r4']);
-            expect((await store.listRuns({ status: ['queued', 'running'] })).total).toBe(3);
+            expect((await store.listRuns({ status: [RunStatus.QUEUED, RunStatus.RUNNING] })).total).toBe(3);
             expect((await store.listRuns({ concurrencyKey: 'k1' })).data.map((r) => r.id)).toEqual(['r1', 'r3']);
 
             const page = await store.listRuns({
@@ -263,7 +263,7 @@ export function describeStoreContract(
 
         it('updateRun on a missing run throws RunNotFoundError', async () => {
             const { store } = await setup();
-            await expect(store.updateRun('nope', { status: 'running' })).rejects.toBeInstanceOf(RunNotFoundError);
+            await expect(store.updateRun('nope', { status: RunStatus.RUNNING })).rejects.toBeInstanceOf(RunNotFoundError);
         });
 
         it('claimRun and renewClaim on a missing run return false', async () => {
@@ -274,36 +274,36 @@ export function describeStoreContract(
 
         it('updateRun accepts several allowed statuses', async () => {
             const { store } = await setup();
-            await store.createRun(makeRun('r1', { status: 'waiting' }));
-            const run = await store.updateRun('r1', { status: 'running' }, { expectStatus: ['queued', 'waiting'] });
-            expect(run.status).toBe('running');
+            await store.createRun(makeRun('r1', { status: RunStatus.WAITING }));
+            const run = await store.updateRun('r1', { status: RunStatus.RUNNING }, { expectStatus: [RunStatus.QUEUED, RunStatus.WAITING] });
+            expect(run.status).toBe(RunStatus.RUNNING);
             await expect(
-                store.updateRun('r1', { status: 'failed' }, { expectStatus: ['queued', 'waiting'] }),
+                store.updateRun('r1', { status: RunStatus.FAILED }, { expectStatus: [RunStatus.QUEUED, RunStatus.WAITING] }),
             ).rejects.toBeInstanceOf(InvalidRunStateError);
         });
 
         it('updateRun enforces expectOwner against the current claim', async () => {
             const { store, clock } = await setup();
-            await store.createRun(makeRun('r1', { status: 'running' }));
+            await store.createRun(makeRun('r1', { status: RunStatus.RUNNING }));
             await expect(
-                store.updateRun('r1', { status: 'completed' }, { expectOwner: 'w1' }),
+                store.updateRun('r1', { status: RunStatus.COMPLETED }, { expectOwner: 'w1' }),
             ).rejects.toBeInstanceOf(InvalidRunStateError);
             expect(await store.claimRun('r1', 'w1', 1_000)).toBe(true);
             await expect(
-                store.updateRun('r1', { status: 'completed' }, { expectOwner: 'w2' }),
+                store.updateRun('r1', { status: RunStatus.COMPLETED }, { expectOwner: 'w2' }),
             ).rejects.toBeInstanceOf(InvalidRunStateError);
             clock.advance(1_001);
             expect(await store.claimRun('r1', 'w2', 1_000)).toBe(true);
             await expect(
-                store.updateRun('r1', { status: 'completed' }, { expectStatus: ['running'], expectOwner: 'w1' }),
+                store.updateRun('r1', { status: RunStatus.COMPLETED }, { expectStatus: [RunStatus.RUNNING], expectOwner: 'w1' }),
             ).rejects.toBeInstanceOf(InvalidRunStateError);
-            expect((await store.getRun('r1'))?.status).toBe('running');
+            expect((await store.getRun('r1'))?.status).toBe(RunStatus.RUNNING);
             const updated = await store.updateRun(
                 'r1',
-                { status: 'completed', claim: undefined },
-                { expectStatus: ['running'], expectOwner: 'w2' },
+                { status: RunStatus.COMPLETED, claim: undefined },
+                { expectStatus: [RunStatus.RUNNING], expectOwner: 'w2' },
             );
-            expect(updated.status).toBe('completed');
+            expect(updated.status).toBe(RunStatus.COMPLETED);
             expect(updated.claim).toBeUndefined();
         });
 
@@ -316,7 +316,7 @@ export function describeStoreContract(
             }));
             await store.claimRun('r1', 'w1', 1_000);
             const before = await store.getRun('r1');
-            const updated = await store.updateRun('r1', { status: 'running' });
+            const updated = await store.updateRun('r1', { status: RunStatus.RUNNING });
             expect(updated.claim).toEqual(before?.claim);
             expect(updated.concurrencyKey).toBe('k');
             expect(updated.thread).toBe('t');
@@ -342,9 +342,9 @@ export function describeStoreContract(
             expect(results.filter(Boolean)).toHaveLength(1);
             const winner = results.indexOf(true);
             expect((await store.getRun('r1'))?.thread).toBe(`t${winner}`);
-            await store.updateRun('r1', { status: 'running' });
+            await store.updateRun('r1', { status: RunStatus.RUNNING });
             expect(await store.createRun(makeRun('r1'))).toBe(false);
-            expect((await store.getRun('r1'))?.status).toBe('running');
+            expect((await store.getRun('r1'))?.status).toBe(RunStatus.RUNNING);
             expect((await store.listRuns({})).total).toBe(1);
         });
 

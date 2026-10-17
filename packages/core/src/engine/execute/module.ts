@@ -16,6 +16,7 @@ import type {
     ToolSet,
 } from 'ai';
 import { FatalToolError } from '../../errors/index.ts';
+import { RunStatus } from '../../run/constants.ts';
 import type { RunContext, Step, Usage } from '../../run/types.ts';
 import {
     resolveBudget,
@@ -69,9 +70,9 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     if (remainingSteps <= 0) {
         // the step limit was reached by an earlier execution that did not settle the run
         if (checkpoint && checkpoint.finishReason !== 'tool-calls') {
-            await ctx.finish({ status: 'completed', output: lastAssistantText(checkpoint.messages) });
+            await ctx.finish({ status: RunStatus.COMPLETED, output: lastAssistantText(checkpoint.messages) });
         } else {
-            await ctx.finish({ status: 'failed', error: toRunError(budgetExceeded(budget, 'steps')) });
+            await ctx.finish({ status: RunStatus.FAILED, error: toRunError(budgetExceeded(budget, 'steps')) });
         }
         return;
     }
@@ -285,16 +286,16 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         } while (settled !== pendingStepEnd);
         abandoned = true;
         if (ctx.signal.aborted) {
-            await ctx.finish({ status: 'cancelled', usage });
+            await ctx.finish({ status: RunStatus.CANCELLED, usage });
         } else if (timeout?.signal.aborted) {
             await ctx.finish({
-                status: 'failed',
+                status: RunStatus.FAILED,
                 usage,
                 error: toRunError(timeout.signal.reason),
             });
         } else {
             await ctx.finish({
-                status: 'failed',
+                status: RunStatus.FAILED,
                 usage,
                 error: toRunError(fatal ? fatal.error : error),
             });
@@ -306,14 +307,14 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
 
     if (fatal) {
         await ctx.finish({
-            status: 'failed',
+            status: RunStatus.FAILED,
             usage,
             error: toRunError(fatal.error),
         });
         return;
     }
     if (ctx.signal.aborted) {
-        await ctx.finish({ status: 'cancelled', usage });
+        await ctx.finish({ status: RunStatus.CANCELLED, usage });
         return;
     }
     if (approval) {
@@ -326,7 +327,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const outOfTokens = budget.maxTokens !== undefined && usage.inputTokens + usage.outputTokens >= budget.maxTokens;
     if (result.finishReason === 'tool-calls' && (outOfSteps || outOfTokens)) {
         await ctx.finish({
-            status: 'failed',
+            status: RunStatus.FAILED,
             usage,
             error: toRunError(budgetExceeded(budget, outOfSteps ? 'steps' : 'tokens')),
         });
@@ -334,7 +335,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     }
 
     await ctx.finish({
-        status: 'completed',
+        status: RunStatus.COMPLETED,
         usage,
         output: result.text,
     });

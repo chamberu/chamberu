@@ -7,8 +7,9 @@
 
 import type { ModelMessage } from 'ai';
 import type { TriggerEnvelope } from '../trigger/types.ts';
+import type { RunStatus } from './constants.ts';
 
-export type RunStatus =    'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
+export type RunStatusLiteral = `${RunStatus}`;
 
 export type Usage = {
     inputTokens: number;
@@ -46,7 +47,7 @@ export type WaitPoint = {
 export type Run = {
     id: string;
     agent: string;
-    status: RunStatus;
+    status: RunStatusLiteral;
     trigger: TriggerEnvelope;
     concurrencyKey?: string;
     thread?: string;

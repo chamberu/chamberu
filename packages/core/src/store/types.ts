@@ -8,7 +8,7 @@
 import type { 
     Checkpoint, 
     Run, 
-    RunStatus, 
+    RunStatusLiteral, 
     Step, 
 } from '../run/types.ts';
 
@@ -32,11 +32,11 @@ export interface IRunStore {
      * status, or when `expectOwner` is given and the run's claim is absent or held
      * by another owner (expiry is not checked: a lease is lost once taken over).
      */
-    updateRun(id: string, patch: Partial<Run>, opts?: { expectStatus?: RunStatus[]; expectOwner?: string }): Promise<Run>;
+    updateRun(id: string, patch: Partial<Run>, opts?: { expectStatus?: RunStatusLiteral[]; expectOwner?: string }): Promise<Run>;
     /** Ordered by createdAt ascending, ties broken by id ascending. `total` ignores limit/offset. */
     listRuns(q: {
         agent?: string;
-        status?: RunStatus[];
+        status?: RunStatusLiteral[];
         concurrencyKey?: string;
         limit?: number;
         offset?: number;

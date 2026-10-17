@@ -62,7 +62,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `errors/` | `ChamberuError` (`base.ts`), one file per subclass, `ErrorCode` (`constants.ts`) |
 | `agent/` | `defineAgent()`, `AgentDefinition`, name rules and budget defaults (`constants.ts`) |
 | `trigger/` | `TriggerDefinition`, `TriggerEnvelope` (`types.ts`); `cron/`, `http/`, `manual/` each hold their factory (`module.ts`) and options type (`types.ts`) |
-| `run/types.ts` | `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage` |
+| `run/` | `RunStatus` enum (`constants.ts`); `Run`, `RunStatusLiteral`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage` |
 | `store/types.ts` | `IStore` and its parts (see architecture) |
 | `store/memory/` | `MemoryStore` |
 | `engine/` | `RunEngine` (`module.ts`), `budget.ts` (stop conditions), `queue/` (scheduler), `execute/` (one execution) |

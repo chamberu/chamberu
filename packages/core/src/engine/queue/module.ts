@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { RunStatus } from '../../run/constants.ts';
 import type { Run } from '../../run/types.ts';
 import { groupKey } from './helpers.ts';
 import type { RunQueueOptions } from './types.ts';
@@ -113,7 +114,7 @@ export class RunQueue {
     protected async pass(): Promise<void> {
         if (this.halted || this.running.size >= this.opts.maxConcurrentRuns) return;
         const { store } = this.opts;
-        const { data: queued } = await store.listRuns({ status: ['queued'] });
+        const { data: queued } = await store.listRuns({ status: [RunStatus.QUEUED] });
         for (const run of queued) {
             if (this.halted || this.running.size >= this.opts.maxConcurrentRuns) return;
 
@@ -154,7 +155,7 @@ export class RunQueue {
             const { total } = await store.listRuns({
                 agent: run.agent,
                 // an interrupted run is unfinished and keeps its key until recovery requeues it
-                status: ['running', 'waiting', 'interrupted'],
+                status: [RunStatus.RUNNING, RunStatus.WAITING, RunStatus.INTERRUPTED],
                 concurrencyKey: run.concurrencyKey,
                 limit: 1,
             });
@@ -166,10 +167,10 @@ export class RunQueue {
         try {
             const now = clock.now();
             return await store.updateRun(run.id, {
-                status: 'running',
+                status: RunStatus.RUNNING,
                 startedAt: now,
                 updatedAt: now,
-            }, { expectStatus: ['queued'] });
+            }, { expectStatus: [RunStatus.QUEUED] });
         } catch {
             this.running.delete(run.id);
             return undefined;

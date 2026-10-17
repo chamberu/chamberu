@@ -27,4 +27,8 @@ describe('public api', () => {
         expect(core).toHaveProperty(name);
         expect(core[name as keyof typeof core]).toBeTypeOf('function');
     });
+
+    it('exports the RunStatus enum', () => {
+        expect(core.RunStatus.QUEUED).toBe('queued');
+    });
 });

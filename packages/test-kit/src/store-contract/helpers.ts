@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { RunStatus } from '@chamberu/core';
 import type { Run } from '@chamberu/core';
 
 export function makeRun(id: string, overrides: Partial<Run> = {}): Run {
@@ -12,7 +13,7 @@ export function makeRun(id: string, overrides: Partial<Run> = {}): Run {
     return {
         id,
         agent: 'a',
-        status: 'queued',
+        status: RunStatus.QUEUED,
         trigger: {
             id: `t-${id}`,
             agent: 'a',
