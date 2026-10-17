@@ -34,8 +34,21 @@ export async function createEngine(model: LanguageModel) {
     // #endregion setup
 
     // #region purge
-    await store.purgeExpired();
+    // expired keys and locks stay until purged: purge every hour
+    const purge = setInterval(() => {
+        store.purgeExpired().catch((e: unknown) => console.error(e));
+    }, 60 * 60 * 1000);
+    purge.unref();
     // #endregion purge
 
-    return engine;
+    // #region shutdown
+    // the store never destroys the data source: the app closes it last
+    const shutdown = async () => {
+        clearInterval(purge);
+        await engine.drain();
+        await dataSource.destroy();
+    };
+    // #endregion shutdown
+
+    return { engine, shutdown };
 }

@@ -57,7 +57,8 @@ npm install @chamberu/store-typeorm @chamberu/core typeorm pg
 Create the data source with the store's entities and migrations, run the migrations, and hand the data source to the store:
 
 ```typescript
-import { RunEngine } from '@chamberu/core';
+import type { LanguageModel } from 'ai';
+import { RunEngine, defineAgent } from '@chamberu/core';
 import {
     STORE_ENTITIES,
     STORE_MIGRATIONS,
@@ -66,22 +67,38 @@ import {
 } from '@chamberu/store-typeorm';
 import { DataSource } from 'typeorm';
 
-const dataSource = new DataSource({
-    type: 'postgres',
-    url: process.env.DATABASE_URL,
-    entities: STORE_ENTITIES,
-    migrations: STORE_MIGRATIONS,
-});
-await dataSource.initialize();
-await migrateStore(dataSource);
+export async function startEngine(model: LanguageModel) {
+    const triage = defineAgent({
+        name: 'triage',
+        model,
+        instructions: 'Triage the issue.',
+    });
 
-const store = new TypeormStore({ dataSource });
-const engine = new RunEngine({
-    store,
-    agents: [triage],
-    resumeSecret: process.env.RESUME_SECRET!,
-});
-await engine.start();
+    const dataSource = new DataSource({
+        type: 'postgres',
+        url: process.env.DATABASE_URL,
+        entities: STORE_ENTITIES,
+        migrations: STORE_MIGRATIONS,
+    });
+    await dataSource.initialize();
+    await migrateStore(dataSource);
+
+    const store = new TypeormStore({ dataSource });
+    const engine = new RunEngine({
+        store,
+        agents: [triage],
+        resumeSecret: process.env.RESUME_SECRET!,
+    });
+    await engine.start();
+
+    // the store never destroys the data source: drain first, then close it
+    const shutdown = async () => {
+        await engine.drain();
+        await dataSource.destroy();
+    };
+
+    return { engine, store, shutdown };
+}
 ```
 
 - `migrateStore()` runs the pending migrations under the Postgres advisory lock `chamberu:migrations`. Several replicas may call it at once: they wait for each other and the migration is recorded once. Each call uses one pooled connection: it migrates on the connection that holds the lock.
@@ -93,10 +110,14 @@ await engine.start();
 Expired idempotency keys and locks are taken over by the next caller, so they never block anything, but they stay in their tables until purged:
 
 ```typescript
-const { idempotencyKeys, locks } = await store.purgeExpired();
+// e.g. every hour; clear the interval on shutdown
+const purge = setInterval(() => {
+    store.purgeExpired().catch((e: unknown) => console.error(e));
+}, 60 * 60 * 1000);
+purge.unref();
 ```
 
-`purgeExpired(now?)` deletes keys and locks expired at `now` (default: the clock's time) and returns how many rows it removed. Effects have no expiry and are never purged.
+`purgeExpired(now?)` deletes keys and locks expired at `now` (default: the clock's time) and returns `{ idempotencyKeys, locks }`, how many rows it removed. Effects have no expiry and are never purged.
 
 ## Options
 

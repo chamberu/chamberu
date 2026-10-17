@@ -14,6 +14,10 @@ npm install @chamberu/store-typeorm typeorm pg
 
 The store takes an initialized `DataSource` and never initializes or destroys it. The database must exist; create it beforehand, for example with `createDatabase()` from `typeorm-extension`.
 
+On shutdown, drain the engine before destroying the data source:
+
+<<< @/snippets/store-typeorm.ts#shutdown
+
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `dataSource` | `DataSource` | required | An initialized Postgres data source that lists `STORE_ENTITIES` and `STORE_MIGRATIONS` |
@@ -53,7 +57,7 @@ Expired idempotency keys and locks never block anyone, but they stay in their ta
 
 <<< @/snippets/store-typeorm.ts#purge
 
-`purgeExpired(now?)` deletes keys and locks expired at `now` (default: the clock's time) and returns `{ idempotencyKeys, locks }`, the number of rows removed. Effects have no expiry and are never purged. Nothing runs it automatically yet; call it periodically (for example hourly) from your app.
+`purgeExpired(now?)` deletes keys and locks expired at `now` (default: the clock's time) and returns `{ idempotencyKeys, locks }`, the number of rows removed. Effects have no expiry and are never purged. Nothing runs it automatically yet, so schedule it in your app as above.
 
 ## Differences from MemoryStore
 
