@@ -8,6 +8,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 |---|---|
 | `@chamberu/core` | `defineAgent()`, trigger definitions, `RunEngine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore` |
 | `@chamberu/test-kit` | `describeStoreContract`, `ControllableClock` |
+| `@chamberu/scheduler` | `createScheduler()` (one locked hubwire component per `cron()` trigger, overlap policies, timezones), `runJob()` for one-shot jobs |
 | `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |
 
 ## Milestones
@@ -30,7 +31,6 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 
 | Package | Status | Purpose |
 |---|---|---|
-| `@chamberu/scheduler` | Planned (M1) | Fires `cron()` triggers once per tick across replicas, with overlap policies, timezones and a one-shot `run-job` mode |
 | `@chamberu/http` | Planned (M1) | REST control API, server-sent events, webhook intake (202 plus run id), health and readiness, MCP endpoint, bearer-token and authup authentication |
 | `@chamberu/github` | Planned (M1) | GitHub App auth, webhook signature checks, `github.webhook()` triggers deduplicated by delivery id, issue and comment tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned (M1) | Disposable workspaces: a temp directory for development, a locked-down pod per workspace in production |
@@ -42,7 +42,7 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 | `chamberu` (CLI and deploy kit) | Planned (M1) | Umbrella package with `createApp()` and the `dev`, `build`, `start`, `run-job` and `migrate` commands, plus a base image, a Helm chart and a template repository. See [Deployment](/deployment/) |
 | `@chamberu/mail` | Planned (M2) | IMAP connector and tools |
 
-Two changes happen upstream first: a lock hook, timezone support and the scheduled time per tick in [hubwire](https://github.com/tada5hi/hubwire) (for the scheduler), and a fetch-native token middleware in [authup](https://github.com/authup/authup) (for the HTTP API).
+Two changes happened or happen upstream first: a lock hook, timezone support and the scheduled time per tick shipped in [hubwire](https://github.com/tada5hi/hubwire) 0.2.2 (for the scheduler); a fetch-native token middleware in [authup](https://github.com/authup/authup) is still to come (for the HTTP API).
 
 ## Stability
 

@@ -53,7 +53,7 @@ Expired idempotency keys and locks never block anyone, but they stay in their ta
 
 <<< @/snippets/store-typeorm.ts#purge
 
-`purgeExpired(now?)` deletes keys and locks expired at `now` (default: the clock's time) and returns `{ idempotencyKeys, locks }`, the number of rows removed. Effects have no expiry and are never purged. The planned scheduler will run it as a maintenance job.
+`purgeExpired(now?)` deletes keys and locks expired at `now` (default: the clock's time) and returns `{ idempotencyKeys, locks }`, the number of rows removed. Effects have no expiry and are never purged. Nothing runs it automatically yet; call it periodically (for example hourly) from your app.
 
 ## Differences from MemoryStore
 

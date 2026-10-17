@@ -5,7 +5,7 @@ chamberu is a TypeScript framework for **self-hosted, trigger-driven AI agents**
 The LLM side is the [Vercel AI SDK](https://ai-sdk.dev) v7. chamberu adds what the AI SDK leaves out on purpose: triggers, a run queue, persistence, concurrency control, approvals and a graceful shutdown.
 
 ::: info Status
-chamberu is pre-1.0. [`@chamberu/core`](/reference/), its test helpers in [`@chamberu/test-kit`](/reference/test-kit) and the [TypeORM store](/stores/typeorm) exist today. The scheduler, the HTTP API, the GitHub connector, the UI and the deploy kit are planned; the [roadmap](/roadmap) lists them. Pages about planned work carry a <Badge type="warning" text="Planned" /> badge.
+chamberu is pre-1.0. [`@chamberu/core`](/reference/), the cron scheduler [`@chamberu/scheduler`](/reference/scheduler), the [TypeORM store](/stores/typeorm) and the test helpers, [`@chamberu/test-kit`](/reference/test-kit), exist today. The HTTP API, the GitHub connector, the UI and the deploy kit are planned; the [roadmap](/roadmap) lists them. Pages about planned work carry a <Badge type="warning" text="Planned" /> badge.
 :::
 
 ## Why chamberu?
@@ -64,7 +64,7 @@ Each of these is a better fit in some setups: if you already run Inngest or Trig
 
 `@chamberu/test-kit` adds the store contract suite and a controllable clock for tests.
 
-The engine starts runs only through `engine.dispatch()`. Firing cron triggers, receiving webhooks and serving an HTTP or MCP API belong to the planned [`@chamberu/scheduler` and `@chamberu/http`](/roadmap) packages.
+The engine starts runs only through `engine.dispatch()`. [`@chamberu/scheduler`](/guide/scheduler) fires cron triggers; receiving webhooks and serving an HTTP or MCP API belong to the planned [`@chamberu/http`](/roadmap) package.
 
 ## Next steps
 

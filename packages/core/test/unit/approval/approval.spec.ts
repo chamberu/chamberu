@@ -684,7 +684,7 @@ describe('approvals', () => {
             {
                 parts: [
                     call('prod', 'c1'),
-                    call('eu', 'c2'),
+                    call('eu', 'unanswered-call'),
                 ],
             },
             deployTurn('eu', 'c3'),
@@ -696,11 +696,11 @@ describe('approvals', () => {
 
         // the unanswered call is not part of the history
         const { messages }: { messages: ModelMessage[] } = (await ctx.store.latestCheckpoint(runId))!;
-        expect(JSON.stringify(messages)).not.toContain('c2');
+        expect(JSON.stringify(messages)).not.toContain('unanswered-call');
 
         await ctx.engine.resume(tokenOf(ctx), { approved: true });
         await ctx.engine.idle();
-        expect(promptOf(model, 1)).not.toContain('c2');
+        expect(promptOf(model, 1)).not.toContain('unanswered-call');
         const second = await ctx.store.getRun(runId);
         expect(second?.status).toBe('waiting');
         expect(second?.waiting).toMatchObject({ input: { env: 'eu' } });

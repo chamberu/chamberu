@@ -27,6 +27,7 @@
     },
     "devDependencies": {
         "@chamberu/core": "*",
+        "@chamberu/scheduler": "*",
         "@chamberu/store-typeorm": "*",
         "@chamberu/test-kit": "*",
         "@tailwindcss/vite": "^4.3.3",

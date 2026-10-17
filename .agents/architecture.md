@@ -16,7 +16,7 @@ App, Agent, Trigger, Run, Step, State, Tool, Workspace, Notifier, Store. Keep th
 
 ## Triggers and the Envelope
 
-`cron()`, `http()` and `manual()` build `TriggerDefinition`s (`{ source, id, options, concurrencyKey?, idempotencyKey? }`). `cron()` validates the expression with cron-parser and stores the overlap policy (default `skip`; others `queue-one`, `allow`), enforced in a later plan. Firing cron and HTTP triggers is not part of core: `engine.dispatch(envelope)` is the only intake.
+`cron()`, `http()` and `manual()` build `TriggerDefinition`s (`{ source, id, options, concurrencyKey?, idempotencyKey? }`). `cron()` validates the expression with cron-parser and stores the overlap policy (default `skip`; others `queue-one`, `allow`), enforced by `@chamberu/scheduler` (see [Scheduler](#scheduler)). Firing cron and HTTP triggers is not part of core: `engine.dispatch(envelope)` is the only intake.
 
 ```ts
 interface TriggerEnvelope {
@@ -69,7 +69,7 @@ The store is a set of small interfaces combined as `IStore` (`src/store/types.ts
 
 | Interface | Holds |
 |-----------|-------|
-| `IRunStore` | Runs; `updateRun` with `expectStatus`/`expectOwner` guards; `listRuns` ordered by createdAt then id; `claimRun`/`renewClaim` leases |
+| `IRunStore` | Runs; `updateRun` with `expectStatus`/`expectOwner` guards; `listRuns` ordered by createdAt then id, unbounded without `limit`; `claimRun`/`renewClaim` leases |
 | `IStepStore` | Append-only steps per run |
 | `ICheckpointStore` | Latest checkpoint per run (highest `stepIndex`; equal index replaces) |
 | `IIdempotencyStore` | `claimKey(scope, key, runId, ttl)`: first caller wins |
@@ -79,7 +79,7 @@ The store is a set of small interfaces combined as `IStore` (`src/store/types.ts
 
 Rules every implementation must keep: a TTL created at T with `ttlMs` is expired at exactly `T + ttlMs`; values are copied in and out (no aliasing); atomic operations are atomic across callers. `MemoryStore` implements it in-process (structured clones, no await between check and write). `describeStoreContract((clock) => store)` from `@chamberu/test-kit` is the shared Vitest suite every store must pass; the factory must use the given `ControllableClock` for expiry. Redis is never required.
 
-`TypeormStore` (`@chamberu/store-typeorm`) is the TypeORM store (PostgreSQL only). Every method is raw parameterized SQL through one helper over a TypeORM query runner (structured result, so UPDATE and DELETE return rows like the rest); the entities describe the schema for the migration and the drift check only. Every atomic operation is one statement: `INSERT ... ON CONFLICT DO NOTHING RETURNING` (`createRun`), `INSERT ... ON CONFLICT DO UPDATE ... WHERE expires_at <= now RETURNING` (`claimKey`, `acquire`), conditional `UPDATE ... RETURNING` (`claimRun`, `renewClaim`, the `updateRun` guards) and `INSERT ... ON CONFLICT DO UPDATE ... WHERE step_index <=` (`saveCheckpoint`). Time comes from the `IClock` as a parameter, never `now()` in SQL. Values are `jsonb` (passed as `JSON.stringify` with a `::jsonb` cast); `trigger.receivedAt`, `waiting.expiresAt` and `waiting.notifiedAt` are revived as `Date`. Only the latest checkpoint is kept. `migrateStore(dataSource)` runs the migrations under the advisory lock `chamberu:migrations`; `purgeExpired(now?)` deletes expired idempotency keys and locks (for plan 004's maintenance job). Documented divergences from `MemoryStore`: opaque JSON loses `Date`/`undefined`/`Map` fidelity, a JSON `null` in a nullable column reads back absent, `putEffect(key, undefined)` reads `{ result: null }`, `docList` `where` is `jsonb` containment and orders by `id`, `listRuns` ties use `COLLATE "C"`.
+`TypeormStore` (`@chamberu/store-typeorm`) is the TypeORM store (PostgreSQL only). Every method is raw parameterized SQL through one helper over a TypeORM query runner (structured result, so UPDATE and DELETE return rows like the rest); the entities describe the schema for the migration and the drift check only. Every atomic operation is one statement: `INSERT ... ON CONFLICT DO NOTHING RETURNING` (`createRun`), `INSERT ... ON CONFLICT DO UPDATE ... WHERE expires_at <= now RETURNING` (`claimKey`, `acquire`), conditional `UPDATE ... RETURNING` (`claimRun`, `renewClaim`, the `updateRun` guards) and `INSERT ... ON CONFLICT DO UPDATE ... WHERE step_index <=` (`saveCheckpoint`). Time comes from the `IClock` as a parameter, never `now()` in SQL. Values are `jsonb` (passed as `JSON.stringify` with a `::jsonb` cast); `trigger.receivedAt`, `waiting.expiresAt` and `waiting.notifiedAt` are revived as `Date`. Only the latest checkpoint is kept. `migrateStore(dataSource)` runs the migrations under the advisory lock `chamberu:migrations`; `purgeExpired(now?)` deletes expired idempotency keys and locks (nothing calls it automatically yet). Documented divergences from `MemoryStore`: opaque JSON loses `Date`/`undefined`/`Map` fidelity, a JSON `null` in a nullable column reads back absent, `putEffect(key, undefined)` reads `{ result: null }`, `docList` `where` is `jsonb` containment and orders by `id`, `listRuns` ties use `COLLATE "C"`.
 
 ## Idempotency and Side Effects
 
@@ -90,6 +90,17 @@ Rules every implementation must keep: a TTL created at T with `ttlMs` is expired
 ## Agent State
 
 `createAgentState(agent, schema, store)`: KV (`state.get/set`) plus typed collections declared as `state: Record<name, StandardSchemaV1>` in `defineAgent`. `upsert` validates with the collection's Standard Schema, mapped through `@validup/standard-schema` (`ValidationError` with the validup `issues` on failure, nothing stored). With a schema, the model also gets `state_<coll>_list`, `state_<coll>_upsert` and `state_<coll>_remove` tools (upsert and remove are effect tools); user tools win on a name clash.
+
+## Scheduler
+
+`@chamberu/scheduler` fires `cron()` triggers; it depends on `hubwire` (croner inside) and is a peer of core.
+
+- `createScheduler({ engine, agents, store, owner?, lockTtlMs?, onError? })` builds one hubwire `defineScheduledComponent` per cron trigger, named `cron:<agent>:<triggerId>`, with `lock: createStoreScheduleLock(store, owner)` (`ILockStore.acquire`, never released) and `lockTtlMs` default `SCHEDULE_LOCK_TTL_MS` (10 min). hubwire's tick key is `${name}:${scheduledAt ISO}`. Duplicate agent names and every hubwire definition error (expression croner rejects, timezone, `lockTtlMs`) throw `InvalidAgentDefinitionError` from `createScheduler`, before `start()`.
+- `runOnStart: false` always: a start pass never takes hubwire's lock and would fire on every replica. hubwire skips a locked tick fired `lockTtlMs` or more late; `onSkip` is not wired (N - 1 replicas skip every tick). Lock, overlap and dispatch failures reach `onError(error, { agent, trigger })`.
+- `fireCronTrigger({ engine, store, agent, trigger, scheduledAt })` is one tick: overlap check, then `dispatch` with source `cron`, payload `options.payload ?? { scheduledAt: ISO }`, idempotency key `<triggerId>@<scheduledAt ISO>` (the trigger's own `idempotencyKey()` is ignored), `concurrencyKey = trigger.concurrencyKey?.(payload) ?? (overlap === 'allow' ? undefined : trigger.id)`.
+- Overlap: active runs are `queued | running | waiting | interrupted` of the agent filtered by `run.trigger.trigger`. `skip` skips while any is active, `queue-one` while one is `queued`, `allow` never. The check-then-dispatch race is made harmless by the default concurrency key (the extra run waits).
+- Shutdown order: `await scheduler.stop()` (stop, then `settled()` per component), then `await engine.drain()`.
+- `runJob({ engine, store, agent, trigger?, clock?, pollMs?, drainTimeoutMs? })` fires once at `clock.now()`, then always starts the engine and calls `engine.tick()` once (so a skipped tick still recovers leftovers of earlier jobs and times out expired approvals), waits via `run.updated` plus an `engine.getRun` poll (`pollMs`, default 1 s, covers another replica) for `completed | failed | cancelled | waiting`, or for `queued` behind a `waiting` run of the same concurrency key (`queue-one` behind an approval), then `drain({ timeoutMs })` (default 30 s). Exit code 1 for `failed`/`cancelled`, else 0; an overlap skip returns `skipped` after the drain. It starts a full engine over the shared store (every queued run of every agent), so size the drain timeout.
 
 ## Errors
 

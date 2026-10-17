@@ -16,6 +16,7 @@ chamberu/
 │   │   ├── tsdown.config.ts         # Builds dist/index.mjs + .d.mts
 │   │   ├── tsconfig.json            # src + test (typecheck)
 │   │   └── tsconfig.build.json      # src only (build:types)
+│   ├── scheduler/                   # @chamberu/scheduler (same layout; aliases core, test-kit and itself to src)
 │   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
 │   ├── store-typeorm/               # @chamberu/store-typeorm (same layout)
 │   │   ├── src/{entities,migrations,schema,store}/
@@ -34,7 +35,7 @@ chamberu/
 ├── .husky/commit-msg                # Runs commitlint
 ├── CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md
 ├── nx.json                          # Task orchestration and caching
-├── tsconfig.json                    # Root config, path aliases @chamberu/core and @chamberu/test-kit -> packages/*/src
+├── tsconfig.json                    # Root config, path aliases @chamberu/core, @chamberu/scheduler and @chamberu/test-kit -> packages/*/src
 ├── tsconfig.build.json              # Shared compiler options
 ├── eslint.config.js                 # @tada5hi/eslint-config flat config
 ├── commitlint.config.mjs            # Conventional Commits
@@ -49,7 +50,7 @@ chamberu/
 | `@chamberu/core` | Exists (0.1.0) | defineAgent, run engine, checkpoints, trigger model, state API, budgets, IStore/INotifier interfaces, in-memory store |
 | `@chamberu/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`; depends on core, core never depends on it |
 | `@chamberu/http` | Planned | REST control API, webhook ingestion, SSE, MCP endpoint, auth |
-| `@chamberu/scheduler` | Planned | hubwire integration: cron triggers, lock wiring |
+| `@chamberu/scheduler` | Exists (0.1.0) | `createScheduler()` (one locked hubwire component per cron trigger), `runJob()`; depends on `hubwire`, peer on core |
 | `@chamberu/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned | Workspaces for clone/exec/artifacts |
 | `@chamberu/coding`, `@chamberu/coding-claude-code` | Planned | Coding tools and Claude Code backend |
@@ -80,6 +81,15 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `clock/` | `IClock`, `systemClock` |
 
 `src/index.ts` re-exports each folder's `index.ts`. `@chamberu/test-kit` (`packages/test-kit/src`) holds `clock/` (`ControllableClock`) and `store-contract/` (`describeStoreContract`).
+
+## Scheduler Module Map (`packages/scheduler/src`)
+
+| Path | Purpose |
+|------|---------|
+| `lock/` | `createStoreScheduleLock()`: hubwire `IScheduleLock` over core's `ILockStore` |
+| `tick/` | `fireCronTrigger()` (overlap check, envelope, dispatch), `readCronOptions()`; overlap check in `helpers.ts` |
+| `scheduler/` | `createScheduler()`, `SCHEDULE_LOCK_TTL_MS`; `buildComponentOptions()` (`helpers.ts`, internal) |
+| `run-job/` | `runJob()`; `resolveCronTrigger()`, `isQueuedBehindApproval()` (`helpers.ts`), `SETTLING` (`constants.ts`), both internal |
 
 ## Store-TypeORM Module Map (`packages/store-typeorm/src`)
 

@@ -38,7 +38,8 @@ See [Writing a Store](/stores/writing-a-store) and the [test-kit reference](/ref
 |---|---|
 | `@chamberu/core` | Shipped (0.x) |
 | `@chamberu/test-kit` | Shipped (0.x), test helpers |
+| `@chamberu/scheduler` | Shipped (0.x), cron triggers across replicas |
 | `@chamberu/store-typeorm` | Shipped (0.x), TypeORM store (PostgreSQL) |
-| `@chamberu/scheduler`, `@chamberu/http`, `@chamberu/github`, notifiers, sandboxes, `@chamberu/ui`, `chamberu` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
+| `@chamberu/http`, `@chamberu/github`, notifiers, sandboxes, `@chamberu/ui`, `chamberu` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
 
 chamberu is pre-1.0: a minor version may contain breaking changes, including changes to the store schema.

@@ -33,7 +33,11 @@ export interface IRunStore {
      * by another owner (expiry is not checked: a lease is lost once taken over).
      */
     updateRun(id: string, patch: Partial<Run>, opts?: { expectStatus?: RunStatusLiteral[]; expectOwner?: string }): Promise<Run>;
-    /** Ordered by createdAt ascending, ties broken by id ascending. `total` ignores limit/offset. */
+    /**
+     * Ordered by createdAt ascending, ties broken by id ascending. `total`
+     * ignores limit/offset. Without `limit`, every matching run (from `offset`)
+     * is returned: there is no default page size.
+     */
     listRuns(q: {
         agent?: string;
         status?: RunStatusLiteral[];
