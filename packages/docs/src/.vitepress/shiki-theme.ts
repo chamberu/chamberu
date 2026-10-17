@@ -14,7 +14,7 @@
 const INK = '#e6dfde';
 const KEYWORD = '#ff7b84';
 const STRING = '#e7c58c';
-const COMMENT = '#7a6f70';
+const COMMENT = '#958a8b';
 
 export const chamberuCodeTheme = {
     name: 'chamberu',

@@ -66,6 +66,10 @@
         --ch-accent: #c8303b;
         --ch-accent-text: #b02a34;
 
+        /* Primary buttons keep the light accent in dark mode too: white text
+         * on #e04652 is only 4.1:1, on #c8303b 5.3:1. */
+        --ch-button-bg: #c8303b;
+
         /* Fixed-dark: the footer and code blocks stay dark in light mode too. */
         --ch-night-bg: #19171a;
         --ch-night-fg: #efe8e6;
@@ -160,11 +164,11 @@
 
     .ch-button-primary {
         @apply border-transparent text-white;
-        background-color: var(--ch-accent);
+        background-color: var(--ch-button-bg);
     }
 
     .ch-button-primary:hover {
-        background-color: color-mix(in srgb, var(--ch-accent) 86%, black);
+        background-color: color-mix(in srgb, var(--ch-button-bg) 86%, black);
     }
 
     .ch-button-secondary {
@@ -251,6 +255,10 @@
     --vp-c-text-2: var(--ch-muted);
     --vp-c-divider: var(--ch-line);
     --vp-c-gutter: var(--ch-line);
+
+    /* The sidebar sits on the page color: a tinted panel would stop at the
+     * viewport height in full-page captures and print. */
+    --vp-sidebar-bg-color: var(--ch-paper);
     --vp-c-border: color-mix(in srgb, var(--ch-ink) 18%, transparent);
 
     --vp-c-brand-1: var(--ch-accent-text);
@@ -258,6 +266,9 @@
     --vp-c-brand-3: var(--ch-accent);
     --vp-c-brand-soft: color-mix(in srgb, var(--ch-accent) 12%, transparent);
 
+    --vp-button-brand-bg: var(--ch-button-bg);
+    --vp-button-brand-hover-bg: color-mix(in srgb, var(--ch-button-bg) 86%, black);
+    --vp-button-brand-active-bg: color-mix(in srgb, var(--ch-button-bg) 78%, black);
     --vp-button-brand-text: #ffffff;
     --vp-button-brand-hover-text: #ffffff;
     --vp-button-brand-active-text: #ffffff;
@@ -268,9 +279,9 @@
     --vp-code-block-bg: var(--ch-code-bg);
     --vp-code-block-color: var(--ch-code-ink);
     --vp-code-block-divider-color: var(--ch-code-line);
-    --vp-code-lang-color: #7a6f70;
+    --vp-code-lang-color: #958a8b;
     --vp-code-line-highlight-color: rgb(255 255 255 / 0.06);
-    --vp-code-line-number-color: #7a6f70;
+    --vp-code-line-number-color: #958a8b;
     --vp-code-copy-code-border-color: var(--ch-night-line);
     --vp-code-copy-code-bg: #2c2729;
     --vp-code-copy-code-hover-border-color: #4a4245;

@@ -112,7 +112,7 @@
     <g opacity="0">
         <circle r="9" class="f-accent" fill="#C8303B" fill-opacity="0.25"/>
         <circle r="4.5" class="f-accent" fill="#C8303B"/>
-        <animateMotion dur="3s" repeatCount="1" fill="freeze" path="M206 98 H728"/>
+        <animateMotion dur="3s" repeatCount="1" fill="freeze" path="M206 56 H728"/>
         <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="3s" repeatCount="1" fill="freeze"/>
     </g>
 
