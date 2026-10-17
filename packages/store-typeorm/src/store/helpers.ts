@@ -34,7 +34,7 @@ const RUN_COLUMNS: Record<string, string> = {
 };
 
 /** Columns whose parameter is serialized JSON and needs a ::jsonb cast. */
-export const JSONB_RUN_COLUMNS: ReadonlySet<string> = new Set([
+const JSONB_RUN_COLUMNS: ReadonlySet<string> = new Set([
     'trigger',
     'output',
     'error',
