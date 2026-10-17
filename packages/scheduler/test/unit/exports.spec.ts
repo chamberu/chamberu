@@ -10,11 +10,16 @@ import * as scheduler from '@chamberu/scheduler';
 
 describe('public api', () => {
     it.each([
+        'createScheduler',
         'createStoreScheduleLock',
         'fireCronTrigger',
         'readCronOptions',
     ])('exports %s', (name) => {
         expect(scheduler).toHaveProperty(name);
         expect(scheduler[name as keyof typeof scheduler]).toBeTypeOf('function');
+    });
+
+    it('exports SCHEDULE_LOCK_TTL_MS', () => {
+        expect(scheduler.SCHEDULE_LOCK_TTL_MS).toBe(600_000);
     });
 });

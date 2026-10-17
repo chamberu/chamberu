@@ -6,4 +6,5 @@
  */
 
 export * from './lock/index.ts';
+export * from './scheduler/index.ts';
 export * from './tick/index.ts';
