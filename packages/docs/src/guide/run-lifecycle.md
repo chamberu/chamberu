@@ -1,16 +1,16 @@
 # Run Lifecycle
 
-A run has exactly one of seven statuses:
+A run has exactly one of seven statuses. `RunStatus` is an enum of them, and `RunStatusLiteral` is the union of its string values, which is the type of `run.status`: compare against the enum, or against the plain string when that reads better.
 
-| Status | Meaning | Final |
-|---|---|---|
-| `queued` | Stored, waiting for a free slot, a free concurrency key and a claim | no |
-| `running` | Claimed by one engine, which drives the model and writes steps and checkpoints | no |
-| `waiting` | Paused on a tool call that needs approval; holds no claim and no slot | no |
-| `interrupted` | Aborted by `drain()`; claim released, waits for `recover()` | no |
-| `completed` | The model finished; `output` holds the text of its last answer | yes |
-| `failed` | A budget, a timeout, a `FatalToolError` or an infrastructure error ended it; `error` holds `{ code, message }` | yes |
-| `cancelled` | `cancel()` ended it | yes |
+| Status | `RunStatus` | Meaning | Final |
+|---|---|---|---|
+| `queued` | `QUEUED` | Stored, waiting for a free slot, a free concurrency key and a claim | no |
+| `running` | `RUNNING` | Claimed by one engine, which drives the model and writes steps and checkpoints | no |
+| `waiting` | `WAITING` | Paused on a tool call that needs approval; holds no claim and no slot | no |
+| `interrupted` | `INTERRUPTED` | Aborted by `drain()`; claim released, waits for `recover()` | no |
+| `completed` | `COMPLETED` | The model finished; `output` holds the text of its last answer | yes |
+| `failed` | `FAILED` | A budget, a timeout, a `FatalToolError` or an infrastructure error ended it; `error` holds `{ code, message }` | yes |
+| `cancelled` | `CANCELLED` | `cancel()` ended it | yes |
 
 <div class="figure">
     <img src="/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." />

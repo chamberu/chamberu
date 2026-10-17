@@ -95,9 +95,13 @@ class RunEngine {
 
 ## Runs
 
-`Run`, `RunStatus`, `RunContext`, `Step`, `Checkpoint`, `WaitPoint`, `Budget` and `Usage`:
+`Run`, `RunStatusLiteral`, `RunContext`, `Step`, `Checkpoint`, `WaitPoint`, `Budget` and `Usage`:
 
 <<< ../../../core/src/run/types.ts{ts}
+
+The `RunStatus` enum, whose values `RunStatusLiteral` is built from:
+
+<<< ../../../core/src/run/constants.ts{ts}
 
 ## Stores
 

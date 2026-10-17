@@ -26,7 +26,7 @@ export async function cancelRun(engine: RunEngine, runId: string) {
     // #region cancel
     await engine.cancel(runId);
     const run = await engine.getRun(runId);
-    // 'cancelled', or still 'running' with cancelRequested when another replica executes it
+    // RunStatus.CANCELLED, or still RunStatus.RUNNING with cancelRequested when another replica executes it
     console.log(run?.status, run?.cancelRequested);
     // #endregion cancel
 }

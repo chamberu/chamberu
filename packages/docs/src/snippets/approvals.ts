@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
     MemoryStore,
     RunEngine,
+    RunStatus,
     defineAgent,
 } from '@chamberu/core';
 import type { INotifier, Notification } from '@chamberu/core';
@@ -71,7 +72,7 @@ export async function approvalFlow(model: LanguageModel) {
 
     // #region resume
     const run = await engine.getRun(runId);
-    if (run?.status === 'waiting' && run.waiting) {
+    if (run?.status === RunStatus.WAITING && run.waiting) {
         const token = inbox.tokens.get(`${run.id}:${run.waiting.approvalId}`);
         if (token) {
             await engine.resume(token, { approved: false, reason: 'Not on a Friday.' });

@@ -2,6 +2,7 @@ import {
     ErrorCode,
     LeaseLostError,
     RunEngine,
+    RunStatus,
 } from '@chamberu/core';
 import type { Agent, IStore } from '@chamberu/core';
 
@@ -29,7 +30,7 @@ export function createEngine(store: IStore, agents: Agent[], resumeSecret: strin
 export async function explainFailure(engine: RunEngine, runId: string) {
     // #region run-error
     const run = await engine.getRun(runId);
-    if (run?.status === 'failed') {
+    if (run?.status === RunStatus.FAILED) {
         switch (run.error?.code) {
             case ErrorCode.BUDGET_EXCEEDED:
                 return 'Raise maxSteps or maxTokens, or narrow the instructions.';
