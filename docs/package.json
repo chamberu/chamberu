@@ -1,0 +1,35 @@
+{
+    "name": "@chamberu/docs",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "description": "chamberu documentation site (VitePress).",
+    "author": {
+        "name": "Peter Placzek",
+        "email": "contact@tada5hi.net",
+        "url": "https://github.com/tada5hi"
+    },
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/chamberu/chamberu.git",
+        "directory": "docs"
+    },
+    "scripts": {
+        "dev": "vitepress dev src",
+        "build": "vitepress build src",
+        "preview": "vitepress preview src",
+        "typecheck": "tsc --noEmit -p tsconfig.json"
+    },
+    "engines": {
+        "node": ">=22.0.0"
+    },
+    "devDependencies": {
+        "@chamberu/core": "*",
+        "@chamberu/test-kit": "*",
+        "ai": "^7.0.143",
+        "vitepress": "^1.6.4",
+        "vue": "^3.5.41",
+        "zod": "^4.6.7"
+    }
+}

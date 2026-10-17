@@ -14,7 +14,8 @@
         "url": "https://github.com/chamberu/chamberu.git"
     },
     "workspaces": [
-        "packages/*"
+        "packages/*",
+        "docs"
     ],
     "engines": {
         "node": ">=22.0.0"
@@ -26,6 +27,8 @@
         "typecheck": "npx nx run-many -t typecheck",
         "lint": "eslint",
         "lint:fix": "npm run lint -- --fix",
+        "docs:dev": "npm run dev -w @chamberu/docs",
+        "docs:build": "npm run build -w @chamberu/docs",
         "prepare": "husky"
     },
     "license": "Apache-2.0",
@@ -36,6 +39,7 @@
         "@types/node": "^22.20.5",
         "@vitest/coverage-v8": "^5.0.4",
         "eslint": "^10.8.0",
+        "eslint-plugin-vue": "^10.11.1",
         "husky": "^9.1.7",
         "nx": "^23.1.1",
         "tsdown": "^0.23.1",

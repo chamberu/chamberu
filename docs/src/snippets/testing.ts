@@ -1,0 +1,15 @@
+import { MemoryStore } from '@chamberu/core';
+import { ControllableClock } from '@chamberu/test-kit';
+
+export async function leaseExpiry() {
+    // #region clock
+    const clock = new ControllableClock(new Date('2026-01-01T00:00:00Z'));
+    const store = new MemoryStore({ clock });
+
+    await store.acquire('job', 'replica-a', 1_000); // true
+    await store.acquire('job', 'replica-b', 1_000); // false, held by replica-a
+
+    clock.advance(1_000); // a lease expires at exactly T + ttlMs
+    await store.acquire('job', 'replica-b', 1_000); // true
+    // #endregion clock
+}

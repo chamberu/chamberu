@@ -1,0 +1,32 @@
+import type { Agent, IStore } from '@chamberu/core';
+import { RunEngine } from '@chamberu/core';
+
+export async function serve(store: IStore, agents: Agent[], resumeSecret: string) {
+    // #region shutdown
+    const engine = new RunEngine({
+        store,
+        agents,
+        resumeSecret,
+        onError: (error, run) => console.error('[agents]', run?.id, error),
+    });
+    await engine.start();
+
+    process.once('SIGTERM', () => {
+        // wait up to 25 s for in-flight runs, then mark the rest interrupted
+        engine.drain({ timeoutMs: 25_000 })
+            .then(() => process.exit(0))
+            .catch(() => process.exit(1));
+    });
+    // #endregion shutdown
+
+    return engine;
+}
+
+export async function cancelRun(engine: RunEngine, runId: string) {
+    // #region cancel
+    await engine.cancel(runId);
+    const run = await engine.getRun(runId);
+    // 'cancelled', or still 'running' with cancelRequested when another replica executes it
+    console.log(run?.status, run?.cancelRequested);
+    // #endregion cancel
+}

@@ -1,0 +1,45 @@
+import type { LanguageModel } from 'ai';
+import {
+    MemoryStore,
+    RunEngine,
+    defineAgent,
+} from '@chamberu/core';
+
+export async function watchRuns(model: LanguageModel) {
+    const agent = defineAgent({
+        name: 'echo',
+        model,
+        instructions: 'Repeat the payload.',
+    });
+    const engine = new RunEngine({
+        store: new MemoryStore(),
+        agents: [agent],
+        resumeSecret: 'change-me',
+    });
+
+    // #region events
+    const offRun = engine.on('run.updated', (event) => {
+        if (event.type === 'run.updated') {
+            console.log(event.run.id, event.run.status);
+        }
+    });
+    const offStep = engine.on('step.appended', (event) => {
+        if (event.type === 'step.appended') {
+            console.log(event.step.runId, event.step.index, event.step.kind);
+        }
+    });
+    // #endregion events
+
+    await engine.start();
+    await engine.dispatch({
+        agent: 'echo',
+        trigger: 'manual',
+        source: 'manual',
+        payload: 'hello',
+    });
+    await engine.idle();
+    engine.stop();
+
+    offRun();
+    offStep();
+}

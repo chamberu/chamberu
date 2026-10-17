@@ -14,3 +14,7 @@ cache
 # local agent plans and specs
 docs/superpowers/
 .agents/plans/
+
+# VitePress
+docs/src/.vitepress/cache
+docs/src/.vitepress/dist
