@@ -14,6 +14,7 @@ describe('public api', () => {
         'createStoreScheduleLock',
         'fireCronTrigger',
         'readCronOptions',
+        'runJob',
     ])('exports %s', (name) => {
         expect(scheduler).toHaveProperty(name);
         expect(scheduler[name as keyof typeof scheduler]).toBeTypeOf('function');
