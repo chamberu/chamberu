@@ -5,11 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Agent, RunStatusLiteral, TriggerDefinition } from '@chamberu/core';
+import type { Agent, TriggerDefinition } from '@chamberu/core';
 import { InvalidAgentDefinitionError } from '@chamberu/core';
-
-/** Statuses a job returns on: the run finished or waits for a human. */
-export const SETTLING: RunStatusLiteral[] = ['completed', 'failed', 'cancelled', 'waiting'];
 
 /**
  * The cron trigger a job fires: `triggerId`, or the agent's only cron trigger.

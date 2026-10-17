@@ -8,7 +8,8 @@
 import type { Run } from '@chamberu/core';
 import { systemClock } from '@chamberu/core';
 import { fireCronTrigger } from '../tick/index.ts';
-import { SETTLING, resolveCronTrigger } from './helpers.ts';
+import { SETTLING } from './constants.ts';
+import { resolveCronTrigger } from './helpers.ts';
 import type { RunJobOptions, RunJobResult } from './types.ts';
 
 /**
