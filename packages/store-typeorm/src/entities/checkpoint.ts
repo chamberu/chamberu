@@ -38,7 +38,7 @@ export class CheckpointEntity {
         length: 64,
         nullable: true,
     })
-    finishReason!: Checkpoint['finishReason'] | null;
+    finishReason!: NonNullable<Checkpoint['finishReason']> | null;
 
     @Column({ name: 'created_at', type: 'timestamp with time zone' })
     createdAt!: Date;

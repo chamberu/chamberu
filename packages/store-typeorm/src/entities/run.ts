@@ -77,7 +77,7 @@ export class RunEntity {
         nullable: true,
         transformer: OPTIONAL_JSON_TRANSFORMER,
     })
-    error!: Run['error'] | null;
+    error!: NonNullable<Run['error']> | null;
 
     @Column({
         name: 'usage',

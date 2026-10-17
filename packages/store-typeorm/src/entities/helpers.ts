@@ -14,20 +14,15 @@
 const UNSUPPORTED_JSONB_ESCAPE = /(?<!\\)((?:\\\\)*)\\u(?:0000|d[89a-f][0-9a-f]{2})/g;
 
 /**
- * JSON text for a jsonb value: NUL characters and lone surrogates, which
- * jsonb cannot hold, become U+FFFD.
- */
-export function json(value: unknown): string {
-    return JSON.stringify(value).replace(UNSUPPORTED_JSONB_ESCAPE, '$1\\ufffd');
-}
-
-/**
- * The value the Postgres driver serializes for a jsonb column. The driver
- * writes JSON.stringify(value) for anything but null and undefined (which
- * become SQL NULL), so a JSON null and the sanitized text both travel
- * through toJSON.
+ * The value the Postgres driver serializes for a jsonb column: NUL
+ * characters and lone surrogates, which jsonb cannot hold, become U+FFFD.
+ * The driver writes JSON.stringify(value) for anything but null and
+ * undefined (which become SQL NULL), so a JSON null and the sanitized value
+ * both travel through toJSON. The value is only re-parsed when sanitizing
+ * changed it.
  */
 export function toJsonParameter(value: unknown): { toJSON: () => unknown } {
-    const text = json(value);
-    return { toJSON: () => JSON.parse(text) };
+    const text = JSON.stringify(value);
+    const clean = text.replace(UNSUPPORTED_JSONB_ESCAPE, '$1\\ufffd');
+    return { toJSON: () => (clean === text ? value : JSON.parse(clean)) };
 }

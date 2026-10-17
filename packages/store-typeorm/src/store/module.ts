@@ -21,6 +21,7 @@ import type {
 import {
     In,
     IsNull,
+    JsonContains,
     LessThanOrEqual,
     MoreThan,
 } from 'typeorm';
@@ -39,7 +40,6 @@ import {
     RunEntity,
     StepEntity,
 } from '../entities/index.ts';
-import { json } from '../entities/helpers.ts';
 import {
     asValues,
     toCheckpoint,
@@ -368,18 +368,20 @@ export class TypeormStore implements IStore {
         if (q.where && Object.keys(q.where).length > 0) {
             // Containment with the defined values (an empty object still
             // restricts to object documents); a key whose value is undefined
-            // matches documents lacking it, as in MemoryStore.
+            // matches documents lacking it, as in MemoryStore. The doc
+            // column's transformer sanitizes the containment value.
             const defined: Record<string, unknown> = {};
             let i = 0;
             for (const [key, value] of Object.entries(q.where)) {
                 if (value === undefined) {
+                    // raw: TypeORM has no operator for jsonb key existence (?)
                     query.andWhere(`NOT jsonb_exists(d.doc, :absent${i})`, { [`absent${i}`]: key });
                     i++;
                 } else {
                     defined[key] = value;
                 }
             }
-            query.andWhere('d.doc @> CAST(:contains AS jsonb)', { contains: json(defined) });
+            query.andWhere({ doc: JsonContains(defined) });
         }
         if (q.limit !== undefined) {
             query.limit(q.limit);

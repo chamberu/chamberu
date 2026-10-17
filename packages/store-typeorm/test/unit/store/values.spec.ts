@@ -193,5 +193,23 @@ describePostgres('TypeormStore values', () => {
         await expect(ids({ a: undefined })).resolves.toEqual(['2']);
         await expect(ids({ a: undefined, b: 1 })).resolves.toEqual(['2']);
         await expect(ids({ b: 1 })).resolves.toEqual(['2', '4']);
+        await expect(ids({ a: undefined, c: undefined })).resolves.toEqual(['2']);
+    });
+
+    it('docList where matches nested values by containment, null values and respects limit', async () => {
+        await store.docUpsert('a', 'c', '1', { nested: { x: [1, 2], y: 1 }, k: null });
+        await store.docUpsert('a', 'c', '2', { nested: { x: [3] }, k: 1 });
+        await store.docUpsert('a', 'c', '3', { k: null });
+
+        const ids = async (q: { where?: Record<string, unknown>; limit?: number }) => (await store.docList('a', 'c', q)).map((d) => d.id);
+        await expect(ids({ where: { nested: { x: [1] } } })).resolves.toEqual(['1']);
+        await expect(ids({ where: { k: null } })).resolves.toEqual(['1', '3']);
+        await expect(ids({ where: { k: null }, limit: 1 })).resolves.toEqual(['1']);
+        await expect(ids({ where: {} })).resolves.toEqual(['1', '2', '3']);
+    });
+
+    it('docUpsert with an undefined doc reads back a JSON null', async () => {
+        await store.docUpsert('a', 'c', 'u', undefined);
+        await expect(store.docList('a', 'c')).resolves.toEqual([{ id: 'u', doc: null }]);
     });
 });
