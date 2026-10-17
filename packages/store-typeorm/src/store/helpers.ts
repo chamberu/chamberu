@@ -71,11 +71,11 @@ export function toRunColumns(patch: Partial<Run>): Record<string, unknown> {
             continue;
         }
 
-        const column = RUN_COLUMNS[key];
-        if (!column) {
+        if (!Object.hasOwn(RUN_COLUMNS, key)) {
             continue;
         }
 
+        const column = RUN_COLUMNS[key]!;
         if (JSONB_RUN_COLUMNS.has(column)) {
             columns[column] = json(value);
         } else {
