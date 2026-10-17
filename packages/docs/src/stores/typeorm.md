@@ -21,7 +21,7 @@ The store takes an initialized `DataSource` and never initializes or destroys it
 
 ## Migrations
 
-`migrateStore(dataSource)` runs the pending migrations under the Postgres advisory lock `chamberu:migrations` (`MIGRATION_LOCK_NAME`). Call it on every boot: replicas that start at once wait for each other, and each migration is applied and recorded once. chamberu is pre-1.0, so a new version may ship a new migration.
+`migrateStore(dataSource)` runs the pending migrations under the Postgres advisory lock `chamberu:migrations` (`MIGRATION_LOCK_NAME`). Call it on every boot: replicas that start at once wait for each other, and each migration is applied and recorded once. Each call uses one pooled connection, the one holding the lock, for the migrations as well. chamberu is pre-1.0, so a new version may ship a new migration.
 
 ## Tables
 

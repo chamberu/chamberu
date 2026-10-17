@@ -79,4 +79,20 @@ describePostgres('schema', () => {
         await ds.undoLastMigration({ transaction: 'each' });
         expect(await tablesIn('other')).toBe(0);
     });
+
+    it('migrateStore needs one connection per call (it migrates on the connection holding the lock)', async () => {
+        const within = <T>(promise: Promise<T>) => Promise.race([
+            promise,
+            new Promise<never>((_resolve, reject) => {
+                setTimeout(() => reject(new Error('migrateStore did not finish within 5 s')), 5_000);
+            }),
+        ]);
+
+        const single = await create({ migrate: false, max: 1 });
+        await expect(within(migrateStore(single))).resolves.toBeUndefined();
+
+        const pair = await create({ migrate: false, max: 2 });
+        await expect(within(Promise.all([migrateStore(pair), migrateStore(pair)]))).resolves.toHaveLength(2);
+        await expect(assertSchemaMatchesMetadata(pair)).resolves.toBeUndefined();
+    }, 15_000);
 });

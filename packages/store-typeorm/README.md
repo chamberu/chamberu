@@ -84,7 +84,7 @@ const engine = new RunEngine({
 await engine.start();
 ```
 
-- `migrateStore()` runs the pending migrations under the Postgres advisory lock `chamberu:migrations`. Several replicas may call it at once: they wait for each other and the migration is recorded once.
+- `migrateStore()` runs the pending migrations under the Postgres advisory lock `chamberu:migrations`. Several replicas may call it at once: they wait for each other and the migration is recorded once. Each call uses one pooled connection: it migrates on the connection that holds the lock.
 - The store takes the data source as it is and never initializes or destroys it.
 - The database must exist. Create it beforehand, for example with `createDatabase()` from `typeorm-extension`.
 
