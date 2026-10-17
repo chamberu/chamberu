@@ -12,6 +12,7 @@
 | release-please | Per-package versions and changelogs |
 | Dependabot | Daily npm + GitHub Actions updates, grouped by prod/dev and major/minor+patch |
 | EditorConfig | Whitespace rules shared with the editor |
+| unplugin-swc | Compiles the store-typeorm entities' legacy decorators in tsdown and Vitest; the root `tsconfig.build.json` sets `experimentalDecorators: true` |
 
 The `@tada5hi/*` config packages are the source of truth for lint, TS and commit rules; the local config files are thin wrappers. Prefer changing the shared package over adding a local override, unless the deviation is chamberu-specific.
 

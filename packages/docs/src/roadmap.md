@@ -8,6 +8,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 |---|---|
 | `@chamberu/core` | `defineAgent()`, trigger definitions, `RunEngine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore` |
 | `@chamberu/test-kit` | `describeStoreContract`, `ControllableClock` |
+| `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [Postgres / TypeORM](/stores/typeorm) |
 
 ## Milestones
 
@@ -29,7 +30,6 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 
 | Package | Status | Purpose |
 |---|---|---|
-| `@chamberu/store-typeorm` | Planned (M1) | Postgres store through TypeORM; passes the store contract suite. See [Postgres / TypeORM](/stores/typeorm) |
 | `@chamberu/scheduler` | Planned (M1) | Fires `cron()` triggers once per tick across replicas, with overlap policies, timezones and a one-shot `run-job` mode |
 | `@chamberu/http` | Planned (M1) | REST control API, server-sent events, webhook intake (202 plus run id), health and readiness, MCP endpoint, bearer-token and authup authentication |
 | `@chamberu/github` | Planned (M1) | GitHub App auth, webhook signature checks, `github.webhook()` triggers deduplicated by delivery id, issue and comment tools with marker reconciliation. See [GitHub App](/deployment/github-app) |

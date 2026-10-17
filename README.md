@@ -28,7 +28,7 @@
 
 ---
 
-> chamberu is at an early stage. `@chamberu/core` and `@chamberu/test-kit` exist; the HTTP, scheduler, Postgres store, sandbox, GitHub and dashboard packages are planned.
+> chamberu is at an early stage. `@chamberu/core`, `@chamberu/test-kit` and `@chamberu/store-typeorm` exist; the HTTP, scheduler, sandbox, GitHub and dashboard packages are planned.
 
 ## Why chamberu?
 
@@ -60,6 +60,7 @@ A run moves from `queued` to `running` and settles `completed`, `failed` or `can
 |---|---|---|
 | [`@chamberu/core`](./packages/core) | [![npm](https://img.shields.io/npm/v/@chamberu/core)](https://www.npmjs.com/package/@chamberu/core) | Agents, triggers, the run engine, checkpoints, effect tools, approvals, agent state and the in-memory store |
 | [`@chamberu/test-kit`](./packages/test-kit) | [![npm](https://img.shields.io/npm/v/@chamberu/test-kit)](https://www.npmjs.com/package/@chamberu/test-kit) | `ControllableClock` and the store contract suite every `IStore` implementation must pass |
+| [`@chamberu/store-typeorm`](./packages/store-typeorm) | [![npm](https://img.shields.io/npm/v/@chamberu/store-typeorm)](https://www.npmjs.com/package/@chamberu/store-typeorm) | Postgres store through TypeORM: durable runs, leases and agent state across replicas |
 
 ## Quick start
 

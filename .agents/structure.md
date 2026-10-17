@@ -17,6 +17,9 @@ chamberu/
 │   │   ├── tsconfig.json            # src + test (typecheck)
 │   │   └── tsconfig.build.json      # src only (build:types)
 │   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
+│   ├── store-typeorm/               # @chamberu/store-typeorm (same layout)
+│   │   ├── src/{entities,migrations,schema,store}/
+│   │   └── test/global-setup.ts     # Starts postgres:18-alpine via testcontainers for the suite
 │   └── docs/                        # @chamberu/docs (private, not released): VitePress site (npm run docs:dev / docs:build)
 │       ├── src/.vitepress/          # config.mts, theme/ (Tailwind v4 tokens, Layout.vue), components/{home,layout}/
 │       ├── src/public/              # logo.svg (favicon), fixed light/dark logo and run-lifecycle copies
@@ -47,7 +50,7 @@ chamberu/
 | `@chamberu/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`; depends on core, core never depends on it |
 | `@chamberu/http` | Planned | REST control API, webhook ingestion, SSE, MCP endpoint, auth |
 | `@chamberu/scheduler` | Planned | hubwire integration: cron triggers, lock wiring |
-| `@chamberu/store-typeorm` | Planned | Postgres store (TypeORM entities and migrations) |
+| `@chamberu/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned | Workspaces for clone/exec/artifacts |
 | `@chamberu/coding`, `@chamberu/coding-claude-code` | Planned | Coding tools and Claude Code backend |
 | `@chamberu/github` | Planned | GitHub App auth, webhooks, tools |
@@ -77,3 +80,12 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `clock/` | `IClock`, `systemClock` |
 
 `src/index.ts` re-exports each folder's `index.ts`. `@chamberu/test-kit` (`packages/test-kit/src`) holds `clock/` (`ControllableClock`) and `store-contract/` (`describeStoreContract`).
+
+## Store-TypeORM Module Map (`packages/store-typeorm/src`)
+
+| Path | Purpose |
+|------|---------|
+| `entities/` | One TypeORM entity per table (`TableName` in `constants.ts`); internal, they describe the schema for the migration and the drift check only |
+| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), generated from the entities |
+| `schema/` | `migrateStore()` (`module.ts`), `STORE_ENTITIES`, `STORE_MIGRATIONS`, `MIGRATION_LOCK_NAME` |
+| `store/` | `TypeormStore` (`module.ts`), row mapping (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |

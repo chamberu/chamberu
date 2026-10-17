@@ -21,6 +21,7 @@ Only `test/unit/**/*.{test,spec}.{js,ts}` is picked up; a new test directory nee
 - Assert the expected behaviour from the module contract, not what the implementation happens to do; a failing test may be a real bug.
 - Use `MemoryStore` and `mockModel(responses)` (`test/utils/mock-model.ts`, scripted `MockResponse`s per model call) instead of mocking internals. Prefer fakes over `vi.mock()`.
 - Time goes through the injectable `IClock`: pass a `ControllableClock` to the engine and store and advance it, never real timers. Core's tests take it from `test/utils/clock.ts`; every other package takes it from `@chamberu/test-kit`.
+- `@chamberu/store-typeorm` tests need Docker: `test/global-setup.ts` starts `postgres:18-alpine` with testcontainers once per run, and each spec file creates its own database (`createTestDataSource()` in `test/utils/database.ts`, sessions in `TimeZone=America/New_York`). Without Docker the Postgres suites skip with a warning locally and fail when `CI` is set.
 - Every store implementation runs `describeStoreContract()` from `@chamberu/test-kit` (the `MemoryStore` run lives in `packages/test-kit/test/unit/memory-store.spec.ts`).
 - `test/unit/smoke.spec.ts` checks that the package entry resolves.
 - `test/unit/exports.spec.ts` pins the public exports; `test/unit/readme.spec.ts` runs `test/fixtures/readme-example.ts` and checks that `packages/core/README.md` contains that file verbatim. Change the example in the fixture, then copy it into the README.

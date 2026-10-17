@@ -1,10 +1,10 @@
 # Multiple Replicas
 
-Running more than one replica of an agent app relies on the store. Part of this works in core today; part needs planned packages.
+Running more than one replica of an agent app relies on the store. Core and the Postgres store cover the store side today; part needs planned packages.
 
 ## What core already guarantees
 
-With a shared, durable store, several `RunEngine`s coordinate without a leader:
+With a shared, durable store such as the [Postgres store](/stores/typeorm) (`MemoryStore` cannot be shared), several `RunEngine`s coordinate without a leader:
 
 - **One executor per run.** Run claims are leases (`claimTtlMs`, renewed every third of it). A replica that loses its lease stops writing.
 - **One run per concurrency key.** Checked under a store lock, across replicas.
@@ -18,7 +18,6 @@ Give each replica a distinct `owner` (the default `<hostname>-<pid>` already is 
 
 ## What still needs planned packages <Badge type="warning" text="Planned" />
 
-- **A shared store.** `MemoryStore` cannot be shared. The planned [Postgres store](/stores/typeorm) is the first that can.
 - **Cron once per tick.** The planned scheduler takes a store lock per trigger and scheduled time (never released, so a late replica cannot fire the same tick again) and dispatches with an idempotency key built from the same pair.
 - **Webhooks to any replica.** The planned HTTP app acknowledges webhooks with `202` and the run id, and uses the delivery id as the idempotency key, so a redelivery to another replica is deduplicated.
 

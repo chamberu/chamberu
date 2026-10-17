@@ -27,10 +27,12 @@
     },
     "devDependencies": {
         "@chamberu/core": "*",
+        "@chamberu/store-typeorm": "*",
         "@chamberu/test-kit": "*",
         "@tailwindcss/vite": "^4.3.3",
         "ai": "^7.0.143",
         "tailwindcss": "^4.3.3",
+        "typeorm": "^1.1.2",
         "vitepress": "^1.6.4",
         "vue": "^3.5.41",
         "zod": "^4.6.7"

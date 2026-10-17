@@ -12,6 +12,16 @@ npm install @chamberu/core ai
 npm install @ai-sdk/anthropic zod
 ```
 
+## Postgres store
+
+For durable runs and more than one replica, add the Postgres store with TypeORM and the `pg` driver:
+
+```bash
+npm install @chamberu/store-typeorm typeorm pg
+```
+
+See [Postgres / TypeORM](/stores/typeorm).
+
 ## Testing helpers
 
 `@chamberu/test-kit` exports the store contract suite and a controllable clock. `@chamberu/core` and `vitest` are its peer dependencies:
@@ -28,6 +38,7 @@ See [Writing a Store](/stores/writing-a-store) and the [test-kit reference](/ref
 |---|---|
 | `@chamberu/core` | Shipped (0.x) |
 | `@chamberu/test-kit` | Shipped (0.x), test helpers |
-| `@chamberu/store-typeorm`, `@chamberu/scheduler`, `@chamberu/http`, `@chamberu/github`, notifiers, sandboxes, `@chamberu/ui`, `chamberu` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
+| `@chamberu/store-typeorm` | Shipped (0.x), Postgres store |
+| `@chamberu/scheduler`, `@chamberu/http`, `@chamberu/github`, notifiers, sandboxes, `@chamberu/ui`, `chamberu` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
 
 chamberu is pre-1.0: a minor version may contain breaking changes, including changes to the store schema.
