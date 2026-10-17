@@ -139,4 +139,4 @@ These guidelines will help to ensure that contributions are made effectively and
 
 Made with 💚
 
-Published under [MIT License](./LICENSE).
+Published under [Apache License 2.0](./LICENSE).

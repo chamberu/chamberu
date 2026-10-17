@@ -63,4 +63,4 @@ clock.advance(60_000); // fires every timer due within the next minute, in order
 
 Made with 💚
 
-Published under [MIT License](./LICENSE).
+Published under [Apache License 2.0](./LICENSE).

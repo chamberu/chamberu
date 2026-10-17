@@ -297,4 +297,4 @@ Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamberu/
 
 ## License
 
-Published under [MIT License](./LICENSE).
+Published under [Apache License 2.0](./LICENSE).

@@ -23,7 +23,8 @@
         }
     },
     "files": [
-        "dist"
+        "dist",
+        "NOTICE"
     ],
     "engines": {
         "node": ">=22.0.0"
@@ -45,7 +46,7 @@
     "publishConfig": {
         "access": "public"
     },
-    "license": "MIT",
+    "license": "Apache-2.0",
     "dependencies": {
         "@ebec/core": "^1.3.2",
         "@standard-schema/spec": "^1.1.0",
