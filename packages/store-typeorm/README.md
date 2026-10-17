@@ -120,6 +120,7 @@ Types: `TypeormStoreOptions`, `PurgeResult`.
 ## Notes
 
 - **Tables are prefixed `chamberu_`:** `chamberu_runs`, `chamberu_steps`, `chamberu_checkpoints`, `chamberu_idempotency_keys`, `chamberu_locks`, `chamberu_effects`, `chamberu_kv`, `chamberu_docs`. They live in the data source's default schema.
+- **Identifiers have length limits** (`MemoryStore` has none): a run id 128 characters; `concurrencyKey`, `thread`, claim owners, step names, document collections and document ids 255; idempotency, lock, effect and state keys 512. A longer value makes the write fail with the driver's `value too long` error, so validate user-supplied keys before they reach `dispatch` (a rejected run with an `idempotencyKey` keeps its key reserved until the key expires).
 - **Only the latest checkpoint is kept** per run; an equal `stepIndex` replaces it.
 - **Opaque values are JSON.** A run's `output`, a step's `input`/`output`/`error`, checkpoint messages, effect results and state values are stored as `jsonb`, so a `Date` inside them comes back as a string, `undefined` or `Map` values are lost and a typed array such as `Uint8Array` comes back as an object keyed by index. A `BigInt` or a circular structure makes the write throw a `TypeError` (`MemoryStore` accepts both). The run's own dates, `trigger.receivedAt`, `waiting.expiresAt` and `waiting.notifiedAt` come back as `Date`.
 - **NUL characters and lone surrogates become U+FFFD** in opaque values (keys and strings alike), because `jsonb` cannot hold them. A literal backslash sequence such as the text `\u0000` is kept.
