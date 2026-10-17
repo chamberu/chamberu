@@ -121,22 +121,22 @@ export class Init1792195200000 implements MigrationInterface {
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`
-            DROP INDEX "public"."IDX_0d9d5c7ee1d7a0cf4909d27216"
+            DROP INDEX "IDX_0d9d5c7ee1d7a0cf4909d27216"
         `);
         await queryRunner.query(`
             DROP TABLE "chamberu_steps"
         `);
         await queryRunner.query(`
-            DROP INDEX "public"."IDX_6f499bcab68b4383c604ed03dd"
+            DROP INDEX "IDX_6f499bcab68b4383c604ed03dd"
         `);
         await queryRunner.query(`
-            DROP INDEX "public"."IDX_3ff46e34511211c8e8dd9e566d"
+            DROP INDEX "IDX_3ff46e34511211c8e8dd9e566d"
         `);
         await queryRunner.query(`
             DROP TABLE "chamberu_runs"
         `);
         await queryRunner.query(`
-            DROP INDEX "public"."IDX_4ca58e2c3649d4c740624222f2"
+            DROP INDEX "IDX_4ca58e2c3649d4c740624222f2"
         `);
         await queryRunner.query(`
             DROP TABLE "chamberu_locks"
@@ -145,7 +145,7 @@ export class Init1792195200000 implements MigrationInterface {
             DROP TABLE "chamberu_kv"
         `);
         await queryRunner.query(`
-            DROP INDEX "public"."IDX_c33705f0ac307138996a6ac106"
+            DROP INDEX "IDX_c33705f0ac307138996a6ac106"
         `);
         await queryRunner.query(`
             DROP TABLE "chamberu_idempotency_keys"
@@ -154,7 +154,7 @@ export class Init1792195200000 implements MigrationInterface {
             DROP TABLE "chamberu_effects"
         `);
         await queryRunner.query(`
-            DROP INDEX "public"."IDX_chamberu_docs_doc_gin"
+            DROP INDEX "IDX_chamberu_docs_doc_gin"
         `);
         await queryRunner.query(`
             DROP TABLE "chamberu_docs"

@@ -35,7 +35,16 @@ export function describePostgres(name: string, fn: () => void): void {
     describe.skipIf(!postgres)(name, fn);
 }
 
-export async function createTestDataSource(opts: { migrate?: boolean } = {}): Promise<DataSource> {
+export type TestDataSourceOptions = {
+    /** Run migrateStore after initializing (default true). */
+    migrate?: boolean;
+    /** Pool size (default 25). */
+    max?: number;
+    /** A schema to create and use as the connections' search_path instead of public. */
+    schema?: string;
+};
+
+export async function createTestDataSource(opts: TestDataSourceOptions = {}): Promise<DataSource> {
     if (!postgres) {
         throw new Error('Postgres is not available.');
     }
@@ -59,11 +68,15 @@ export async function createTestDataSource(opts: { migrate?: boolean } = {}): Pr
         entities: STORE_ENTITIES,
         migrations: STORE_MIGRATIONS,
         extra: {
-            max: 25,
-            options: '-c TimeZone=America/New_York',
+            max: opts.max ?? 25,
+            options: `-c TimeZone=America/New_York${opts.schema ? ` -c search_path=${opts.schema}` : ''}`,
         },
     });
     await dataSource.initialize();
+
+    if (opts.schema) {
+        await dataSource.query(`CREATE SCHEMA "${opts.schema}"`);
+    }
 
     if (opts.migrate !== false) {
         await migrateStore(dataSource);

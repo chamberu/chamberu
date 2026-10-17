@@ -15,11 +15,12 @@ import {
 import { migrateStore } from '@chamberu/store-typeorm';
 import { TableName } from '../../../src/entities/constants.ts';
 import { createTestDataSource, describePostgres } from '../../utils/database.ts';
+import type { TestDataSourceOptions } from '../../utils/database.ts';
 
 describePostgres('schema', () => {
     const dataSources: DataSource[] = [];
 
-    const create = async (opts?: { migrate?: boolean }) => {
+    const create = async (opts?: TestDataSourceOptions) => {
         const dataSource = await createTestDataSource(opts);
         dataSources.push(dataSource);
         return dataSource;
@@ -61,5 +62,21 @@ describePostgres('schema', () => {
             [Object.values(TableName)],
         );
         expect(tables.map((t) => t.table_name).sort()).toEqual(Object.values(TableName).sort());
+    });
+
+    it('the migration reverts in a schema other than public', async () => {
+        const ds = await create({ schema: 'other' });
+        const tablesIn = async (schema: string) => {
+            const rows: { table_name: string }[] = await ds.query(
+                'SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_name = ANY($2::text[])',
+                [schema, Object.values(TableName)],
+            );
+            return rows.length;
+        };
+        expect(await tablesIn('other')).toBe(Object.values(TableName).length);
+        expect(await tablesIn('public')).toBe(0);
+
+        await ds.undoLastMigration({ transaction: 'each' });
+        expect(await tablesIn('other')).toBe(0);
     });
 });
