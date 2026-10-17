@@ -5,17 +5,18 @@
 ```
 chamberu/
 ├── packages/
-│   └── core/                        # @chamberu/core
-│       ├── src/                     # Library source (entries: src/index.ts, src/testing.ts)
-│       ├── test/
-│       │   ├── vitest.config.ts     # Aliases @chamberu/core{,/testing} to ../src/{index,testing}.ts
-│       │   ├── unit/                # *.spec.ts, one folder per src module (agent/, engine/, store/, ...)
-│       │   ├── fixtures/            # readme-example.ts (the README example, run as a test)
-│       │   └── utils/               # mock-model.ts
-│       ├── README.md                # Package README (must contain the fixture verbatim)
-│       ├── tsdown.config.ts         # Builds dist/{index,testing}.mjs + .d.mts
-│       ├── tsconfig.json            # src + test (typecheck)
-│       └── tsconfig.build.json      # src only (build:types)
+│   ├── core/                        # @chamberu/core
+│   │   ├── src/                     # Library source (entry: src/index.ts), one folder per module
+│   │   ├── test/
+│   │   │   ├── vitest.config.ts     # Aliases @chamberu/core to ../src/index.ts
+│   │   │   ├── unit/                # *.spec.ts, one folder per src module (agent/, engine/, ...)
+│   │   │   ├── fixtures/            # readme-example.ts (the README example, run as a test)
+│   │   │   └── utils/               # mock-model.ts, clock.ts (private ControllableClock copy)
+│   │   ├── README.md                # Package README (must contain the fixture verbatim)
+│   │   ├── tsdown.config.ts         # Builds dist/index.mjs + .d.mts
+│   │   ├── tsconfig.json            # src + test (typecheck)
+│   │   └── tsconfig.build.json      # src only (build:types)
+│   └── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
 ├── .github/
 │   ├── assets/                      # README diagrams (theme-aware SVGs)
 │   ├── actions/{install,build}/     # Composite actions
@@ -26,7 +27,7 @@ chamberu/
 ├── .husky/commit-msg                # Runs commitlint
 ├── CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md
 ├── nx.json                          # Task orchestration and caching
-├── tsconfig.json                    # Root config, path aliases @chamberu/core{,/testing} -> packages/core/src
+├── tsconfig.json                    # Root config, path aliases @chamberu/core and @chamberu/test-kit -> packages/*/src
 ├── tsconfig.build.json              # Shared compiler options
 ├── eslint.config.js                 # @tada5hi/eslint-config flat config
 ├── commitlint.config.mjs            # Conventional Commits
@@ -38,7 +39,8 @@ chamberu/
 
 | Package | Status | Responsibility |
 |---------|--------|----------------|
-| `@chamberu/core` | Exists (0.1.0) | defineAgent, run engine, checkpoints, trigger model, state API, budgets, Store/Notifier interfaces, in-memory store |
+| `@chamberu/core` | Exists (0.1.0) | defineAgent, run engine, checkpoints, trigger model, state API, budgets, IStore/INotifier interfaces, in-memory store |
+| `@chamberu/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`; depends on core, core never depends on it |
 | `@chamberu/http` | Planned | REST control API, webhook ingestion, SSE, MCP endpoint, auth |
 | `@chamberu/scheduler` | Planned | hubwire integration: cron triggers, lock wiring |
 | `@chamberu/store-typeorm` | Planned | Postgres store (TypeORM entities and migrations) |
@@ -53,20 +55,21 @@ The memory store lives inside `@chamberu/core` (no separate `store-memory` packa
 
 ## Core Module Map (`packages/core/src`)
 
+Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.ts` and an `index.ts` barrel as needed (see [conventions](conventions.md#file-organization)).
+
 | Path | Purpose |
 |------|---------|
-| `errors.ts` | `ChamberuError` subclasses (ebec) |
-| `agent/{types,define}.ts` | `AgentDefinition`, `defineAgent()` |
-| `trigger/{types,builders}.ts` | `TriggerDefinition`, `TriggerEnvelope`, `cron()`, `http()`, `manual()` |
+| `errors/` | `ChamberuError` (`base.ts`), one file per subclass, `ErrorCode` (`constants.ts`) |
+| `agent/` | `defineAgent()`, `AgentDefinition`, name rules and budget defaults (`constants.ts`) |
+| `trigger/` | `cron()`, `http()`, `manual()`, `TriggerDefinition`, `TriggerEnvelope` |
 | `run/types.ts` | `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage` |
-| `store/types.ts` | Store interfaces (see architecture) |
-| `store/memory.ts` | `MemoryStore` |
-| `store/contract.ts` | `describeStoreContract()`, exported via `@chamberu/core/testing` |
-| `engine/{engine,queue,execute,budget}.ts` | `RunEngine`, scheduler, one execution, stop conditions |
-| `effect/{define,wrap}.ts` | `defineEffectTool()`, `effectMarker()`, `wrapToolsForRun()` (`effect/index.ts` re-exports both) |
-| `approval/token.ts` | Signed resume tokens |
-| `notify/types.ts` | `Notifier`, `Notification` |
-| `state/{api,tools}.ts` | Agent state API and generated tools |
-| `clock.ts` | `Clock` interface, `systemClock`, `ControllableClock` |
+| `store/types.ts` | `IStore` and its parts (see architecture) |
+| `store/memory/` | `MemoryStore` |
+| `engine/` | `RunEngine` (`module.ts`), `budget.ts` (stop conditions), `queue/` (scheduler), `execute/` (one execution) |
+| `effect/` | `defineEffectTool()`, `effectMarker()` (`define.ts`), `wrapToolsForRun()` (`wrap.ts`), `EFFECT` |
+| `approval/` | Signed resume tokens |
+| `notify/types.ts` | `INotifier`, `Notification` |
+| `state/` | `createAgentState()` (`module.ts`, validation via `@validup/standard-schema`), generated tools (`tools.ts`) |
+| `clock/` | `IClock`, `systemClock` |
 
-`testing.ts` is the `@chamberu/core/testing` entry (`describeStoreContract`, `ControllableClock`).
+`src/index.ts` re-exports each folder's `index.ts`. `@chamberu/test-kit` (`packages/test-kit/src`) holds `clock/` (`ControllableClock`) and `store-contract/` (`describeStoreContract`).

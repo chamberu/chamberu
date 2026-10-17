@@ -4,7 +4,7 @@
 
 App, Agent, Trigger, Run, Step, State, Tool, Workspace, Notifier, Store. Keep the concept surface at about ten. chamberu never wraps the AI SDK: models (`LanguageModel`), messages (`ModelMessage`) and tool sets (`ToolSet`) are passed through as-is.
 
-`@chamberu/core` (as built in plan 001) holds: agent and trigger definitions, the `RunEngine`, step checkpoints, budgets, effect tools, approvals with signed resume tokens, recovery and drain, agent state, the `Store`/`Notifier` interfaces, `MemoryStore` and the store contract suite. Everything time-based goes through an injectable `Clock` (`systemClock`, `ControllableClock` in tests). The public surface is `src/index.ts`; `@chamberu/core/testing` exports `describeStoreContract` and `ControllableClock`.
+`@chamberu/core` (as built in plan 001) holds: agent and trigger definitions, the `RunEngine`, step checkpoints, budgets, effect tools, approvals with signed resume tokens, recovery and drain, agent state, the `IStore`/`INotifier` interfaces, `MemoryStore`. Everything time-based goes through an injectable `IClock` (`systemClock`; `ControllableClock` in tests). The public surface is `src/index.ts`. `@chamberu/test-kit` exports `describeStoreContract` and `ControllableClock`.
 
 ## Engine
 
@@ -45,11 +45,11 @@ running -> interrupted (drain) -> queued (recover) -> running
 running with an expired claim (crash) -> queued (recover) -> running
 ```
 
-- **Intake**: with an `idempotencyKey`, `dispatch` claims `(agent:source, key)` in the `IdempotencyStore` (TTL 7 days); a duplicate returns the existing run id with `deduplicated: true`. A key whose run was never created (createRun failed after the claim) is healed by the next dispatch, which creates the run under the reserved id; `createRun` is insert-if-absent, so concurrent healers create it once.
+- **Intake**: with an `idempotencyKey`, `dispatch` claims `(agent:source, key)` in the `IIdempotencyStore` (TTL 7 days); a duplicate returns the existing run id with `deduplicated: true`. A key whose run was never created (createRun failed after the claim) is healed by the next dispatch, which creates the run under the reserved id; `createRun` is insert-if-absent, so concurrent healers create it once.
 - **Scheduling** (`engine/queue.ts`): a pass lists `queued` runs FIFO (createdAt, then id) and starts them up to `maxConcurrentRuns`. A keyed run starts only when no other run of the same agent and `concurrencyKey` is `running`, `waiting` or `interrupted`; check, claim and transition happen under a store lock `concurrency:<agent>:<key>` so it holds across replicas.
 - **Claims**: `claimRun(id, owner, claimTtlMs)` is a lease, renewed every `claimTtlMs / 3`. The poll runs on the same interval and calls `tick()` (approval expiry) and `recover()`. Every write of a running run is conditional on status and owner; an engine that loses its lease aborts the execution, writes nothing more and reports a `LeaseLostError` to `onError`.
 - **Execution** (`engine/execute.ts`): one `ToolLoopAgent` call per execution, starting from the latest checkpoint. After every step the engine appends the steps and saves a checkpoint (messages plus the step's `finishReason`). A cancel or drain abort lets the step-end writes in flight finish (all tool rows and the checkpoint of a completed step), so a recovery does not redo a step whose tools already ran; an abandon guard then stops a still-running generate from writing after the run settled.
-- **Budgets** (`engine/budget.ts`): `maxSteps` and `maxTokens` are stop conditions, `timeoutMs` an abort signal per execution (built on the `Clock`). Stopped by a budget while the last step asked for tool calls: `failed` with `BudgetExceeded`; otherwise `completed`. Timeout: `failed` with `Timeout`.
+- **Budgets** (`engine/budget.ts`): `maxSteps` and `maxTokens` are stop conditions, `timeoutMs` an abort signal per execution (built on the `IClock`). Stopped by a budget while the last step asked for tool calls: `failed` with `BudgetExceeded`; otherwise `completed`. Timeout: `failed` with `Timeout`.
 - **Tool errors** go back to the model as tool-error results; only `FatalToolError` (and infrastructure or store failures) fail the run.
 - **Cancel**: aborts a local execution (`cancelled`), or marks a `queued`/`waiting` run cancelled. A run `running` on another replica (or `interrupted`) gets `cancelRequested: true`; the owner sees it in `recover()` on its next poll and aborts with stop `cancel`, and an execution that starts on such a run settles it `cancelled` without a model call. A cancel that races a pause (the abort cannot interrupt the `waiting` write) cancels the run the pause left waiting, without notifying.
 - **Drain**: `drain({ timeoutMs })` stops polling and starting runs, waits for in-flight runs (default 30 s), then aborts the rest and marks them `interrupted` with the claim released. `stop()` only stops polling.
@@ -65,30 +65,30 @@ running with an expired claim (crash) -> queued (recover) -> running
 
 ## Store Contract
 
-The store is a set of small interfaces combined as `Store` (`src/store/types.ts`):
+The store is a set of small interfaces combined as `IStore` (`src/store/types.ts`):
 
 | Interface | Holds |
 |-----------|-------|
-| `RunStore` | Runs; `updateRun` with `expectStatus`/`expectOwner` guards; `listRuns` ordered by createdAt then id; `claimRun`/`renewClaim` leases |
-| `StepStore` | Append-only steps per run |
-| `CheckpointStore` | Latest checkpoint per run (highest `stepIndex`; equal index replaces) |
-| `IdempotencyStore` | `claimKey(scope, key, runId, ttl)`: first caller wins |
-| `LockStore` | `acquire`/`release` of keyed leases |
-| `EffectStore` | Recorded effect results by effect key |
-| `StateStore` | Per-agent KV and document collections (`where` = top-level equality) |
+| `IRunStore` | Runs; `updateRun` with `expectStatus`/`expectOwner` guards; `listRuns` ordered by createdAt then id; `claimRun`/`renewClaim` leases |
+| `IStepStore` | Append-only steps per run |
+| `ICheckpointStore` | Latest checkpoint per run (highest `stepIndex`; equal index replaces) |
+| `IIdempotencyStore` | `claimKey(scope, key, runId, ttl)`: first caller wins |
+| `ILockStore` | `acquire`/`release` of keyed leases |
+| `IEffectStore` | Recorded effect results by effect key |
+| `IStateStore` | Per-agent KV and document collections (`where` = top-level equality) |
 
-Rules every implementation must keep: a TTL created at T with `ttlMs` is expired at exactly `T + ttlMs`; values are copied in and out (no aliasing); atomic operations are atomic across callers. `MemoryStore` implements it in-process (structured clones, no await between check and write). `describeStoreContract((clock) => store)` from `@chamberu/core/testing` is the shared Vitest suite every store must pass; the factory must use the given `ControllableClock` for expiry. Redis is never required; a TypeORM/Postgres store is planned.
+Rules every implementation must keep: a TTL created at T with `ttlMs` is expired at exactly `T + ttlMs`; values are copied in and out (no aliasing); atomic operations are atomic across callers. `MemoryStore` implements it in-process (structured clones, no await between check and write). `describeStoreContract((clock) => store)` from `@chamberu/test-kit` is the shared Vitest suite every store must pass; the factory must use the given `ControllableClock` for expiry. Redis is never required; a TypeORM/Postgres store is planned.
 
 ## Idempotency and Side Effects
 
-1. Trigger dedupe at intake via `IdempotencyStore`.
+1. Trigger dedupe at intake via `IIdempotencyStore`.
 2. Completed steps are never repeated: execution resumes from the latest checkpoint.
 3. Side-effecting tools use `defineEffectTool()`. Per call the wrapper (`wrapToolsForRun`) returns the recorded result for the effect key, else asks `alreadyApplied(effectKey, input, ctx)`, else executes and records the result. The default key is `${runId}:${toolName}:${sha256(canonical JSON of input)}`. A throwing execute records nothing; a crash between the effect and the record repeats it unless `alreadyApplied` finds it (`effectMarker(key)` is the hidden marker to embed). Parallel identical calls in one step share one application.
 
 ## Agent State
 
-`createAgentState(agent, schema, store)`: KV (`state.get/set`) plus typed collections declared as `state: Record<name, StandardSchemaV1>` in `defineAgent`. `upsert` validates with the collection's Standard Schema (`ValidationError` on failure, nothing stored). With a schema, the model also gets `state_<coll>_list`, `state_<coll>_upsert` and `state_<coll>_remove` tools (upsert and remove are effect tools); user tools win on a name clash.
+`createAgentState(agent, schema, store)`: KV (`state.get/set`) plus typed collections declared as `state: Record<name, StandardSchemaV1>` in `defineAgent`. `upsert` validates with the collection's Standard Schema, mapped through `@validup/standard-schema` (`ValidationError` with the validup `issues` on failure, nothing stored). With a schema, the model also gets `state_<coll>_list`, `state_<coll>_upsert` and `state_<coll>_remove` tools (upsert and remove are effect tools); user tools win on a name clash.
 
 ## Errors
 
-All errors extend `ChamberuError` (ebec `BaseError`) with a `code`: `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `BudgetExceededError` (`BudgetExceeded`), `FatalToolError`, `RunNotFoundError`, `InvalidRunStateError`, `LeaseLostError`, `ValidationError`. A failed run stores `{ code, message }` in `run.error`.
+All errors extend `ChamberuError` (ebec `BaseError`) with a `code`: `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `BudgetExceededError` (`BudgetExceeded`), `FatalToolError`, `RunNotFoundError`, `InvalidRunStateError`, `LeaseLostError`, `TimeoutError` (`Timeout`), `ValidationError`; the codes are `ErrorCode` (`errors/constants.ts`). A failed run stores `{ code, message }` in `run.error`.

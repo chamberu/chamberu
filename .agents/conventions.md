@@ -24,29 +24,46 @@ The `@tada5hi/*` config packages are the source of truth for lint, TS and commit
 
 ## File Organization
 
-- **A module is a folder, not a file.** Once a concept has more than one kind of content (types, an implementation, helpers), it gets `src/<concept>/` with:
-  - `module.ts`: the implementation (the class or the main functions).
-  - `types.ts`: its exported interfaces and type aliases. Implementation files import from here; no exported type lives inline in `module.ts`.
-  - `helpers.ts`: internal functions. When helpers grow, it becomes a `helpers/` folder with one file per helper and its own `index.ts`.
-  - `constants.ts`: exported constants, if any.
-  - `index.ts`: the barrel, `export * from './<file>'` for files of **this folder only**, in alphabetical order.
-  
-  Example: `src/clock/{module,types,index}.ts` (`Clock`, `ClockTimerOptions` in `types.ts`, `systemClock` in `module.ts`).
-- **One class per file.** `max-classes-per-file` is `1` in `@tada5hi/eslint-config`; never disable it in source. Sibling classes share a folder instead, e.g. errors:
-  - `src/errors/base.ts` holds `ChamberuError`; every other error has its own file named after its concept, kebab-case and without an `-error` suffix (`lease-lost.ts` holds `LeaseLostError`).
-  - Error codes live in `src/errors/constants.ts`, not as string literals in the constructors.
-- **No cross-module re-export files.** A barrel only re-exports its own folder. A file that just pulls symbols out of other modules (like the old `src/testing.ts`) is not allowed; the code it exposes moves into the folder it is the entry of. Test helpers shipped as `@chamberu/core/testing` live in `src/testing/` (e.g. `testing/clock.ts` for `ControllableClock`, `testing/store-contract.ts` for `describeStoreContract`), with `src/testing/index.ts` as the tsdown entry.
-- **The package entry composes folder barrels.** `src/index.ts` re-exports `./<folder>/index.ts`; what a folder keeps internal, it leaves out of its own barrel.
-- Not migrated yet: `errors.ts`, `clock.ts`, `testing.ts`, `store/contract.ts`, and the inline exported types in `engine/*.ts`, `effect/define.ts`, `state/api.ts`, `approval/token.ts`. Do not add to them; migrate a file when touching it.
+- **Every file under `src/` and `test/` starts with the copyright header** (config files such as `tsdown.config.ts` and `test/vitest.config.ts` do not; neither does `test/fixtures/readme-example.ts`, which the README embeds verbatim):
+
+  ```ts
+  /*
+   * Copyright (c) <year>.
+   * Author Peter Placzek (tada5hi)
+   * For the full copyright and license information,
+   * view the LICENSE file that was distributed with this source code.
+   */
+  ```
+- **A module is a folder, not a file.** A concept gets `src/<concept>/` with, as needed:
+  - `module.ts`: the implementation (the class or the main functions). A folder with several implementations names them after what they do (`effect/define.ts`, `effect/wrap.ts`), and a sub-concept with its own content gets a subfolder (`engine/queue/`, `engine/execute/`).
+  - `types.ts`: every exported type. No exported type lives in an implementation file.
+  - `helpers.ts`: functions the implementation uses. When helpers grow, it becomes a `helpers/` folder with one file per helper and its own `index.ts`.
+  - `constants.ts`: every exported constant (`agent/constants.ts`, `effect/constants.ts`, `errors/constants.ts`).
+  - `index.ts`: the barrel. It re-exports **files of its own folder only**, alphabetically: `export *` when the whole file is public, named exports when the folder keeps part of it internal (`effect/index.ts` exports `EFFECT` but not `EFFECT_HOOKS`; helpers are never exported).
+- **One class per file.** `max-classes-per-file` is `1` in `@tada5hi/eslint-config`; never disable it in source. Sibling classes share a folder: `src/errors/base.ts` holds `ChamberuError`, and every other error has its own file named after its concept, kebab-case and without an `-error` suffix (`lease-lost.ts` holds `LeaseLostError`). Error codes live in `ErrorCode` (`errors/constants.ts`), never as string literals in the constructors.
+- **No cross-module re-export files.** A file that just pulls symbols out of other modules is not allowed; the code moves into the folder (or package) it belongs to.
+- **The package entry composes folder barrels.** `src/index.ts` is `export * from './<folder>/index.ts'` per folder. Inside a package, import the file you need (`../errors/index.ts`, `../state/types.ts`), not `src/index.ts`.
+- **Test helpers are a package.** Helpers other packages test with (`ControllableClock`, `describeStoreContract`) live in `@chamberu/test-kit`, which depends on `@chamberu/core`; core never depends on the kit (that would be an nx cycle), so core's own tests use the private copy in `test/utils/clock.ts`.
+
+## Naming
+
+- **`interface` is for behavior contracts and always carries the `I` prefix**: `IStore`, `IRunStore`, `IClock`, `INotifier`, `IAgentState`. A class implements it (`MemoryStore implements IStore`), or a factory returns it.
+- **Data shapes are `type` aliases without a prefix**: `Run`, `Step`, `TriggerEnvelope`, `RunEngineOptions`, `ResumeTokenClaims`.
+- Files are kebab-case.
+
+## Helpers and Dependencies
+
+- Object checks use `isObject` from `smob`, never `typeof x === 'object' && x !== null` (note that `isObject` is false for arrays).
+- Standard Schema validation goes through validup (`buildIssuesForStandardSchemaIssues` from `@validup/standard-schema`); errors carry ebec `issues`, never a custom issue field.
 
 ## Workflow
 
 - After changes run `npm run build && npm run test && npm run typecheck && npm run lint`. Run `npm run lint:fix` before hand-fixing formatting.
 - Never edit `dist/` (generated, git-ignored). Never hand-edit `.release-please-manifest.json` or package versions; release-please owns them.
-- Keep runtime `dependencies` minimal; tooling belongs in `devDependencies`, and the AI SDK (`ai`) stays a peer dependency.
-- New package: add `packages/<name>` (copy `packages/core` layout), a path alias in the root `tsconfig.json`, an alias in its `test/vitest.config.ts`, and an entry in `release-please-config.json` and `.release-please-manifest.json`.
+- Keep runtime `dependencies` minimal (the house libraries `@ebec/core`, `smob`, `validup` are fine); tooling belongs in `devDependencies`, and the AI SDK (`ai`) stays a peer dependency.
+- New package: add `packages/<name>` (copy `packages/test-kit` layout), a path alias in the root `tsconfig.json`, aliases in its `test/vitest.config.ts` for itself and every workspace package it imports, and an entry in `release-please-config.json` and `.release-please-manifest.json`.
 - Errors extend `ChamberuError` (`@ebec/core` `BaseError`) and live in `src/errors/`, one file each (see File Organization); never throw a bare `Error` from library code.
-- A new public export goes through its folder's `index.ts` (reached from `src/index.ts`, or `src/testing/index.ts` for test helpers) and must be added to `test/unit/exports.spec.ts`.
+- A new public export goes through its folder's `index.ts` (reached from `src/index.ts`) and must be added to the package's `test/unit/exports.spec.ts`.
 
 ## Commits
 
