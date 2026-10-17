@@ -17,7 +17,7 @@ A trigger describes how a run of an agent can start. At intake every trigger bec
 A `TriggerDefinition` may also carry `concurrencyKey(payload)` and `idempotencyKey(payload)` functions. They are meant for the intake packages, which compute the envelope keys from a payload.
 
 ::: warning Firing triggers is not in core
-In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigger definitions describe intent; nothing in core fires a cron expression or listens on an HTTP path. That is the job of the planned [`@chamberu/scheduler`](/roadmap#planned-packages) (cron, with per-tick locks and the overlap policy) and [`@chamberu/http`](/roadmap#planned-packages) (webhooks, REST and MCP). Until then, call `dispatch()` from your own handler or timer.
+In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigger definitions describe intent; nothing in core fires a cron expression or listens on an HTTP path. [`@chamberu/scheduler`](/guide/scheduler) fires `cron()` triggers (with per-tick locks and the overlap policy); the planned [`@chamberu/http`](/roadmap#planned-packages) will handle webhooks, REST and MCP. Until then, call `dispatch()` from your own HTTP handler.
 :::
 
 ## The envelope

@@ -43,6 +43,6 @@ So a crashed replica's runs are picked up by another replica within about one le
 
 A shorter lease recovers crashed runs sooner and polls more often. A longer lease tolerates longer pauses (a slow store, a stop-the-world GC) before another replica takes a run over. The default of 60 s polls every 20 s.
 
-## Cron across replicas <Badge type="warning" text="Planned" />
+## Cron across replicas
 
-Firing a cron trigger once across replicas needs a per-tick lock. The planned [`@chamberu/scheduler`](/roadmap#planned-packages) takes a store lock per `(trigger, scheduledAt)` and dispatches with an idempotency key built from the same pair, so a second firing is harmless even if the lock failed. See [Multiple Replicas](/deployment/replicas).
+Firing a cron trigger once across replicas needs a per-tick lock. [`@chamberu/scheduler`](/guide/scheduler) takes the store lock `cron:<agent>:<triggerId>:<scheduledAt>` per tick (never released, held for 10 minutes by default) and dispatches with the idempotency key `<triggerId>@<scheduledAt>`, so a second firing is harmless even if the lock failed. See [Cron Scheduling](/guide/scheduler) and [Multiple Replicas](/deployment/replicas).

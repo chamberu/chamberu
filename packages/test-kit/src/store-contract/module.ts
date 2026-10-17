@@ -219,6 +219,18 @@ export function describeStoreContract(
             expect(page.data.map((r) => r.id)).toEqual(['r3']);
         });
 
+        it('listRuns without a limit returns every matching run', async () => {
+            const { store } = await setup();
+            for (let i = 0; i < 250; i++) {
+                await store.createRun(makeRun(`r${String(i).padStart(3, '0')}`, { createdAt: new Date(i) }));
+            }
+
+            const all = await store.listRuns({});
+            expect(all.total).toBe(250);
+            expect(all.data).toHaveLength(250);
+            expect((await store.listRuns({ offset: 200 })).data).toHaveLength(50);
+        });
+
         it('claimRun is atomic under concurrency', async () => {
             const { store } = await setup();
             await store.createRun(makeRun('r1'));
