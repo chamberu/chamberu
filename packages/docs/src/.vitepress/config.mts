@@ -17,6 +17,7 @@ export default defineConfig({
     title: 'chamberu',
     description: 'A TypeScript framework for self-hosted, trigger-driven AI agents on the Vercel AI SDK: durable runs, checkpoints, approvals and a pluggable store.',
     base: '/',
+    sitemap: { hostname: 'https://chamberu.dev' },
     cleanUrls: true,
     lastUpdated: true,
 
@@ -58,6 +59,7 @@ export default defineConfig({
         }],
         ['meta', { name: 'theme-color', content: '#19171a' }],
         ['meta', { property: 'og:type', content: 'website' }],
+        ['meta', { property: 'og:url', content: 'https://chamberu.dev/' }],
         ['meta', { property: 'og:title', content: 'chamberu' }],
         ['meta', {
             property: 'og:description',
