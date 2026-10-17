@@ -11,6 +11,7 @@ import * as pkg from '@chamberu/store-typeorm';
 describe('public api', () => {
     it.each([
         'migrateStore',
+        'TypeormStore',
     ])('exports %s', (name) => {
         expect(pkg).toHaveProperty(name);
         expect(pkg[name as keyof typeof pkg]).toBeTypeOf('function');
