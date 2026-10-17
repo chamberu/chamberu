@@ -37,9 +37,9 @@
 | Concern | `MemoryStore` | `TypeormStore` |
 |---|---|---|
 | **Restarts** | Everything is gone | Runs, steps, checkpoints, effects and state stay in Postgres; `recover()` picks interrupted runs up |
-| **Replicas** | One process only | Claims, idempotency keys and locks are single SQL statements, atomic across processes |
+| **Replicas** | One process only | Claims, idempotency keys and locks are single statements built with TypeORM's query builder, atomic across processes |
 | **Schema** | None | One migration, applied by `migrateStore()` under an advisory lock, so replicas booting at once migrate once |
-| **Time** | From the injected `IClock` | From the injected `IClock` too, passed into SQL as a parameter (never `now()` in SQL) |
+| **Time** | From the injected `IClock` | From the injected `IClock` too, passed to every query as a parameter (never the database's `now()`) |
 | **Housekeeping** | Nothing to clean up | `purgeExpired()` deletes expired idempotency keys and locks |
 
 ## Installation
@@ -145,7 +145,7 @@ Types: `TypeormStoreOptions`, `PurgeResult`.
 - **Only the latest checkpoint is kept** per run; an equal `stepIndex` replaces it.
 - **Opaque values are JSON.** A run's `output`, a step's `input`/`output`/`error`, checkpoint messages, effect results and state values are stored as `jsonb`, so a `Date` inside them comes back as a string, `undefined` or `Map` values are lost and a typed array such as `Uint8Array` comes back as an object keyed by index. A `BigInt` or a circular structure makes the write throw a `TypeError` (`MemoryStore` accepts both). The run's own dates, `trigger.receivedAt`, `waiting.expiresAt` and `waiting.notifiedAt` come back as `Date`.
 - **NUL characters and lone surrogates become U+FFFD** in opaque values (keys and strings alike), because `jsonb` cannot hold them. A literal backslash sequence such as the text `\u0000` is kept.
-- **A JSON `null` in a nullable column reads back as absent:** a run `output` of `null` and a step `input`, `output` or `error` of `null`. `putEffect(key, undefined)` reads back `{ result: null }`. `kvSet(agent, key, undefined)` deletes the key.
+- **`null` in an optional property reads back as absent:** a run `output` of `null` and a step `input`, `output` or `error` of `null` are stored as SQL `NULL`. `putEffect(key, undefined)` reads back `{ result: null }`. `kvSet(agent, key, undefined)` deletes the key.
 - **`docList` `where` uses `jsonb` containment (`@>`).** For primitive values that is top-level equality; a nested object or array matches by containment (`MemoryStore` never matches those). A key whose value is `undefined` matches documents that lack the key. Documents are returned ordered by `id` (`MemoryStore`: insertion order).
 - **`listRuns` breaks `createdAt` ties by byte order of `id`** (`COLLATE "C"`, so `'B' < 'a'`); `MemoryStore` compares with `localeCompare`. Both agree for lowercase ids and UUIDs.
 - **The schema may still change before 1.0.** New versions ship new migrations; run `migrateStore()` on every boot.
