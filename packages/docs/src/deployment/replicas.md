@@ -1,10 +1,10 @@
 # Multiple Replicas
 
-Running more than one replica of an agent app relies on the store. Core and the Postgres store cover the store side today; part needs planned packages.
+Running more than one replica of an agent app relies on the store. Core and the TypeORM store cover the store side today; part needs planned packages.
 
 ## What core already guarantees
 
-With a shared, durable store such as the [Postgres store](/stores/typeorm) (`MemoryStore` cannot be shared), several `RunEngine`s coordinate without a leader:
+With a shared, durable store such as the [TypeORM store](/stores/typeorm) (`MemoryStore` cannot be shared), several `RunEngine`s coordinate without a leader:
 
 - **One executor per run.** Run claims are leases (`claimTtlMs`, renewed every third of it). A replica that loses its lease stops writing.
 - **One run per concurrency key.** Checked under a store lock, across replicas.

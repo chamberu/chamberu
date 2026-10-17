@@ -5,7 +5,7 @@
 <h1 align="center">@chamberu/store-typeorm</h1>
 
 <p align="center">
-    <b>Postgres store for chamberu through TypeORM: durable runs, leases and agent state.</b><br>
+    <b>TypeORM store for chamberu (PostgreSQL): durable runs, leases and agent state.</b><br>
     Runs, checkpoints, claims and state survive restarts, and several replicas<br>
     share one database without a leader.
 </p>

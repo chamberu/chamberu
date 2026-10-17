@@ -155,7 +155,7 @@ export default defineConfig({
                         { text: 'Store Contract', link: '/stores/' },
                         { text: 'MemoryStore', link: '/stores/memory' },
                         { text: 'Writing a Store', link: '/stores/writing-a-store' },
-                        { text: 'Postgres / TypeORM', link: '/stores/typeorm' },
+                        { text: 'TypeORM', link: '/stores/typeorm' },
                     ],
                 },
             ],

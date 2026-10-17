@@ -8,7 +8,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 |---|---|
 | `@chamberu/core` | `defineAgent()`, trigger definitions, `RunEngine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore` |
 | `@chamberu/test-kit` | `describeStoreContract`, `ControllableClock` |
-| `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [Postgres / TypeORM](/stores/typeorm) |
+| `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |
 
 ## Milestones
 
@@ -16,7 +16,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 
 On every new issue in the owner's repositories, a triage agent labels it, checks for duplicates, tries to reproduce the bug against the latest release in a sandbox and posts a first reply asking for missing details. A periodic sweep catches issues missed while the agent was down.
 
-M1 is done only when everything it needs ships: the Postgres store, the scheduler, the HTTP and MCP API with authentication, the GitHub connector, local and Kubernetes sandboxes with coding tools, the OpenClaw and GitHub notifiers, the UI, the CLI, the base image, the Helm chart, the template repository, and the triage agent itself, deployed with Flux.
+M1 is done only when everything it needs ships: the TypeORM store, the scheduler, the HTTP and MCP API with authentication, the GitHub connector, local and Kubernetes sandboxes with coding tools, the OpenClaw and GitHub notifiers, the UI, the CLI, the base image, the Helm chart, the template repository, and the triage agent itself, deployed with Flux.
 
 ### M2: mail digest <Badge type="warning" text="Planned" />
 

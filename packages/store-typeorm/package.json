@@ -2,7 +2,7 @@
     "name": "@chamberu/store-typeorm",
     "version": "0.1.0",
     "type": "module",
-    "description": "Postgres store for chamberu through TypeORM: durable runs, leases and agent state.",
+    "description": "TypeORM store for chamberu (PostgreSQL): durable runs, leases and agent state.",
     "author": {
         "name": "Peter Placzek",
         "email": "contact@tada5hi.net",

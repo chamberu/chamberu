@@ -48,7 +48,7 @@ const {
 } = TableName;
 
 /**
- * Postgres store. Every method is parameterized SQL through the data source,
+ * TypeORM store (PostgreSQL). Every method is parameterized SQL through the data source,
  * every atomic operation a single statement, with time taken from the clock.
  */
 export class TypeormStore implements IStore {

@@ -74,7 +74,7 @@ const env = {
     payload: { issue: 42 },
 };
 
-describePostgres('two engines on one Postgres store', () => {
+describePostgres('two engines on one TypeORM store', () => {
     let dataSource: DataSource;
     const engines: RunEngine[] = [];
 

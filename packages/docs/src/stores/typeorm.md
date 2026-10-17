@@ -1,4 +1,4 @@
-# Postgres / TypeORM
+# TypeORM store
 
 `@chamberu/store-typeorm` keeps everything the engine persists in Postgres through TypeORM. It passes `describeStoreContract` unchanged, so the engine behaves the same on memory and on Postgres, also with several replicas on one database.
 
