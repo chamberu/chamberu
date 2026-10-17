@@ -5,7 +5,8 @@
     "initial-version": "0.1.0",
     "packages": {
         "packages/core": {"component": "core"},
-        "packages/test-kit": {"component": "test-kit"}
+        "packages/test-kit": {"component": "test-kit"},
+        "packages/store-typeorm": {"component": "store-typeorm"}
     },
     "plugins": [
         {
