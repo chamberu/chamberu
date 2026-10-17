@@ -226,6 +226,27 @@ describe('runJob', () => {
         expect(getRun.mock.calls.length).toBe(calls);
     });
 
+    it('drains the engine when waiting for the run fails', async () => {
+        const {
+            clock, 
+            store, 
+            agent, 
+            engine, 
+        } = setup(textModel());
+        const error = new Error('store down');
+        vi.spyOn(engine, 'getRun').mockRejectedValue(error);
+        vi.spyOn(engine, 'on').mockReturnValue(() => {});
+        const drain = vi.spyOn(engine, 'drain');
+
+        await expect(runJob({
+            engine,
+            store,
+            agent,
+            clock,
+        })).rejects.toBe(error);
+        expect(drain).toHaveBeenCalledWith({ timeoutMs: 30_000 });
+    });
+
     it('drains the engine before returning', async () => {
         const {
             clock, 

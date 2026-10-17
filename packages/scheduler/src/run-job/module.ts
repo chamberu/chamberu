@@ -75,6 +75,11 @@ export async function runJob(opts: RunJobOptions): Promise<RunJobResult> {
             };
             engine.start().then(poll, reject);
         });
+    } catch (error) {
+        // the engine was started: shut it down before reporting
+        settled = true;
+        await engine.drain({ timeoutMs: drainTimeoutMs }).catch(() => {});
+        throw error;
     } finally {
         settled = true;
         timer?.clear();
