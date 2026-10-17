@@ -6,13 +6,9 @@
  */
 
 import { CronExpressionParser } from 'cron-parser';
-import { InvalidAgentDefinitionError } from '../errors/index.ts';
-import type {
-    CronOptions, 
-    HttpTriggerOptions, 
-    ManualTriggerOptions, 
-    TriggerDefinition,
-} from './types.ts';
+import { InvalidAgentDefinitionError } from '../../errors/index.ts';
+import type { TriggerDefinition } from '../types.ts';
+import type { CronOptions } from './types.ts';
 
 export function cron(expression: string, opts: CronOptions = {}): TriggerDefinition {
     try {
@@ -32,22 +28,5 @@ export function cron(expression: string, opts: CronOptions = {}): TriggerDefinit
             overlap: opts.overlap ?? 'skip',
             payload: opts.payload,
         },
-    };
-}
-
-export function http(opts: HttpTriggerOptions = {}): TriggerDefinition {
-    const path = opts.path ?? '/';
-    return {
-        source: 'http',
-        id: `http:${path}`,
-        options: { path, schema: opts.schema },
-    };
-}
-
-export function manual(opts: ManualTriggerOptions = {}): TriggerDefinition {
-    return {
-        source: 'manual',
-        id: 'manual',
-        options: { schema: opts.schema },
     };
 }

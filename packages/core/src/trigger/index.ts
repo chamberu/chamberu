@@ -5,5 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export * from './module.ts';
+export * from './cron/index.ts';
+export * from './http/index.ts';
+export * from './manual/index.ts';
 export type * from './types.ts';

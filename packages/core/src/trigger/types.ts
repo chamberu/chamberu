@@ -5,10 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { StandardSchemaV1 } from '@standard-schema/spec';
-
 export type TriggerSource = 'cron' | 'http' | 'github' | 'mcp' | 'manual';
-export type OverlapPolicy = 'skip' | 'queue-one' | 'allow';
 
 export type TriggerDefinition<P = unknown> = {
     source: TriggerSource;
@@ -31,19 +28,4 @@ export type TriggerEnvelope<P = unknown> = {
     concurrencyKey?: string;
     thread?: string;
     receivedAt: Date;
-};
-
-export type CronOptions = {
-    timezone?: string;
-    overlap?: OverlapPolicy;
-    payload?: unknown;
-};
-
-export type HttpTriggerOptions = {
-    path?: string;
-    schema?: StandardSchemaV1;
-};
-
-export type ManualTriggerOptions = {
-    schema?: StandardSchemaV1;
 };

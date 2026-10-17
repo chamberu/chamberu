@@ -1,0 +1,13 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import type { StandardSchemaV1 } from '@standard-schema/spec';
+
+export type HttpTriggerOptions = {
+    path?: string;
+    schema?: StandardSchemaV1;
+};
