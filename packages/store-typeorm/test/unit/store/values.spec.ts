@@ -111,17 +111,17 @@ describePostgres('TypeormStore values', () => {
     it('stores NUL characters and lone surrogates as U+FFFD, keeping escaped text and surrogate pairs', async () => {
         const raw = {
             nul: 'a\u0000b',
-            ['k\u0000']: 1,
+            'k\u0000': 1,
             lone: 'x\uD800y\uDC00z',
-            pair: 'emoji 😀',
+            pair: 'emoji \uD83D\uDE00',
             literal: '\\u0000 and \\\u0000 and \\uD800',
         };
         const clean = {
-            nul: 'a�b',
-            ['k�']: 1,
-            lone: 'x�y�z',
-            pair: 'emoji 😀',
-            literal: '\\u0000 and \\� and \\uD800',
+            nul: 'a\uFFFDb',
+            'k\uFFFD': 1,
+            lone: 'x\uFFFDy\uFFFDz',
+            pair: 'emoji \uD83D\uDE00',
+            literal: '\\u0000 and \\\uFFFD and \\uD800',
         };
 
         await store.kvSet('a', 'k', raw);
@@ -146,7 +146,11 @@ describePostgres('TypeormStore values', () => {
             finishedAt: at,
         });
         const [step] = await store.listSteps('r1');
-        expect(step).toMatchObject({ input: clean, output: clean, error: clean });
+        expect(step).toMatchObject({
+            input: clean,
+            output: clean,
+            error: clean,
+        });
 
         await store.saveCheckpoint({
             runId: 'r1',

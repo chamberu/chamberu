@@ -196,7 +196,11 @@ describePostgres('TypeormStore runs', () => {
 
     it('updateRun ignores patch keys that are Object.prototype members', async () => {
         await store.createRun(makeRun('r1'));
-        const patch = { constructor: 1, toString: 2, status: 'running' } as unknown as Partial<Run>;
+        const patch = {
+            constructor: 1,
+            toString: 2,
+            status: 'running',
+        } as unknown as Partial<Run>;
         await expect(store.updateRun('r1', patch)).resolves.toMatchObject({ id: 'r1', status: 'running' });
     });
 });
