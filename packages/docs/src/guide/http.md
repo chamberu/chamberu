@@ -32,7 +32,7 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 | `POST /hooks/:agent/:triggerId` | `agent:<agent>:run` | `202 { runId, deduplicated }` |
 | `GET /agents`, `GET /schedules` | `run:read` | Agent summaries; `cron()` triggers with their next fire time |
 | `GET`, `PATCH /agents/:name/state/kv/:key` | `state:read`, `state:write` | `{ key, value }` |
-| `GET /agents/:name/state/collections/:collection` | `state:read` | Documents; top-level equality filters |
+| `GET /agents/:name/state/collections/:collection` | `state:read` | Documents (`{ id, ...fields }`, or `{ id, doc }` for a non-object); top-level equality filters, `page[limit]` (no offset) |
 | `/mcp` | authenticated | MCP endpoint |
 | `GET /healthz`, `/readyz`, `/metrics` | none | Liveness, readiness, Prometheus |
 
