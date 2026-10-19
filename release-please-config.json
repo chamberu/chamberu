@@ -6,6 +6,7 @@
     "packages": {
         "packages/core": {"component": "core"},
         "packages/scheduler": {"component": "scheduler"},
+        "packages/store-typeorm": {"component": "store-typeorm"},
         "packages/test-kit": {"component": "test-kit"}
     },
     "plugins": [

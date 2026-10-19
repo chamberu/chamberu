@@ -9,6 +9,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 | `@chamberu/core` | `defineAgent()`, trigger definitions, `RunEngine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore` |
 | `@chamberu/test-kit` | `describeStoreContract`, `ControllableClock` |
 | `@chamberu/scheduler` | `createScheduler()` (one locked hubwire component per `cron()` trigger, overlap policies, timezones), `runJob()` for one-shot jobs |
+| `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |
 
 ## Milestones
 
@@ -16,7 +17,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 
 On every new issue in the owner's repositories, a triage agent labels it, checks for duplicates, tries to reproduce the bug against the latest release in a sandbox and posts a first reply asking for missing details. A periodic sweep catches issues missed while the agent was down.
 
-M1 is done only when everything it needs ships: the Postgres store, the scheduler, the HTTP and MCP API with authentication, the GitHub connector, local and Kubernetes sandboxes with coding tools, the OpenClaw and GitHub notifiers, the UI, the CLI, the base image, the Helm chart, the template repository, and the triage agent itself, deployed with Flux.
+M1 is done only when everything it needs ships: the TypeORM store, the scheduler, the HTTP and MCP API with authentication, the GitHub connector, local and Kubernetes sandboxes with coding tools, the OpenClaw and GitHub notifiers, the UI, the CLI, the base image, the Helm chart, the template repository, and the triage agent itself, deployed with Flux.
 
 ### M2: mail digest <Badge type="warning" text="Planned" />
 
@@ -30,7 +31,6 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 
 | Package | Status | Purpose |
 |---|---|---|
-| `@chamberu/store-typeorm` | Planned (M1) | Postgres store through TypeORM; passes the store contract suite. See [Postgres / TypeORM](/stores/typeorm) |
 | `@chamberu/http` | Planned (M1) | REST control API, server-sent events, webhook intake (202 plus run id), health and readiness, MCP endpoint, bearer-token and authup authentication |
 | `@chamberu/github` | Planned (M1) | GitHub App auth, webhook signature checks, `github.webhook()` triggers deduplicated by delivery id, issue and comment tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned (M1) | Disposable workspaces: a temp directory for development, a locked-down pod per workspace in production |

@@ -1,0 +1,33 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import {
+    CheckpointEntity,
+    DocEntity,
+    EffectEntity,
+    IdempotencyKeyEntity,
+    KvEntity,
+    LockEntity,
+    RunEntity,
+    StepEntity,
+} from '../entities/index.ts';
+import { Init1792195200000 } from '../migrations/index.ts';
+
+export const STORE_ENTITIES = [
+    RunEntity,
+    StepEntity,
+    CheckpointEntity,
+    IdempotencyKeyEntity,
+    LockEntity,
+    EffectEntity,
+    KvEntity,
+    DocEntity,
+];
+
+export const STORE_MIGRATIONS = [Init1792195200000];
+
+export const MIGRATION_LOCK_NAME = 'chamberu:migrations';

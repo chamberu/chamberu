@@ -5,7 +5,7 @@ chamberu is a TypeScript framework for **self-hosted, trigger-driven AI agents**
 The LLM side is the [Vercel AI SDK](https://ai-sdk.dev) v7. chamberu adds what the AI SDK leaves out on purpose: triggers, a run queue, persistence, concurrency control, approvals and a graceful shutdown.
 
 ::: info Status
-chamberu is pre-1.0. [`@chamberu/core`](/reference/), the cron scheduler [`@chamberu/scheduler`](/reference/scheduler) and the test helpers, [`@chamberu/test-kit`](/reference/test-kit), exist today. The HTTP API, the Postgres store, the GitHub connector, the UI and the deploy kit are planned; the [roadmap](/roadmap) lists them. Pages about planned work carry a <Badge type="warning" text="Planned" /> badge.
+chamberu is pre-1.0. [`@chamberu/core`](/reference/), the cron scheduler [`@chamberu/scheduler`](/reference/scheduler), the [TypeORM store](/stores/typeorm) and the test helpers, [`@chamberu/test-kit`](/reference/test-kit), exist today. The HTTP API, the GitHub connector, the UI and the deploy kit are planned; the [roadmap](/roadmap) lists them. Pages about planned work carry a <Badge type="warning" text="Planned" /> badge.
 :::
 
 ## Why chamberu?

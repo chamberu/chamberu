@@ -5,6 +5,7 @@
         "module": "ESNext",
         "moduleResolution": "bundler",
         "noEmit": true,
+        "experimentalDecorators": true,
         "allowImportingTsExtensions": true,
         "types": ["node"]
     },

@@ -18,6 +18,9 @@ chamberu/
 │   │   └── tsconfig.build.json      # src only (build:types)
 │   ├── scheduler/                   # @chamberu/scheduler (same layout; aliases core, test-kit and itself to src)
 │   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
+│   ├── store-typeorm/               # @chamberu/store-typeorm (same layout)
+│   │   ├── src/{entities,migrations,schema,store}/
+│   │   └── test/global-setup.ts     # Starts postgres:18-alpine via testcontainers for the suite
 │   └── docs/                        # @chamberu/docs (private, not released): VitePress site (npm run docs:dev / docs:build)
 │       ├── src/.vitepress/          # config.mts, theme/ (Tailwind v4 tokens, Layout.vue), components/{home,layout}/
 │       ├── src/public/              # logo.svg (favicon), fixed light/dark logo and run-lifecycle copies
@@ -48,7 +51,7 @@ chamberu/
 | `@chamberu/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`; depends on core, core never depends on it |
 | `@chamberu/http` | Planned | REST control API, webhook ingestion, SSE, MCP endpoint, auth |
 | `@chamberu/scheduler` | Exists (0.1.0) | `createScheduler()` (one locked hubwire component per cron trigger), `runJob()`; depends on `hubwire`, peer on core |
-| `@chamberu/store-typeorm` | Planned | Postgres store (TypeORM entities and migrations) |
+| `@chamberu/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned | Workspaces for clone/exec/artifacts |
 | `@chamberu/coding`, `@chamberu/coding-claude-code` | Planned | Coding tools and Claude Code backend |
 | `@chamberu/github` | Planned | GitHub App auth, webhooks, tools |
@@ -87,3 +90,12 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `tick/` | `fireCronTrigger()` (overlap check, envelope, dispatch), `readCronOptions()`; overlap check in `helpers.ts` |
 | `scheduler/` | `createScheduler()`, `SCHEDULE_LOCK_TTL_MS`; `buildComponentOptions()` (`helpers.ts`, internal) |
 | `run-job/` | `runJob()`; `resolveCronTrigger()`, `isQueuedBehindApproval()` (`helpers.ts`), `SETTLING` (`constants.ts`), both internal |
+
+## Store-TypeORM Module Map (`packages/store-typeorm/src`)
+
+| Path | Purpose |
+|------|---------|
+| `entities/` | One TypeORM entity per table, the repositories the store queries through; `TableName` and the jsonb transformers (`JSON_VALUE_TRANSFORMER`, `OPTIONAL_JSON_TRANSFORMER`) in `constants.ts`, `toJsonParameter()` (jsonb sanitizing) in `helpers.ts` |
+| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), generated from the entities |
+| `schema/` | `migrateStore()` (`module.ts`), `STORE_ENTITIES`, `STORE_MIGRATIONS`, `MIGRATION_LOCK_NAME` |
+| `store/` | `TypeormStore` (`module.ts`), entity to domain mapping, value builders and `RETURNING` row hydration (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |

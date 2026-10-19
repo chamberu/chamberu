@@ -45,7 +45,7 @@ flow:
 packages:
     eyebrow: Packages
     title: Small today, planned in the open.
-    lead: The engine, the cron scheduler and the test helpers ship now. The HTTP API, the Postgres store and the rest are designed milestone by milestone.
+    lead: The engine, the cron scheduler, the TypeORM store and the test helpers ship now. The HTTP API and the rest are designed milestone by milestone.
     shipped:
         -   name: '@chamberu/core'
             body: Agents, triggers, the run engine, checkpoints, budgets, effect tools, approvals, agent state and the in-memory store.
@@ -56,10 +56,10 @@ packages:
         -   name: '@chamberu/scheduler'
             body: Fires cron() triggers once per tick across replicas, with overlap policies, timezones and one-shot jobs.
             link: /reference/scheduler
-    planned:
         -   name: '@chamberu/store-typeorm'
-            milestone: M1
-            body: Postgres store through TypeORM, passing the store contract suite.
+            body: TypeORM store (PostgreSQL) for durable runs across replicas, passing the store contract suite.
+            link: /stores/typeorm
+    planned:
         -   name: '@chamberu/http'
             milestone: M1
             body: REST control API, server-sent events, webhook intake and an MCP endpoint.

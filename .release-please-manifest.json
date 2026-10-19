@@ -1,5 +1,6 @@
 {
     "packages/core": "0.1.0",
     "packages/test-kit": "0.1.0",
-    "packages/scheduler": "0.1.0"
+    "packages/scheduler": "0.1.0",
+    "packages/store-typeorm": "0.1.0"
 }
