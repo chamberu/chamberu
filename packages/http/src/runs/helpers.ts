@@ -5,14 +5,14 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { RunStatus } from '@chamberu/core';
+import { InvalidResumeTokenError, RunStatus } from '@chamberu/core';
 import type {
     Agent,
     Run,
     RunStatusLiteral,
     TriggerDefinition,
 } from '@chamberu/core';
-import { BadRequestError, NotFoundError } from '@ebec/http';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@ebec/http';
 import { defineSchema } from '@rapiq/core';
 import type { IFilter } from '@rapiq/core';
 import { Container } from 'validup';
@@ -22,9 +22,14 @@ import type { Principal } from '../auth/types.ts';
 import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
 import type { HttpContext } from '../app/types.ts';
 import { decodeQuery } from '../request/helpers.ts';
-import { isDefined, isString } from '../request/validators.ts';
-import { KEY_MAX_LENGTH } from './constants.ts';
-import type { RunListQuery, RunView, StartRunBody } from './types.ts';
+import { isBoolean, isDefined, isString } from '../request/validators.ts';
+import { KEY_MAX_LENGTH, RESUME_REASON_MAX_LENGTH, RESUME_TOKEN_MAX_LENGTH } from './constants.ts';
+import type {
+    ResumeBody,
+    RunListQuery,
+    RunView,
+    StartRunBody,
+} from './types.ts';
 
 /** Drops the internal `claim` (owner and lease expiry) from a run. */
 export function serializeRun(run: Run): RunView {
@@ -120,4 +125,30 @@ export function parseRunListQuery(searchParams: URLSearchParams): RunListQuery {
     }
 
     return query;
+}
+
+export function createResumeContainer(): Container<ResumeBody> {
+    const container = new Container<ResumeBody>();
+    container.mount('token', isString({ min: 1, max: RESUME_TOKEN_MAX_LENGTH }));
+    container.mount('approved', isBoolean());
+    container.mount('reason', { optional: true }, isString({ max: RESUME_REASON_MAX_LENGTH }));
+    return container;
+}
+
+/**
+ * The run a resume token answers, once the principal may approve for its
+ * agent: the signature and expiry are checked before any store lookup
+ * (400), a run that does not exist reads as an invalid token (400), a
+ * missing `agent:<agent>:approve` is 403.
+ */
+export async function resolveResumeTarget(ctx: HttpContext, principal: Principal, token: string): Promise<Run> {
+    const claims = ctx.engine.inspectResumeToken(token);
+    const run = await ctx.store.getRun(claims.runId);
+    if (!run) throw new InvalidResumeTokenError();
+
+    const permission = agentPermission(run.agent, 'approve');
+    if (!hasPermission(principal, permission)) {
+        throw new ForbiddenError({ message: `Missing permission "${permission}".` });
+    }
+    return run;
 }

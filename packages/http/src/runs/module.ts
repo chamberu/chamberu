@@ -17,11 +17,13 @@ import { agentPermission, hasPermission } from '../auth/module.ts';
 import { readJsonBody, validateBody, validatePayload } from '../request/helpers.ts';
 import {
     canReadRun,
+    createResumeContainer,
     createStartRunContainer,
     parseRunListQuery,
     readIdempotencyHeader,
     requireAgent,
     requireHttpTrigger,
+    resolveResumeTarget,
     serializeRun,
 } from './helpers.ts';
 
@@ -29,9 +31,10 @@ function param(event: IAppEvent, name: string): string {
     return event.params[name] ?? '';
 }
 
-/** `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `POST /runs/:id/cancel`. */
+/** `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `POST /runs/:id/cancel`, `POST /resume`. */
 export function registerRunRoutes(app: App, ctx: HttpContext): void {
     const startContainer = createStartRunContainer();
+    const resumeContainer = createResumeContainer();
 
     app.post('/agents/:name/runs', defineCoreHandler(async (event) => {
         const name = param(event, 'name');
@@ -93,5 +96,18 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
         const run = await ctx.engine.getRun(id);
         event.response.status = 202;
         return { runId: id, status: run?.status };
+    }));
+
+    app.post('/resume', defineCoreHandler(async (event) => {
+        // the permission depends on the token: authenticate before reading the body
+        const principal = await authenticate(event, ctx);
+        const body = await validateBody(resumeContainer, await readJsonBody(event, ctx.bodyLimit), { required: true });
+        const run = await resolveResumeTarget(ctx, principal, body.token);
+        await ctx.engine.resume(body.token, {
+            approved: body.approved,
+            ...(body.reason !== undefined ? { reason: body.reason } : {}),
+        });
+        event.response.status = 202;
+        return { runId: run.id, status: 'queued' };
     }));
 }

@@ -24,3 +24,10 @@ export type StartRunBody = {
     idempotencyKey?: string;
     thread?: string;
 };
+
+/** Body of `POST /resume`; internal. */
+export type ResumeBody = {
+    token: string;
+    approved: boolean;
+    reason?: string;
+};
