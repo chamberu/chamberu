@@ -13,8 +13,8 @@ import {
 } from '@chamberu/core';
 import type { Agent, INotifier } from '@chamberu/core';
 import { ControllableClock } from '@chamberu/test-kit';
-import { createHttpApp } from '@chamberu/http';
-import type { Authenticator, HttpAppOptions } from '@chamberu/http';
+import { createHttpApp, staticTokens } from '@chamberu/http';
+import type { HttpAppOptions } from '@chamberu/http';
 import type { App } from 'routup';
 import { textModel } from './model.ts';
 
@@ -22,20 +22,12 @@ export const ADMIN_TOKEN = 'admin-token-0123456789';
 export const READER_TOKEN = 'reader-token-0123456789';
 
 /** Admin and reader principals by bearer token. */
-export const testAuth: Authenticator = async (request) => {
-    const header = request.headers.get('authorization');
-    if (header === `Bearer ${ADMIN_TOKEN}`) {return {
-        id: 'admin', 
-        kind: 'token', 
-        permissions: ['*'], 
-    };}
-    if (header === `Bearer ${READER_TOKEN}`) {return {
-        id: 'reader', 
-        kind: 'token', 
-        permissions: ['run:read'], 
-    };}
-    return undefined;
-};
+export const testAuth = staticTokens({
+    tokens: {
+        [ADMIN_TOKEN]: { id: 'admin', permissions: ['*'] },
+        [READER_TOKEN]: { id: 'reader', permissions: ['run:read'] },
+    },
+});
 
 export type TestAppOverrides = Partial<Omit<HttpAppOptions, 'clock'>> & {
     agents?: Agent[];

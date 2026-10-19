@@ -10,9 +10,22 @@ import * as http from '@chamberu/http';
 
 describe('public api', () => {
     it.each([
+        'agentPermission',
         'createHttpApp',
+        'hasPermission',
+        'staticTokens',
     ])('exports %s', (name) => {
         expect(http).toHaveProperty(name);
         expect(http[name as keyof typeof http]).toBeTypeOf('function');
+    });
+
+    it('exports Permission', () => {
+        expect(http.Permission).toEqual({
+            ALL: '*',
+            RUN_READ: 'run:read',
+            RUN_CANCEL: 'run:cancel',
+            STATE_READ: 'state:read',
+            STATE_WRITE: 'state:write',
+        });
     });
 });
