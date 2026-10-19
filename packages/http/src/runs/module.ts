@@ -5,8 +5,6 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ForbiddenError } from '@ebec/http';
-import { RunNotFoundError } from '@chamberu/core';
 import type { Run } from '@chamberu/core';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { defineCoreHandler } from 'routup';
@@ -15,7 +13,7 @@ import { requireAgent } from '../agents/helpers.ts';
 import type { HttpContext } from '../app/types.ts';
 import { authenticate, authorize } from '../auth/helpers.ts';
 import { Permission } from '../auth/constants.ts';
-import { agentPermission, hasPermission } from '../auth/module.ts';
+import { agentPermission } from '../auth/module.ts';
 import {
     readIdempotencyHeader,
     readJsonBody,
@@ -23,9 +21,10 @@ import {
     validatePayload,
 } from '../request/helpers.ts';
 import {
-    canReadRun,
+    assertCanListRuns,
     createResumeContainer,
     createStartRunContainer,
+    loadReadableRun,
     parseRunListQuery,
     requireHttpTrigger,
     resolveResumeTarget,
@@ -39,13 +38,7 @@ function param(event: IAppEvent, name: string): string {
 
 /** The run, once the principal may read it: 401, then 404, then 403. */
 async function readableRun(event: IAppEvent, ctx: HttpContext, id: string): Promise<Run> {
-    const principal = await authenticate(event, ctx);
-    const run = await ctx.store.getRun(id);
-    if (!run) throw new RunNotFoundError(id);
-    if (!canReadRun(principal, run)) {
-        throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
-    }
-    return run;
+    return loadReadableRun(ctx, await authenticate(event, ctx), id);
 }
 
 /** `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `GET /runs/:id/stream`, `POST /runs/:id/cancel`, `POST /resume`. */
@@ -77,12 +70,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
     app.get('/runs', defineCoreHandler(async (event) => {
         const principal = await authenticate(event, ctx);
         const query = parseRunListQuery(event.searchParams);
-        if (
-            !hasPermission(principal, Permission.RUN_READ) &&
-            (query.agent === undefined || !hasPermission(principal, agentPermission(query.agent, 'run')))
-        ) {
-            throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
-        }
+        assertCanListRuns(principal, query.agent);
 
         const { data, total } = await ctx.store.listRuns(query);
         return {

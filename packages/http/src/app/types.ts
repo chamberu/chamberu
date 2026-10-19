@@ -73,6 +73,6 @@ export type HttpContext = {
     clock: IClock;
     shutdown?: IShutdown;
     /** Ends open streams and closes handlers on shutdown. */
-    closers: Set<() => void>;
+    closers: Set<() => void | Promise<void>>;
     onError: (error: unknown) => void;
 };

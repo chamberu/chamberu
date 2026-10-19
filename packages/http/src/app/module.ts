@@ -10,6 +10,7 @@ import { App, defineCoreHandler } from 'routup';
 import { registerAgentRoutes } from '../agents/module.ts';
 import { registerHealthRoutes } from '../health/module.ts';
 import { registerHookRoutes } from '../hooks/module.ts';
+import { registerMcpRoutes } from '../mcp/module.ts';
 import { registerRunRoutes } from '../runs/module.ts';
 import { buildContext, createErrorHandler } from './helpers.ts';
 import type { HttpAppOptions } from './types.ts';
@@ -29,20 +30,21 @@ export function createHttpApp(options: HttpAppOptions): App {
     registerAgentRoutes(app, ctx);
     registerRunRoutes(app, ctx);
     registerHookRoutes(app, ctx);
+    if (options.mcp !== false) registerMcpRoutes(app, ctx, options.mcp);
 
     app.use(defineCoreHandler(() => {
         throw new NotFoundError({ message: 'The requested route does not exist.' });
     }));
     app.use(createErrorHandler(ctx));
 
-    options.shutdown?.onShutdown(() => {
-        for (const close of [...ctx.closers]) {
+    options.shutdown?.onShutdown(async () => {
+        await Promise.all([...ctx.closers].map(async (close) => {
             try {
-                close();
+                await close();
             } catch (error) {
                 ctx.onError(error);
             }
-        }
+        }));
     });
     return app;
 }

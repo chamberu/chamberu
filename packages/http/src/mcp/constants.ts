@@ -1,0 +1,18 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+/** Server name the MCP endpoint reports by default. */
+export const DEFAULT_MCP_NAME = 'chamberu';
+
+/** Server version the MCP endpoint reports by default. */
+export const DEFAULT_MCP_VERSION = '0.0.0';
+
+/** Longest `waitSeconds` a `run_<agent>` call waits; larger values are clamped. */
+export const DEFAULT_MCP_MAX_WAIT_SECONDS = 60;
+
+/** How often a waiting `run_<agent>` call polls the store. */
+export const MCP_WAIT_POLL_MS = 1_000;

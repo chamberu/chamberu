@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidResumeTokenError, RunStatus } from '@chamberu/core';
+import { InvalidResumeTokenError, RunNotFoundError, RunStatus } from '@chamberu/core';
 import type {
     Agent,
     Run,
@@ -43,6 +43,26 @@ export function serializeRun(run: Run): RunView {
 export function canReadRun(principal: Principal, run: Run): boolean {
     return hasPermission(principal, Permission.RUN_READ) ||
         hasPermission(principal, agentPermission(run.agent, 'run'));
+}
+
+/** The run, once the principal may read it: 404, then 403. */
+export async function loadReadableRun(ctx: HttpContext, principal: Principal, id: string): Promise<Run> {
+    const run = await ctx.store.getRun(id);
+    if (!run) throw new RunNotFoundError(id);
+    if (!canReadRun(principal, run)) {
+        throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
+    }
+    return run;
+}
+
+/**
+ * 403 unless the principal may list runs: `run:read`, or a filter to one
+ * agent it may run (one store query keeps `total` and paging exact).
+ */
+export function assertCanListRuns(principal: Principal, agent: string | undefined): void {
+    if (hasPermission(principal, Permission.RUN_READ)) return;
+    if (agent !== undefined && hasPermission(principal, agentPermission(agent, 'run'))) return;
+    throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
 }
 
 /** The agent's `http()` trigger, else 404. */
