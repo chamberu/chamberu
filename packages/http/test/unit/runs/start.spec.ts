@@ -217,6 +217,18 @@ describe('POST /agents/:name/runs', () => {
             expect(response.status).toBe(400);
         });
 
+        it.each([
+            ['an oversized list', Array.from({ length: 20000 }, () => ({}))],
+            ['an object with many keys', Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`k${i}`, {}]))],
+        ])('answers %s with one issue before checking any item', async (_, attachments) => {
+            const { app } = createRunTestApp({ bodyLimit: 1024 * 1024 });
+            const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { attachments } });
+            expect(response.status).toBe(400);
+            const body = await response.json();
+            expect(body.issues).toHaveLength(1);
+            expect(body.issues[0].path).toEqual(['attachments']);
+        });
+
         it('stores nothing for a deduplicated dispatch', async () => {
             const { app, store } = createRunTestApp();
             const body = { idempotencyKey: 'k', attachments: [{ mediaType: 'text/plain', data: b64('x') }] };

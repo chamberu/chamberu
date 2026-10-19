@@ -31,7 +31,6 @@ import {
     requireHttpTrigger,
     resolveResumeTarget,
     serializeRun,
-    toAttachmentInputs,
     toBody,
 } from './helpers.ts';
 import { streamRun } from './stream/module.ts';
@@ -69,7 +68,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
             payload,
             ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
             ...(body.thread !== undefined ? { thread: body.thread } : {}),
-            ...(body.attachments?.length ? { attachments: toAttachmentInputs(body.attachments) } : {}),
+            ...(body.attachments?.length ? { attachments: body.attachments } : {}),
         });
         event.response.status = 202;
         return result;

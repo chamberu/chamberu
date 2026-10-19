@@ -5,9 +5,15 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { IssueCode } from '@ebec/core';
-import { createValidupError, defineValidator } from 'validup';
-import type { ValidatorDescriptor } from 'validup';
+import { IssueCode, prefixIssuePath } from '@ebec/core';
+import type { Issue } from '@ebec/core';
+import {
+    ValidupError,
+    createValidupError,
+    defineValidator,
+    isValidupError,
+} from 'validup';
+import type { Container, ValidatorDescriptor } from 'validup';
 
 /** A string of `min` to `max` characters without U+0000 (which Postgres text columns refuse). */
 export function isString({ min = 0, max }: { min?: number; max: number }): ValidatorDescriptor {
@@ -43,14 +49,29 @@ export function isDefined(): ValidatorDescriptor {
     });
 }
 
-/** An array of at most `max` items (the items are checked by their own mounts). */
-export function isArray({ max }: { max: number }): ValidatorDescriptor {
+/**
+ * An array of at most `max` items, each run through `item`. The length is
+ * checked before any item, so an oversized list costs one issue; item
+ * issues carry the item's index in their path. Returns the cleaned items.
+ */
+export function isArrayOf<T extends Record<string, any>>(item: Container<T>, { max }: { max: number }): ValidatorDescriptor {
     return defineValidator({
-        run: ({ value }) => {
+        run: async ({ value }) => {
             if (!Array.isArray(value) || value.length > max) {
                 throw createValidupError(value, IssueCode.VALUE_INVALID, `must be an array of at most ${max} items`);
             }
-            return value;
+            const items: T[] = [];
+            const issues: Issue[] = [];
+            for (const [index, entry] of value.entries()) {
+                try {
+                    items.push(await item.run(entry));
+                } catch (error) {
+                    if (!isValidupError(error)) throw error;
+                    issues.push(...error.issues.map((issue) => prefixIssuePath(issue, [index])));
+                }
+            }
+            if (issues.length > 0) throw new ValidupError(issues);
+            return items;
         },
     });
 }

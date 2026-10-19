@@ -9,7 +9,7 @@ import { IssueCode } from '@ebec/core';
 import { Container, ValidupError } from 'validup';
 import { describe, expect, it } from 'vitest';
 import {
-    isArray,
+    isArrayOf,
     isBase64,
     isBoolean,
     isDefined,
@@ -55,14 +55,20 @@ describe('validators', () => {
         await rejects(isDefined(), {}, IssueCode.REQUIRED);
     });
 
-    it('isArray checks type and length', async () => {
-        const v = isArray({ max: 2 });
+    it('isArrayOf checks type and length before any item', async () => {
+        const item = new Container<{ n: string }>();
+        item.mount('n', isString({ min: 1, max: 3 }));
+        const v = isArrayOf(item, { max: 2 });
         expect(await run(v, { k: [] })).toEqual({ k: [] });
-        expect(await run(v, { k: [1, 'a'] })).toEqual({ k: [1, 'a'] });
-        await rejects(v, { k: [1, 2, 3] });
+        expect(await run(v, { k: [{ n: 'a', x: 1 }, { n: 'b' }] })).toEqual({ k: [{ n: 'a' }, { n: 'b' }] });
+        await rejects(v, { k: [{}, {}, {}] });
         await rejects(v, { k: 'ab' });
         await rejects(v, { k: { 0: 1 } });
         await rejects(v, { k: null });
+
+        const error = await run(v, { k: [{ n: 'a' }, { n: '' }] }).catch((e: unknown) => e) as ValidupError;
+        expect(error).toBeInstanceOf(ValidupError);
+        expect(error.issues.map((issue) => issue.path)).toEqual([['k', 1, 'n']]);
     });
 
     it('isMediaType accepts type/subtype without parameters', async () => {

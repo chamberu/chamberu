@@ -32,7 +32,7 @@ import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
 import type { HttpContext } from '../app/types.ts';
 import { decodeQuery } from '../request/helpers.ts';
 import {
-    isArray,
+    isArrayOf,
     isBase64,
     isBoolean,
     isDefined,
@@ -98,24 +98,17 @@ export function createStartRunContainer(): Container<StartRunBody> {
     container.mount('payload', { optional: true }, isDefined());
     container.mount('idempotencyKey', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
     container.mount('thread', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
-    container.mount('attachments', { optional: true }, isArray({ max: MAX_ATTACHMENTS }));
-    container.mount('attachments.*.mediaType', isMediaType());
-    container.mount('attachments.*.filename', { optional: true }, isString({ min: 1, max: ATTACHMENT_FILENAME_MAX_LENGTH }));
-    container.mount('attachments.*.data', isBase64());
+    container.mount('attachments', { optional: true }, isArrayOf(createAttachmentContainer(), { max: MAX_ATTACHMENTS }));
     return container;
 }
 
-/** The validated attachments as dispatch inputs, without the keys a client added. */
-export function toAttachmentInputs(attachments: ArtifactInput[]): ArtifactInput[] {
-    return attachments.map(({
-        mediaType,
-        filename,
-        data,
-    }) => ({
-        mediaType,
-        ...(filename !== undefined ? { filename } : {}),
-        data,
-    }));
+/** One attachment; unknown keys are dropped. */
+function createAttachmentContainer(): Container<ArtifactInput> {
+    const container = new Container<ArtifactInput>();
+    container.mount('mediaType', isMediaType());
+    container.mount('filename', { optional: true }, isString({ min: 1, max: ATTACHMENT_FILENAME_MAX_LENGTH }));
+    container.mount('data', isBase64());
+    return container;
 }
 
 /** An artifact of `run` with its bytes; ArtifactNotFoundError (404) for an unknown id or another run's artifact. */
