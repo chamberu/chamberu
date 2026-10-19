@@ -5,9 +5,6 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-/** Bounds of an `idempotencyKey`, a `thread` and an `Idempotency-Key` header. */
-export const KEY_MAX_LENGTH = 256;
-
 /** Longest resume token `POST /resume` reads. */
 export const RESUME_TOKEN_MAX_LENGTH = 4_096;
 

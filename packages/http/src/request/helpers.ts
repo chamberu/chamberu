@@ -26,6 +26,7 @@ import type { IAppEvent } from 'routup';
 import { isObject } from 'smob';
 import type { Container } from 'validup';
 import { MAX_PAGE_LIMIT } from '../app/constants.ts';
+import { KEY_MAX_LENGTH } from './constants.ts';
 import type { DecodedQuery } from './types.ts';
 
 function isJsonMediaType(contentType: string | null): boolean {
@@ -170,4 +171,14 @@ export function decodeQuery(searchParams: URLSearchParams, schema: AnySchema): D
         ...(offset !== undefined ? { offset } : {}),
         sorts: query.sorts.value,
     };
+}
+
+/** An `Idempotency-Key` header: 1 to 256 characters, else 400. */
+export function readIdempotencyHeader(request: Request): string | undefined {
+    const value = request.headers.get('idempotency-key');
+    if (value === null) return undefined;
+    if (value.length < 1 || value.length > KEY_MAX_LENGTH) {
+        throw new BadRequestError({ message: `The Idempotency-Key header must have 1 to ${KEY_MAX_LENGTH} characters.` });
+    }
+    return value;
 }

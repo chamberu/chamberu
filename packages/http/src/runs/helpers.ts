@@ -23,7 +23,8 @@ import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
 import type { HttpContext } from '../app/types.ts';
 import { decodeQuery } from '../request/helpers.ts';
 import { isBoolean, isDefined, isString } from '../request/validators.ts';
-import { KEY_MAX_LENGTH, RESUME_REASON_MAX_LENGTH, RESUME_TOKEN_MAX_LENGTH } from './constants.ts';
+import { KEY_MAX_LENGTH } from '../request/constants.ts';
+import { RESUME_REASON_MAX_LENGTH, RESUME_TOKEN_MAX_LENGTH } from './constants.ts';
 import type {
     ResumeBody,
     RunListQuery,
@@ -56,16 +57,6 @@ export function requireHttpTrigger(agent: Agent): TriggerDefinition {
     const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
     if (!trigger) throw new NotFoundError({ message: `Agent "${agent.name}" declares no http() trigger.` });
     return trigger;
-}
-
-/** An `Idempotency-Key` header: 1 to 256 characters, else 400. */
-export function readIdempotencyHeader(request: Request): string | undefined {
-    const value = request.headers.get('idempotency-key');
-    if (value === null) return undefined;
-    if (value.length < 1 || value.length > KEY_MAX_LENGTH) {
-        throw new BadRequestError({ message: `The Idempotency-Key header must have 1 to ${KEY_MAX_LENGTH} characters.` });
-    }
-    return value;
 }
 
 export function createStartRunContainer(): Container<StartRunBody> {
