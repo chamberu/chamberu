@@ -13,6 +13,7 @@ import type { App } from 'routup';
 import { refuseWhenClosed } from '../app/helpers.ts';
 import type { HttpContext, McpOptions } from '../app/types.ts';
 import { authenticate } from '../auth/helpers.ts';
+import { assertContentLength, readBodyBytes } from '../request/helpers.ts';
 import {
     DEFAULT_MCP_MAX_WAIT_SECONDS,
     DEFAULT_MCP_NAME,
@@ -21,6 +22,12 @@ import {
 import { readRequestExtra } from './helpers.ts';
 import { buildRunTools, registerTools } from './tools.ts';
 import type { McpEndpointOptions, McpRequestExtra } from './types.ts';
+
+function withoutTransferEncoding(input: Headers): Headers {
+    const headers = new Headers(input);
+    headers.delete('transfer-encoding');
+    return headers;
+}
 
 /**
  * The MCP handler: one McpServer per request, with the tools the request's
@@ -54,9 +61,19 @@ export function registerMcpRoutes(app: App, ctx: HttpContext, options: McpOption
         const principal = await authenticate(event, ctx);
         const refused = refuseWhenClosed(event, ctx);
         if (refused) return refused;
+        assertContentLength(event, ctx.bodyLimit);
+        // read here, bounded and drained like REST bodies; the SDK gets the bytes
+        const request = event.request.method === 'POST' ?
+            new Request(event.request.url, {
+                method: 'POST',
+                headers: withoutTransferEncoding(event.request.headers),
+                body: await readBodyBytes(event, ctx.bodyLimit, true),
+                signal: event.request.signal,
+            }) :
+            event.request;
         // event.request.signal is the only signal that follows the HTTP request
         const extra: McpRequestExtra = { principal, signal: AbortSignal.any([event.request.signal, closing.signal]) };
-        return handler.fetch(event.request, {
+        return handler.fetch(request, {
             authInfo: {
                 token: '',
                 clientId: principal.id,

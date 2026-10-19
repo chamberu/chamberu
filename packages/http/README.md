@@ -123,7 +123,7 @@ Paths are relative to `basePath` (default none).
 
 `GET /runs` takes the [rapiq](https://www.npmjs.com/package/@rapiq/codec-url) URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]=20` (default 50, at most 100), `page[offset]=40` and `sort=createdAt` (the only order, oldest first). The expression dialect works too (`filter=eq(agent,'triage')`); only filters joined with `and` are supported. Unknown keys, operators and sorts answer 400.
 
-Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413 above, 415 for another media type). A protected route checks the bearer token before it reads the body, so an unauthenticated client cannot make the server buffer it. Unknown body keys are dropped without an error.
+Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413 above, 415 for another media type). A refused body is drained (at most `bodyLimit` more bytes) so a keep-alive connection serves the next request; a longer one closes the connection. A protected route checks the bearer token before it reads the body, so an unauthenticated client cannot make the server buffer it. Unknown body keys are dropped without an error.
 
 `GET /runs/:id` answers 404 before 403, so any authenticated principal can tell whether a run id exists; run ids are random UUIDs. Runs on the wire never carry the internal `claim` (owner and lease).
 

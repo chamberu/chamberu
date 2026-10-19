@@ -43,23 +43,54 @@ function unsupported(): UnsupportedMediaTypeError {
     return new UnsupportedMediaTypeError({ message: 'The request body must be application/json.' });
 }
 
-/** Reads at most `limit` bytes; `json: false` throws 415 at the first non-empty chunk. */
-async function readBytes(request: Request, limit: number, json: boolean): Promise<Uint8Array> {
-    if (!request.body) return new Uint8Array(0);
-    const reader = request.body.getReader();
+/**
+ * Discards the rest of a refused body, at most `max` bytes, so a keep-alive
+ * connection can serve the next request; false when the body is longer
+ * (or the read fails) and the connection must close instead.
+ */
+async function drain(reader: ReadableStreamDefaultReader<Uint8Array>, max: number): Promise<boolean> {
+    let size = 0;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) return true;
+            size += value.byteLength;
+            if (size > max) {
+                await reader.cancel().catch(() => {});
+                return false;
+            }
+        }
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Answers with `connection: close`: a refused body left unread would stall
+ * the next request on a keep-alive connection.
+ */
+function closeAfterResponse(event: IAppEvent): void {
+    event.response.headers.set('connection', 'close');
+}
+
+/**
+ * Reads at most `limit` bytes; `json: false` throws 415 at the first
+ * non-empty chunk. A refused body is drained (at most `limit` more bytes),
+ * else the connection closes after the answer.
+ */
+export async function readBodyBytes(event: IAppEvent, limit: number, json: boolean): Promise<Uint8Array<ArrayBuffer>> {
+    const { body } = event.request;
+    if (!body) return new Uint8Array(0);
+    const reader = body.getReader();
     const chunks: Uint8Array[] = [];
     let size = 0;
     for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         size += value.byteLength;
-        if (size > 0 && !json) {
-            await reader.cancel().catch(() => {});
-            throw unsupported();
-        }
-        if (size > limit) {
-            await reader.cancel().catch(() => {});
-            throw tooLarge(limit);
+        if ((size > 0 && !json) || size > limit) {
+            if (!await drain(reader, limit)) closeAfterResponse(event);
+            throw json ? tooLarge(limit) : unsupported();
         }
         chunks.push(value);
     }
@@ -73,16 +104,24 @@ async function readBytes(request: Request, limit: number, json: boolean): Promis
 }
 
 /**
+ * 413 when `content-length` already exceeds `limit`; the body is left
+ * unread, which the server discards itself.
+ */
+export function assertContentLength(event: IAppEvent, limit: number): void {
+    const length = Number(event.request.headers.get('content-length'));
+    if (Number.isFinite(length) && length > limit) throw tooLarge(limit);
+}
+
+/**
  * Reads a JSON body of at most `limit` bytes: `undefined` when empty, 413
  * when too large, 415 for another media type, 400 when unparsable. Call it
  * only after `authorize`.
  */
 export async function readJsonBody(event: IAppEvent, limit: number): Promise<unknown> {
     const { request } = event;
-    const length = Number(request.headers.get('content-length'));
-    if (Number.isFinite(length) && length > limit) throw tooLarge(limit);
+    assertContentLength(event, limit);
 
-    const bytes = await readBytes(request, limit, isJsonMediaType(request.headers.get('content-type')));
+    const bytes = await readBodyBytes(event, limit, isJsonMediaType(request.headers.get('content-type')));
     if (bytes.byteLength === 0) return undefined;
 
     try {

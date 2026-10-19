@@ -46,7 +46,32 @@ function post(app: App, body: BodyInit | undefined, headers: Record<string, stri
     } as RequestInit));
 }
 
+function streamOf(sizes: number[]): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+        start(controller) {
+            for (const size of sizes) controller.enqueue(new Uint8Array(size).fill(0x20));
+            controller.close();
+        },
+    });
+}
+
 describe('readJsonBody', () => {
+    it('drains a refused body up to the limit again, keeping the connection', async () => {
+        const response = await post(echoApp(), streamOf([10, 10, 10]), { 'content-type': 'application/json' });
+        expect(response.status).toBe(413);
+        expect(response.headers.get('connection')).toBeNull();
+    });
+
+    it('closes the connection after a refused body longer than twice the limit', async () => {
+        const response = await post(echoApp(), streamOf([10, 10, 10, 10]), { 'content-type': 'application/json' });
+        expect(response.status).toBe(413);
+        expect(response.headers.get('connection')).toBe('close');
+
+        const unsupported = await post(echoApp(), streamOf([10, 10, 10]), { 'content-type': 'text/plain' });
+        expect(unsupported.status).toBe(415);
+        expect(unsupported.headers.get('connection')).toBe('close');
+    });
+
     it('parses a JSON body', async () => {
         const response = await post(echoApp(), '{"a":1}', { 'content-type': 'application/json' });
         expect(response.status).toBe(200);
@@ -68,19 +93,20 @@ describe('readJsonBody', () => {
         expect(response.status).toBe(415);
     });
 
-    it('rejects another media type at the first chunk', async () => {
+    it('refuses another media type at the first chunk and drains at most the limit after it', async () => {
         let pulled = 0;
+        // an endless body: only the bounded drain stops reading it
         const stream = new ReadableStream<Uint8Array>({
             pull(controller) {
                 pulled++;
-                if (pulled > 4) controller.close();
-                else controller.enqueue(new TextEncoder().encode('12345678'));
+                controller.enqueue(new TextEncoder().encode('12345678'));
             },
         });
         const response = await post(echoApp(), stream, { 'content-type': 'text/plain' });
         expect(response.status).toBe(415);
-        // the stream may pull one chunk ahead of the reader
-        expect(pulled).toBeLessThanOrEqual(2);
+        expect(response.headers.get('connection')).toBe('close');
+        // the refused chunk, 17 bytes of drain (limit 16), and one chunk pulled ahead
+        expect(pulled).toBeLessThanOrEqual(5);
     });
 
     it('reads an empty body of another media type as undefined', async () => {
