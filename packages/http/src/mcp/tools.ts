@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { RunStatus } from '@chamberu/core';
+import { InvalidAgentDefinitionError, RunStatus } from '@chamberu/core';
 import type { Agent, RunStatusLiteral } from '@chamberu/core';
 import { fromJsonSchema } from '@modelcontextprotocol/server';
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -34,17 +34,12 @@ import {
 import type {
     McpEndpointOptions,
     McpRequestExtra,
+    McpRunTool,
+    RunAgentArgs,
     RunSummary,
 } from './types.ts';
 
 type GetRunArgs = { runId: string };
-
-type RunAgentArgs = {
-    payload?: unknown;
-    idempotencyKey?: string;
-    thread?: string;
-    waitSeconds?: number;
-};
 
 type ResumeRunArgs = {
     token: string;
@@ -61,6 +56,44 @@ type ListRunsArgs = {
     offset?: number;
 };
 
+// built once: fromJsonSchema compiles a validator per schema object
+const GET_RUN_INPUT = fromJsonSchema<GetRunArgs>({
+    type: 'object',
+    properties: { runId: { type: 'string', minLength: 1 } },
+    required: ['runId'],
+    additionalProperties: false,
+});
+
+const LIST_RUNS_INPUT = fromJsonSchema<ListRunsArgs>({
+    type: 'object',
+    properties: {
+        agent: { type: 'string', minLength: 1 },
+        status: { type: 'array', items: { type: 'string', enum: Object.values(RunStatus) } },
+        limit: {
+            type: 'integer',
+            minimum: 1,
+            maximum: MAX_PAGE_LIMIT,
+        },
+        offset: { type: 'integer', minimum: 0 },
+    },
+    additionalProperties: false,
+});
+
+const RESUME_RUN_INPUT = fromJsonSchema<ResumeRunArgs>({
+    type: 'object',
+    properties: {
+        token: {
+            type: 'string',
+            minLength: 1,
+            maxLength: RESUME_TOKEN_MAX_LENGTH,
+        },
+        approved: { type: 'boolean' },
+        reason: { type: 'string', maxLength: RESUME_REASON_MAX_LENGTH },
+    },
+    required: ['token', 'approved'],
+    additionalProperties: false,
+});
+
 function summarize(run: RunSummary): RunSummary {
     return {
         id: run.id,
@@ -76,32 +109,14 @@ function registerReadTools(server: McpServer, ctx: HttpContext, principal: Princ
     server.registerTool('get_run', {
         title: 'Get run',
         description: 'Reads one run: status, output, error and the pending approval, if any.',
-        inputSchema: fromJsonSchema<GetRunArgs>({
-            type: 'object',
-            properties: { runId: { type: 'string', minLength: 1 } },
-            required: ['runId'],
-            additionalProperties: false,
-        }),
+        inputSchema: GET_RUN_INPUT,
         annotations: { readOnlyHint: true },
     }, (args) => runTool(ctx, async () => toolResult(serializeRun(await loadReadableRun(ctx, principal, args.runId)))));
 
     server.registerTool('list_runs', {
         title: 'List runs',
         description: 'Lists runs, oldest first. Without run:read, agent must name an agent you may run.',
-        inputSchema: fromJsonSchema<ListRunsArgs>({
-            type: 'object',
-            properties: {
-                agent: { type: 'string', minLength: 1 },
-                status: { type: 'array', items: { type: 'string', enum: Object.values(RunStatus) } },
-                limit: {
-                    type: 'integer',
-                    minimum: 1,
-                    maximum: MAX_PAGE_LIMIT,
-                },
-                offset: { type: 'integer', minimum: 0 },
-            },
-            additionalProperties: false,
-        }),
+        inputSchema: LIST_RUNS_INPUT,
         annotations: { readOnlyHint: true },
     }, (args) => runTool(ctx, async () => {
         assertCanListRuns(principal, args.agent);
@@ -120,43 +135,76 @@ function describeAgent(agent: Agent): string {
     return firstLine.trim().slice(0, DESCRIPTION_MAX_LENGTH) || `Starts a run of agent "${agent.name}".`;
 }
 
+/**
+ * The `run_<agent>` tool of every agent with an `http()` trigger, built once
+ * per app: the payload's JSON Schema is converted and compiled here, not per
+ * request. A schema the MCP validator cannot compile fails the app.
+ */
+export function buildRunTools(agents: Iterable<Agent>, options: McpEndpointOptions): McpRunTool[] {
+    const tools: McpRunTool[] = [];
+    for (const agent of agents) {
+        const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
+        if (!trigger) continue;
+        const schema = trigger.options.schema as StandardSchemaV1 | undefined;
+        let inputSchema: McpRunTool['inputSchema'];
+        try {
+            inputSchema = fromJsonSchema<RunAgentArgs>({
+                type: 'object',
+                properties: {
+                    payload: toJsonSchema(schema, '#/properties/payload'),
+                    idempotencyKey: {
+                        type: 'string',
+                        minLength: 1,
+                        maxLength: KEY_MAX_LENGTH,
+                        description: 'Dedupes starts over MCP; a key used over REST is a different scope.',
+                    },
+                    thread: {
+                        type: 'string',
+                        minLength: 1,
+                        maxLength: KEY_MAX_LENGTH,
+                    },
+                    waitSeconds: {
+                        type: 'integer',
+                        minimum: 0,
+                        description: `Seconds to wait for the run to finish or pause (at most ${options.maxWaitSeconds}). Default 0.`,
+                    },
+                },
+                additionalProperties: false,
+            });
+        } catch (error) {
+            throw new InvalidAgentDefinitionError(
+                `The payload schema of agent "${agent.name}" is no valid JSON Schema for MCP: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+        tools.push({
+            agent,
+            trigger,
+            ...(schema ? { schema } : {}),
+            description: describeAgent(agent),
+            inputSchema,
+        });
+    }
+    return tools;
+}
+
 function registerRunTool(
     server: McpServer,
     ctx: HttpContext,
-    agent: Agent,
+    tool: McpRunTool,
     extra: McpRequestExtra,
     options: McpEndpointOptions,
 ): void {
-    const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
-    if (!trigger || !hasPermission(extra.principal, agentPermission(agent.name, 'run'))) return;
-    const schema = trigger.options.schema as StandardSchemaV1 | undefined;
+    const {
+        agent, 
+        trigger, 
+        schema, 
+    } = tool;
+    if (!hasPermission(extra.principal, agentPermission(agent.name, 'run'))) return;
 
     server.registerTool(`run_${agent.name}`, {
         title: `Run ${agent.name}`,
-        description: describeAgent(agent),
-        inputSchema: fromJsonSchema<RunAgentArgs>({
-            type: 'object',
-            properties: {
-                payload: toJsonSchema(schema, '#/properties/payload'),
-                idempotencyKey: {
-                    type: 'string',
-                    minLength: 1,
-                    maxLength: KEY_MAX_LENGTH,
-                    description: 'Dedupes starts over MCP; a key used over REST is a different scope.',
-                },
-                thread: {
-                    type: 'string',
-                    minLength: 1,
-                    maxLength: KEY_MAX_LENGTH,
-                },
-                waitSeconds: {
-                    type: 'integer',
-                    minimum: 0,
-                    description: `Seconds to wait for the run to finish or pause (at most ${options.maxWaitSeconds}). Default 0.`,
-                },
-            },
-            additionalProperties: false,
-        }),
+        description: tool.description,
+        inputSchema: tool.inputSchema,
     }, (args, toolCtx) => runTool(ctx, async () => {
         const payload = await validatePayload(schema, args.payload);
         const { runId, deduplicated } = await ctx.engine.dispatch({
@@ -193,20 +241,7 @@ function registerResumeTool(server: McpServer, ctx: HttpContext, principal: Prin
     server.registerTool('resume_run', {
         title: 'Resume run',
         description: 'Answers a pending approval with its resume token. Needs agent:<agent>:approve for the run\'s agent.',
-        inputSchema: fromJsonSchema<ResumeRunArgs>({
-            type: 'object',
-            properties: {
-                token: {
-                    type: 'string',
-                    minLength: 1,
-                    maxLength: RESUME_TOKEN_MAX_LENGTH,
-                },
-                approved: { type: 'boolean' },
-                reason: { type: 'string', maxLength: RESUME_REASON_MAX_LENGTH },
-            },
-            required: ['token', 'approved'],
-            additionalProperties: false,
-        }),
+        inputSchema: RESUME_RUN_INPUT,
     }, (args) => runTool(ctx, async () => {
         const run = await resolveResumeTarget(ctx, principal, args.token);
         await ctx.engine.resume(args.token, {
@@ -217,14 +252,15 @@ function registerResumeTool(server: McpServer, ctx: HttpContext, principal: Prin
     }));
 }
 
-/** Registers the tools one MCP request's principal sees. */
+/** Registers the tools one MCP request's principal sees (from definitions built once). */
 export function registerTools(
     server: McpServer,
     ctx: HttpContext,
+    runTools: McpRunTool[],
     extra: McpRequestExtra,
     options: McpEndpointOptions,
 ): void {
-    for (const agent of ctx.agents.values()) registerRunTool(server, ctx, agent, extra, options);
+    for (const tool of runTools) registerRunTool(server, ctx, tool, extra, options);
     registerReadTools(server, ctx, extra.principal);
     registerResumeTool(server, ctx, extra.principal);
 }

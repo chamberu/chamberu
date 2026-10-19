@@ -5,7 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { describe, expect, it } from 'vitest';
+import {
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
 import { z } from 'zod';
 import { defineAgent, http } from '@chamberu/core';
 import {
@@ -175,5 +180,24 @@ describe('mcp run_<agent>', () => {
         const invalid = await callTool(client, 'run_tree', { payload: { root: { name: 'a', children: [{ name: 1 }] }, alias: payload.alias } });
         expect(invalid.isError).toBe(true);
         await client.close();
+    });
+
+    it('converts the payload schema once, not per request', async () => {
+        const schema = z.object({ n: z.number() });
+        const input = vi.spyOn(schema['~standard'].jsonSchema!, 'input');
+        const agent = defineAgent({
+            name: 'counted',
+            model: textModel(),
+            instructions: 'Counted.',
+            triggers: [http({ schema })],
+        });
+        const { app } = createRunTestApp({ agents: [...createRunAgents(), agent] });
+        for (let i = 0; i < 3; i++) {
+            const client = await connectMcp(app, ADMIN_TOKEN);
+            await client.listTools();
+            await callTool(client, 'run_counted', { payload: { n: i } });
+            await client.close();
+        }
+        expect(input).toHaveBeenCalledTimes(1);
     });
 });
