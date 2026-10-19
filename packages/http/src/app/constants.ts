@@ -13,3 +13,9 @@ export const DEFAULT_STREAM_POLL_MS = 2_000;
 
 /** How long `/readyz` waits for the store. */
 export const DEFAULT_READY_TIMEOUT_MS = 2_000;
+
+/** Page size of `GET /runs`, MCP `list_runs` and state collection lists without `page[limit]`. */
+export const DEFAULT_PAGE_LIMIT = 50;
+
+/** Largest `page[limit]` a list accepts. */
+export const MAX_PAGE_LIMIT = 100;

@@ -87,6 +87,15 @@ function isBareAppError(error: IHTTPError): boolean {
 }
 
 function toErrorBody(cause: unknown): ErrorBody | undefined {
+    // before validup: isValidupError duck-types any error carrying issues
+    if (isHTTPError(cause) && !isBareAppError(cause)) {
+        return withIssues({
+            status: cause.status,
+            code: cause.code.toLowerCase(),
+            message: cause.message,
+        }, cause.issues);
+    }
+
     if (isValidupError(cause)) {
         return withIssues({
             status: 400,
@@ -101,14 +110,6 @@ function toErrorBody(cause: unknown): ErrorBody | undefined {
         return withIssues({
             status,
             code: cause.code,
-            message: cause.message,
-        }, cause.issues);
-    }
-
-    if (isHTTPError(cause) && !isBareAppError(cause)) {
-        return withIssues({
-            status: cause.status,
-            code: cause.code.toLowerCase(),
             message: cause.message,
         }, cause.issues);
     }

@@ -79,6 +79,22 @@ describe('error handler', () => {
             message: 'x',
         });
 
+        // validup's guard duck-types any error with issues: an HTTP error keeps its own code
+        const issue = {
+            type: 'item' as const,
+            code: 'keyNotAllowed',
+            path: ['nope'],
+            message: 'no',
+        };
+        const withIssues = await call(appThrowing(new BadRequestError({ message: 'x', issues: [issue] })), 'GET', '/boom');
+        expect(withIssues.status).toBe(400);
+        expect(await bodyOf(withIssues)).toEqual({
+            status: 400,
+            code: 'bad_request',
+            message: 'x',
+            issues: [issue],
+        });
+
         const tooLarge = await call(appThrowing(new RequestEntityTooLargeError()), 'GET', '/boom');
         expect(tooLarge.status).toBe(413);
         expect(await bodyOf(tooLarge)).toMatchObject({ code: 'request_entity_too_large' });

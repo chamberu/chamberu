@@ -13,11 +13,12 @@ import type { App, IAppEvent } from 'routup';
 import type { HttpContext } from '../app/types.ts';
 import { authenticate, authorize } from '../auth/helpers.ts';
 import { Permission } from '../auth/constants.ts';
-import { agentPermission } from '../auth/module.ts';
+import { agentPermission, hasPermission } from '../auth/module.ts';
 import { readJsonBody, validateBody, validatePayload } from '../request/helpers.ts';
 import {
     canReadRun,
     createStartRunContainer,
+    parseRunListQuery,
     readIdempotencyHeader,
     requireAgent,
     requireHttpTrigger,
@@ -28,7 +29,7 @@ function param(event: IAppEvent, name: string): string {
     return event.params[name] ?? '';
 }
 
-/** `POST /agents/:name/runs`, `GET /runs/:id`, `POST /runs/:id/cancel`. */
+/** `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `POST /runs/:id/cancel`. */
 export function registerRunRoutes(app: App, ctx: HttpContext): void {
     const startContainer = createStartRunContainer();
 
@@ -51,6 +52,27 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
         });
         event.response.status = 202;
         return result;
+    }));
+
+    app.get('/runs', defineCoreHandler(async (event) => {
+        const principal = await authenticate(event, ctx);
+        const query = parseRunListQuery(event.searchParams);
+        if (
+            !hasPermission(principal, Permission.RUN_READ) &&
+            (query.agent === undefined || !hasPermission(principal, agentPermission(query.agent, 'run')))
+        ) {
+            throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
+        }
+
+        const { data, total } = await ctx.store.listRuns(query);
+        return {
+            data: data.map(serializeRun),
+            meta: {
+                total, 
+                limit: query.limit, 
+                offset: query.offset, 
+            },
+        };
     }));
 
     app.get('/runs/:id', defineCoreHandler(async (event) => {

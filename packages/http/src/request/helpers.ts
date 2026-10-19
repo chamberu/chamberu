@@ -12,11 +12,21 @@ import {
     RequestEntityTooLargeError,
     UnsupportedMediaTypeError,
 } from '@ebec/http';
+import { createURLCodec } from '@rapiq/codec-url';
+import {
+    CodecError,
+    isFilter,
+    isFilters,
+    isParseError,
+} from '@rapiq/core';
+import type { Schema } from '@rapiq/core';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { buildIssuesForStandardSchemaIssues } from '@validup/standard-schema';
 import type { IAppEvent } from 'routup';
 import { isObject } from 'smob';
 import type { Container } from 'validup';
+import { MAX_PAGE_LIMIT } from '../app/constants.ts';
+import type { DecodedQuery } from './types.ts';
 
 function isJsonMediaType(contentType: string | null): boolean {
     if (!contentType) return false;
@@ -109,4 +119,55 @@ export async function validatePayload(schema: StandardSchemaV1 | undefined, payl
         throw new BadRequestError({ message: `Invalid payload: ${describeIssues(issues)}`, issues });
     }
     return result.value;
+}
+
+const codec = createURLCodec();
+
+// rapiq's Schema is invariant in its record type; the codec takes any of them
+type AnySchema = Schema<any>;
+
+function decodeWithCodec(searchParams: URLSearchParams, schema: AnySchema) {
+    try {
+        return codec.decode(searchParams.toString(), {
+            schema,
+            fields: false,
+            relations: false,
+        });
+    } catch (error) {
+        if (isParseError(error) || error instanceof CodecError) {
+            const { issues } = error;
+            const message = issues.length > 0 ? flattenIssueItems(issues).map((issue) => issue.message).join('; ') : error.message;
+            throw new BadRequestError({ message, issues });
+        }
+        throw error;
+    }
+}
+
+/**
+ * Decodes a rapiq URL query (bracket or expression dialect) against
+ * `schema` (built with `throwOnFailure: true` and without `maxLimit`):
+ * 400 for a rejected query, a compound filter or a limit above 100.
+ */
+export function decodeQuery(searchParams: URLSearchParams, schema: AnySchema): DecodedQuery {
+    const query = decodeWithCodec(searchParams, schema);
+    if (!query) return { filters: [], sorts: [] };
+
+    const root = query.filters;
+    const children = isFilters(root) && root.operator === 'and' ? root.value : [root];
+    const filters = children.filter((child) => isFilter(child));
+    if (filters.length !== children.length) {
+        throw new BadRequestError({ message: 'Only top-level filters joined with "and" are supported.' });
+    }
+
+    const { limit, offset } = query.pagination;
+    if (limit !== undefined && limit > MAX_PAGE_LIMIT) {
+        throw new BadRequestError({ message: `The pagination limit must not exceed the value of ${MAX_PAGE_LIMIT}.` });
+    }
+
+    return {
+        filters,
+        ...(limit !== undefined ? { limit } : {}),
+        ...(offset !== undefined ? { offset } : {}),
+        sorts: query.sorts.value,
+    };
 }

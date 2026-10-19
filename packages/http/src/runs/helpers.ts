@@ -5,16 +5,26 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Agent, Run, TriggerDefinition } from '@chamberu/core';
+import { RunStatus } from '@chamberu/core';
+import type {
+    Agent,
+    Run,
+    RunStatusLiteral,
+    TriggerDefinition,
+} from '@chamberu/core';
 import { BadRequestError, NotFoundError } from '@ebec/http';
+import { defineSchema } from '@rapiq/core';
+import type { IFilter } from '@rapiq/core';
 import { Container } from 'validup';
 import { agentPermission, hasPermission } from '../auth/module.ts';
 import { Permission } from '../auth/constants.ts';
 import type { Principal } from '../auth/types.ts';
+import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
 import type { HttpContext } from '../app/types.ts';
+import { decodeQuery } from '../request/helpers.ts';
 import { isDefined, isString } from '../request/validators.ts';
 import { KEY_MAX_LENGTH } from './constants.ts';
-import type { RunView, StartRunBody } from './types.ts';
+import type { RunListQuery, RunView, StartRunBody } from './types.ts';
 
 /** Drops the internal `claim` (owner and lease expiry) from a run. */
 export function serializeRun(run: Run): RunView {
@@ -59,4 +69,55 @@ export function createStartRunContainer(): Container<StartRunBody> {
     container.mount('idempotencyKey', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
     container.mount('thread', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
     return container;
+}
+
+const RUN_LIST_SCHEMA = defineSchema({
+    filters: { allowed: ['agent', 'status'] },
+    sorts: { allowed: ['createdAt'] },
+    throwOnFailure: true,
+});
+
+const RUN_STATUSES = new Set<string>(Object.values(RunStatus));
+
+function readAgentFilter(filter: IFilter): string {
+    if (filter.operator !== 'eq' || typeof filter.value !== 'string') {
+        throw new BadRequestError({ message: 'filter[agent] takes one agent name.' });
+    }
+    return filter.value;
+}
+
+function readStatusFilter(filter: IFilter): RunStatusLiteral[] {
+    let values: unknown[] | undefined;
+    if (filter.operator === 'eq') values = [filter.value];
+    else if (filter.operator === 'in' && Array.isArray(filter.value)) values = filter.value;
+    if (!values || values.some((value) => !(typeof value === 'string' && RUN_STATUSES.has(value)))) {
+        throw new BadRequestError({ message: 'filter[status] takes run statuses.' });
+    }
+    return values as RunStatusLiteral[];
+}
+
+/** `GET /runs` (and MCP `list_runs`) query: one agent, statuses, a page, `sort=createdAt` only. */
+export function parseRunListQuery(searchParams: URLSearchParams): RunListQuery {
+    const decoded = decodeQuery(searchParams, RUN_LIST_SCHEMA);
+
+    const seen = new Set<string>();
+    const query: RunListQuery = {
+        limit: decoded.limit ?? DEFAULT_PAGE_LIMIT,
+        offset: decoded.offset ?? 0,
+    };
+    for (const filter of decoded.filters) {
+        if (seen.has(filter.field)) {
+            throw new BadRequestError({ message: `filter[${filter.field}] may be given once.` });
+        }
+        seen.add(filter.field);
+        if (filter.field === 'agent') query.agent = readAgentFilter(filter);
+        else query.status = readStatusFilter(filter);
+    }
+
+    const [sort, ...others] = decoded.sorts;
+    if (others.length > 0 || (sort && (sort.name !== 'createdAt' || sort.operator !== 'ASC'))) {
+        throw new BadRequestError({ message: 'Only sort=createdAt is supported.' });
+    }
+
+    return query;
 }
