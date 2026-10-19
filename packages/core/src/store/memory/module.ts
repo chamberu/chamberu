@@ -6,6 +6,7 @@
  */
 
 import { isObject } from 'smob';
+import type { Artifact } from '../../artifact/types.ts';
 import { systemClock } from '../../clock/index.ts';
 import type { IClock } from '../../clock/index.ts';
 import { InvalidRunStateError, RunNotFoundError } from '../../errors/index.ts';
@@ -36,6 +37,8 @@ export class MemoryStore implements IStore {
     protected kv = new Map<string, unknown>();
 
     protected docs = new Map<string, Map<string, unknown>>();
+
+    protected artifacts = new Map<string, { artifact: Artifact; data: Uint8Array }>();
 
     constructor(opts: { clock?: IClock } = {}) {
         this.clock = opts.clock ?? systemClock;
@@ -215,5 +218,31 @@ export class MemoryStore implements IStore {
 
     async docDelete(agent: string, coll: string, id: string): Promise<void> {
         this.docs.get(`${agent}\u0000${coll}`)?.delete(id);
+    }
+
+    // IArtifactStore
+
+    async putArtifact(artifact: Artifact, data: Uint8Array): Promise<boolean> {
+        if (this.artifacts.has(artifact.id)) return false;
+        this.artifacts.set(artifact.id, { artifact: copy(artifact), data: new Uint8Array(data) });
+        return true;
+    }
+
+    async getArtifact(id: string): Promise<Artifact | undefined> {
+        const entry = this.artifacts.get(id);
+        return entry ? copy(entry.artifact) : undefined;
+    }
+
+    async readArtifact(id: string): Promise<Uint8Array | undefined> {
+        const entry = this.artifacts.get(id);
+        return entry ? new Uint8Array(entry.data) : undefined;
+    }
+
+    async listArtifacts(runId: string): Promise<Artifact[]> {
+        return this.artifacts.values().toArray()
+            .map((entry) => entry.artifact)
+            .filter((artifact) => artifact.runId === runId)
+            .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id, 'en'))
+            .map((artifact) => copy(artifact));
     }
 }

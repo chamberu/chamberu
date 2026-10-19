@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { Artifact } from '../artifact/types.ts';
 import type { 
     Checkpoint, 
     Run, 
@@ -90,4 +91,19 @@ export interface IStateStore {
     docDelete(agent: string, coll: string, id: string): Promise<void>;
 }
 
-export interface IStore extends IRunStore, IStepStore, ICheckpointStore, IIdempotencyStore, ILockStore, IEffectStore, IStateStore {}
+/** Files of runs (attachments and tool outputs): metadata and bytes, both copied in and out. */
+export interface IArtifactStore {
+    /**
+     * Atomic insert-if-absent: resolves false and keeps the stored artifact
+     * (metadata and bytes) when an artifact with that id exists.
+     */
+    putArtifact(artifact: Artifact, data: Uint8Array): Promise<boolean>;
+    /** Metadata only. */
+    getArtifact(id: string): Promise<Artifact | undefined>;
+    /** The bytes, as a plain Uint8Array (no Buffer or other subclass). */
+    readArtifact(id: string): Promise<Uint8Array | undefined>;
+    /** Metadata of a run's artifacts, ordered by createdAt ascending, ties broken by id ascending. */
+    listArtifacts(runId: string): Promise<Artifact[]>;
+}
+
+export interface IStore extends IRunStore, IStepStore, ICheckpointStore, IIdempotencyStore, ILockStore, IEffectStore, IStateStore, IArtifactStore {}

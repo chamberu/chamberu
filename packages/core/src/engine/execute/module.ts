@@ -15,7 +15,8 @@ import type {
     ToolExecutionEndEvent,
     ToolSet,
 } from 'ai';
-import { FatalToolError } from '../../errors/index.ts';
+import { hydrateMessages } from '../../artifact/helpers.ts';
+import { ArtifactNotFoundError, FatalToolError } from '../../errors/index.ts';
 import { RunStatus } from '../../run/constants.ts';
 import type { RunContext, Step, Usage } from '../../run/types.ts';
 import {
@@ -28,10 +29,10 @@ import {
     assembleTools,
     budgetExceeded,
     endsOnApprovalResponse,
+    initialMessage,
     lastAssistantText,
     outputContext,
     pendingApproval,
-    renderTrigger,
     toRunError,
     toToolApproval,
     toValidationError,
@@ -54,7 +55,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     } = ctx;
     const budget = resolveBudget(agent);
     const checkpoint = await store.latestCheckpoint(run.id);
-    const initial: ModelMessage[] = checkpoint?.messages ?? [{ role: 'user', content: renderTrigger(run.trigger) }];
+    // stored form: file parts hold artifact markers; the model gets a hydrated copy
+    const initial: ModelMessage[] = checkpoint?.messages ?? [initialMessage(run.trigger)];
     const usage: Usage = { ...run.usage };
     let stepIndex = checkpoint ? checkpoint.stepIndex + 1 : 0;
     let stepSeq = (await store.listSteps(run.id)).length;
@@ -88,6 +90,15 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         } else {
             await ctx.finish({ status: RunStatus.FAILED, error: toRunError(budgetExceeded(budget, 'steps')) });
         }
+        return;
+    }
+
+    let prompt: ModelMessage[];
+    try {
+        prompt = await hydrateMessages(initial, store);
+    } catch (error) {
+        if (!(error instanceof ArtifactNotFoundError)) throw error;
+        await ctx.finish({ status: RunStatus.FAILED, error: toRunError(error) });
         return;
     }
 
@@ -289,7 +300,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         // onError is no typed agent stream parameter but reaches streamText; the
         // error is the run's, so the AI SDK's default console logging is muted
         const options = {
-            messages: initial,
+            messages: prompt,
             abortSignal: signal,
             onToolExecutionEnd,
             onError: () => {},

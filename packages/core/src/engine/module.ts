@@ -10,6 +10,8 @@ import { hostname } from 'node:os';
 import { pid } from 'node:process';
 import type { Agent } from '../agent/types.ts';
 import { createResumeToken, verifyResumeToken } from '../approval/module.ts';
+import { assertArtifactInput } from '../artifact/helpers.ts';
+import { storeArtifact } from '../artifact/module.ts';
 import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
 import type { IClock } from '../clock/index.ts';
@@ -19,6 +21,7 @@ import {
     InvalidRunStateError,
     LeaseLostError,
     RunNotFoundError,
+    ValidationError,
 } from '../errors/index.ts';
 import type { INotifier } from '../notify/types.ts';
 import { RunStatus } from '../run/constants.ts';
@@ -131,9 +134,15 @@ export class RunEngine {
         if (!this.agents.has(envelope.agent)) {
             throw new InvalidAgentDefinitionError(`unknown agent: ${envelope.agent}`);
         }
+        const { attachments, ...rest } = envelope;
+        // before any store write: an invalid attachment stores nothing
+        if (attachments !== undefined && !Array.isArray(attachments)) {
+            throw new ValidationError('The attachments must be an array.');
+        }
+        attachments?.forEach((attachment, i) => assertArtifactInput(attachment, `attachment ${i}`));
         const now = this.nextCreatedAt();
         const trigger: TriggerEnvelope = {
-            ...envelope,
+            ...rest,
             id: envelope.id ?? randomUUID(),
             receivedAt: envelope.receivedAt ?? now,
         };
@@ -151,6 +160,14 @@ export class RunEngine {
                 // the key's run was never created (createRun failed after the claim, or is
                 // still in flight): create it under the reserved id; createRun decides the race
                 runId = claimed.runId;
+            }
+        }
+
+        if (attachments?.length) {
+            // stored before the run, so an executing run finds them; a crash in between leaves orphans
+            trigger.attachments = [];
+            for (const attachment of attachments) {
+                trigger.attachments.push(await storeArtifact(this.store, { id: runId, agent: trigger.agent }, attachment, now));
             }
         }
 

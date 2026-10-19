@@ -139,6 +139,8 @@ The run settles `completed`, and its `output` is the text of the model's last an
 - `tools` is a factory. It gets the agent's `state` and the run context (`runId`, `agent`, `trigger`, `signal`) and returns an AI SDK `ToolSet`.
 - `cron()`, `http()` and `webhook()` describe triggers. `cron()` validates the expression and defaults its overlap policy to `skip`. `http()` is the control-plane trigger (id `http`, at most one per agent) that REST, the UI and MCP start runs through; `webhook({ path })` is a generic webhook (id `webhook:<path>`, many per agent). In this package only `engine.dispatch()` starts runs: firing cron, HTTP and webhook triggers belongs to the scheduler and HTTP packages.
 - The trigger envelope (source, trigger id, payload) becomes the run's first user message, as a JSON block.
+- `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments`, and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
+- The tool factory also gets `artifacts`, scoped to the run: `put({ mediaType, filename?, data })`, `get(id)` and `list()`. `put()` is no effect by itself; call it inside a `defineEffectTool` to store a file exactly once.
 
 ### Effect tools
 
@@ -221,7 +223,7 @@ const digest = defineAgent({
 
 ### Stores
 
-`MemoryStore` keeps everything in process memory, for development and tests. A store implements the `IStore` interface (runs, steps, checkpoints, idempotency keys, locks, effects, state) and proves it with the shared contract suite from [`@chamberu/test-kit`](../test-kit):
+`MemoryStore` keeps everything in process memory, for development and tests. A store implements the `IStore` interface (runs, steps, checkpoints, idempotency keys, locks, effects, state, artifacts) and proves it with the shared contract suite from [`@chamberu/test-kit`](../test-kit):
 
 ```typescript
 import { describeStoreContract } from '@chamberu/test-kit';
@@ -277,12 +279,12 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API and generated state tools over a store |
 | `ChamberuError` | class | Base class of every error below |
-| `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError` | class | Rejections of definitions and engine calls |
+| `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `TriggerDefinition`, `TriggerEnvelope`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `RunEngineOptions`, `IClock`.
+Types: `Agent`, `AgentDefinition`, `TriggerDefinition`, `TriggerEnvelope`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `RunEngineOptions`, `IClock`.
 
 Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamberu/test-kit`](../test-kit).
 

@@ -5,6 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { Artifact } from '../artifact/types.ts';
+
 export type TriggerSource = 'cron' | 'http' | 'webhook' | 'github' | 'mcp';
 
 export type TriggerDefinition<P = unknown> = {
@@ -27,5 +29,7 @@ export type TriggerEnvelope<P = unknown> = {
     idempotencyKey?: string;
     concurrencyKey?: string;
     thread?: string;
+    /** Files the run was started with, stored as artifacts of the run; the model gets them as file parts. */
+    attachments?: Artifact[];
     receivedAt: Date;
 };

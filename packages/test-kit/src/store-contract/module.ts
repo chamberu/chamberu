@@ -8,12 +8,13 @@
 import { describe, expect, it } from 'vitest';
 import { InvalidRunStateError, RunNotFoundError, RunStatus } from '@chamberu/core';
 import type {
+    Artifact,
     Checkpoint,
     IStore,
     Step,
 } from '@chamberu/core';
 import { ControllableClock } from '../clock/index.ts';
-import { makeRun } from './helpers.ts';
+import { makeArtifact, makeRun } from './helpers.ts';
 
 /**
  * Shared behavioural contract for every IStore implementation.
@@ -435,6 +436,79 @@ export function describeStoreContract(
             expect(stored).toEqual({ n: [1] });
             stored.n.push(3);
             expect(await store.kvGet('a', 'k')).toEqual({ n: [1] });
+        });
+
+        it('putArtifact inserts only when the id is absent, also under concurrency', async () => {
+            const { store } = await setup();
+            const first = makeArtifact('a1', { filename: 'first.txt' });
+            expect(await store.putArtifact(first, new Uint8Array([1, 2, 3]))).toBe(true);
+            expect(await store.putArtifact(makeArtifact('a1', { filename: 'second.txt', size: 1 }), new Uint8Array([9]))).toBe(false);
+            expect(await store.getArtifact('a1')).toEqual(first);
+            expect(Array.from((await store.readArtifact('a1'))!)).toEqual([1, 2, 3]);
+
+            const results = await Promise.all(
+                Array.from({ length: 10 }, (_, i) => store.putArtifact(makeArtifact('a2', { size: 1 }), new Uint8Array([i]))),
+            );
+            expect(results.filter(Boolean)).toHaveLength(1);
+            expect((await store.listArtifacts('r1')).filter((a) => a.id === 'a2')).toHaveLength(1);
+        });
+
+        it('getArtifact and readArtifact return metadata and plain Uint8Array bytes', async () => {
+            const { store } = await setup();
+            const artifact = makeArtifact('a1', { size: 4 });
+            await store.putArtifact(artifact, new Uint8Array([0, 255, 10, 13]));
+            const got = await store.getArtifact('a1');
+            expect(got).toEqual(artifact);
+            expect(got?.createdAt).toBeInstanceOf(Date);
+            expect(got).not.toHaveProperty('data');
+            const bytes = await store.readArtifact('a1');
+            expect(bytes?.constructor).toBe(Uint8Array);
+            expect(Array.from(bytes!)).toEqual([0, 255, 10, 13]);
+
+            const empty = makeArtifact('a2', { size: 0, filename: undefined });
+            await store.putArtifact(empty, new Uint8Array());
+            expect((await store.readArtifact('a2'))?.byteLength).toBe(0);
+            expect((await store.getArtifact('a2'))?.filename).toBeUndefined();
+        });
+
+        it('artifact reads of unknown ids are empty', async () => {
+            const { store } = await setup();
+            expect(await store.getArtifact('nope')).toBeUndefined();
+            expect(await store.readArtifact('nope')).toBeUndefined();
+            expect(await store.listArtifacts('nope')).toEqual([]);
+        });
+
+        it('listArtifacts returns the run\'s artifacts by createdAt, then id', async () => {
+            const { store } = await setup();
+            await store.putArtifact(makeArtifact('c', { createdAt: new Date(2_000) }), new Uint8Array([1]));
+            await store.putArtifact(makeArtifact('b', { createdAt: new Date(1_000) }), new Uint8Array([1]));
+            await store.putArtifact(makeArtifact('a', { createdAt: new Date(2_000) }), new Uint8Array([1]));
+            await store.putArtifact(makeArtifact('z', { runId: 'r2', createdAt: new Date(500) }), new Uint8Array([1]));
+            const listed = await store.listArtifacts('r1');
+            expect(listed.map((a) => a.id)).toEqual(['b', 'a', 'c']);
+            expect(listed[0]).toEqual(makeArtifact('b', { createdAt: new Date(1_000) }));
+            expect((await store.listArtifacts('r2')).map((a) => a.id)).toEqual(['z']);
+        });
+
+        it('does not alias artifacts passed in or returned', async () => {
+            const { store } = await setup();
+            const artifact: Artifact = makeArtifact('a1');
+            const data = new Uint8Array([1, 2, 3]);
+            await store.putArtifact(artifact, data);
+            data[0] = 9;
+            artifact.mediaType = 'text/html';
+            artifact.createdAt.setTime(0);
+            expect(Array.from((await store.readArtifact('a1'))!)).toEqual([1, 2, 3]);
+            expect(await store.getArtifact('a1')).toEqual(makeArtifact('a1'));
+
+            const read = (await store.readArtifact('a1'))!;
+            read[1] = 9;
+            expect(Array.from((await store.readArtifact('a1'))!)).toEqual([1, 2, 3]);
+            const got = (await store.getArtifact('a1'))!;
+            got.size = 99;
+            const [listed] = await store.listArtifacts('r1');
+            listed!.filename = 'evil';
+            expect(await store.getArtifact('a1')).toEqual(makeArtifact('a1'));
         });
     });
 }

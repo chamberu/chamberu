@@ -6,6 +6,7 @@
  */
 
 import type { Agent } from '../agent/types.ts';
+import type { ArtifactInput } from '../artifact/types.ts';
 import type { IClock } from '../clock/index.ts';
 import type { INotifier } from '../notify/types.ts';
 import type { Run, Step } from '../run/types.ts';
@@ -44,7 +45,11 @@ export type RunEngineOptions = {
     onError?: (error: unknown, run?: Run) => void;
 };
 
-export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt'> & Partial<Pick<TriggerEnvelope, 'id' | 'receivedAt'>>;
+export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt' | 'attachments'> &
+    Partial<Pick<TriggerEnvelope, 'id' | 'receivedAt'>> & {
+        /** Files to start the run with; stored as artifacts of the run before it is created. */
+        attachments?: ArtifactInput[];
+    };
 
 export type ResumeDecision = {
     approved: boolean;

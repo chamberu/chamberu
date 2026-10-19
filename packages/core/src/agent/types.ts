@@ -6,6 +6,7 @@
  */
 
 import type { LanguageModel, OutputInterface, ToolSet } from 'ai';
+import type { IRunArtifacts } from '../artifact/types.ts';
 import type { Budget, RunContext } from '../run/types.ts';
 import type { IAgentState, StateSchema } from '../state/types.ts';
 import type { TriggerDefinition } from '../trigger/types.ts';
@@ -13,6 +14,11 @@ import type { TriggerDefinition } from '../trigger/types.ts';
 export type ToolFactoryContext<S extends StateSchema = StateSchema> = {
     state: IAgentState<S>;
     run: RunContext;
+    /**
+     * The run's artifacts (its attachments and files tools stored). Not an
+     * effect: put `put()` inside a `defineEffectTool` to store a file exactly once.
+     */
+    artifacts: IRunArtifacts;
 };
 
 export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: RunContext }) => 'user' | 'allow' | 'deny');

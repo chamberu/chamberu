@@ -7,6 +7,7 @@
 
 export * from './agent/index.ts';
 export * from './approval/index.ts';
+export * from './artifact/index.ts';
 export * from './clock/index.ts';
 export * from './effect/index.ts';
 export * from './engine/index.ts';
