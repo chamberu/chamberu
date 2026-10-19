@@ -16,14 +16,14 @@ App, Agent, Trigger, Run, Step, State, Tool, Workspace, Notifier, Store. Keep th
 
 ## Triggers and the Envelope
 
-`cron()`, `http()` and `manual()` build `TriggerDefinition`s (`{ source, id, options, concurrencyKey?, idempotencyKey? }`). `cron()` validates the expression with cron-parser and stores the overlap policy (default `skip`; others `queue-one`, `allow`), enforced by `@chamberu/scheduler` (see [Scheduler](#scheduler)). Firing cron and HTTP triggers is not part of core: `engine.dispatch(envelope)` is the only intake.
+`cron()`, `http()` and `webhook()` build `TriggerDefinition`s (`{ source, id, options, concurrencyKey?, idempotencyKey? }`). `http({ schema? })` is the control-plane trigger (id `http`, so at most one per agent): REST `POST /agents/:name/runs`, the UI and MCP `run_<agent>` start runs through it (envelope `trigger: 'http'`, `source: 'http'` or `'mcp'`). `webhook({ path, schema?, idempotencyKey?, concurrencyKey? })` is a generic webhook (id `webhook:<path>`, many per agent, `path` must start with `/`, envelope `source: 'webhook'`); the key functions are copied onto the definition only when given. `cron()` validates the expression with cron-parser and stores the overlap policy (default `skip`; others `queue-one`, `allow`), enforced by `@chamberu/scheduler` (see [Scheduler](#scheduler)). Firing cron and HTTP triggers is not part of core: `engine.dispatch(envelope)` is the only intake.
 
 ```ts
 interface TriggerEnvelope {
     id: string;              // defaults to a UUID
     agent: string;
-    trigger: string;         // trigger id, e.g. 'manual'
-    source: 'cron' | 'http' | 'github' | 'mcp' | 'manual';
+    trigger: string;         // trigger id, e.g. 'http'
+    source: 'cron' | 'http' | 'webhook' | 'github' | 'mcp';
     payload: unknown;
     idempotencyKey?: string;
     concurrencyKey?: string;
@@ -59,7 +59,7 @@ running with an expired claim (crash) -> queued (recover) -> running
 
 - A tool call needing approval ends the step; the first unanswered `tool-approval-request` becomes the run's `WaitPoint` (`approvalId`, `toolName`, `input`, `expiresAt`, `tokenId`). Other approval requests from the same step are dropped from the history; the model asks again after the resume (one approval per pause).
 - `running -> waiting` releases claim and slot (a keyed run keeps its key blocked). The notifier named by the agent gets one `approval` notification per wait point, carrying a resume token; a successful send records `waiting.notifiedAt`. `tick()` re-sends on every poll while `notifiedAt` is missing (a failed send, or a crash mid-send); a store lock `notify:<run>:<approval>` held for one attempt (at most `claimTtlMs`) keeps replicas from sending concurrently, and the notifier's `idempotencyKey` (`<run>:<approval>`) dedupes a send whose record was lost.
-- Resume token: `base64url(JSON { runId, approvalId, tokenId, exp }) + '.' + base64url(HMAC-SHA256(resumeSecret, payload))`, compared in constant time.
+- Resume token: `base64url(JSON { runId, approvalId, tokenId, exp }) + '.' + base64url(HMAC-SHA256(resumeSecret, payload))`, compared in constant time. `engine.inspectResumeToken(token)` checks signature and expiry only (no store access) and returns the claims, so an intake layer can authorize against the run's agent before `resume()`.
 - `resume(token, decision)` verifies the token against the current wait point, moves `waiting -> queued` (guarded by `expectStatus`, so only one answer writes), appends the `tool-approval-response` to the checkpoint and a `wait` step, then clears `waiting`. A failure undoes back to `waiting`, so the token stays valid; a crash in between re-pauses on the same wait point.
 - `tick()` also denies approvals past `expiresAt` with reason `approval timed out` (default `approvalTimeoutMs` 24 h). A resumed approval gets one step beyond `maxSteps`, so an approval on the last step is still answered.
 

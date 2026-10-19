@@ -8,6 +8,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 
 export type HttpTriggerOptions = {
-    path?: string;
+    /** Validates the payload of a REST, UI or MCP start. */
     schema?: StandardSchemaV1;
 };

@@ -33,8 +33,8 @@ export async function watchRuns(model: LanguageModel) {
     await engine.start();
     await engine.dispatch({
         agent: 'echo',
-        trigger: 'manual',
-        source: 'manual',
+        trigger: 'http',
+        source: 'http',
         payload: 'hello',
     });
     await engine.idle();

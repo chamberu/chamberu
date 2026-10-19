@@ -21,7 +21,7 @@ import {
     RunEngine,
     cron,
     defineAgent,
-    manual,
+    http,
 } from '@chamberu/core';
 import { fireCronTrigger, runJob } from '@chamberu/scheduler';
 import { ControllableClock } from '@chamberu/test-kit';
@@ -386,9 +386,9 @@ describe('runJob', () => {
         await expect(runJob({ ...several, clock: several.clock })).rejects.toThrow(InvalidAgentDefinitionError);
         await expect(runJob({ ...several, trigger: 'cron:nope' })).rejects.toThrow(InvalidAgentDefinitionError);
 
-        const none = setup(textModel(), [manual()]);
+        const none = setup(textModel(), [http()]);
         await expect(runJob({ ...none })).rejects.toThrow(InvalidAgentDefinitionError);
-        await expect(runJob({ ...none, trigger: 'manual' })).rejects.toThrow(InvalidAgentDefinitionError);
+        await expect(runJob({ ...none, trigger: 'http' })).rejects.toThrow(InvalidAgentDefinitionError);
     });
 
     it('fires a named trigger', async () => {

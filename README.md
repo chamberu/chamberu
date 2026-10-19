@@ -79,14 +79,14 @@ import {
     RunEngine,
     defineAgent,
     defineEffectTool,
-    manual,
+    http,
 } from '@chamberu/core';
 
 const triage = defineAgent({
     name: 'triage',
     model: anthropic('claude-sonnet-5-5'),
     instructions: 'Label the issue in the trigger payload as bug, feature or question.',
-    triggers: [manual()],
+    triggers: [http()],
     tools: () => ({
         // recorded per (run, tool, input): a recovered run reuses the result
         addLabel: defineEffectTool({
@@ -106,8 +106,8 @@ await engine.start();
 
 const { runId } = await engine.dispatch({
     agent: 'triage',
-    trigger: 'manual',
-    source: 'manual',
+    trigger: 'http',
+    source: 'http',
     payload: { title: 'App crashes on start' },
 });
 

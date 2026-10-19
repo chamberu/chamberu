@@ -7,7 +7,7 @@ This guide describes `@chamberu/core` as it is built today. Every sample on thes
 | Concept | In core | What it is |
 |---|---|---|
 | **Agent** | `defineAgent()` | A model, instructions, triggers, a tool factory, a budget, approvals and state |
-| **Trigger** | `cron()`, `http()`, `manual()` | How a run can start. Normalized into a `TriggerEnvelope` at intake |
+| **Trigger** | `cron()`, `http()`, `webhook()` | How a run can start. Normalized into a `TriggerEnvelope` at intake |
 | **Run** | `Run` | One execution of an agent for one envelope, with a status, usage and output |
 | **Step** | `Step` | An `llm`, `tool` or `wait` record, appended as the run progresses |
 | **Checkpoint** | `Checkpoint` | The message history after a step; a resumed run continues from the latest one |

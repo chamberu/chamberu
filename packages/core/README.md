@@ -85,7 +85,7 @@ import {
     RunEngine,
     defineAgent,
     defineEffectTool,
-    manual,
+    http,
 } from '@chamberu/core';
 
 export async function triageIssue(model: LanguageModel) {
@@ -95,7 +95,7 @@ export async function triageIssue(model: LanguageModel) {
         name: 'triage',
         model,
         instructions: 'Label the issue in the trigger payload as bug, feature or question.',
-        triggers: [manual()],
+        triggers: [http()],
         budget: { maxSteps: 5 },
         tools: () => ({
             // the result is recorded per (run, tool, input): a resumed run reuses it
@@ -119,8 +119,8 @@ export async function triageIssue(model: LanguageModel) {
 
     const { runId } = await engine.dispatch({
         agent: 'triage',
-        trigger: 'manual',
-        source: 'manual',
+        trigger: 'http',
+        source: 'http',
         payload: { title: 'App crashes on start' },
     });
 
@@ -137,7 +137,7 @@ The run settles `completed`, and its `output` is the text of the model's last an
 
 - `defineAgent()` checks the name (`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 characters) and that trigger ids are unique, and fills in the default budget (`maxSteps: 20`, `timeoutMs: 900_000`).
 - `tools` is a factory. It gets the agent's `state` and the run context (`runId`, `agent`, `trigger`, `signal`) and returns an AI SDK `ToolSet`.
-- `cron()`, `http()` and `manual()` describe triggers. `cron()` validates the expression and defaults its overlap policy to `skip`. In this package only `engine.dispatch()` starts runs: firing cron and HTTP triggers belongs to the scheduler and HTTP packages.
+- `cron()`, `http()` and `webhook()` describe triggers. `cron()` validates the expression and defaults its overlap policy to `skip`. `http()` is the control-plane trigger (id `http`, at most one per agent) that REST, the UI and MCP start runs through; `webhook({ path })` is a generic webhook (id `webhook:<path>`, many per agent). In this package only `engine.dispatch()` starts runs: firing cron, HTTP and webhook triggers belongs to the scheduler and HTTP packages.
 - The trigger envelope (source, trigger id, payload) becomes the run's first user message, as a JSON block.
 
 ### Effect tools
@@ -254,7 +254,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `name` | `string` | required | Unique per app, lowercase words joined by `-` |
 | `model` | `LanguageModel` | required | Any AI SDK model |
 | `instructions` | `string` | required | System instructions |
-| `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `manual()` |
+| `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()` |
 | `tools` | `(ctx) => ToolSet` | none | Tool factory, called for each execution |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections |
 | `budget` | `{ maxSteps, maxTokens?, timeoutMs? }` | `{ maxSteps: 20, timeoutMs: 900_000 }` | Per run; the timeout applies to each execution |
@@ -268,7 +268,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 |---|---|---|
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
-| `cron`, `http`, `manual` | function | Trigger definitions |
+| `cron`, `http`, `webhook` | function | Trigger definitions |
 | `RunEngine` | class | `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |

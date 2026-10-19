@@ -4,7 +4,7 @@ import { z } from 'zod';
 import {
     cron,
     defineAgent,
-    manual,
+    http,
 } from '@chamberu/core';
 
 export function createReporter(model: LanguageModel) {
@@ -14,7 +14,7 @@ export function createReporter(model: LanguageModel) {
         model,
         instructions: 'Summarize the open work items in the trigger payload.',
         triggers: [
-            manual(),
+            http(),
             cron('0 8 * * 1', { timezone: 'Europe/Berlin' }),
         ],
         budget: {

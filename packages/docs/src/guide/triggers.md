@@ -8,13 +8,13 @@ A trigger describes how a run of an agent can start. At intake every trigger bec
 
 | Builder | Source | Id | Options |
 |---|---|---|---|
-| `manual(opts?)` | `manual` | `manual` | `schema?`: a Standard Schema for the payload |
-| `http(opts?)` | `http` | `http:<path>` (path defaults to `/`) | `path?`, `schema?` |
+| `http(opts?)` | `http` | `http` | `schema?`: a Standard Schema for the payload. At most one per agent; REST, the UI and MCP start runs through it |
+| `webhook(opts)` | `webhook` | `webhook:<path>` | `path` (starts with `/`), `schema?`, `idempotencyKey?`, `concurrencyKey?`. Many per agent |
 | `cron(expression, opts?)` | `cron` | `cron:<expression>` | `timezone?`, `overlap?` (`skip` by default, `queue-one`, `allow`), `payload?` |
 
-`cron()` validates the expression (and timezone) with cron-parser and throws `InvalidAgentDefinitionError` for an invalid one. Trigger ids must be unique per agent.
+`cron()` validates the expression (and timezone) with cron-parser and throws `InvalidAgentDefinitionError` for an invalid one; `webhook()` throws it for a path that does not start with `/`. Trigger ids must be unique per agent, so an agent declares `http()` at most once.
 
-A `TriggerDefinition` may also carry `concurrencyKey(payload)` and `idempotencyKey(payload)` functions. They are meant for the intake packages, which compute the envelope keys from a payload.
+A `TriggerDefinition` may also carry `concurrencyKey(payload)` and `idempotencyKey(payload)` functions (`webhook()` copies them from its options). They are meant for the intake packages, which compute the envelope keys from a payload.
 
 ::: warning Firing triggers is not in core
 In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigger definitions describe intent; nothing in core fires a cron expression or listens on an HTTP path. [`@chamberu/scheduler`](/guide/scheduler) fires `cron()` triggers (with per-tick locks and the overlap policy); the planned [`@chamberu/http`](/roadmap#planned-packages) will handle webhooks, REST and MCP. Until then, call `dispatch()` from your own HTTP handler.
@@ -24,7 +24,7 @@ In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigg
 
 <<< ../../../core/src/trigger/types.ts{ts}
 
-`dispatch()` takes the envelope without `id` and `receivedAt`; it fills in a random UUID and the current time. `trigger` is the trigger id (`'manual'`, `'http:/issues'`, ...). `source` is one of `cron`, `http`, `github`, `mcp` or `manual`.
+`dispatch()` takes the envelope without `id` and `receivedAt`; it fills in a random UUID and the current time. `trigger` is the trigger id (`'http'`, `'webhook:/issues'`, ...). `source` is one of `cron`, `http`, `webhook`, `github` or `mcp` (a run started through `http()` over MCP has `trigger: 'http'` and `source: 'mcp'`).
 
 The engine renders the source, trigger id and payload as a JSON block and makes it the run's first user message. The model sees exactly that; put what it needs into the payload.
 
@@ -34,7 +34,7 @@ The engine renders the source, trigger id and payload as a JSON block and makes 
 
 <<< @/snippets/triggers.ts#dispatch
 
-With an `idempotencyKey`, `dispatch()` claims the key in the store under the scope `<agent>:<source>` for 7 days. The first dispatch creates the run. Every later dispatch with the same agent, source and key returns the existing run id with `deduplicated: true`, and no new run is created.
+With an `idempotencyKey`, `dispatch()` claims the key in the store under the scope `<agent>:<source>` (for example `triage:webhook`) for 7 days. The first dispatch creates the run. Every later dispatch with the same agent, source and key returns the existing run id with `deduplicated: true`, and no new run is created.
 
 Use a key that is stable across redeliveries: a GitHub delivery id, a cron job plus its scheduled time, or a key your client sends.
 

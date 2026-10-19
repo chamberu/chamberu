@@ -102,8 +102,8 @@ function make(opts: Partial<RunEngineOptions> & { store?: MemoryStore } = {}) {
 
 const env = (extra: Record<string, unknown> = {}) => ({
     agent: 'triage',
-    trigger: 'manual',
-    source: 'manual' as const,
+    trigger: 'http',
+    source: 'http' as const,
     payload: {},
     ...extra,
 });
@@ -389,5 +389,26 @@ describe('RunEngine.dispatch', () => {
         // one chain means one approval expiry check, one recovery and one scheduling pass per poll tick
         const statuses = list.mock.calls.map(([q]) => q.status?.join());
         expect(statuses).toEqual(['waiting', 'running,interrupted', 'queued']);
+    });
+});
+
+describe('RunEngine.on', () => {
+    it('narrows the listener to the event type', async () => {
+        const { engine } = make();
+        const statuses: string[] = [];
+        const ids: string[] = [];
+        const offRun = engine.on('run.updated', (e) => {
+            statuses.push(e.run.status);
+        });
+        const offStep = engine.on('step.appended', (e) => {
+            ids.push(e.step.runId);
+            // @ts-expect-error a step.appended event carries no run
+            expect(e.run).toBeUndefined();
+        });
+        await engine.dispatch(env());
+        offRun();
+        offStep();
+        expect(statuses).toEqual(['queued']);
+        expect(ids).toEqual([]);
     });
 });

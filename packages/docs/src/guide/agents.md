@@ -22,7 +22,7 @@ The engine checks the rest when you construct it: agent names must be unique wit
 | `name` | `string` | required | Unique per engine, lowercase words joined by `-`, at most 64 characters |
 | `model` | `LanguageModel` | required | Any AI SDK model |
 | `instructions` | `string` | required | System instructions |
-| `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `manual()`. See [Triggers](/guide/triggers) |
+| `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()`. See [Triggers](/guide/triggers) |
 | `tools` | `(ctx) => ToolSet` | none | Tool factory, called for each execution |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections. See [Agent State](/guide/state) |
 | `budget` | `Partial<Budget>` | `{ maxSteps: 20, timeoutMs: 900_000 }` | See [Budgets & Timeouts](/guide/budgets) |

@@ -56,7 +56,7 @@ Each of these is a better fit in some setups: if you already run Inngest or Trig
 
 `@chamberu/core` contains:
 
-- [`defineAgent()`](/guide/agents) and the trigger builders `cron()`, `http()` and `manual()`
+- [`defineAgent()`](/guide/agents) and the trigger builders `cron()`, `http()` and `webhook()`
 - the [`RunEngine`](/reference/#runengine): dispatch, scheduling, execution, checkpoints, budgets, approvals, cancel, drain and recovery
 - [effect tools](/guide/effect-tools) and [agent state](/guide/state)
 - the [store contract](/stores/) and [`MemoryStore`](/stores/memory)

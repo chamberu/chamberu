@@ -167,8 +167,8 @@ describePostgres('TypeormStore values', () => {
             trigger: {
                 id: 't1',
                 agent: 'a',
-                trigger: 'manual',
-                source: 'manual',
+                trigger: 'http',
+                source: 'http',
                 payload: raw,
                 receivedAt: at,
             },
