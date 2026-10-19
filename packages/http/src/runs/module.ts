@@ -7,6 +7,7 @@
 
 import { ForbiddenError } from '@ebec/http';
 import { RunNotFoundError } from '@chamberu/core';
+import type { Run } from '@chamberu/core';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { defineCoreHandler } from 'routup';
 import type { App, IAppEvent } from 'routup';
@@ -26,12 +27,24 @@ import {
     resolveResumeTarget,
     serializeRun,
 } from './helpers.ts';
+import { streamRun } from './stream/module.ts';
 
 function param(event: IAppEvent, name: string): string {
     return event.params[name] ?? '';
 }
 
-/** `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `POST /runs/:id/cancel`, `POST /resume`. */
+/** The run, once the principal may read it: 401, then 404, then 403. */
+async function readableRun(event: IAppEvent, ctx: HttpContext, id: string): Promise<Run> {
+    const principal = await authenticate(event, ctx);
+    const run = await ctx.store.getRun(id);
+    if (!run) throw new RunNotFoundError(id);
+    if (!canReadRun(principal, run)) {
+        throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
+    }
+    return run;
+}
+
+/** `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `GET /runs/:id/stream`, `POST /runs/:id/cancel`, `POST /resume`. */
 export function registerRunRoutes(app: App, ctx: HttpContext): void {
     const startContainer = createStartRunContainer();
     const resumeContainer = createResumeContainer();
@@ -79,14 +92,13 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
     }));
 
     app.get('/runs/:id', defineCoreHandler(async (event) => {
-        const principal = await authenticate(event, ctx);
-        const id = param(event, 'id');
-        const run = await ctx.store.getRun(id);
-        if (!run) throw new RunNotFoundError(id);
-        if (!canReadRun(principal, run)) {
-            throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
-        }
-        return { ...serializeRun(run), steps: await ctx.store.listSteps(id) };
+        const run = await readableRun(event, ctx, param(event, 'id'));
+        return { ...serializeRun(run), steps: await ctx.store.listSteps(run.id) };
+    }));
+
+    app.get('/runs/:id/stream', defineCoreHandler(async (event) => {
+        const run = await readableRun(event, ctx, param(event, 'id'));
+        return streamRun(event, ctx, run.id);
     }));
 
     app.post('/runs/:id/cancel', defineCoreHandler(async (event) => {
