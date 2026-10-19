@@ -117,9 +117,12 @@ function toErrorBody(cause: unknown): ErrorBody | undefined {
     return undefined;
 }
 
-/** Renders every error as `{ status, code, message, issues? }`; never sends a cause. */
+/**
+ * Renders every error as `{ status, code, message, issues? }`; never sends a cause.
+ * Keeps the headers plugins already set (CORS, `RateLimit-*`, `Retry-After`).
+ */
 export function createErrorHandler(ctx: HttpContext): Handler {
-    return defineErrorHandler((error) => {
+    return defineErrorHandler((error, event) => {
         const cause = unwrap(error);
         let body = toErrorBody(cause);
         if (!body || body.status >= 500) {
@@ -131,7 +134,8 @@ export function createErrorHandler(ctx: HttpContext): Handler {
             };
         }
 
-        const headers = new Headers({ 'content-type': 'application/json; charset=utf-8' });
+        const headers = new Headers(event.response.headers);
+        headers.set('content-type', 'application/json; charset=utf-8');
         if (body.status === 401) headers.set('www-authenticate', 'Bearer');
         return new Response(JSON.stringify(body), { status: body.status, headers });
     });

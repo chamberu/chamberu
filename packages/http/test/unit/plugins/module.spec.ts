@@ -84,6 +84,20 @@ describe('cors', () => {
         expect(response.headers.get('access-control-allow-origin')).toBeNull();
     });
 
+    it('keeps the cors headers on error responses', async () => {
+        const { app } = createTestApp({ cors: { origin: 'https://ui.test' } });
+        const headers = { origin: 'https://ui.test' };
+        const notFound = await send(app, '/runs/nope', { token: ADMIN_TOKEN, headers });
+        expect(notFound.status).toBe(404);
+        expect(notFound.headers.get('access-control-allow-origin')).toBe('https://ui.test');
+        expect(notFound.headers.get('content-type')).toBe('application/json; charset=utf-8');
+
+        const unauthorized = await send(app, '/agents', { headers });
+        expect(unauthorized.status).toBe(401);
+        expect(unauthorized.headers.get('access-control-allow-origin')).toBe('https://ui.test');
+        expect(unauthorized.headers.get('www-authenticate')).toBe('Bearer');
+    });
+
     it('never rate limits a preflight', async () => {
         const { app } = createTestApp({ cors: { origin: 'https://ui.test' }, rateLimit: { max: 1 } });
         for (let i = 0; i < 3; i++) {
@@ -109,6 +123,9 @@ describe('rate limit', () => {
             code: 'too_many_requests',
             message: 'Too many requests, please try again later.',
         });
+        expect(limited.headers.get('retry-after')).not.toBeNull();
+        expect(limited.headers.get('ratelimit-limit')).toBe('2');
+        expect(limited.headers.get('ratelimit-remaining')).toBe('0');
     });
 
     it('keys by client address', async () => {
