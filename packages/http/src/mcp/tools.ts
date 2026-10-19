@@ -137,7 +137,7 @@ function registerRunTool(
         inputSchema: fromJsonSchema<RunAgentArgs>({
             type: 'object',
             properties: {
-                payload: toJsonSchema(schema),
+                payload: toJsonSchema(schema, '#/properties/payload'),
                 idempotencyKey: {
                     type: 'string',
                     minLength: 1,

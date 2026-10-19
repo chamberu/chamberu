@@ -18,6 +18,41 @@ import {
 import { textModel } from '../../utils/model.ts';
 import { callTool, connectMcp, textOf } from '../../utils/mcp.ts';
 
+type TreeNode = { name: string; children: TreeNode[] };
+
+const TreeNodeSchema: z.ZodType<TreeNode> = z.object({
+    name: z.string(),
+    get children() { return z.array(TreeNodeSchema); },
+});
+
+function recursiveAgent() {
+    return defineAgent({
+        name: 'tree',
+        model: textModel(),
+        instructions: 'Tree runs.',
+        triggers: [http({ schema: z.object({ root: TreeNodeSchema, alias: TreeNodeSchema }) })],
+    });
+}
+
+/** Every local `$ref` in `schema`, resolved as a JSON pointer from `root`. */
+function resolveRefs(root: unknown, node: unknown = root): unknown[] {
+    if (Array.isArray(node)) return node.flatMap((item) => resolveRefs(root, item));
+    if (typeof node !== 'object' || node === null) return [];
+    const resolved: unknown[] = [];
+    for (const [key, value] of Object.entries(node)) {
+        if (key === '$ref' && typeof value === 'string') {
+            expect(value.startsWith('#')).toBe(true);
+            const target = value.slice(1).split('/').filter(Boolean)
+                .map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'))
+                .reduce<unknown>((current, segment) => (current as Record<string, unknown> | undefined)?.[segment], root);
+            resolved.push(target);
+        } else {
+            resolved.push(...resolveRefs(root, value));
+        }
+    }
+    return resolved;
+}
+
 function typedAgent() {
     return defineAgent({
         name: 'typed',
@@ -116,6 +151,29 @@ describe('mcp run_<agent>', () => {
         const result = await callTool(client, 'run_echo', { extra: 1 });
         expect(result.isError).toBe(true);
         expect((await store.listRuns({})).total).toBe(0);
+        await client.close();
+    });
+
+    it('advertises a recursive payload schema whose refs resolve from the tool schema', async () => {
+        const { app, store } = createRunTestApp({ agents: [...createRunAgents(), recursiveAgent()] });
+        const client = await connectMcp(app, ADMIN_TOKEN);
+        const { tools } = await client.listTools();
+        const tree = tools.find((t) => t.name === 'run_tree')!;
+        const targets = resolveRefs(tree.inputSchema);
+        expect(targets.length).toBeGreaterThan(0);
+        for (const target of targets) expect(target).toMatchObject({ type: 'object' });
+
+        const payload = {
+            root: { name: 'a', children: [{ name: 'b', children: [] }] },
+            alias: { name: 'c', children: [] },
+        };
+        const result = await callTool(client, 'run_tree', { payload });
+        expect(result.isError, textOf(result)).toBeFalsy();
+        const { runId } = result.structuredContent as { runId: string };
+        expect((await store.getRun(runId))?.trigger.payload).toEqual(payload);
+
+        const invalid = await callTool(client, 'run_tree', { payload: { root: { name: 'a', children: [{ name: 1 }] }, alias: payload.alias } });
+        expect(invalid.isError).toBe(true);
         await client.close();
     });
 });

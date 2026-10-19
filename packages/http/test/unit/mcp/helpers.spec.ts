@@ -28,6 +28,32 @@ describe('toJsonSchema', () => {
         expect(schema).not.toHaveProperty('$schema');
     });
 
+    it('re-roots local refs at the given pointer, leaving data keywords alone', () => {
+        const schema = toJsonSchema(plainSchema({
+            input: () => ({
+                type: 'object',
+                properties: {
+                    self: { $ref: '#' },
+                    node: { $ref: '#/definitions/node' },
+                    remote: { $ref: 'https://example.com/schema' },
+                    fixed: { const: { $ref: '#' } },
+                },
+                definitions: { node: { type: 'array', items: { $ref: '#/definitions/node' } } },
+            }),
+            output: () => ({}),
+        }), '#/properties/payload');
+        expect(schema).toEqual({
+            type: 'object',
+            properties: {
+                self: { $ref: '#/properties/payload' },
+                node: { $ref: '#/properties/payload/definitions/node' },
+                remote: { $ref: 'https://example.com/schema' },
+                fixed: { const: { $ref: '#' } },
+            },
+            definitions: { node: { type: 'array', items: { $ref: '#/properties/payload/definitions/node' } } },
+        });
+    });
+
     it('is {} without a schema, without a converter, or when the converter throws', () => {
         expect(toJsonSchema(undefined)).toEqual({});
         expect(toJsonSchema(plainSchema())).toEqual({});
