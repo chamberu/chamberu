@@ -151,6 +151,16 @@ function decodeWithCodec(searchParams: URLSearchParams, schema: AnySchema) {
  */
 export function decodeQuery(searchParams: URLSearchParams, schema: AnySchema): DecodedQuery {
     const query = decodeWithCodec(searchParams, schema);
+    // rapiq reads page values with parseInt ('1e2' -> 1, '50.5' -> 50); checked
+    // after the codec, so its own rejections keep their issues
+    for (const key of ['limit', 'offset']) {
+        for (const value of searchParams.getAll(`page[${key}]`)) {
+            if (!/^\d+$/.test(value.trim())) {
+                throw new BadRequestError({ message: `page[${key}] takes a non-negative integer.` });
+            }
+        }
+    }
+
     if (!query) return { filters: [], sorts: [] };
 
     const root = query.filters;

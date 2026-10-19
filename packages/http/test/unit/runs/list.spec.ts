@@ -6,13 +6,16 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { defineAgent, http } from '@chamberu/core';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
     call,
     createRunTestApp,
+    createTestApp,
     tokenFor,
 } from '../../utils/app.ts';
+import { textModel } from '../../utils/model.ts';
 
 async function setup() {
     const ctx = createRunTestApp();
@@ -64,6 +67,24 @@ describe('GET /runs', () => {
         const { app } = await setup();
         const body = await (await call(app, 'GET', '/runs?filter%5Bagent%5D=echo', { token: READER_TOKEN })).json() as ListBody;
         expect(body.meta.total).toBe(2);
+    });
+
+    it('lets a principal filter to an agent named like a number', async () => {
+        const { app } = createTestApp({
+            agents: [defineAgent({
+                name: '007',
+                model: textModel(),
+                instructions: 'Count.',
+                triggers: [http()],
+            })],
+        });
+        const token = tokenFor('agent:007:run');
+        expect((await call(app, 'POST', '/agents/007/runs', { token })).status).toBe(202);
+        for (const query of ['filter[agent]=007', 'filter=eq(agent,\'007\')']) {
+            const response = await call(app, 'GET', `/runs?${query}`, { token });
+            expect(response.status).toBe(200);
+            expect((await response.json() as ListBody).meta.total).toBe(1);
+        }
     });
 
     it('lets run:read list without a filter', async () => {
