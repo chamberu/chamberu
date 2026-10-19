@@ -42,7 +42,7 @@ export type McpEndpointOptions = {
 /** What the route hands each MCP request through `authInfo.extra`; internal. */
 export type McpRequestExtra = {
     principal: Principal;
-    /** Follows the HTTP request: aborts when the client goes away. */
+    /** Follows the HTTP request and the shutdown: aborts when the client goes away or the app closes. */
     signal: AbortSignal;
 };
 

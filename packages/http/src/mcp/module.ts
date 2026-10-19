@@ -39,7 +39,7 @@ export function createMcpEndpoint(ctx: HttpContext, options: McpEndpointOptions)
     }, { maxRequestBodySize: ctx.bodyLimit });
 }
 
-/** Mounts the MCP endpoint at `/mcp` (authenticated); the app's shutdown hook closes it. */
+/** Mounts the MCP endpoint at `/mcp` (authenticated); the app's shutdown hook ends open waits and closes it. */
 export function registerMcpRoutes(app: App, ctx: HttpContext, options: McpOptions = {}): void {
     const handler = createMcpEndpoint(ctx, {
         name: options.name ?? DEFAULT_MCP_NAME,
@@ -47,12 +47,15 @@ export function registerMcpRoutes(app: App, ctx: HttpContext, options: McpOption
         maxWaitSeconds: options.maxWaitSeconds ?? DEFAULT_MCP_MAX_WAIT_SECONDS,
     });
 
+    // ends run_<agent> waits on shutdown: the legacy stateless path is not torn down by handler.close()
+    const closing = new AbortController();
+
     app.use('/mcp', defineCoreHandler(async (event) => {
         const principal = await authenticate(event, ctx);
         const refused = refuseWhenClosed(event, ctx);
         if (refused) return refused;
         // event.request.signal is the only signal that follows the HTTP request
-        const extra: McpRequestExtra = { principal, signal: event.request.signal };
+        const extra: McpRequestExtra = { principal, signal: AbortSignal.any([event.request.signal, closing.signal]) };
         return handler.fetch(event.request, {
             authInfo: {
                 token: '',
@@ -63,5 +66,9 @@ export function registerMcpRoutes(app: App, ctx: HttpContext, options: McpOption
         });
     }));
 
-    ctx.closers.add(() => handler.close());
+    ctx.closers.add(async () => {
+        // a wait answers with the run as stored, so the client keeps the run id
+        closing.abort();
+        await handler.close();
+    });
 }

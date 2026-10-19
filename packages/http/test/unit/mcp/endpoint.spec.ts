@@ -138,4 +138,27 @@ describe('/mcp', () => {
         expect(await response.json()).toMatchObject({ status: 503, code: 'service_unavailable' });
         expect(onError).not.toHaveBeenCalled();
     });
+
+    it('ends a run_<agent> wait in flight on shutdown, answering with the run id', async () => {
+        const shutdown = fakeShutdown();
+        const { app, engine } = createRunTestApp({ shutdown });
+        const unsubscribes: Array<ReturnType<typeof vi.fn>> = [];
+        const on = engine.on.bind(engine);
+        vi.spyOn(engine, 'on').mockImplementation(((event: never, listener: never) => {
+            const unsubscribe = vi.fn(on(event, listener));
+            unsubscribes.push(unsubscribe);
+            return unsubscribe;
+        }) as typeof engine.on);
+
+        const client = await connectMcp(app, ADMIN_TOKEN);
+        const pending = callTool(client, 'run_echo', { waitSeconds: 30 });
+        await vi.waitFor(() => expect(unsubscribes).toHaveLength(1));
+
+        await shutdown.shutdown();
+        expect(unsubscribes[0]).toHaveBeenCalled();
+        const result = await pending;
+        expect(result.isError).toBeFalsy();
+        expect(result.structuredContent).toMatchObject({ runId: expect.any(String), status: 'queued' });
+        await client.close();
+    });
 });
