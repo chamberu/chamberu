@@ -61,7 +61,7 @@ describePostgres('schema', () => {
         await migrateStore(ds);
 
         const migrations: { name: string }[] = await ds.query('SELECT name FROM migrations ORDER BY id');
-        expect(migrations.map((m) => m.name)).toEqual(['Init1792195200000', 'Artifacts1792800000000']);
+        expect(migrations.map((m) => m.name)).toEqual(['Init1792195200000', 'Artifacts1792368000000']);
 
         const tables: { table_name: string }[] = await ds.query(
             'SELECT table_name FROM information_schema.tables WHERE table_name = ANY($1::text[])',

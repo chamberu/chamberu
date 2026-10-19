@@ -7,8 +7,8 @@
 
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class Artifacts1792800000000 implements MigrationInterface {
-    name = 'Artifacts1792800000000';
+export class Artifacts1792368000000 implements MigrationInterface {
+    name = 'Artifacts1792368000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`
