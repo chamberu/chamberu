@@ -33,6 +33,8 @@ const ROUTE_TEMPLATES: Array<[RegExp, string]> = [
     [/^\/runs\/[^/]+$/, '/runs/:id'],
     [/^\/runs\/[^/]+\/stream$/, '/runs/:id/stream'],
     [/^\/runs\/[^/]+\/cancel$/, '/runs/:id/cancel'],
+    [/^\/runs\/[^/]+\/artifacts$/, '/runs/:id/artifacts'],
+    [/^\/runs\/[^/]+\/artifacts\/[^/]+$/, '/runs/:id/artifacts/:artifactId'],
     [/^\/agents\/[^/]+\/runs$/, '/agents/:name/runs'],
     [/^\/agents\/[^/]+\/state\/kv\/[^/]+$/, '/agents/:name/state/kv/:key'],
     [/^\/agents\/[^/]+\/state\/collections\/[^/]+$/, '/agents/:name/state/collections/:collection'],

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Run, RunStatusLiteral } from '@chamberu/core';
+import type { ArtifactInput, Run, RunStatusLiteral } from '@chamberu/core';
 
 /** A run as it leaves the package (REST, SSE, MCP): without the internal `claim`. */
 export type RunView = Omit<Run, 'claim'>;
@@ -23,6 +23,8 @@ export type StartRunBody = {
     payload?: unknown;
     idempotencyKey?: string;
     thread?: string;
+    /** Decoded from base64 by the validator; unknown item keys are dropped by the route. */
+    attachments?: ArtifactInput[];
 };
 
 /** Body of `POST /resume`; internal. */

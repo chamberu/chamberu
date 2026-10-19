@@ -8,7 +8,14 @@
 import { IssueCode } from '@ebec/core';
 import { Container, ValidupError } from 'validup';
 import { describe, expect, it } from 'vitest';
-import { isBoolean, isDefined, isString } from '../../../src/request/validators.ts';
+import {
+    isArray,
+    isBase64,
+    isBoolean,
+    isDefined,
+    isMediaType,
+    isString,
+} from '../../../src/request/validators.ts';
 import type { ValidatorDescriptor } from 'validup';
 
 async function run(validator: ValidatorDescriptor, input: Record<string, unknown>) {
@@ -46,5 +53,51 @@ describe('validators', () => {
         expect(await run(isDefined(), { k: 0 })).toEqual({ k: 0 });
         expect(await run(isDefined(), { k: {} })).toEqual({ k: {} });
         await rejects(isDefined(), {}, IssueCode.REQUIRED);
+    });
+
+    it('isArray checks type and length', async () => {
+        const v = isArray({ max: 2 });
+        expect(await run(v, { k: [] })).toEqual({ k: [] });
+        expect(await run(v, { k: [1, 'a'] })).toEqual({ k: [1, 'a'] });
+        await rejects(v, { k: [1, 2, 3] });
+        await rejects(v, { k: 'ab' });
+        await rejects(v, { k: { 0: 1 } });
+        await rejects(v, { k: null });
+    });
+
+    it('isMediaType accepts type/subtype without parameters', async () => {
+        for (const value of ['image/png', 'application/vnd.api+json', 'text/plain']) {
+            expect(await run(isMediaType(), { k: value })).toEqual({ k: value });
+        }
+        for (const value of ['png', 'image/', '/png', 'text/plain; charset=utf-8', 'a/b\u0000', 'image/png\r\nx: y', 1, '']) {
+            await rejects(isMediaType(), { k: value });
+        }
+    });
+
+    it('isBase64 decodes strict base64 to a plain Uint8Array', async () => {
+        const out = await run(isBase64(), { k: 'aGk=' }) as { k: Uint8Array };
+        expect(out.k).toBeInstanceOf(Uint8Array);
+        expect(Buffer.isBuffer(out.k)).toBe(false);
+        expect([...out.k]).toEqual([104, 105]);
+        expect([...(await run(isBase64(), { k: '' }) as { k: Uint8Array }).k]).toEqual([]);
+        expect([...(await run(isBase64(), { k: '+/8=' }) as { k: Uint8Array }).k]).toEqual([251, 255]);
+    });
+
+    it.each([
+        'aGk',
+        'aGk==',
+        'aG k=',
+        'aGk=\n',
+        '-_8=',
+        'aGl=',
+        '=aGk',
+        'a===',
+    ])('isBase64 rejects %j', async (value) => {
+        await rejects(isBase64(), { k: value });
+    });
+
+    it('isBase64 rejects non-strings', async () => {
+        await rejects(isBase64(), { k: 1 });
+        await rejects(isBase64(), { k: null });
     });
 });

@@ -5,9 +5,16 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidResumeTokenError, RunNotFoundError, RunStatus } from '@chamberu/core';
+import {
+    ArtifactNotFoundError,
+    InvalidResumeTokenError,
+    RunNotFoundError,
+    RunStatus,
+} from '@chamberu/core';
 import type {
     Agent,
+    Artifact,
+    ArtifactInput,
     Run,
     RunStatusLiteral,
     TriggerDefinition,
@@ -24,9 +31,21 @@ import type { Principal } from '../auth/types.ts';
 import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
 import type { HttpContext } from '../app/types.ts';
 import { decodeQuery } from '../request/helpers.ts';
-import { isBoolean, isDefined, isString } from '../request/validators.ts';
+import {
+    isArray,
+    isBase64,
+    isBoolean,
+    isDefined,
+    isMediaType,
+    isString,
+} from '../request/validators.ts';
 import { KEY_MAX_LENGTH } from '../request/constants.ts';
-import { RESUME_REASON_MAX_LENGTH, RESUME_TOKEN_MAX_LENGTH } from './constants.ts';
+import {
+    ATTACHMENT_FILENAME_MAX_LENGTH,
+    MAX_ATTACHMENTS,
+    RESUME_REASON_MAX_LENGTH,
+    RESUME_TOKEN_MAX_LENGTH,
+} from './constants.ts';
 import type {
     ResumeBody,
     RunListQuery,
@@ -79,7 +98,54 @@ export function createStartRunContainer(): Container<StartRunBody> {
     container.mount('payload', { optional: true }, isDefined());
     container.mount('idempotencyKey', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
     container.mount('thread', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
+    container.mount('attachments', { optional: true }, isArray({ max: MAX_ATTACHMENTS }));
+    container.mount('attachments.*.mediaType', isMediaType());
+    container.mount('attachments.*.filename', { optional: true }, isString({ min: 1, max: ATTACHMENT_FILENAME_MAX_LENGTH }));
+    container.mount('attachments.*.data', isBase64());
     return container;
+}
+
+/** The validated attachments as dispatch inputs, without the keys a client added. */
+export function toAttachmentInputs(attachments: ArtifactInput[]): ArtifactInput[] {
+    return attachments.map(({
+        mediaType,
+        filename,
+        data,
+    }) => ({
+        mediaType,
+        ...(filename !== undefined ? { filename } : {}),
+        data,
+    }));
+}
+
+/** An artifact of `run` with its bytes; ArtifactNotFoundError (404) for an unknown id or another run's artifact. */
+export async function loadRunArtifact(ctx: HttpContext, run: Run, id: string): Promise<{ artifact: Artifact; data: Uint8Array }> {
+    const artifact = await ctx.store.getArtifact(id);
+    if (!artifact || artifact.runId !== run.id) throw new ArtifactNotFoundError(id);
+    const data = await ctx.store.readArtifact(id);
+    if (!data) throw new ArtifactNotFoundError(id);
+    return { artifact, data };
+}
+
+/** The bytes as a response body; a view over a SharedArrayBuffer is copied (a body needs an ArrayBuffer). */
+export function toBody(data: Uint8Array): Uint8Array<ArrayBuffer> {
+    return data.buffer instanceof ArrayBuffer ? data as Uint8Array<ArrayBuffer> : new Uint8Array(data);
+}
+
+/** A quoted-string fallback: printable ASCII only, without `"` and `\`. */
+function asciiFilename(filename: string): string {
+    return filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
+}
+
+/** RFC 5987 `ext-value` characters: what encodeURIComponent leaves, minus `'()*`. */
+function encodeRfc5987(value: string): string {
+    return encodeURIComponent(value).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+/** `attachment`, with `filename` and an RFC 5987 `filename*` when the artifact has a filename. */
+export function contentDisposition(filename: string | undefined): string {
+    if (filename === undefined) return 'attachment';
+    return `attachment; filename="${asciiFilename(filename)}"; filename*=UTF-8''${encodeRfc5987(filename)}`;
 }
 
 const RUN_LIST_SCHEMA = defineSchema({

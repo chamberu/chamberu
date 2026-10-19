@@ -6,7 +6,12 @@
  */
 
 import { RunNotFoundError } from '@chamberu/core';
-import type { Run, RunEvent, Step } from '@chamberu/core';
+import type {
+    Run,
+    RunDelta,
+    RunEvent,
+    Step,
+} from '@chamberu/core';
 import { createEventStream } from 'routup';
 import type { IAppEvent } from 'routup';
 import { acquireStreamSlot, refuseStreamOverCap, refuseWhenClosed } from '../../app/helpers.ts';
@@ -24,7 +29,8 @@ import {
  * Streams a run as SSE: `run.updated` with the current run, then each step
  * after `Last-Event-ID` (or the `after` query, for clients that cannot set
  * the header; a valid header wins) as `step.appended` (`id` = step index), then live
- * events, with a store poll every `streamPollMs` for runs executing on
+ * events (the model output of an execution on this replica as `delta`,
+ * without `id`), with a store poll every `streamPollMs` for runs executing on
  * another replica (`ping` when it found nothing; the steps are read only
  * when the polled run changed). Ends once a settled run
  * was sent, on shutdown, when the client goes away (a failed write or the
@@ -56,6 +62,9 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
     const unsubscribeStep = ctx.engine.on('step.appended', (e) => {
         if (e.step.runId === runId) live(e);
     });
+    const unsubscribeDelta = ctx.engine.on('run.delta', (e) => {
+        if (e.delta.runId === runId) live(e);
+    });
     const { signal } = event.request;
 
     function cleanup(): void {
@@ -63,6 +72,7 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
         ended = true;
         unsubscribeRun();
         unsubscribeStep();
+        unsubscribeDelta();
         timer?.clear();
         signal.removeEventListener('abort', cleanup);
         ctx.closers.delete(cleanup);
@@ -94,6 +104,18 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
             event: 'step.appended',
             id: String(step.index),
             data: JSON.stringify(step),
+        });
+    }
+
+    /** Live model output; no `id`, so `Last-Event-ID` stays a step index. */
+    function sendDelta(delta: RunDelta): void {
+        write({
+            event: 'delta',
+            data: JSON.stringify({
+                step: delta.step,
+                kind: delta.kind,
+                text: delta.text,
+            }),
         });
     }
 
@@ -130,6 +152,10 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
         }
         if (e.type === 'step.appended') {
             sendStep(e.step);
+            return;
+        }
+        if (e.type === 'run.delta') {
+            sendDelta(e.delta);
             return;
         }
         if (e.type !== 'run.updated') return;

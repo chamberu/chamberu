@@ -10,3 +10,9 @@ export const RESUME_TOKEN_MAX_LENGTH = 4_096;
 
 /** Longest approval `reason`. */
 export const RESUME_REASON_MAX_LENGTH = 1_000;
+
+/** Most attachments one `POST /agents/:name/runs` takes; their size stays bounded by `bodyLimit`. */
+export const MAX_ATTACHMENTS = 16;
+
+/** Longest attachment `filename`. */
+export const ATTACHMENT_FILENAME_MAX_LENGTH = 255;
