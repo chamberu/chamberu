@@ -16,9 +16,11 @@ import { agentPermission, hasPermission } from '../auth/module.ts';
 import type { Principal } from '../auth/types.ts';
 import { KEY_MAX_LENGTH } from '../request/constants.ts';
 import { validatePayload } from '../request/helpers.ts';
+import { RESUME_REASON_MAX_LENGTH, RESUME_TOKEN_MAX_LENGTH } from '../runs/constants.ts';
 import {
     assertCanListRuns,
     loadReadableRun,
+    resolveResumeTarget,
     serializeRun,
 } from '../runs/helpers.ts';
 import { MCP_WAIT_POLL_MS } from './constants.ts';
@@ -42,6 +44,12 @@ type RunAgentArgs = {
     idempotencyKey?: string;
     thread?: string;
     waitSeconds?: number;
+};
+
+type ResumeRunArgs = {
+    token: string;
+    approved: boolean;
+    reason?: string;
 };
 
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -181,6 +189,34 @@ function registerRunTool(
     }));
 }
 
+function registerResumeTool(server: McpServer, ctx: HttpContext, principal: Principal): void {
+    server.registerTool('resume_run', {
+        title: 'Resume run',
+        description: 'Answers a pending approval with its resume token. Needs agent:<agent>:approve for the run\'s agent.',
+        inputSchema: fromJsonSchema<ResumeRunArgs>({
+            type: 'object',
+            properties: {
+                token: {
+                    type: 'string', 
+                    minLength: 1, 
+                    maxLength: RESUME_TOKEN_MAX_LENGTH, 
+                },
+                approved: { type: 'boolean' },
+                reason: { type: 'string', maxLength: RESUME_REASON_MAX_LENGTH },
+            },
+            required: ['token', 'approved'],
+            additionalProperties: false,
+        }),
+    }, (args) => runTool(ctx, async () => {
+        const run = await resolveResumeTarget(ctx, principal, args.token);
+        await ctx.engine.resume(args.token, {
+            approved: args.approved,
+            ...(args.reason !== undefined ? { reason: args.reason } : {}),
+        });
+        return toolResult({ runId: run.id, status: RunStatus.QUEUED });
+    }));
+}
+
 /** Registers the tools one MCP request's principal sees. */
 export function registerTools(
     server: McpServer,
@@ -190,4 +226,5 @@ export function registerTools(
 ): void {
     for (const agent of ctx.agents.values()) registerRunTool(server, ctx, agent, extra, options);
     registerReadTools(server, ctx, extra.principal);
+    registerResumeTool(server, ctx, extra.principal);
 }
