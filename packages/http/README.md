@@ -107,7 +107,7 @@ Paths are relative to `basePath` (default none).
 | `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, thread? }`, the key also as an `Idempotency-Key` header; the agent must declare `http()` |
 | `GET /runs` | `run:read`, or `agent:<agent>:run` with `filter[agent]=<agent>` | `200 { data, meta: { total, limit, offset } }` |
 | `GET /runs/:id` | `run:read` or `agent:<run.agent>:run` | `200` the run plus its `steps` |
-| `GET /runs/:id/stream` | as `GET /runs/:id` | SSE: `run.updated`, `step.appended` (`id` = step index), `ping`; ends once the run settled |
+| `GET /runs/:id/stream` | as `GET /runs/:id` | SSE: `run.updated`, `step.appended` (`id` = step index), `ping`; ends once the run settled. `Last-Event-ID` resumes; `503` with `Retry-After` over `stream.maxOpen` |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
 | `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }`; the whole body is the payload |
@@ -128,6 +128,8 @@ Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413
 `GET /runs/:id` answers 404 before 403, so any authenticated principal can tell whether a run id exists; run ids are random UUIDs. Runs on the wire never carry the internal `claim` (owner and lease).
 
 The SSE stream follows the run through `engine.on` and polls the store every `stream.pollMs` (default 2 s), so it also sees a run executing on another replica. `Last-Event-ID` resumes after a step index.
+
+Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`waitSeconds` above 0) at `stream.maxOpen` (default 1000, one counter for both). A stream over the cap answers `503 { code: 'service_unavailable' }` with `Retry-After: 5` (not reported to `onError`); an MCP call over the cap does not wait and answers at once with `{ runId, status, deduplicated }`, as with `waitSeconds: 0`, since its run is already dispatched. A slot is freed when the stream ends (settled run, client gone, failure, shutdown) or the wait answers; a client that cancels the body without the request signal aborting frees it at the next write, within `stream.pollMs`.
 
 ## Permissions
 
@@ -179,7 +181,7 @@ auth: [
 | `list_runs` | `{ agent?, status?, limit?, offset? }` | `{ data: RunSummary[], total }` |
 | `resume_run` | `{ token, approved, reason? }` | `{ runId, status: 'queued' }` |
 
-- `run_<agent>` is listed for each agent with an `http()` trigger the principal may run; its `payload` carries the trigger schema's JSON Schema (local `$ref`s re-rooted under `payload`). Tool definitions are built once in `createHttpApp`, which throws `InvalidAgentDefinitionError` for a payload schema the MCP validator cannot compile or a tool name above the 64 characters MCP allows (an agent name above 60; set `mcp: false` to keep it). `waitSeconds` (default 0) waits for `completed`, `failed`, `cancelled` or `waiting`, at most `mcp.maxWaitSeconds` (default 60; larger values are clamped). The wait polls the store every second, so it sees a run executing on another replica, and stops when the client goes away. A `waiting` answer names the tool and input, never the resume token.
+- `run_<agent>` is listed for each agent with an `http()` trigger the principal may run; its `payload` carries the trigger schema's JSON Schema (local `$ref`s re-rooted under `payload`). Tool definitions are built once in `createHttpApp`, which throws `InvalidAgentDefinitionError` for a payload schema the MCP validator cannot compile or a tool name above the 64 characters MCP allows (an agent name above 60; set `mcp: false` to keep it). `waitSeconds` (default 0) waits for `completed`, `failed`, `cancelled` or `waiting`, at most `mcp.maxWaitSeconds` (default 60; larger values are clamped). A wait holds one of the app's `stream.maxOpen` slots; with all taken the call answers at once with `{ runId, status, deduplicated }`, like `waitSeconds: 0`, and the run proceeds. The wait polls the store every second, so it sees a run executing on another replica, and stops when the client goes away. A `waiting` answer names the tool and input, never the resume token.
 - Idempotency keys are scoped per agent and source: an MCP start dedupes under `<agent>:mcp`, a REST start under `<agent>:http`, so one key used over both creates two runs.
 - `get_run` and `list_runs` follow the REST read rule; denied permissions and unknown runs come back as tool errors (`isError`).
 
@@ -229,6 +231,7 @@ process.once('SIGTERM', () => {
 | `shutdown` | `IShutdown` | none | Fails `/readyz` and ends streams on shutdown |
 | `bodyLimit` | `number` | `1_048_576` | Bytes a REST or MCP request body may have |
 | `stream.pollMs` | `number` | `2_000` | Store poll of SSE streams |
+| `stream.maxOpen` | `number` | `1_000` | Open SSE streams plus waiting MCP `run_<agent>` calls per app; a positive integer, else `createHttpApp` throws `InvalidAgentDefinitionError` |
 | `mcp` | `false \| { name?, version?, maxWaitSeconds? }` | `chamberu`, `0.0.0`, `60` | MCP server info and wait cap; `false` mounts nothing |
 | `cors` | `false \| CorsOptions` | off | `@routup/cors` options |
 | `rateLimit` | `false \| Partial<RateLimitOptions>` | 300 per minute | `@routup/rate-limit` options |

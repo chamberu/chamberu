@@ -19,8 +19,10 @@ import type { Handler, IAppEvent } from 'routup';
 import { isValidupError } from 'validup';
 import {
     DEFAULT_BODY_LIMIT,
+    DEFAULT_MAX_OPEN_STREAMS,
     DEFAULT_READY_TIMEOUT_MS,
     DEFAULT_STREAM_POLL_MS,
+    STREAM_RETRY_AFTER_SECONDS,
 } from './constants.ts';
 import type { HttpAppOptions, HttpContext } from './types.ts';
 
@@ -54,6 +56,11 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         throw new InvalidAgentDefinitionError('The http app needs at least one authenticator.');
     }
 
+    const maxOpenStreams = options.stream?.maxOpen ?? DEFAULT_MAX_OPEN_STREAMS;
+    if (!Number.isSafeInteger(maxOpenStreams) || maxOpenStreams < 1) {
+        throw new InvalidAgentDefinitionError(`stream.maxOpen must be a positive integer, got ${maxOpenStreams}.`);
+    }
+
     return {
         engine: options.engine,
         store: options.store,
@@ -62,6 +69,8 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         basePath: options.basePath ?? '',
         bodyLimit: options.bodyLimit ?? DEFAULT_BODY_LIMIT,
         streamPollMs: options.stream?.pollMs ?? DEFAULT_STREAM_POLL_MS,
+        maxOpenStreams,
+        openStreams: 0,
         readyTimeoutMs: options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS,
         clock: options.clock ?? systemClock,
         shutdown: options.shutdown,
@@ -90,6 +99,34 @@ export function refuseWhenClosed(event: IAppEvent, ctx: HttpContext): Response |
         status: 503,
         code: 'service_unavailable',
         message: 'The server is shutting down.',
+    });
+}
+
+/**
+ * Takes one of the app's `stream.maxOpen` slots: the release (idempotent,
+ * call it on every exit path), or `undefined` when all are taken.
+ */
+export function acquireStreamSlot(ctx: HttpContext): (() => void) | undefined {
+    if (ctx.openStreams >= ctx.maxOpenStreams) return undefined;
+    ctx.openStreams++;
+    let released = false;
+    return () => {
+        if (released) return;
+        released = true;
+        ctx.openStreams--;
+    };
+}
+
+/**
+ * The 503 (with `Retry-After`) of a stream over `stream.maxOpen`. Rendered
+ * here, not thrown: an expected refusal is not reported to `onError`.
+ */
+export function refuseStreamOverCap(event: IAppEvent): Response {
+    event.response.headers.set('retry-after', String(STREAM_RETRY_AFTER_SECONDS));
+    return renderError(event, {
+        status: 503,
+        code: 'service_unavailable',
+        message: 'Too many open streams, retry later.',
     });
 }
 

@@ -48,7 +48,16 @@ export type HttpAppOptions = {
     shutdown?: IShutdown;
     /** Bytes a request body may have. Default: 1 MiB. */
     bodyLimit?: number;
-    stream?: { pollMs?: number };
+    stream?: {
+        /** How often a stream polls the store for runs executing elsewhere. Default: 2 s. */
+        pollMs?: number;
+        /**
+         * Open SSE run streams plus waiting MCP `run_<agent>` calls, per app
+         * (a positive integer). Over it a stream answers 503 with
+         * `Retry-After`, an MCP call answers without waiting. Default: 1000.
+         */
+        maxOpen?: number;
+    };
     mcp?: false | McpOptions;
     /** CORS is off unless given. */
     cors?: false | CorsOptions;
@@ -72,6 +81,10 @@ export type HttpContext = {
     basePath: string;
     bodyLimit: number;
     streamPollMs: number;
+    /** Cap on `openStreams`. */
+    maxOpenStreams: number;
+    /** Open SSE run streams plus waiting MCP `run_<agent>` calls. */
+    openStreams: number;
     readyTimeoutMs: number;
     clock: IClock;
     shutdown?: IShutdown;

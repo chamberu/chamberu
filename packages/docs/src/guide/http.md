@@ -42,6 +42,8 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 
 `GET /runs/:id/stream` sends `run.updated` with the current run, then each step as `step.appended` (`id` is the step index, so `Last-Event-ID` resumes), then live events; it ends once the run is `completed`, `failed` or `cancelled`. The engine's events only cover runs executing in this process, so the stream also polls the store every `stream.pollMs` (2 s) and sees a run that [another replica](/guide/concurrency) executes; an idle poll sends `ping`. A client that disconnects unsubscribes at once, and the app ends open streams on shutdown.
 
+An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_<agent>` calls, on one counter. Over the cap a stream answers 503 with `Retry-After: 5`; retry after that many seconds.
+
 ## Authentication and permissions
 
 `auth` takes one authenticator or a chain; the first principal wins.
@@ -69,7 +71,7 @@ A `*` segment matches exactly one segment (`agent:*:run`). A client that may sta
 
 `/mcp` is a streamable HTTP endpoint (MCP TypeScript SDK v2; 2025-era clients are served statelessly), authenticated like REST. Each client sees the tools its principal may use:
 
-- `run_<agent>` for each agent with `http()` it may run: `{ payload?, idempotencyKey?, thread?, waitSeconds? }`. With `waitSeconds` (capped by `mcp.maxWaitSeconds`, default 60) it waits for `completed`, `failed`, `cancelled` or `waiting` and returns the output, the error or the pending approval, never the resume token.
+- `run_<agent>` for each agent with `http()` it may run: `{ payload?, idempotencyKey?, thread?, waitSeconds? }`. With `waitSeconds` (capped by `mcp.maxWaitSeconds`, default 60) it waits for `completed`, `failed`, `cancelled` or `waiting` and returns the output, the error or the pending approval, never the resume token. A wait counts against `stream.maxOpen`: over the cap the call does not wait and answers at once with `{ runId, status, deduplicated }`, as with `waitSeconds: 0`; the run is already dispatched and goes on.
 - `get_run`, `list_runs`: the REST read rule applies.
 - `resume_run`: `{ token, approved, reason? }`, with the approve permission.
 

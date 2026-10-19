@@ -11,6 +11,7 @@ import { fromJsonSchema } from '@modelcontextprotocol/server';
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '../app/constants.ts';
+import { acquireStreamSlot } from '../app/helpers.ts';
 import type { HttpContext } from '../app/types.ts';
 import { agentPermission, hasPermission } from '../auth/module.ts';
 import type { Principal } from '../auth/types.ts';
@@ -238,7 +239,9 @@ function registerRunTool(
         });
 
         const waitSeconds = Math.min(args.waitSeconds ?? 0, options.maxWaitSeconds);
-        if (waitSeconds <= 0) {
+        // a wait holds one stream.maxOpen slot; over the cap the dispatched run is answered at once
+        const release = waitSeconds > 0 ? acquireStreamSlot(ctx) : undefined;
+        if (!release) {
             const status = deduplicated ? (await ctx.store.getRun(runId))?.status ?? RunStatus.QUEUED : RunStatus.QUEUED;
             return toolResult({
                 runId,
@@ -249,12 +252,16 @@ function registerRunTool(
 
         // the HTTP request going away, or an MCP cancel notification
         const signal = AbortSignal.any([extra.signal, toolCtx.mcpReq.signal]);
-        const run = await waitForRun(ctx, runId, {
-            timeoutMs: waitSeconds * 1_000,
-            pollMs: MCP_WAIT_POLL_MS,
-            signal,
-        });
-        return toolResult(toRunToolResult(run, deduplicated));
+        try {
+            const run = await waitForRun(ctx, runId, {
+                timeoutMs: waitSeconds * 1_000,
+                pollMs: MCP_WAIT_POLL_MS,
+                signal,
+            });
+            return toolResult(toRunToolResult(run, deduplicated));
+        } finally {
+            release();
+        }
     }));
 }
 

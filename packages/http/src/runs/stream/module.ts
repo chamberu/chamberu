@@ -9,7 +9,7 @@ import { RunNotFoundError } from '@chamberu/core';
 import type { Run, RunEvent, Step } from '@chamberu/core';
 import { createEventStream } from 'routup';
 import type { IAppEvent } from 'routup';
-import { refuseWhenClosed } from '../../app/helpers.ts';
+import { acquireStreamSlot, refuseStreamOverCap, refuseWhenClosed } from '../../app/helpers.ts';
 import type { HttpContext } from '../../app/types.ts';
 import { serializeRun } from '../helpers.ts';
 import {
@@ -28,12 +28,16 @@ import {
  * was sent, on shutdown, when the client goes away (a failed write or the
  * request signal) or when the poll fails (reported to `onError`). A failing
  * snapshot is an error response (500, or 404 for a run gone meanwhile), not
- * an empty stream; after shutdown ran the closers it is 503. The caller
- * checks the run exists and may be read.
+ * an empty stream; after shutdown ran the closers it is 503, and with all
+ * `stream.maxOpen` slots taken a 503 with `Retry-After`. The stream holds
+ * one slot until it ends. The caller checks the run exists and may be read.
  */
 export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: string): Promise<Response> {
     const refused = refuseWhenClosed(event, ctx);
     if (refused) return refused;
+    const slot = acquireStreamSlot(ctx);
+    if (!slot) return refuseStreamOverCap(event);
+    const release: () => void = slot;
 
     const stream = createEventStream(event);
     let lastStep = parseLastEventId(event.request.headers.get('last-event-id'));
@@ -60,6 +64,7 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
         signal.removeEventListener('abort', cleanup);
         ctx.closers.delete(cleanup);
         stream.end();
+        release();
     }
 
     function write(message: {

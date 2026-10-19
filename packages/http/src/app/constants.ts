@@ -11,6 +11,12 @@ export const DEFAULT_BODY_LIMIT = 1_048_576;
 /** How often an SSE stream polls the store for runs executing elsewhere. */
 export const DEFAULT_STREAM_POLL_MS = 2_000;
 
+/** Open SSE run streams plus waiting MCP `run_<agent>` calls an app holds at once. */
+export const DEFAULT_MAX_OPEN_STREAMS = 1_000;
+
+/** The `Retry-After` (seconds) of a stream refused over `stream.maxOpen`. */
+export const STREAM_RETRY_AFTER_SECONDS = 5;
+
 /** How long `/readyz` waits for the store. */
 export const DEFAULT_READY_TIMEOUT_MS = 2_000;
 
