@@ -53,7 +53,7 @@ On shutdown, drain the engine before destroying the data source:
   - `putArtifact`: an insert with `orIgnore()` returning `id`.
 - **Time from the clock.** The injected `IClock`'s time is passed as a parameter; queries never call the database's `now()`.
 - **No aliasing.** Values are serialized into the query and parsed out again; nothing is cached in memory.
-- **Dates.** Timestamps are `timestamptz`; `trigger.receivedAt`, `waiting.expiresAt` and `waiting.notifiedAt` live in JSON and are revived as `Date`.
+- **Dates.** Timestamps are `timestamptz`; `trigger.receivedAt`, `trigger.attachments[].createdAt`, `waiting.expiresAt` and `waiting.notifiedAt` live in JSON and are revived as `Date`.
 
 ## Housekeeping
 

@@ -123,10 +123,18 @@ export function toEntity<T extends ObjectLiteral>(
 }
 
 function reviveTrigger(trigger: Record<string, unknown>): TriggerEnvelope {
-    return {
+    const output = {
         ...trigger,
         receivedAt: new Date(trigger.receivedAt as string),
     } as TriggerEnvelope;
+    if (Array.isArray(trigger.attachments)) {
+        output.attachments = (trigger.attachments as Record<string, unknown>[]).map((attachment) => ({
+            ...attachment,
+            createdAt: new Date(attachment.createdAt as string),
+        }) as Artifact);
+    }
+
+    return output;
 }
 
 function reviveWaiting(waiting: Record<string, unknown>): WaitPoint {
