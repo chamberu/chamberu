@@ -15,9 +15,13 @@ import { serve } from 'routup';
 /** `verifier`: an authup `TokenVerifier` in remote mode (with a `creator`), so tokens carry their grants. */
 export function authenticators(verifier: ITokenVerifier): Authenticator[] {
     // #region auth
+    const ciToken = process.env.CI_TOKEN;
     return [
-        // CI and service accounts: tokens of at least 16 characters
-        staticTokens({ tokens: { [process.env.CI_TOKEN!]: { id: 'ci', permissions: ['agent:deploy:run', 'run:read'] } } }),
+        // CI and service accounts: tokens of at least 16 characters.
+        // Static tokens go first: authup() in remote mode introspects every non-JWT bearer.
+        ...(ciToken ?
+            [staticTokens({ tokens: { [ciToken]: { id: 'ci', permissions: ['agent:deploy:run', 'run:read'] } } })] :
+            []),
         // authup: grants come from global tokens, verified remotely
         authup({ verifier }),
         // GitHub Actions OIDC: the mapper decides which repository gets which grants

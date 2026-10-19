@@ -48,7 +48,7 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 
 <<< @/snippets/http.ts#auth
 
-- `staticTokens()`: bearer tokens of at least 16 characters.
+- `staticTokens()`: bearer tokens of at least 16 characters. Put it before `authup()` and `oidc()`: `authup()` in remote mode introspects every bearer that is not a JWT, so a static token placed after it is sent to the authup server.
 - `authup()`: authup tokens through `@authup/server-adapter-web`. Only tokens with the `global` scope grant their permissions; others authenticate and get 403. Grants need remote verification (introspection); a cached result lives until the token's `exp`.
 - `oidc()`: any OIDC issuer through [vouchly](https://github.com/tada5hi/vouchly). `principal` is required: a public issuer such as GitHub Actions lets anyone mint a token for your audience, so the mapper decides which claims get which grants.
 

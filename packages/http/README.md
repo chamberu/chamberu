@@ -149,15 +149,17 @@ A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:ru
 `auth` takes one authenticator or a chain; the first principal wins. An authenticator resolves `undefined` for a request it does not recognize (the chain continues) and throws a 401 for credentials it rejects.
 
 ```ts
+const ciToken = process.env.CI_TOKEN;
 auth: [
-    staticTokens({ tokens: { [process.env.CI_TOKEN!]: { id: 'ci', permissions: ['agent:deploy:run'] } } }),
+    // static tokens first: authup() in remote mode introspects every non-JWT bearer
+    ...(ciToken ? [staticTokens({ tokens: { [ciToken]: { id: 'ci', permissions: ['agent:deploy:run'] } } })] : []),
     // an authup TokenVerifier in remote mode (with a creator), so tokens carry their grants
     authup({ verifier }),
     oidc({ issuers: [githubActions], principal: mapGithubClaims }),
 ],
 ```
 
-- **`staticTokens({ tokens })`**: bearer tokens of at least 16 characters, compared by SHA-256 digest. Fits CI and service accounts.
+- **`staticTokens({ tokens })`**: bearer tokens of at least 16 characters, compared by SHA-256 digest. Fits CI and service accounts. Put it **before** `authup()` and `oidc()`: `authup()` in remote mode sends every bearer that is not a JWT to the authup server's introspection endpoint, so a static token placed after it leaks to that server on every request.
 - **`authup({ verifier })`**: verifies through `@authup/server-adapter-web`. A token grants its permissions only when its `scope` contains `global`; other tokens keep their identity but grant nothing (so they answer 403). Local verification always yields no permissions: grants need remote mode (`creator`, introspection). Permission `policies`, `realm_id` and `client_id` are not evaluated. Caching: a cached result is served until the token's `exp`, so in local mode it outlives a disabled signing key and in remote mode a revoked token (`maxRemoteCacheTTL` bounds remote caching); without `cache`, nothing is cached.
 - **`oidc({ issuers, principal })`**: any OIDC issuer through vouchly, e.g. GitHub Actions tokens. `principal` is **required** and maps the verified claims to a principal (or `undefined` to refuse it): a public issuer lets anyone mint a token for your audience, so the deployment decides which `sub` or `repository` gets which grants. A token from an issuer that is not configured passes to the next authenticator; an unreachable issuer answers 503.
 
