@@ -5,18 +5,22 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { tool } from 'ai';
+import { z } from 'zod';
 import {
     MemoryStore,
     RunEngine,
+    cron,
     defineAgent,
     http,
+    webhook,
 } from '@chamberu/core';
-import type { Agent, INotifier } from '@chamberu/core';
+import type { Agent, INotifier, Notification } from '@chamberu/core';
 import { ControllableClock } from '@chamberu/test-kit';
 import { createHttpApp, staticTokens } from '@chamberu/http';
-import type { HttpAppOptions } from '@chamberu/http';
+import type { HttpAppOptions, Principal } from '@chamberu/http';
 import type { App } from 'routup';
-import { textModel } from './model.ts';
+import { approvalModel, textModel } from './model.ts';
 
 export const ADMIN_TOKEN = 'admin-token-0123456789';
 export const READER_TOKEN = 'reader-token-0123456789';
@@ -55,7 +59,7 @@ export function createTestApp(overrides: TestAppOverrides = {}) {
         onError: () => {},
     });
     const app = createHttpApp({
-        auth: testAuth,
+        auth: [testAuth, permissionsAuth],
         metrics: false,
         rateLimit: false,
         ...overrides,
@@ -94,4 +98,92 @@ export function call(app: App, method: string, path: string, options: CallOption
         body,
         signal: options.signal,
     }));
+}
+
+/** Records every notification it is asked to send. */
+export class CapturingNotifier implements INotifier {
+    readonly name = 'capture';
+
+    readonly sent: Notification[] = [];
+
+    async notify(n: Notification): Promise<void> {
+        this.sent.push(n);
+    }
+
+    /** The resume token of the latest approval notification. */
+    get lastToken(): string {
+        const token = this.sent.findLast((n) => n.kind === 'approval')?.resumeToken;
+        if (!token) throw new Error('no approval notification captured');
+        return token;
+    }
+}
+
+/**
+ * `echo` (http, text), `gate` (http, approval on `deploy`, notifies
+ * `capture`), `sweep` (cron only) and `hooked` (webhook only); fresh models
+ * per call.
+ */
+export function createRunAgents(): Agent[] {
+    return [
+        defineAgent({
+            name: 'echo',
+            model: textModel(),
+            instructions: 'Echo.',
+            triggers: [http()],
+        }),
+        defineAgent({
+            name: 'gate',
+            model: approvalModel('deploy'),
+            instructions: 'Deploy.',
+            triggers: [http()],
+            tools: () => ({ deploy: tool({ inputSchema: z.object({}), execute: async () => 'deployed' }) }),
+            approvals: { deploy: 'user' },
+            notify: 'capture',
+        }),
+        defineAgent({
+            name: 'sweep',
+            model: textModel(),
+            instructions: 'Sweep.',
+            triggers: [cron('0 * * * *')],
+        }),
+        defineAgent({
+            name: 'hooked',
+            model: textModel(),
+            instructions: 'Hooked.',
+            triggers: [webhook({ path: '/x' })],
+        }),
+    ];
+}
+
+/** `createTestApp` over `createRunAgents()` with a capturing notifier. */
+export function createRunTestApp(overrides: TestAppOverrides = {}) {
+    const notifier = new CapturingNotifier();
+    const setup = createTestApp({
+        agents: createRunAgents(),
+        notifiers: { capture: notifier },
+        ...overrides,
+    });
+    return { ...setup, notifier };
+}
+
+/** An authenticator that maps `Bearer p:<a>,<b>` to a principal with those permissions. */
+export async function permissionsAuth(request: Request): Promise<Principal | undefined> {
+    const match = /^Bearer p:(.*)$/.exec(request.headers.get('authorization') ?? '');
+    if (!match) return undefined;
+    const permissions = match[1] ? match[1].split(',') : [];
+    return {
+        id: `p:${match[1]}`, 
+        kind: 'token', 
+        permissions, 
+    };
+}
+
+/** The bearer token `permissionsAuth` reads as exactly these permissions. */
+export function tokenFor(...permissions: string[]): string {
+    return `p:${permissions.join(',')}`;
+}
+
+/** Waits until every pending microtask and immediate ran. */
+export function flush(): Promise<void> {
+    return new Promise((resolve) => { setImmediate(resolve); });
 }
