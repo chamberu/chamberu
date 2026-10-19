@@ -11,6 +11,7 @@ import type { Run } from '@chamberu/core';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { defineCoreHandler } from 'routup';
 import type { App, IAppEvent } from 'routup';
+import { requireAgent } from '../agents/helpers.ts';
 import type { HttpContext } from '../app/types.ts';
 import { authenticate, authorize } from '../auth/helpers.ts';
 import { Permission } from '../auth/constants.ts';
@@ -26,7 +27,6 @@ import {
     createResumeContainer,
     createStartRunContainer,
     parseRunListQuery,
-    requireAgent,
     requireHttpTrigger,
     resolveResumeTarget,
     serializeRun,
@@ -56,7 +56,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
     app.post('/agents/:name/runs', defineCoreHandler(async (event) => {
         const name = param(event, 'name');
         await authorize(event, ctx, agentPermission(name, 'run'));
-        const trigger = requireHttpTrigger(requireAgent(ctx, name));
+        const trigger = requireHttpTrigger(requireAgent(ctx.agents, name));
 
         const body = await validateBody(startContainer, await readJsonBody(event, ctx.bodyLimit));
         const idempotencyKey = body.idempotencyKey ?? readIdempotencyHeader(event.request);

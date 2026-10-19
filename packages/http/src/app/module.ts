@@ -7,6 +7,7 @@
 
 import { NotFoundError } from '@ebec/http';
 import { App, defineCoreHandler } from 'routup';
+import { registerAgentRoutes } from '../agents/module.ts';
 import { registerHealthRoutes } from '../health/module.ts';
 import { registerHookRoutes } from '../hooks/module.ts';
 import { registerRunRoutes } from '../runs/module.ts';
@@ -25,6 +26,7 @@ export function createHttpApp(options: HttpAppOptions): App {
     });
 
     registerHealthRoutes(app, ctx);
+    registerAgentRoutes(app, ctx);
     registerRunRoutes(app, ctx);
     registerHookRoutes(app, ctx);
 

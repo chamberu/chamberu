@@ -45,13 +45,6 @@ export function canReadRun(principal: Principal, run: Run): boolean {
         hasPermission(principal, agentPermission(run.agent, 'run'));
 }
 
-/** The agent by name, else 404. */
-export function requireAgent(ctx: HttpContext, name: string): Agent {
-    const agent = ctx.agents.get(name);
-    if (!agent) throw new NotFoundError({ message: `Agent "${name}" was not found.` });
-    return agent;
-}
-
 /** The agent's `http()` trigger, else 404. */
 export function requireHttpTrigger(agent: Agent): TriggerDefinition {
     const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
