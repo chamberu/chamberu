@@ -190,7 +190,7 @@ auth: [
 
 ## Shutdown
 
-`createShutdown()` runs the shutdown in order: fail readiness, wait `readinessDelayMs`, stop the scheduler, end open SSE streams and close MCP (the app registers that), stop accepting connections, `engine.drain()`, then wait at most `closeTimeoutMs` for open connections before closing them. Pass `gracefulShutdown: false` to `serve()` so srvx does not install its own signal handler:
+`createShutdown()` runs the shutdown in order: fail readiness, wait `readinessDelayMs`, stop the scheduler, end open SSE streams and close MCP (the app registers that; new streams and MCP requests then answer 503), stop accepting connections, `engine.drain()`, then wait at most `closeTimeoutMs` for open connections before closing them. Pass `gracefulShutdown: false` to `serve()` so srvx does not install its own signal handler:
 
 ```ts
 import { serve } from 'routup';

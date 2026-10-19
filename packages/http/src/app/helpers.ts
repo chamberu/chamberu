@@ -15,7 +15,7 @@ import type { Issue } from '@ebec/core';
 import { isHTTPError } from '@ebec/http';
 import type { IHTTPError } from '@ebec/http';
 import { AppError, defineErrorHandler } from 'routup';
-import type { Handler } from 'routup';
+import type { Handler, IAppEvent } from 'routup';
 import { isValidupError } from 'validup';
 import {
     DEFAULT_BODY_LIMIT,
@@ -67,9 +67,31 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         clock: options.clock ?? systemClock,
         shutdown: options.shutdown,
         closers: new Set(),
+        closed: false,
         // eslint-disable-next-line no-console
         onError: options.onError ?? ((error) => console.error('[chamberu]', error)),
     };
+}
+
+function renderError(event: IAppEvent, body: ErrorBody): Response {
+    const headers = new Headers(event.response.headers);
+    headers.set('content-type', 'application/json; charset=utf-8');
+    if (body.status === 401) headers.set('www-authenticate', 'Bearer');
+    return new Response(JSON.stringify(body), { status: body.status, headers });
+}
+
+/**
+ * A 503 once the shutdown ran the closers (streams ended, MCP handler
+ * closed), else `undefined`. Rendered here, not thrown: an expected
+ * refusal is not reported to `onError`.
+ */
+export function refuseWhenClosed(event: IAppEvent, ctx: HttpContext): Response | undefined {
+    if (!ctx.closed) return undefined;
+    return renderError(event, {
+        status: 503,
+        code: 'service_unavailable',
+        message: 'The server is shutting down.',
+    });
 }
 
 function withIssues(body: ErrorBody, issues: readonly Issue[] | undefined): ErrorBody {
@@ -134,9 +156,6 @@ export function createErrorHandler(ctx: HttpContext): Handler {
             };
         }
 
-        const headers = new Headers(event.response.headers);
-        headers.set('content-type', 'application/json; charset=utf-8');
-        if (body.status === 401) headers.set('www-authenticate', 'Bearer');
-        return new Response(JSON.stringify(body), { status: body.status, headers });
+        return renderError(event, body);
     });
 }

@@ -5,40 +5,46 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import {
-    afterEach,
-    describe,
-    expect,
-    it,
-    vi,
+import { 
+    describe, 
+    expect, 
+    it, 
+    vi, 
 } from 'vitest';
-import type * as McpServerModule from '@modelcontextprotocol/server';
-import { createShutdown } from '@chamberu/http';
+import { App } from 'routup';
+import type { IShutdown } from '@chamberu/http';
+import { buildContext, createErrorHandler } from '../../../src/app/helpers.ts';
+import { registerMcpRoutes } from '../../../src/mcp/module.ts';
 import {
     ADMIN_TOKEN,
     call,
     createRunTestApp,
+    testAuth,
 } from '../../utils/app.ts';
 import { callTool, connectMcp } from '../../utils/mcp.ts';
 
-const closes = vi.hoisted(() => [] as Array<ReturnType<typeof vi.fn>>);
+const LIST_TOOLS = {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/list',
+};
+const MCP_HEADERS = { accept: 'application/json, text/event-stream' };
 
-vi.mock('@modelcontextprotocol/server', async (importOriginal) => {
-    const original = await importOriginal<typeof McpServerModule>();
-    return {
-        ...original,
-        createMcpHandler: (...args: Parameters<typeof original.createMcpHandler>) => {
-            const handler = original.createMcpHandler(...args);
-            const close = vi.fn(handler.close);
-            closes.push(close);
-            return { ...handler, close };
+/** An IShutdown whose callbacks the test runs itself. */
+function fakeShutdown() {
+    const callbacks: Array<() => void | Promise<void>> = [];
+    const shutdown: IShutdown = {
+        shuttingDown: false,
+        onShutdown: (fn) => {
+            callbacks.push(fn);
+            return () => {};
+        },
+        shutdown: async () => {
+            for (const fn of callbacks) await fn();
         },
     };
-});
-
-afterEach(() => {
-    closes.length = 0;
-});
+    return shutdown;
+}
 
 describe('/mcp', () => {
     it('answers 401 JSON with a bearer challenge before the mcp layer', async () => {
@@ -81,18 +87,55 @@ describe('/mcp', () => {
         await client.close();
     });
 
-    it('closes the mcp handler on shutdown', async () => {
-        const setup = createRunTestApp();
-        const shutdown = createShutdown({ engine: setup.engine, clock: setup.clock });
-        createRunTestApp({
-            shutdown,
-            engine: setup.engine,
-            store: setup.store,
-            clock: setup.clock,
+    it('closes the mcp handler through the app closers', async () => {
+        const {
+            engine, 
+            store, 
+            agents, 
+        } = createRunTestApp();
+        const onError = vi.fn();
+        const ctx = buildContext({
+            engine,
+            store,
+            agents,
+            auth: testAuth,
+            onError,
         });
-        const close = closes.at(-1)!;
-        expect(close).not.toHaveBeenCalled();
+        const app = new App();
+        registerMcpRoutes(app, ctx);
+        app.use(createErrorHandler(ctx));
+        expect(ctx.closers.size).toBe(1);
+
+        const open = await call(app, 'POST', '/mcp', {
+            token: ADMIN_TOKEN, 
+            body: LIST_TOOLS, 
+            headers: MCP_HEADERS, 
+        });
+        expect(open.status).toBe(200);
+
+        for (const close of ctx.closers) await close();
+        // ungated on purpose: the closed handler itself refuses the request
+        const closed = await call(app, 'POST', '/mcp', {
+            token: ADMIN_TOKEN, 
+            body: LIST_TOOLS, 
+            headers: MCP_HEADERS, 
+        });
+        expect(closed.status).toBe(500);
+        expect(String(onError.mock.calls[0]?.[0])).toMatch(/closed/i);
+    });
+
+    it('answers 503 once the app closers ran', async () => {
+        const shutdown = fakeShutdown();
+        const onError = vi.fn();
+        const { app } = createRunTestApp({ shutdown, onError });
         await shutdown.shutdown();
-        expect(close).toHaveBeenCalledTimes(1);
+        const response = await call(app, 'POST', '/mcp', {
+            token: ADMIN_TOKEN, 
+            body: LIST_TOOLS, 
+            headers: MCP_HEADERS, 
+        });
+        expect(response.status).toBe(503);
+        expect(await response.json()).toMatchObject({ status: 503, code: 'service_unavailable' });
+        expect(onError).not.toHaveBeenCalled();
     });
 });

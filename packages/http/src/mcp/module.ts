@@ -10,6 +10,7 @@ import type { McpHttpHandler } from '@modelcontextprotocol/server';
 import { UnauthorizedError } from '@ebec/http';
 import { defineCoreHandler } from 'routup';
 import type { App } from 'routup';
+import { refuseWhenClosed } from '../app/helpers.ts';
 import type { HttpContext, McpOptions } from '../app/types.ts';
 import { authenticate } from '../auth/helpers.ts';
 import {
@@ -47,6 +48,8 @@ export function registerMcpRoutes(app: App, ctx: HttpContext, options: McpOption
 
     app.use('/mcp', defineCoreHandler(async (event) => {
         const principal = await authenticate(event, ctx);
+        const refused = refuseWhenClosed(event, ctx);
+        if (refused) return refused;
         // event.request.signal is the only signal that follows the HTTP request
         const extra: McpRequestExtra = { principal, signal: event.request.signal };
         return handler.fetch(event.request, {

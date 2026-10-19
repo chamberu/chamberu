@@ -77,5 +77,7 @@ export type HttpContext = {
     shutdown?: IShutdown;
     /** Ends open streams and closes handlers on shutdown. */
     closers: Set<() => void | Promise<void>>;
+    /** Set once the shutdown callback runs the closers: no new streams or MCP requests. */
+    closed: boolean;
     onError: (error: unknown) => void;
 };

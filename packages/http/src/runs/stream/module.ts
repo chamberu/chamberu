@@ -5,9 +5,11 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { RunNotFoundError } from '@chamberu/core';
 import type { Run, RunEvent, Step } from '@chamberu/core';
 import { createEventStream } from 'routup';
 import type { IAppEvent } from 'routup';
+import { refuseWhenClosed } from '../../app/helpers.ts';
 import type { HttpContext } from '../../app/types.ts';
 import { serializeRun } from '../helpers.ts';
 import { isNewer, isSettled, parseLastEventId } from './helpers.ts';
@@ -18,10 +20,15 @@ import { isNewer, isSettled, parseLastEventId } from './helpers.ts';
  * events, with a store poll every `streamPollMs` for runs executing on
  * another replica (`ping` when it found nothing). Ends once a settled run
  * was sent, on shutdown, when the client goes away (a failed write or the
- * request signal) or when the poll fails (reported to `onError`). The caller
+ * request signal) or when the poll fails (reported to `onError`). A failing
+ * snapshot is an error response (500, or 404 for a run gone meanwhile), not
+ * an empty stream; after shutdown ran the closers it is 503. The caller
  * checks the run exists and may be read.
  */
 export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: string): Promise<Response> {
+    const refused = refuseWhenClosed(event, ctx);
+    if (refused) return refused;
+
     const stream = createEventStream(event);
     let lastStep = parseLastEventId(event.request.headers.get('last-event-id'));
     let lastRun: Run | undefined;
@@ -154,20 +161,21 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
     }
     signal.addEventListener('abort', cleanup, { once: true });
 
+    let run: Run | undefined;
+    let steps: Step[];
     try {
-        const run = await ctx.store.getRun(runId);
-        if (!run) {
-            cleanup();
-            return stream.response;
-        }
-        sendRun(run);
-        sendSteps(await ctx.store.listSteps(runId));
-        if (isSettled(run)) {
-            cleanup();
-            return stream.response;
-        }
+        run = await ctx.store.getRun(runId);
+        if (!run) throw new RunNotFoundError(runId);
+        steps = await ctx.store.listSteps(runId);
     } catch (error) {
-        fail(error);
+        // nothing was written yet: the error handler answers instead
+        cleanup();
+        throw error;
+    }
+    sendRun(run);
+    sendSteps(steps);
+    if (isSettled(run)) {
+        cleanup();
         return stream.response;
     }
 

@@ -40,6 +40,7 @@ export function createHttpApp(options: HttpAppOptions): App {
     app.use(createErrorHandler(ctx));
 
     options.shutdown?.onShutdown(async () => {
+        ctx.closed = true;
         await Promise.all([...ctx.closers].map(async (close) => {
             try {
                 await close();

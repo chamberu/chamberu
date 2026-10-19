@@ -239,6 +239,31 @@ describe('GET /runs/:id/stream', () => {
         for (const unsubscribe of unsubscribes) expect(unsubscribe).toHaveBeenCalledTimes(1);
     });
 
+    it('answers 500 when the snapshot fails', async () => {
+        const onError = vi.fn();
+        const ctx = createRunTestApp({ onError });
+        const runId = await start(ctx.app);
+        const unsubscribes = spyOnSubscriptions(ctx.engine);
+        const failure = new Error('store down');
+        vi.spyOn(ctx.store, 'listSteps').mockRejectedValueOnce(failure);
+
+        const response = await call(ctx.app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN });
+        expect(response.status).toBe(500);
+        expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+        expect(onError).toHaveBeenCalledWith(failure);
+        for (const unsubscribe of unsubscribes) expect(unsubscribe).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers 404 when the run is gone before the snapshot', async () => {
+        const ctx = createRunTestApp();
+        const runId = await start(ctx.app);
+        const run = await ctx.store.getRun(runId);
+        vi.spyOn(ctx.store, 'getRun').mockResolvedValueOnce(run).mockResolvedValueOnce(undefined);
+
+        const response = await call(ctx.app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN });
+        expect(response.status).toBe(404);
+    });
+
     it('checks the run and the permission before it streams', async () => {
         const { app } = createRunTestApp();
         const runId = await start(app);
@@ -280,5 +305,10 @@ describe('GET /runs/:id/stream', () => {
         await shutdown.shutdown();
         expect(await reader.rest()).toEqual([]);
         expect(reader.done).toBe(true);
+
+        const subscribe = vi.spyOn(engine, 'on');
+        const late = await call(app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN });
+        expect(late.status).toBe(503);
+        expect(subscribe).not.toHaveBeenCalled();
     });
 });
