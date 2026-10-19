@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { IssueCode } from '@ebec/core';
 import { Container, ValidupError } from 'validup';
 import { describe, expect, it } from 'vitest';
 import { isBoolean, isDefined, isString } from '../../../src/request/validators.ts';
@@ -16,10 +17,10 @@ async function run(validator: ValidatorDescriptor, input: Record<string, unknown
     return container.run(input);
 }
 
-async function rejects(validator: ValidatorDescriptor, input: Record<string, unknown>) {
+async function rejects(validator: ValidatorDescriptor, input: Record<string, unknown>, code: string = IssueCode.VALUE_INVALID) {
     const error = await run(validator, input).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ValidupError);
-    expect((error as ValidupError).issues[0]).toMatchObject({ path: ['k'] });
+    expect((error as ValidupError).issues[0]).toMatchObject({ path: ['k'], code });
 }
 
 describe('validators', () => {
@@ -44,6 +45,6 @@ describe('validators', () => {
         expect(await run(isDefined(), { k: null })).toEqual({ k: null });
         expect(await run(isDefined(), { k: 0 })).toEqual({ k: 0 });
         expect(await run(isDefined(), { k: {} })).toEqual({ k: {} });
-        await rejects(isDefined(), {});
+        await rejects(isDefined(), {}, IssueCode.REQUIRED);
     });
 });
