@@ -57,6 +57,18 @@ describe('authup', () => {
         });
     });
 
+    it.each([[undefined], ['']])('rejects a verified token with sub %j with 401', async (sub) => {
+        const data = {
+            scope: 'global', 
+            permissions: PERMISSIONS, 
+            ...(sub === undefined ? {} : { sub }), 
+        } as TokenVerificationData;
+        await expect(authup({ verifier: verifierFor(data) })(request('Bearer good'))).rejects.toMatchObject({
+            status: 401,
+            message: 'The access token names no subject.',
+        });
+    });
+
     it('rejects a malformed header with 401', async () => {
         await expect(withScope('global')(request('Bearer'))).rejects.toMatchObject({ status: 401 });
     });

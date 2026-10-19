@@ -32,9 +32,12 @@ export function authup(options: AuthupOptions): Authenticator {
             throw new UnauthorizedError({ message: 'The access token is invalid.', cause });
         }
         if (!data) return undefined;
+        if (typeof data.sub !== 'string' || data.sub.length === 0) {
+            throw new UnauthorizedError({ message: 'The access token names no subject.' });
+        }
 
         return {
-            id: String(data.sub ?? ''),
+            id: data.sub,
             kind: 'authup',
             permissions: grantsGlobal(data.scope) ? data.permissions.map((p) => p.name) : [],
             claims: { ...data },
