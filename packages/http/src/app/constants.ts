@@ -19,3 +19,12 @@ export const DEFAULT_PAGE_LIMIT = 50;
 
 /** Largest `page[limit]` a list accepts. */
 export const MAX_PAGE_LIMIT = 100;
+
+/** Requests per client and window before `429`. */
+export const DEFAULT_RATE_LIMIT_MAX = 300;
+
+/** The rate limit window. */
+export const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
+
+/** Where Prometheus scrapes, relative to `basePath`. */
+export const DEFAULT_METRICS_PATH = '/metrics';

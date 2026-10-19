@@ -11,6 +11,7 @@ import { registerAgentRoutes } from '../agents/module.ts';
 import { registerHealthRoutes } from '../health/module.ts';
 import { registerHookRoutes } from '../hooks/module.ts';
 import { registerMcpRoutes } from '../mcp/module.ts';
+import { installPlugins } from '../plugins/module.ts';
 import { registerRunRoutes } from '../runs/module.ts';
 import { buildContext, createErrorHandler } from './helpers.ts';
 import type { HttpAppOptions } from './types.ts';
@@ -26,6 +27,7 @@ export function createHttpApp(options: HttpAppOptions): App {
         ...(options.trustProxy !== undefined ? { options: { trustProxy: options.trustProxy } } : {}),
     });
 
+    installPlugins(app, options);
     registerHealthRoutes(app, ctx);
     registerAgentRoutes(app, ctx);
     registerRunRoutes(app, ctx);
