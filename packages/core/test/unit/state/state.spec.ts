@@ -52,8 +52,8 @@ async function runOnce(store: MemoryStore, agent: Parameters<typeof defineAgent>
     await engine.start();
     const { runId } = await engine.dispatch({
         agent: agent.name,
-        trigger: 'manual',
-        source: 'manual',
+        trigger: 'http',
+        source: 'http',
         payload: {},
     });
     await engine.idle();
@@ -146,8 +146,8 @@ describe('agent state', () => {
             agent: 'alpha',
             trigger: {
                 agent: 'alpha',
-                trigger: 'manual',
-                source: 'manual',
+                trigger: 'http',
+                source: 'http',
                 payload: {},
             } as RunContext['trigger'],
             signal: new AbortController().signal,

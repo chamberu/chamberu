@@ -13,7 +13,7 @@ describe('public api', () => {
         'defineAgent',
         'cron',
         'http',
-        'manual',
+        'webhook',
         'RunEngine',
         'MemoryStore',
         'defineEffectTool',

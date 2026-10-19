@@ -5,7 +5,7 @@ import {
     cron,
     defineAgent,
     http,
-    manual,
+    webhook,
 } from '@chamberu/core';
 
 export async function dispatchExamples(model: LanguageModel) {
@@ -15,8 +15,8 @@ export async function dispatchExamples(model: LanguageModel) {
         model,
         instructions: 'Triage the issue in the trigger payload.',
         triggers: [
-            manual(), // id 'manual'
-            http({ path: '/issues' }), // id 'http:/issues'
+            http(), // id 'http'
+            webhook({ path: '/issues' }), // id 'webhook:/issues'
             cron('*/30 * * * *', { overlap: 'skip' }), // id 'cron:*/30 * * * *'
         ],
     });
@@ -31,8 +31,8 @@ export async function dispatchExamples(model: LanguageModel) {
     // #region dispatch
     const first = await engine.dispatch({
         agent: 'triage',
-        trigger: 'http:/issues',
-        source: 'http',
+        trigger: 'webhook:/issues',
+        source: 'webhook',
         payload: { repo: 'acme/app', issue: 42 },
         // a redelivery with the same key returns the same run
         idempotencyKey: 'delivery-7f3a',
@@ -42,8 +42,8 @@ export async function dispatchExamples(model: LanguageModel) {
 
     const again = await engine.dispatch({
         agent: 'triage',
-        trigger: 'http:/issues',
-        source: 'http',
+        trigger: 'webhook:/issues',
+        source: 'webhook',
         payload: { repo: 'acme/app', issue: 42 },
         idempotencyKey: 'delivery-7f3a',
     });

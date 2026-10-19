@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export type TriggerSource = 'cron' | 'http' | 'github' | 'mcp' | 'manual';
+export type TriggerSource = 'cron' | 'http' | 'webhook' | 'github' | 'mcp';
 
 export type TriggerDefinition<P = unknown> = {
     source: TriggerSource;

@@ -21,7 +21,7 @@ import {
     cron,
     defineAgent,
     http,
-    manual,
+    webhook,
 } from '@chamberu/core';
 import type { IScheduler, SchedulerOptions } from '@chamberu/scheduler';
 import { createScheduler } from '@chamberu/scheduler';
@@ -126,7 +126,7 @@ describe('createScheduler', () => {
 
     it('ignores non-cron triggers', async () => {
         const store = new MemoryStore();
-        const scheduler = make(store, [agentWith([manual(), http({ path: '/sweep' })])]);
+        const scheduler = make(store, [agentWith([http(), webhook({ path: '/sweep' })])]);
         await scheduler.start();
 
         await vi.advanceTimersByTimeAsync(120_000);

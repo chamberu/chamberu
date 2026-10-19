@@ -8,11 +8,16 @@
 import type { TriggerDefinition } from '../types.ts';
 import type { HttpTriggerOptions } from './types.ts';
 
+/**
+ * The control-plane trigger: REST `POST /agents/:name/runs`, the UI and the
+ * MCP tool `run_<agent>` start runs through it (envelope `trigger: 'http'`,
+ * `source: 'http'` or `'mcp'`). Its id is `http`, so an agent declares it at
+ * most once (enforced by the duplicate trigger id check of `defineAgent`).
+ */
 export function http(opts: HttpTriggerOptions = {}): TriggerDefinition {
-    const path = opts.path ?? '/';
     return {
         source: 'http',
-        id: `http:${path}`,
-        options: { path, schema: opts.schema },
+        id: 'http',
+        options: { schema: opts.schema },
     };
 }

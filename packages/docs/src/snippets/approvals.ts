@@ -64,8 +64,8 @@ export async function approvalFlow(model: LanguageModel) {
     await engine.start();
     const { runId } = await engine.dispatch({
         agent: 'deployer',
-        trigger: 'manual',
-        source: 'manual',
+        trigger: 'http',
+        source: 'http',
         payload: { version: '1.4.0', env: 'prod' },
     });
     await engine.idle();

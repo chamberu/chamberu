@@ -51,5 +51,5 @@ base64url(JSON { runId, approvalId, tokenId, exp }) + "." + base64url(HMAC-SHA25
 The signature is compared in constant time, and a token expires at the wait point's `expiresAt`. `createResumeToken(secret, claims)` and `verifyResumeToken(secret, token, now)` are exported for transports that carry tokens themselves.
 
 ::: tip Where tokens are answered
-In core you call `engine.resume()` yourself. The planned [`@chamberu/http`](/roadmap#planned-packages) package adds an authenticated resume endpoint and an MCP `resume_run` tool, and the planned UI an approvals inbox.
+In core you call `engine.resume()` yourself. [`@chamberu/http`](/guide/http) adds the authenticated `POST /resume` endpoint and the MCP `resume_run` tool (both need `agent:<name>:approve` besides the token), and the planned UI an approvals inbox.
 :::

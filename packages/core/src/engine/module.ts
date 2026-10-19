@@ -10,6 +10,7 @@ import { hostname } from 'node:os';
 import { pid } from 'node:process';
 import type { Agent } from '../agent/types.ts';
 import { createResumeToken, verifyResumeToken } from '../approval/module.ts';
+import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
 import type { IClock } from '../clock/index.ts';
 import {
@@ -174,9 +175,9 @@ export class RunEngine {
         return this.store.getRun(id);
     }
 
-    on(event: RunEvent['type'], listener: (e: RunEvent) => void): () => void {
+    on<T extends RunEvent['type']>(event: T, listener: (e: Extract<RunEvent, { type: T }>) => void): () => void {
         const wrapped = (e: RunEvent) => {
-            if (e.type === event) listener(e);
+            if (e.type === event) listener(e as Extract<RunEvent, { type: T }>);
         };
         this.listeners.add(wrapped);
         return () => {
@@ -350,6 +351,17 @@ export class RunEngine {
             { expectStatus },
         );
         this.emit({ type: 'run.updated', run: updated });
+    }
+
+    /**
+     * Checks a resume token's signature (constant time) and expiry and returns
+     * its claims; touches no store. Lets an intake layer authorize against the
+     * run's agent before `resume()` without acting on an unsigned payload;
+     * `resume()` still checks the token against the current wait point.
+     * Throws InvalidResumeTokenError for a forged, malformed or expired token.
+     */
+    inspectResumeToken(token: string): ResumeTokenClaims {
+        return verifyResumeToken(this.resumeSecret, token, this.clock.now());
     }
 
     /**

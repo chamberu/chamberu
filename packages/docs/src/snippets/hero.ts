@@ -5,7 +5,7 @@ import {
     cron,
     defineAgent,
     defineEffectTool,
-    http,
+    webhook,
 } from '@chamberu/core';
 
 declare const model: LanguageModel;
@@ -18,7 +18,7 @@ export const triage = defineAgent({
     model,
     instructions: 'Label new issues and close duplicates.',
     triggers: [
-        http({ path: '/issues' }),
+        webhook({ path: '/issues' }),
         cron('0 * * * *'),
     ],
     tools: () => ({

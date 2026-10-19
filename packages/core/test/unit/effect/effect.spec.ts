@@ -32,8 +32,8 @@ const ctx: RunContext = {
     agent: 'triage',
     trigger: {
         agent: 'triage',
-        trigger: 'manual',
-        source: 'manual',
+        trigger: 'http',
+        source: 'http',
         payload: {},
     } as RunContext['trigger'],
     signal: new AbortController().signal,
@@ -106,8 +106,8 @@ describe('effect tools', () => {
         await first.start();
         const { runId } = await first.dispatch({
             agent: 'triage',
-            trigger: 'manual',
-            source: 'manual',
+            trigger: 'http',
+            source: 'http',
             payload: {},
         });
         await first.idle();

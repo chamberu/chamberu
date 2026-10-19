@@ -37,8 +37,8 @@ The model sees the trigger as a JSON block:
 ````md
 ```json
 {
-  "source": "manual",
-  "trigger": "manual",
+  "source": "http",
+  "trigger": "http",
   "payload": {
     "title": "App crashes on start"
   }

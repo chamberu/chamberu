@@ -2,7 +2,7 @@
 
 # chamberu: Agent Guide
 
-chamberu is a TypeScript framework for building self-hosted, trigger-driven AI agents. Agents are declared with `defineAgent()`, started by triggers (cron, http, github, mcp, manual), and executed as durable runs whose steps are checkpointed in a pluggable store, so runs survive restarts and approval pauses. LLM access goes through the Vercel AI SDK; its types (`ToolSet`, `LanguageModel`, `ModelMessage`) pass through unchanged and are never re-wrapped.
+chamberu is a TypeScript framework for building self-hosted, trigger-driven AI agents. Agents are declared with `defineAgent()`, started by triggers (cron, http, webhook, github, mcp), and executed as durable runs whose steps are checkpointed in a pluggable store, so runs survive restarts and approval pauses. LLM access goes through the Vercel AI SDK; its types (`ToolSet`, `LanguageModel`, `ModelMessage`) pass through unchanged and are never re-wrapped.
 
 ## Quick Reference
 
@@ -21,7 +21,7 @@ npm run lint
 - **Package manager**: npm (workspaces)
 - **Build orchestration**: nx (`nx run-many`), packages built with tsdown (ESM only)
 
-Packages live in `packages/*`. `@chamberu/core`, `@chamberu/scheduler`, `@chamberu/store-typeorm` and `@chamberu/test-kit` exist today; the others are planned (see [Project Structure](.agents/structure.md)).
+Packages live in `packages/*`. `@chamberu/core`, `@chamberu/http`, `@chamberu/scheduler`, `@chamberu/store-typeorm` and `@chamberu/test-kit` exist today; the others are planned (see [Project Structure](.agents/structure.md)).
 
 ## Detailed Guides
 

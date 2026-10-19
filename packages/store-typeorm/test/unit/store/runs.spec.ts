@@ -28,8 +28,8 @@ function makeRun(id: string, overrides: Partial<Run> = {}): Run {
         trigger: {
             id: `t-${id}`,
             agent: 'a',
-            trigger: 'manual',
-            source: 'manual',
+            trigger: 'http',
+            source: 'http',
             payload: { n: 1 },
             receivedAt: new Date(1_234_567),
         },

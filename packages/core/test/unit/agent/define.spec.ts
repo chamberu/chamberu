@@ -12,11 +12,12 @@ import {
     expectTypeOf,
     it,
 } from 'vitest';
-import { 
-    InvalidAgentDefinitionError, 
-    cron, 
-    defineAgent, 
-    manual, 
+import {
+    InvalidAgentDefinitionError,
+    cron,
+    defineAgent,
+    http,
+    webhook,
 } from '@chamberu/core';
 import type { AgentDefinition, TriggerDefinition } from '@chamberu/core';
 
@@ -64,23 +65,36 @@ describe('defineAgent', () => {
         expect(() => defineAgent({
             ...base,
             name: 'a',
-            triggers: [cron('*/5 * * * *'), manual()],
+            triggers: [cron('*/5 * * * *'), http()],
+        })).not.toThrow();
+    });
+
+    it('allows at most one http() trigger and many webhook() triggers', () => {
+        expect(() => defineAgent({
+            ...base,
+            name: 'a',
+            triggers: [http(), http()],
+        })).toThrow(InvalidAgentDefinitionError);
+        expect(() => defineAgent({
+            ...base,
+            name: 'a',
+            triggers: [http(), webhook({ path: '/a' }), webhook({ path: '/b' }), cron('*/5 * * * *')],
         })).not.toThrow();
     });
 
     it('accepts a trigger typed by its payload', () => {
-        const webhook: TriggerDefinition<{ repo: string }> = {
+        const githubTrigger: TriggerDefinition<{ repo: string }> = {
             source: 'github',
             id: 'github:issues',
             options: {},
             concurrencyKey: (payload) => payload.repo,
             idempotencyKey: (payload) => `${payload.repo}:1`,
         };
-        expectTypeOf(webhook).toExtend<TriggerDefinition>();
+        expectTypeOf(githubTrigger).toExtend<TriggerDefinition>();
         const agent = defineAgent({
             ...base,
             name: 'a',
-            triggers: [webhook],
+            triggers: [githubTrigger],
         });
         expectTypeOf(agent.definition.triggers).toEqualTypeOf<AgentDefinition['triggers']>();
         expect(agent.definition.triggers?.[0]?.concurrencyKey?.({ repo: 'o/r' })).toBe('o/r');

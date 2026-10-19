@@ -17,8 +17,8 @@ export function makeRun(id: string, overrides: Partial<Run> = {}): Run {
         trigger: {
             id: `t-${id}`,
             agent: 'a',
-            trigger: 'manual',
-            source: 'manual',
+            trigger: 'http',
+            source: 'http',
             payload: {},
             receivedAt: createdAt,
         },

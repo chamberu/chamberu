@@ -136,8 +136,8 @@ type Ctx = ReturnType<typeof setup>;
 
 const env = (concurrencyKey?: string) => ({
     agent: 'release',
-    trigger: 'manual',
-    source: 'manual' as const,
+    trigger: 'http',
+    source: 'http' as const,
     payload: {},
     concurrencyKey,
 });
@@ -764,5 +764,34 @@ describe('approvals', () => {
             expiresAt: new Date(2_000_000),
         });
         await expect(ctx.engine.resume(token, { approved: true })).rejects.toThrow(/was not found/);
+    });
+});
+
+describe('RunEngine.inspectResumeToken', () => {
+    const claims = {
+        runId: 'r1', 
+        approvalId: 'a1', 
+        tokenId: 't1', 
+    };
+
+    it('returns the claims of a valid token without touching the store', () => {
+        const ctx = setup({ model: mockModel([]) });
+        const getRun = vi.spyOn(ctx.store, 'getRun');
+        const token = createResumeToken(SECRET, { ...claims, expiresAt: new Date(2_000_000) });
+        expect(ctx.engine.inspectResumeToken(token)).toEqual(claims);
+        expect(getRun).not.toHaveBeenCalled();
+    });
+
+    it('rejects forged, malformed and expired tokens without touching the store', () => {
+        const ctx = setup({ model: mockModel([]) });
+        const getRun = vi.spyOn(ctx.store, 'getRun');
+        const forged = createResumeToken('other', { ...claims, expiresAt: new Date(2_000_000) });
+        expect(() => ctx.engine.inspectResumeToken(forged)).toThrow(InvalidResumeTokenError);
+        expect(() => ctx.engine.inspectResumeToken('x')).toThrow(InvalidResumeTokenError);
+
+        const token = createResumeToken(SECRET, { ...claims, expiresAt: new Date(2_000_000) });
+        ctx.clock.advance(1_000_000);
+        expect(() => ctx.engine.inspectResumeToken(token)).toThrow('The resume token has expired.');
+        expect(getRun).not.toHaveBeenCalled();
     });
 });

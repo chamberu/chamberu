@@ -13,7 +13,7 @@ import {
     RunEngine,
     cron,
     defineAgent,
-    manual,
+    http,
 } from '@chamberu/core';
 import { fireCronTrigger, readCronOptions } from '@chamberu/scheduler';
 import { ControllableClock } from '@chamberu/test-kit';
@@ -110,10 +110,10 @@ describe('fireCronTrigger', () => {
     it('rejects a non-cron trigger', async () => {
         const { fire } = setup();
 
-        const promise = fire(T, manual());
+        const promise = fire(T, http());
 
         await expect(promise).rejects.toThrow(InvalidAgentDefinitionError);
-        await expect(promise).rejects.toThrow(/sweep.*manual/);
+        await expect(promise).rejects.toThrow(/sweep.*http/);
     });
 
     it('ignores the trigger\'s own idempotencyKey', async () => {

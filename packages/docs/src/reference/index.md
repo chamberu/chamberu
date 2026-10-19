@@ -26,20 +26,20 @@ Throws `InvalidAgentDefinitionError` for an invalid name or duplicate trigger id
 ```ts
 function cron(expression: string, opts?: CronOptions): TriggerDefinition;
 function http(opts?: HttpTriggerOptions): TriggerDefinition;
-function manual(opts?: ManualTriggerOptions): TriggerDefinition;
+function webhook(opts: WebhookTriggerOptions): TriggerDefinition;
 ```
 
 `TriggerSource`, `TriggerDefinition` and `TriggerEnvelope`:
 
 <<< ../../../core/src/trigger/types.ts{ts}
 
-`CronOptions` and `OverlapPolicy`, `HttpTriggerOptions`, `ManualTriggerOptions`:
+`CronOptions` and `OverlapPolicy`, `HttpTriggerOptions`, `WebhookTriggerOptions`:
 
 <<< ../../../core/src/trigger/cron/types.ts{ts}
 
 <<< ../../../core/src/trigger/http/types.ts{ts}
 
-<<< ../../../core/src/trigger/manual/types.ts{ts}
+<<< ../../../core/src/trigger/webhook/types.ts{ts}
 
 See [Triggers & the Envelope](/guide/triggers).
 

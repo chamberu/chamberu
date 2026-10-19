@@ -120,8 +120,8 @@ function make(
 
 const env = {
     agent: 'triage',
-    trigger: 'manual',
-    source: 'manual' as const,
+    trigger: 'http',
+    source: 'http' as const,
     payload: { issue: 42 },
 };
 

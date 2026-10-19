@@ -5,7 +5,7 @@ chamberu is a TypeScript framework for **self-hosted, trigger-driven AI agents**
 The LLM side is the [Vercel AI SDK](https://ai-sdk.dev) v7. chamberu adds what the AI SDK leaves out on purpose: triggers, a run queue, persistence, concurrency control, approvals and a graceful shutdown.
 
 ::: info Status
-chamberu is pre-1.0. [`@chamberu/core`](/reference/), the cron scheduler [`@chamberu/scheduler`](/reference/scheduler), the [TypeORM store](/stores/typeorm) and the test helpers, [`@chamberu/test-kit`](/reference/test-kit), exist today. The HTTP API, the GitHub connector, the UI and the deploy kit are planned; the [roadmap](/roadmap) lists them. Pages about planned work carry a <Badge type="warning" text="Planned" /> badge.
+chamberu is pre-1.0. [`@chamberu/core`](/reference/), the cron scheduler [`@chamberu/scheduler`](/reference/scheduler), the HTTP and MCP API [`@chamberu/http`](/reference/http), the [TypeORM store](/stores/typeorm) and the test helpers, [`@chamberu/test-kit`](/reference/test-kit), exist today. The GitHub connector, the UI and the deploy kit are planned; the [roadmap](/roadmap) lists them. Pages about planned work carry a <Badge type="warning" text="Planned" /> badge.
 :::
 
 ## Why chamberu?
@@ -56,7 +56,7 @@ Each of these is a better fit in some setups: if you already run Inngest or Trig
 
 `@chamberu/core` contains:
 
-- [`defineAgent()`](/guide/agents) and the trigger builders `cron()`, `http()` and `manual()`
+- [`defineAgent()`](/guide/agents) and the trigger builders `cron()`, `http()` and `webhook()`
 - the [`RunEngine`](/reference/#runengine): dispatch, scheduling, execution, checkpoints, budgets, approvals, cancel, drain and recovery
 - [effect tools](/guide/effect-tools) and [agent state](/guide/state)
 - the [store contract](/stores/) and [`MemoryStore`](/stores/memory)
@@ -64,7 +64,7 @@ Each of these is a better fit in some setups: if you already run Inngest or Trig
 
 `@chamberu/test-kit` adds the store contract suite and a controllable clock for tests.
 
-The engine starts runs only through `engine.dispatch()`. [`@chamberu/scheduler`](/guide/scheduler) fires cron triggers; receiving webhooks and serving an HTTP or MCP API belong to the planned [`@chamberu/http`](/roadmap) package.
+The engine starts runs only through `engine.dispatch()`. [`@chamberu/scheduler`](/guide/scheduler) fires cron triggers; [`@chamberu/http`](/guide/http) serves REST, webhooks and MCP.
 
 ## Next steps
 

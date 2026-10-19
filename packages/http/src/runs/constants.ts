@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { StandardSchemaV1 } from '@standard-schema/spec';
+/** Longest resume token `POST /resume` reads. */
+export const RESUME_TOKEN_MAX_LENGTH = 4_096;
 
-export type ManualTriggerOptions = {
-    schema?: StandardSchemaV1;
-};
+/** Longest approval `reason`. */
+export const RESUME_REASON_MAX_LENGTH = 1_000;
