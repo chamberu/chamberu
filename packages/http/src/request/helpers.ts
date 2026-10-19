@@ -237,9 +237,25 @@ export function readIdempotencyHeader(request: Request): string | undefined {
     return value;
 }
 
-/** A key a trigger derived from the payload: at most `KEY_MAX_LENGTH` characters, else 400. */
+/** A key a trigger derived from the payload: at most `KEY_MAX_LENGTH` characters and no NUL, else 400. */
 export function assertDerivedKey(name: string, value: string | undefined): void {
     if (value !== undefined && value.length > KEY_MAX_LENGTH) {
         throw new BadRequestError({ message: `The ${name} derived from the payload exceeds ${KEY_MAX_LENGTH} characters.` });
     }
+    if (value?.includes('\u0000')) {
+        throw new BadRequestError({ message: `The ${name} derived from the payload contains a NUL character.` });
+    }
+}
+
+/**
+ * 400 for a NUL character (`%00`) in the path or the query: Postgres text
+ * columns refuse it, so a lookup by such an id, key or filter would fail
+ * as a 500 instead of a 404.
+ */
+export function assertNoNul(event: IAppEvent): void {
+    let found = /%00/i.test(event.path);
+    for (const [key, value] of event.searchParams) {
+        if (key.includes('\u0000') || value.includes('\u0000')) found = true;
+    }
+    if (found) throw new BadRequestError({ message: 'The request URL must not contain a NUL character.' });
 }

@@ -41,6 +41,9 @@ import type {
 
 type GetRunArgs = { runId: string };
 
+/** No U+0000: Postgres text columns refuse it. */
+const NO_NUL = '^[^\\u0000]*$';
+
 type ResumeRunArgs = {
     token: string;
     approved: boolean;
@@ -59,7 +62,13 @@ type ListRunsArgs = {
 // built once: fromJsonSchema compiles a validator per schema object
 const GET_RUN_INPUT = fromJsonSchema<GetRunArgs>({
     type: 'object',
-    properties: { runId: { type: 'string', minLength: 1 } },
+    properties: {
+        runId: {
+            type: 'string', 
+            minLength: 1, 
+            pattern: NO_NUL,
+        },
+    },
     required: ['runId'],
     additionalProperties: false,
 });
@@ -67,7 +76,11 @@ const GET_RUN_INPUT = fromJsonSchema<GetRunArgs>({
 const LIST_RUNS_INPUT = fromJsonSchema<ListRunsArgs>({
     type: 'object',
     properties: {
-        agent: { type: 'string', minLength: 1 },
+        agent: {
+            type: 'string', 
+            minLength: 1, 
+            pattern: NO_NUL,
+        },
         status: { type: 'array', items: { type: 'string', enum: Object.values(RunStatus) } },
         limit: {
             type: 'integer',
@@ -162,12 +175,14 @@ export function buildRunTools(agents: Iterable<Agent>, options: McpEndpointOptio
                         type: 'string',
                         minLength: 1,
                         maxLength: KEY_MAX_LENGTH,
+                        pattern: NO_NUL,
                         description: 'Dedupes starts over MCP; a key used over REST is a different scope.',
                     },
                     thread: {
                         type: 'string',
                         minLength: 1,
                         maxLength: KEY_MAX_LENGTH,
+                        pattern: NO_NUL,
                     },
                     waitSeconds: {
                         type: 'integer',

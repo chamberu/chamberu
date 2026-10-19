@@ -12,6 +12,7 @@ import { registerHealthRoutes } from '../health/module.ts';
 import { registerHookRoutes } from '../hooks/module.ts';
 import { registerMcpRoutes } from '../mcp/module.ts';
 import { installPlugins } from '../plugins/module.ts';
+import { assertNoNul } from '../request/helpers.ts';
 import { registerRunRoutes } from '../runs/module.ts';
 import { buildContext, createErrorHandler } from './helpers.ts';
 import type { HttpAppOptions } from './types.ts';
@@ -28,6 +29,10 @@ export function createHttpApp(options: HttpAppOptions): App {
     });
 
     installPlugins(app, options);
+    app.use(defineCoreHandler((event) => {
+        assertNoNul(event);
+        return event.next();
+    }));
     registerHealthRoutes(app, ctx);
     registerAgentRoutes(app, ctx);
     registerRunRoutes(app, ctx);

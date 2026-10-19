@@ -9,12 +9,15 @@ import { IssueCode } from '@ebec/core';
 import { createValidupError, defineValidator } from 'validup';
 import type { ValidatorDescriptor } from 'validup';
 
-/** A string of `min` to `max` characters. */
+/** A string of `min` to `max` characters without U+0000 (which Postgres text columns refuse). */
 export function isString({ min = 0, max }: { min?: number; max: number }): ValidatorDescriptor {
     return defineValidator({
         run: ({ value }) => {
             if (typeof value !== 'string' || value.length < min || value.length > max) {
                 throw createValidupError(value, IssueCode.VALUE_INVALID, `must be a string of ${min} to ${max} characters`);
+            }
+            if (value.includes('\u0000')) {
+                throw createValidupError(value, IssueCode.VALUE_INVALID, 'must not contain a NUL character');
             }
             return value;
         },
