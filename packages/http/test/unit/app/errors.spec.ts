@@ -21,7 +21,7 @@ import {
     http,
 } from '@chamberu/core';
 import { textModel } from '../../utils/model.ts';
-import { call, createTestApp } from '../../utils/app.ts';
+import { ADMIN_TOKEN, call, createTestApp } from '../../utils/app.ts';
 
 function appThrowing(error: unknown, onError?: (error: unknown) => void) {
     // the app ends in a catch-all, so the throwing route goes in front of it
@@ -168,5 +168,30 @@ describe('createHttpApp', () => {
 
     it('rejects an empty auth chain', () => {
         expect(() => createTestApp({ auth: [] })).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('answers 500 and reports an agent the engine does not know', async () => {
+        const known = defineAgent({
+            name: 'known', 
+            model: textModel(), 
+            instructions: 'Known.', 
+            triggers: [http()],
+        });
+        const unknown = defineAgent({
+            name: 'unknown', 
+            model: textModel(), 
+            instructions: 'Unknown.', 
+            triggers: [http()],
+        });
+        const errors: unknown[] = [];
+        const { engine } = createTestApp({ agents: [known] });
+        const { app } = createTestApp({
+            agents: [known, unknown], 
+            engine, 
+            onError: (error) => { errors.push(error); },
+        });
+        const response = await call(app, 'POST', '/agents/unknown/runs', { token: ADMIN_TOKEN });
+        expect(response.status).toBe(500);
+        expect(errors[0]).toBeInstanceOf(InvalidAgentDefinitionError);
     });
 });
