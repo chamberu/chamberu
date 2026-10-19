@@ -12,13 +12,19 @@ import type { IAppEvent } from 'routup';
 import { refuseWhenClosed } from '../../app/helpers.ts';
 import type { HttpContext } from '../../app/types.ts';
 import { serializeRun } from '../helpers.ts';
-import { isNewer, isSettled, parseLastEventId } from './helpers.ts';
+import {
+    isNewer,
+    isSettled,
+    parseLastEventId,
+    usageChanged,
+} from './helpers.ts';
 
 /**
  * Streams a run as SSE: `run.updated` with the current run, then each step
  * after `Last-Event-ID` as `step.appended` (`id` = step index), then live
  * events, with a store poll every `streamPollMs` for runs executing on
- * another replica (`ping` when it found nothing). Ends once a settled run
+ * another replica (`ping` when it found nothing; the steps are read only
+ * when the polled run changed). Ends once a settled run
  * was sent, on shutdown, when the client goes away (a failed write or the
  * request signal) or when the poll fails (reported to `onError`). A failing
  * snapshot is an error response (500, or 404 for a run gone meanwhile), not
@@ -134,18 +140,19 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
         try {
             const run = await ctx.store.getRun(runId);
             if (ended) return;
-            let sent = false;
-            if (run && isNewer(run, lastRun)) sent = sendRun(run);
-            if (run && sent && isSettled(run)) {
-                await settle();
-                return;
-            }
-            const steps = await ctx.store.listSteps(runId);
-            if (sendSteps(steps)) sent = true;
             if (!run) {
                 cleanup();
                 return;
             }
+            let sent = false;
+            // the engine appends a step before it bumps the run: an unchanged run has no new steps
+            const changed = isNewer(run, lastRun) || usageChanged(run, lastRun);
+            if (changed) sent = sendRun(run);
+            if (sent && isSettled(run)) {
+                await settle();
+                return;
+            }
+            if (changed && sendSteps(await ctx.store.listSteps(runId))) sent = true;
             if (!sent) write({ event: 'ping', data: '' });
         } catch (error) {
             fail(error);

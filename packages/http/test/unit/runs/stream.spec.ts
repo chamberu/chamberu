@@ -176,6 +176,30 @@ describe('GET /runs/:id/stream', () => {
         await reader.reader.cancel();
     });
 
+    it('reads the steps again only when the polled run changed', async () => {
+        const {
+            app, 
+            clock, 
+            store, 
+        } = createRunTestApp();
+        const runId = await start(app);
+        const listSteps = vi.spyOn(store, 'listSteps');
+        const reader = new SseReader(await call(app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN }));
+        await reader.next(1);
+        for (let i = 0; i < 3; i++) {
+            clock.advance(2_000);
+            await reader.next(1);
+        }
+        expect(listSteps).toHaveBeenCalledTimes(1);
+
+        const run = (await store.getRun(runId))!;
+        await store.updateRun(runId, { updatedAt: new Date(run.updatedAt.getTime() + 1) });
+        clock.advance(2_000);
+        await reader.next(1);
+        expect(listSteps).toHaveBeenCalledTimes(2);
+        await reader.reader.cancel();
+    });
+
     it('cleans up when the client cancels the body', async () => {
         const ctx = createRunTestApp();
         const runId = await start(ctx.app);

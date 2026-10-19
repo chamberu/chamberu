@@ -26,3 +26,12 @@ export function isNewer(run: Run, last: Run | undefined): boolean {
     if (!last) return true;
     return run.updatedAt.getTime() > last.updatedAt.getTime() || run.status !== last.status;
 }
+
+/**
+ * Whether the run's usage moved since `last`: two steps within one
+ * millisecond leave `updatedAt` equal, but an LLM step adds tokens.
+ */
+export function usageChanged(run: Run, last: Run | undefined): boolean {
+    if (!last) return true;
+    return run.usage.inputTokens !== last.usage.inputTokens || run.usage.outputTokens !== last.usage.outputTokens;
+}
