@@ -26,6 +26,13 @@ export function oidc(options: OidcOptions): Authenticator {
     if (!Array.isArray(options.issuers) || options.issuers.length === 0) {
         throw new InvalidAgentDefinitionError('oidc() needs at least one issuer.');
     }
+    for (const issuer of options.issuers) {
+        const audiences = Array.isArray(issuer.audience) ? issuer.audience : [issuer.audience];
+        if (audiences.length === 0 || audiences.some((audience) => typeof audience !== 'string' || audience.length === 0)) {
+            // vouchly skips the aud check without one
+            throw new InvalidAgentDefinitionError(`oidc() issuer "${issuer.id}" needs an audience.`);
+        }
+    }
 
     const verifier = createVerifier({
         issuers: options.issuers,

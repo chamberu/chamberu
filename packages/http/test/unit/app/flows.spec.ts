@@ -7,7 +7,7 @@
 
 import type { ITokenVerifier } from '@authup/server-adapter-kit';
 import { staticKeys } from 'vouchly';
-import type { Issuer } from 'vouchly';
+import type { OidcIssuer as Issuer, Principal  } from '@chamberu/http';
 import {
     beforeAll,
     describe,
@@ -22,7 +22,6 @@ import {
     oidc,
     staticTokens,
 } from '@chamberu/http';
-import type { Principal } from '@chamberu/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,

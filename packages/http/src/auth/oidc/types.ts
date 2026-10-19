@@ -8,9 +8,15 @@
 import type { ITokenCache, Issuer, VerifyResult } from 'vouchly';
 import type { Principal } from '../types.ts';
 
+/**
+ * A vouchly issuer with a required `audience`: without one vouchly skips the
+ * `aud` check, and a public issuer's tokens minted for any audience would pass.
+ */
+export type OidcIssuer = Issuer & { audience: string | string[] };
+
 export type OidcOptions = {
     /** The trusted issuers (vouchly), e.g. GitHub Actions with `audience: 'chamberu'`. */
-    issuers: Issuer[];
+    issuers: OidcIssuer[];
     /**
      * Maps a verified token to a principal, or `undefined` to refuse it.
      * Required: a public issuer lets anyone mint a matching token, so the

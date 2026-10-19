@@ -7,7 +7,8 @@
 
 import type { JWK } from 'jose';
 import { staticKeys } from 'vouchly';
-import type { Issuer, VerifyResult } from 'vouchly';
+import type { VerifyResult } from 'vouchly';
+import type { OidcIssuer as Issuer, OidcOptions, Principal  } from '@chamberu/http';
 import {
     beforeAll,
     describe,
@@ -16,7 +17,6 @@ import {
 } from 'vitest';
 import { InvalidAgentDefinitionError } from '@chamberu/core';
 import { oidc } from '@chamberu/http';
-import type { OidcOptions, Principal } from '@chamberu/http';
 import { createSigningKey, signToken } from '../../utils/jwt.ts';
 
 const ISS = 'https://issuer.test';
@@ -60,6 +60,16 @@ describe('oidc', () => {
     it('needs a principal mapper and at least one issuer', () => {
         expect(() => oidc({ issuers: [issuer] } as unknown as OidcOptions)).toThrow(InvalidAgentDefinitionError);
         expect(() => oidc({ issuers: [], principal: mapper })).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it.each([
+        ['missing', undefined],
+        ['empty', ''],
+        ['an empty list', []],
+        ['a list with an empty entry', ['chamberu', '']],
+    ])('needs an audience on every issuer (%s)', (_name, audience) => {
+        const candidate = { ...issuer, audience } as Issuer;
+        expect(() => oidc({ issuers: [candidate], principal: mapper })).toThrow(InvalidAgentDefinitionError);
     });
 
     it('maps a valid token to a principal', async () => {
