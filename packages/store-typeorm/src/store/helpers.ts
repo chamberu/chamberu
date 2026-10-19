@@ -6,6 +6,7 @@
  */
 
 import type {
+    Artifact,
     Checkpoint,
     Run,
     Step,
@@ -19,6 +20,7 @@ import type {
     QueryDeepPartialEntity,
 } from 'typeorm';
 import type {
+    ArtifactEntity,
     CheckpointEntity,
     RunEntity,
     StepEntity,
@@ -194,4 +196,35 @@ export function toCheckpoint(entity: CheckpointEntity): Checkpoint {
     if (entity.finishReason !== null) checkpoint.finishReason = entity.finishReason;
 
     return checkpoint;
+}
+
+/** ArtifactEntity values for a new artifact: the bytes copied into a Buffer, the bytea parameter the driver expects. */
+export function toArtifactValues(artifact: Artifact, data: Uint8Array): QueryDeepPartialEntity<ArtifactEntity> {
+    const values: ArtifactEntity = {
+        id: artifact.id,
+        runId: artifact.runId,
+        agent: artifact.agent,
+        mediaType: artifact.mediaType,
+        filename: artifact.filename ?? null,
+        size: artifact.size,
+        data: Buffer.from(data),
+        createdAt: artifact.createdAt,
+    };
+
+    return asValues<ArtifactEntity>(values);
+}
+
+/** Map an ArtifactEntity (bytes not selected) to an Artifact: a null filename becomes absent. */
+export function toArtifact(entity: ArtifactEntity): Artifact {
+    const artifact: Artifact = {
+        id: entity.id,
+        runId: entity.runId,
+        agent: entity.agent,
+        mediaType: entity.mediaType,
+        size: entity.size,
+        createdAt: entity.createdAt,
+    };
+    if (entity.filename !== null) artifact.filename = entity.filename;
+
+    return artifact;
 }

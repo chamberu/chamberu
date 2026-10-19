@@ -6,3 +6,4 @@
  */
 
 export * from './1792195200000-init.ts';
+export * from './1792800000000-artifacts.ts';

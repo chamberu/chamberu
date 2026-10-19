@@ -46,16 +46,22 @@ describePostgres('schema', () => {
         expect(rows[0]!.indexdef).toContain('USING gin');
     });
 
+    it('indexes artifacts by run', async () => {
+        const ds = await create();
+        const rows: { indexdef: string }[] = await ds.query(
+            'SELECT indexdef FROM pg_indexes WHERE tablename = $1',
+            [TableName.ARTIFACTS],
+        );
+        expect(rows.some((row) => row.indexdef.includes('(run_id)'))).toBe(true);
+    });
+
     it('migrateStore is safe to call concurrently and twice', async () => {
         const ds = await create({ migrate: false });
         await Promise.all([migrateStore(ds), migrateStore(ds)]);
         await migrateStore(ds);
 
-        const [{ count }] = await ds.query(
-            'SELECT count(*) FROM migrations WHERE name = $1',
-            ['Init1792195200000'],
-        );
-        expect(count).toBe('1');
+        const migrations: { name: string }[] = await ds.query('SELECT name FROM migrations ORDER BY id');
+        expect(migrations.map((m) => m.name)).toEqual(['Init1792195200000', 'Artifacts1792800000000']);
 
         const tables: { table_name: string }[] = await ds.query(
             'SELECT table_name FROM information_schema.tables WHERE table_name = ANY($1::text[])',
@@ -76,6 +82,8 @@ describePostgres('schema', () => {
         expect(await tablesIn('other')).toBe(Object.values(TableName).length);
         expect(await tablesIn('public')).toBe(0);
 
+        await ds.undoLastMigration({ transaction: 'each' });
+        expect(await tablesIn('other')).toBe(Object.values(TableName).length - 1);
         await ds.undoLastMigration({ transaction: 'each' });
         expect(await tablesIn('other')).toBe(0);
     });
