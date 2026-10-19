@@ -14,6 +14,7 @@ describe('public api', () => {
         'authup',
         'createHttpApp',
         'hasPermission',
+        'oidc',
         'staticTokens',
     ])('exports %s', (name) => {
         expect(http).toHaveProperty(name);
