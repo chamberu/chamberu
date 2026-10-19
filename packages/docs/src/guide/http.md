@@ -42,6 +42,10 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 
 `GET /runs/:id/stream` sends `run.updated` with the current run, then each step as `step.appended` (`id` is the step index, so `Last-Event-ID` resumes), then live events; it ends once the run is `completed`, `failed` or `cancelled`. The engine's events only cover runs executing in this process, so the stream also polls the store every `stream.pollMs` (2 s) and sees a run that [another replica](/guide/concurrency) executes; an idle poll sends `ping`. A client that disconnects unsubscribes at once, and the app ends open streams on shutdown.
 
+To resume, send `Last-Event-ID` with the last step id you saw, or the query `?after=<step index>` (a non-negative integer, else 400). If both are present, a valid `Last-Event-ID` wins: it is the client's progress on a reconnect, while the URL stays the one of the first connect.
+
+The stream takes bearer tokens only, and browser `EventSource` cannot send an `Authorization` header. In a browser, read the stream with a fetch-based SSE reader (`fetch` plus an SSE parser over the response body) that sends `Authorization` and, on reconnect, `Last-Event-ID` (or `?after=`).
+
 An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_<agent>` calls, on one counter. Over the cap a stream answers 503 with `Retry-After: 5`; retry after that many seconds.
 
 ## Authentication and permissions

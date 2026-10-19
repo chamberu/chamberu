@@ -133,6 +133,62 @@ describe('GET /runs/:id/stream', () => {
         expect(stepIds(await readEvents(response))).toEqual(steps.map((s) => String(s.index)));
     });
 
+    it('skips the steps up to ?after', async () => {
+        const {
+            app,
+            runId,
+            steps,
+        } = await completedRun();
+        const response = await call(app, 'GET', `/runs/${runId}/stream?after=0`, { token: READER_TOKEN });
+        expect(response.status).toBe(200);
+        expect(stepIds(await readEvents(response))).toEqual(steps.slice(1).map((s) => String(s.index)));
+    });
+
+    it('sends no step at or below a large ?after', async () => {
+        const { app, runId } = await completedRun();
+        const response = await call(app, 'GET', `/runs/${runId}/stream?after=1000`, { token: READER_TOKEN });
+        const events = await readEvents(response);
+        expect(stepIds(events)).toEqual([]);
+        expect(statusOf(events[0]!)).toBe('completed');
+    });
+
+    it('lets a valid Last-Event-ID win over ?after', async () => {
+        const {
+            app,
+            runId,
+            steps,
+        } = await completedRun();
+        const lastEventId = await call(app, 'GET', `/runs/${runId}/stream?after=1000`, {
+            token: READER_TOKEN,
+            headers: { 'last-event-id': '0' },
+        });
+        expect(stepIds(await readEvents(lastEventId))).toEqual(steps.slice(1).map((s) => String(s.index)));
+
+        const malformed = await call(app, 'GET', `/runs/${runId}/stream?after=0`, {
+            token: READER_TOKEN,
+            headers: { 'last-event-id': 'abc' },
+        });
+        expect(stepIds(await readEvents(malformed))).toEqual(steps.slice(1).map((s) => String(s.index)));
+    });
+
+    it.each([
+        'after=-1',
+        'after=1.5',
+        'after=abc',
+        'after=',
+        'after=1e3',
+        'after=99999999999999999999',
+        'after=1&after=2',
+    ])('answers 400 for %s', async (query) => {
+        const { app, runId } = await completedRun();
+        const response = await call(app, 'GET', `/runs/${runId}/stream?${query}`, {
+            token: READER_TOKEN,
+            headers: { 'last-event-id': '0' },
+        });
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ status: 400, code: 'bad_request' });
+    });
+
     it('sees a run executing on another replica through the store poll', async () => {
         const clock = new ControllableClock(new Date(1_000_000));
         const store = new MemoryStore({ clock });

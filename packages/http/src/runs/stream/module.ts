@@ -15,13 +15,15 @@ import { serializeRun } from '../helpers.ts';
 import {
     isNewer,
     isSettled,
-    parseLastEventId,
+    parseAfter,
+    resolveLastStep,
     usageChanged,
 } from './helpers.ts';
 
 /**
  * Streams a run as SSE: `run.updated` with the current run, then each step
- * after `Last-Event-ID` as `step.appended` (`id` = step index), then live
+ * after `Last-Event-ID` (or the `after` query, for clients that cannot set
+ * the header; a valid header wins) as `step.appended` (`id` = step index), then live
  * events, with a store poll every `streamPollMs` for runs executing on
  * another replica (`ping` when it found nothing; the steps are read only
  * when the polled run changed). Ends once a settled run
@@ -33,6 +35,7 @@ import {
  * one slot until it ends. The caller checks the run exists and may be read.
  */
 export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: string): Promise<Response> {
+    const after = parseAfter(event.searchParams);
     const refused = refuseWhenClosed(event, ctx);
     if (refused) return refused;
     const slot = acquireStreamSlot(ctx);
@@ -40,7 +43,7 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
     const release: () => void = slot;
 
     const stream = createEventStream(event);
-    let lastStep = parseLastEventId(event.request.headers.get('last-event-id'));
+    let lastStep = resolveLastStep(event.request.headers.get('last-event-id'), after);
     let lastRun: Run | undefined;
     let ended = false;
     let ready = false;
