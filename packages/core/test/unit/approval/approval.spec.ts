@@ -158,7 +158,7 @@ async function poll(ctx: Ctx, ms = 10) {
 
 const tokenOf = (ctx: Ctx, i = 0) => ctx.notifier.calls[i]!.n.resumeToken!;
 
-const promptOf = (model: ReturnType<typeof mockModel>, i: number) => JSON.stringify(model.doGenerateCalls[i]?.prompt);
+const promptOf = (model: ReturnType<typeof mockModel>, i: number) => JSON.stringify(model.doStreamCalls[i]?.prompt);
 
 describe('approvals', () => {
     it('tool requiring approval puts run in waiting and notifies once', async () => {
@@ -202,7 +202,7 @@ describe('approvals', () => {
             expect(again?.status).toBe('waiting');
             expect(again?.waiting).toEqual(run?.waiting);
         }
-        expect(model.doGenerateCalls).toHaveLength(1);
+        expect(model.doStreamCalls).toHaveLength(1);
         expect(ctx.notifier.calls).toHaveLength(1);
 
         // the token sent first still resumes the run
@@ -320,7 +320,7 @@ describe('approvals', () => {
         await ctx.engine.idle();
         expect((await ctx.store.getRun(runId))?.status).toBe('completed');
         expect(ctx.executed).toEqual([{ env: 'prod' }]);
-        expect(model.doGenerateCalls).toHaveLength(2);
+        expect(model.doStreamCalls).toHaveLength(2);
     });
 
     it('a crash between the queued transition and the approval checkpoint keeps the original token valid', async () => {
@@ -347,7 +347,7 @@ describe('approvals', () => {
         expect(again?.waiting?.approvalId).toBe(run?.waiting?.approvalId);
         expect(again?.waiting?.tokenId).toBe(run?.waiting?.tokenId);
         expect(again?.waiting?.expiresAt).toEqual(run?.waiting?.expiresAt);
-        expect(model.doGenerateCalls).toHaveLength(1);
+        expect(model.doStreamCalls).toHaveLength(1);
         expect(ctx.notifier.calls).toHaveLength(1);
 
         // the owner's original token still resumes the run
@@ -421,7 +421,7 @@ describe('approvals', () => {
         const done = await ctx.store.getRun(runId);
         expect(done?.status).toBe('failed');
         expect(done?.error).toEqual({ code: 'BudgetExceeded', message: 'The run reached its 1 step limit.' });
-        expect(model.doGenerateCalls).toHaveLength(2);
+        expect(model.doStreamCalls).toHaveLength(2);
         expect(ctx.executed).toEqual([{ env: 'prod' }, { env: 'dev' }]);
     });
 
@@ -453,7 +453,7 @@ describe('approvals', () => {
         expect(done?.error).toEqual({ code: 'RepoGone', message: 'repository gone' });
         expect(done?.waiting).toBeUndefined();
         // no model call after the fatal tool
-        expect(model.doGenerateCalls).toHaveLength(1);
+        expect(model.doStreamCalls).toHaveLength(1);
         const steps = await ctx.store.listSteps(runId);
         expect(steps.map((s) => s.kind)).toEqual(['llm', 'wait', 'tool']);
         expect(steps[2]).toMatchObject({ name: 'deploy', error: { code: 'RepoGone', message: 'repository gone' } });

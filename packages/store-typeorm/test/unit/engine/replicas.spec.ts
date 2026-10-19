@@ -38,7 +38,7 @@ type Turn = MockResponse | 'hang' | { before: () => Promise<void>; response: Moc
 function scripted(script: Turn[]) {
     const calls: LanguageModelV4CallOptions[] = [];
     const model = new MockLanguageModelV4({
-        doGenerate: async (options) => {
+        doStream: async (options) => {
             const turn = script[calls.length];
             calls.push(options);
             if (!turn) throw new Error('mock script exhausted');
@@ -49,9 +49,9 @@ function scripted(script: Turn[]) {
             }
             if ('before' in turn) {
                 await turn.before();
-                return mockModel([turn.response]).doGenerate(options);
+                return mockModel([turn.response]).doStream(options);
             }
-            return mockModel([turn]).doGenerate(options);
+            return mockModel([turn]).doStream(options);
         },
     });
     return { model, calls };

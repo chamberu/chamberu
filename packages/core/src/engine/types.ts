@@ -12,7 +12,20 @@ import type { Run, Step } from '../run/types.ts';
 import type { IStore } from '../store/types.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 
-export type RunEvent = { type: 'run.updated'; run: Run } | { type: 'step.appended'; step: Step };
+/**
+ * A piece of model output while it streams; never stored. `step` is the
+ * checkpoint step index the step it belongs to is saved under.
+ */
+export type RunDelta = {
+    runId: string;
+    step: number;
+    kind: 'text' | 'reasoning';
+    text: string;
+};
+
+export type RunEvent = { type: 'run.updated'; run: Run } |
+    { type: 'step.appended'; step: Step } |
+    { type: 'run.delta'; delta: RunDelta };
 
 export type RunEngineOptions = {
     store: IStore;

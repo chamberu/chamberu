@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { LanguageModel, ToolSet } from 'ai';
+import type { LanguageModel, OutputInterface, ToolSet } from 'ai';
 import type { Budget, RunContext } from '../run/types.ts';
 import type { IAgentState, StateSchema } from '../state/types.ts';
 import type { TriggerDefinition } from '../trigger/types.ts';
@@ -37,6 +37,12 @@ export type AgentDefinition<S extends StateSchema = StateSchema> = {
     approvalTimeoutMs?: number;
     /** Notifier name registered on the engine. */
     notify?: string;
+    /**
+     * Structured output (AI SDK `Output`, e.g. `Output.object({ schema })`):
+     * a completed run's `output` is the parsed value instead of the text; a
+     * final answer that does not parse fails the run with a ValidationError.
+     */
+    output?: OutputInterface;
 };
 
 export type Agent<S extends StateSchema = StateSchema> = {

@@ -117,7 +117,7 @@ const toolTurn = (input: unknown = { q: 1 }): MockResponse => ({
 function hangingModel() {
     const calls: LanguageModelV4CallOptions[] = [];
     const model = new MockLanguageModelV4({
-        doGenerate: (options) => {
+        doStream: (options) => {
             calls.push(options);
             return new Promise((_resolve, reject) => {
                 options.abortSignal?.addEventListener('abort', () => reject(options.abortSignal?.reason));
@@ -188,7 +188,7 @@ describe('executeRun', () => {
     it('starts from a user message rendering the trigger', async () => {
         const model = mockModel([{ parts: [{ type: 'text', text: 'ok' }] }]);
         await runOnce({ model });
-        const prompt = JSON.stringify(model.doGenerateCalls[0]?.prompt);
+        const prompt = JSON.stringify(model.doStreamCalls[0]?.prompt);
         expect(prompt).toContain('You triage.');
         expect(prompt).toContain('```json');
         expect(prompt).toContain('\\"issue\\": 42');
@@ -324,7 +324,7 @@ describe('executeRun', () => {
         await engine.start();
         await engine.idle();
         expect((await store.getRun(runId))?.status).toBe('cancelled');
-        expect(model.doGenerateCalls).toHaveLength(0);
+        expect(model.doStreamCalls).toHaveLength(0);
     });
 
     it('cancel rejects unknown and settled runs', async () => {
@@ -352,7 +352,7 @@ describe('executeRun', () => {
         });
         expect(run?.status).toBe('completed');
         expect(run?.output).toBe('recovered');
-        expect(JSON.stringify(model.doGenerateCalls[1]?.prompt)).toContain('kaput');
+        expect(JSON.stringify(model.doStreamCalls[1]?.prompt)).toContain('kaput');
         const steps = await store.listSteps(runId);
         expect(steps.map((s) => s.kind)).toEqual(['llm', 'tool', 'llm']);
         expect(steps[1]?.error).toEqual({ code: 'tool_broke', message: 'kaput' });
@@ -370,7 +370,7 @@ describe('executeRun', () => {
         });
         expect(run?.status).toBe('failed');
         expect(run?.error).toEqual({ code: 'RepoGone', message: 'repository gone' });
-        expect(model.doGenerateCalls).toHaveLength(1);
+        expect(model.doStreamCalls).toHaveLength(1);
     });
 
     it.each(['appendStep', 'saveCheckpoint'] as const)('a cancel while %s is pending keeps the step whole and writes nothing after', async (method) => {
@@ -435,7 +435,7 @@ describe('executeRun', () => {
         expect(run?.status).toBe(status);
         if (status === 'completed') expect(run?.output).toBe('final answer');
         else expect(run?.error?.code).toBe('BudgetExceeded');
-        expect(model.doGenerateCalls).toHaveLength(0);
+        expect(model.doStreamCalls).toHaveLength(0);
     });
 
     it('model error marks run failed', async () => {
@@ -462,7 +462,7 @@ describe('executeRun', () => {
         await engine.start();
         await engine.idle();
 
-        const prompt = model.doGenerateCalls[0]?.prompt ?? [];
+        const prompt = model.doStreamCalls[0]?.prompt ?? [];
         expect(prompt.filter((m) => m.role !== 'system')).toEqual([
             { role: 'user', content: [{ type: 'text', text: 'seeded question' }] },
             { role: 'assistant', content: [{ type: 'text', text: 'seeded answer' }] },

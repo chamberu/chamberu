@@ -132,6 +132,7 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
             sendStep(e.step);
             return;
         }
+        if (e.type !== 'run.updated') return;
         sendRun(e.run);
         if (isSettled(e.run)) void settle();
     }

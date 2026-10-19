@@ -602,6 +602,7 @@ export class RunEngine {
                 return updated;
             },
             onStepAppended: (step) => this.emit({ type: 'step.appended', step }),
+            onDelta: (delta) => this.emit({ type: 'run.delta', delta }),
             pause: (request, usage) => this.pause(run, agent, request, usage),
             toolApprovalSecret: this.resumeSecret,
             ownsRun: () => this.ownsRun(run.id),

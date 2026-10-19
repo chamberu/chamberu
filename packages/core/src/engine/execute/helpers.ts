@@ -6,6 +6,9 @@
  */
 
 import type {
+    FinishReason,
+    LanguageModelResponseMetadata,
+    LanguageModelUsage,
     ModelMessage,
     ToolApprovalStatus,
     ToolLoopAgentSettings,
@@ -14,8 +17,8 @@ import type {
 import { isObject } from 'smob';
 import type { ApprovalPolicy } from '../../agent/types.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
-import { BudgetExceededError } from '../../errors/index.ts';
-import type { Budget, RunContext } from '../../run/types.ts';
+import { BudgetExceededError, ValidationError } from '../../errors/index.ts';
+import type { Budget, Checkpoint, RunContext  } from '../../run/types.ts';
 import { createAgentState } from '../../state/module.ts';
 import { createStateTools } from '../../state/tools.ts';
 import type { TriggerEnvelope } from '../../trigger/types.ts';
@@ -170,4 +173,43 @@ export function budgetExceeded(budget: Budget, kind: 'steps' | 'tokens'): Budget
     return new BudgetExceededError(kind === 'steps' ?
         `The run reached its ${budget.maxSteps} step limit.` :
         `The run reached its ${budget.maxTokens} token limit.`);
+}
+
+/** A structured output that failed to parse or validate, as a core ValidationError. */
+export function toValidationError(error: unknown): ValidationError {
+    const message = error instanceof Error ? error.message : String(error);
+    return new ValidationError(message);
+}
+
+/**
+ * The context `Output.parseCompleteOutput` gets for the final answer of an
+ * earlier execution: its finish reason, zero usage, minimal response metadata.
+ */
+export function outputContext(checkpoint: Checkpoint, now: Date): {
+    response: Omit<LanguageModelResponseMetadata, 'messages' | 'body'>;
+    usage: LanguageModelUsage;
+    finishReason: FinishReason;
+} {
+    return {
+        response: {
+            id: `checkpoint-${checkpoint.runId}-${checkpoint.stepIndex}`,
+            timestamp: now,
+            modelId: 'checkpoint',
+        },
+        usage: {
+            inputTokens: 0,
+            inputTokenDetails: {
+                noCacheTokens: 0,
+                cacheReadTokens: 0,
+                cacheWriteTokens: 0,
+            },
+            outputTokens: 0,
+            outputTokenDetails: {
+                textTokens: 0,
+                reasoningTokens: 0,
+            },
+            totalTokens: 0,
+        },
+        finishReason: (checkpoint.finishReason ?? 'other') as FinishReason,
+    };
 }
