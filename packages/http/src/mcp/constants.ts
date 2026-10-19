@@ -16,3 +16,6 @@ export const DEFAULT_MCP_MAX_WAIT_SECONDS = 60;
 
 /** How often a waiting `run_<agent>` call polls the store. */
 export const MCP_WAIT_POLL_MS = 1_000;
+
+/** Longest tool name the MCP spec allows (`run_<agent>` included). */
+export const MCP_TOOL_NAME_MAX_LENGTH = 64;

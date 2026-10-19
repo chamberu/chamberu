@@ -23,7 +23,7 @@ import {
     resolveResumeTarget,
     serializeRun,
 } from '../runs/helpers.ts';
-import { MCP_WAIT_POLL_MS } from './constants.ts';
+import { MCP_TOOL_NAME_MAX_LENGTH, MCP_WAIT_POLL_MS } from './constants.ts';
 import {
     runTool,
     toJsonSchema,
@@ -138,13 +138,19 @@ function describeAgent(agent: Agent): string {
 /**
  * The `run_<agent>` tool of every agent with an `http()` trigger, built once
  * per app: the payload's JSON Schema is converted and compiled here, not per
- * request. A schema the MCP validator cannot compile fails the app.
+ * request. A schema the MCP validator cannot compile, or a tool name above 64
+ * characters, fails the app.
  */
 export function buildRunTools(agents: Iterable<Agent>, options: McpEndpointOptions): McpRunTool[] {
     const tools: McpRunTool[] = [];
     for (const agent of agents) {
         const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
         if (!trigger) continue;
+        if (`run_${agent.name}`.length > MCP_TOOL_NAME_MAX_LENGTH) {
+            throw new InvalidAgentDefinitionError(
+                `The MCP tool "run_${agent.name}" exceeds ${MCP_TOOL_NAME_MAX_LENGTH} characters: shorten the agent name to ${MCP_TOOL_NAME_MAX_LENGTH - 4} or set mcp: false.`,
+            );
+        }
         const schema = trigger.options.schema as StandardSchemaV1 | undefined;
         let inputSchema: McpRunTool['inputSchema'];
         try {

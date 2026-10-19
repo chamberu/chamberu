@@ -12,7 +12,7 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { defineAgent, http } from '@chamberu/core';
+import { InvalidAgentDefinitionError, defineAgent, http } from '@chamberu/core';
 import {
     ADMIN_TOKEN,
     call,
@@ -199,5 +199,18 @@ describe('mcp run_<agent>', () => {
             await client.close();
         }
         expect(input).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails the app when run_<agent> would exceed the 64 characters MCP allows', () => {
+        const long = defineAgent({
+            name: 'a'.repeat(61),
+            model: textModel(),
+            instructions: 'Long.',
+            triggers: [http()],
+        });
+        expect(() => createRunTestApp({ agents: [long] })).toThrow(InvalidAgentDefinitionError);
+        expect(() => createRunTestApp({ agents: [long], mcp: false })).not.toThrow();
+        const fits = defineAgent({ ...long.definition, name: 'a'.repeat(60) });
+        expect(() => createRunTestApp({ agents: [fits] })).not.toThrow();
     });
 });
