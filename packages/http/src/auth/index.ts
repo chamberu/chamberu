@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+export * from './authup/index.ts';
 export { Permission } from './constants.ts';
 export * from './module.ts';
 export * from './static-tokens/index.ts';

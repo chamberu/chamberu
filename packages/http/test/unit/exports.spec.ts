@@ -11,6 +11,7 @@ import * as http from '@chamberu/http';
 describe('public api', () => {
     it.each([
         'agentPermission',
+        'authup',
         'createHttpApp',
         'hasPermission',
         'staticTokens',
