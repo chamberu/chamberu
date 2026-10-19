@@ -39,7 +39,12 @@ function tooLarge(limit: number): RequestEntityTooLargeError {
     return new RequestEntityTooLargeError({ message: `The request body exceeds ${limit} bytes.` });
 }
 
-async function readBytes(request: Request, limit: number): Promise<Uint8Array> {
+function unsupported(): UnsupportedMediaTypeError {
+    return new UnsupportedMediaTypeError({ message: 'The request body must be application/json.' });
+}
+
+/** Reads at most `limit` bytes; `json: false` throws 415 at the first non-empty chunk. */
+async function readBytes(request: Request, limit: number, json: boolean): Promise<Uint8Array> {
     if (!request.body) return new Uint8Array(0);
     const reader = request.body.getReader();
     const chunks: Uint8Array[] = [];
@@ -48,6 +53,10 @@ async function readBytes(request: Request, limit: number): Promise<Uint8Array> {
         const { done, value } = await reader.read();
         if (done) break;
         size += value.byteLength;
+        if (size > 0 && !json) {
+            await reader.cancel().catch(() => {});
+            throw unsupported();
+        }
         if (size > limit) {
             await reader.cancel().catch(() => {});
             throw tooLarge(limit);
@@ -73,12 +82,8 @@ export async function readJsonBody(event: IAppEvent, limit: number): Promise<unk
     const length = Number(request.headers.get('content-length'));
     if (Number.isFinite(length) && length > limit) throw tooLarge(limit);
 
-    const bytes = await readBytes(request, limit);
+    const bytes = await readBytes(request, limit, isJsonMediaType(request.headers.get('content-type')));
     if (bytes.byteLength === 0) return undefined;
-
-    if (!isJsonMediaType(request.headers.get('content-type'))) {
-        throw new UnsupportedMediaTypeError({ message: 'The request body must be application/json.' });
-    }
 
     try {
         return JSON.parse(new TextDecoder().decode(bytes));

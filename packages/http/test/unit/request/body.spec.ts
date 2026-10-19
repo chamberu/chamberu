@@ -68,6 +68,27 @@ describe('readJsonBody', () => {
         expect(response.status).toBe(415);
     });
 
+    it('rejects another media type at the first chunk', async () => {
+        let pulled = 0;
+        const stream = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                pulled++;
+                if (pulled > 4) controller.close();
+                else controller.enqueue(new TextEncoder().encode('12345678'));
+            },
+        });
+        const response = await post(echoApp(), stream, { 'content-type': 'text/plain' });
+        expect(response.status).toBe(415);
+        // the stream may pull one chunk ahead of the reader
+        expect(pulled).toBeLessThanOrEqual(2);
+    });
+
+    it('reads an empty body of another media type as undefined', async () => {
+        const response = await post(echoApp(), '', { 'content-type': 'text/plain' });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ body: '<none>' });
+    });
+
     it('rejects invalid JSON with 400', async () => {
         const response = await post(echoApp(), '{', { 'content-type': 'application/json' });
         expect(response.status).toBe(400);
