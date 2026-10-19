@@ -65,6 +65,39 @@ describe('metrics', () => {
         expect(samples.some((line) => line.includes('/stream'))).toBe(false);
         await engine.drain();
     });
+
+    function pathLabels(metrics: string): Set<string> {
+        const labels = new Set<string>();
+        for (const match of metrics.matchAll(/path="([^"]*)"/g)) labels.add(match[1]!);
+        return labels;
+    }
+
+    it('labels requests by route template, not by raw path', async () => {
+        const { app } = createRunTestApp({ metrics: undefined, basePath: '/api' });
+        for (let i = 0; i < 5; i++) {
+            await send(app, `/api/runs/${crypto.randomUUID()}`, { token: ADMIN_TOKEN });
+            await send(app, `/api/runs/${crypto.randomUUID()}/cancel`, { method: 'POST' });
+            await send(app, `/api/nope/${crypto.randomUUID()}`);
+            await send(app, `/api/agents/echo/state/kv/k${i}`, { token: ADMIN_TOKEN });
+            await send(app, `/api/hooks/hooked/x${i}/y`, { method: 'POST' });
+        }
+        const labels = pathLabels(await (await send(app, '/api/metrics')).text());
+        expect([...labels].sort()).toEqual([
+            '/_unmatched',
+            '/agents/:name/state/kv/:key',
+            '/hooks/:agent/*',
+            '/runs/:id',
+            '/runs/:id/cancel',
+        ]);
+    });
+
+    it('does not time rate-limited requests', async () => {
+        const { app } = createTestApp({ metrics: undefined, rateLimit: { max: 1 } });
+        await send(app, '/agents');
+        expect((await send(app, '/agents')).status).toBe(429);
+        const metrics = await (await send(app, '/metrics')).text();
+        expect(metrics).not.toContain('status_code="429"');
+    });
 });
 
 describe('cors', () => {

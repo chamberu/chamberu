@@ -81,7 +81,7 @@ This is the "MCP in" half of the [OpenClaw](/deployment/openclaw) integration.
 
 ## Operations
 
-- `/metrics` is unauthenticated: keep it off the public ingress (a NetworkPolicy, or an internal listener) or set `metrics: false`. Each app has its own `prom-client` registry; SSE streams are not timed.
+- `/metrics` is unauthenticated: keep it off the public ingress (a NetworkPolicy, or an internal listener) or set `metrics: false`. Each app has its own `prom-client` registry, labelled by route template (`/runs/:id`; unknown paths share `/_unmatched`); SSE streams and rate-limited requests are not timed.
 - The rate limit (300 requests per minute per client, health, metrics and CORS preflights excluded) keys on the socket address. Behind a reverse proxy set `trustProxy`, or every client shares the proxy's bucket; `X-Forwarded-For` is never trusted otherwise.
 - CORS is off unless `cors` is given.
 - `/readyz` fails while shutting down, while the engine drains and when the store does not answer within `readyTimeoutMs` (2 s).

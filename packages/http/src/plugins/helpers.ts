@@ -26,3 +26,31 @@ export function isOperationalPath(event: IAppEvent, basePath: string, metricsPat
     const path = routePath(event, basePath).replace(/\/+$/, '') || '/';
     return path === '/healthz' || path === '/readyz' || path === metricsPath;
 }
+
+/** The routes of the app as metric labels, matched against the path without `basePath`; keep in step with the route modules. */
+const ROUTE_TEMPLATES: Array<[RegExp, string]> = [
+    [/^\/(?:healthz|readyz|agents|schedules|runs|resume|mcp)$/, ''],
+    [/^\/runs\/[^/]+$/, '/runs/:id'],
+    [/^\/runs\/[^/]+\/stream$/, '/runs/:id/stream'],
+    [/^\/runs\/[^/]+\/cancel$/, '/runs/:id/cancel'],
+    [/^\/agents\/[^/]+\/runs$/, '/agents/:name/runs'],
+    [/^\/agents\/[^/]+\/state\/kv\/[^/]+$/, '/agents/:name/state/kv/:key'],
+    [/^\/agents\/[^/]+\/state\/collections\/[^/]+$/, '/agents/:name/state/collections/:collection'],
+    [/^\/hooks\/[^/]+(?:\/.*)?$/, '/hooks/:agent/*'],
+];
+
+/** Every request that matches no route shares this label. */
+const UNMATCHED_ROUTE_LABEL = '/_unmatched';
+
+/**
+ * The `path` label of a request: its route template (`/runs/:id`), so ids,
+ * keys and unknown paths cannot mint a series each.
+ */
+export function routeLabel(event: IAppEvent, basePath: string, metricsPath: string): string {
+    const path = routePath(event, basePath).replace(/\/+$/, '') || '/';
+    if (path === metricsPath) return path;
+    for (const [pattern, template] of ROUTE_TEMPLATES) {
+        if (pattern.test(path)) return template || path;
+    }
+    return UNMATCHED_ROUTE_LABEL;
+}

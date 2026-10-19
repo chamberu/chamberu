@@ -18,13 +18,13 @@ import {
     DEFAULT_RATE_LIMIT_WINDOW_MS,
 } from '../app/constants.ts';
 import type { HttpAppOptions } from '../app/types.ts';
-import { isOperationalPath, isStreamRequest } from './helpers.ts';
+import { isOperationalPath, isStreamRequest, routeLabel } from './helpers.ts';
 
 /**
- * CORS (only when configured), Prometheus at `/metrics` with a registry
- * of its own, and a rate limit keyed by the client address as the App's
- * `trustProxy` resolves it (never a raw `X-Forwarded-For`). Installed
- * before any route.
+ * CORS (only when configured), a rate limit keyed by the client address
+ * as the App's `trustProxy` resolves it (never a raw `X-Forwarded-For`),
+ * and Prometheus at `/metrics` with a registry of its own, labelled by
+ * route template. Installed before any route.
  */
 export function installPlugins(app: App, options: HttpAppOptions): void {
     const basePath = options.basePath ?? '';
@@ -34,16 +34,8 @@ export function installPlugins(app: App, options: HttpAppOptions): void {
     const metricsPath = options.metrics === false ?
         undefined :
         options.metrics?.metricsPath ?? DEFAULT_METRICS_PATH;
-    if (options.metrics !== false) {
-        app.use(prometheus({
-            metricsPath,
-            // the global default registry throws on a second app in one process
-            registry: new Registry(),
-            skip: (event) => isStreamRequest(event, basePath),
-            ...options.metrics,
-        }));
-    }
 
+    // before metrics: a refused request is not timed (and mints no series)
     if (options.rateLimit !== false) {
         app.use(rateLimit({
             windowMs: DEFAULT_RATE_LIMIT_WINDOW_MS,
@@ -55,6 +47,17 @@ export function installPlugins(app: App, options: HttpAppOptions): void {
                 throw new TooManyRequestsError({ message: 'Too many requests, please try again later.' });
             },
             ...options.rateLimit,
+        }));
+    }
+
+    if (options.metrics !== false) {
+        app.use(prometheus({
+            metricsPath,
+            // the global default registry throws on a second app in one process
+            registry: new Registry(),
+            skip: (event) => isStreamRequest(event, basePath),
+            normalizePath: (_path, event) => routeLabel(event, basePath, metricsPath ?? DEFAULT_METRICS_PATH),
+            ...options.metrics,
         }));
     }
 }
