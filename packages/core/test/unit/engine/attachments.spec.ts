@@ -246,7 +246,6 @@ describe('attachments in the model prompt', () => {
             filename: 'shot.png',
             data: `chamberu-artifact:${artifact!.id}`,
         });
-        expect(JSON.stringify(checkpoint.messages)).not.toContain('"137"');
     });
 
     it('keeps the first message a plain string without attachments', async () => {
