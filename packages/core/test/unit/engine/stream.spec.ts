@@ -27,6 +27,7 @@ const engines: RunEngine[] = [];
 afterEach(() => {
     for (const e of engines) e.stop();
     engines.length = 0;
+    vi.restoreAllMocks();
 });
 
 const env = {
@@ -266,5 +267,19 @@ describe('streaming', () => {
         expect(run?.status).toBe('failed');
         expect(run?.error).toEqual({ code: 'Error', message: 'mock script exhausted' });
         expect((await store.latestCheckpoint(runId))?.stepIndex).toBe(0);
+    });
+
+    it('a model error is not logged by the AI SDK', async () => {
+        // onError is passed untyped to streamText; a dependency bump that stops forwarding it fails here
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { engine, store } = make(mockModel([]));
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await engine.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('failed');
+        expect(run?.error).toEqual({ code: 'Error', message: 'mock script exhausted' });
+        expect(log).not.toHaveBeenCalled();
     });
 });

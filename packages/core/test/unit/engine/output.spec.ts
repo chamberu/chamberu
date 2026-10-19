@@ -103,6 +103,8 @@ describe('structured output', () => {
         expect(run?.status).toBe('failed');
         expect(run?.error?.code).toBe('validation_error');
         expect(run?.error?.message).toMatch(/could not parse/);
+        // the cause names the offending text
+        expect(run?.error?.message).toMatch(/not json/);
     });
 
     it('fails with a validation error on a schema mismatch', async () => {
@@ -110,6 +112,8 @@ describe('structured output', () => {
         expect(run?.status).toBe('failed');
         expect(run?.error?.code).toBe('validation_error');
         expect(run?.error?.message).toMatch(/did not match schema/);
+        // the cause names the offending field
+        expect(run?.error?.message).toMatch(/"path":\s*\[\s*"label"\s*\]/);
     });
 
     it('plain agents keep the text output', async () => {

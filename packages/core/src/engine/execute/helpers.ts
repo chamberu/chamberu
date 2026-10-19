@@ -18,7 +18,7 @@ import { isObject } from 'smob';
 import type { ApprovalPolicy } from '../../agent/types.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
 import { BudgetExceededError, ValidationError } from '../../errors/index.ts';
-import type { Budget, Checkpoint, RunContext  } from '../../run/types.ts';
+import type { Budget, Checkpoint, RunContext } from '../../run/types.ts';
 import { createAgentState } from '../../state/module.ts';
 import { createStateTools } from '../../state/tools.ts';
 import type { TriggerEnvelope } from '../../trigger/types.ts';
@@ -175,10 +175,14 @@ export function budgetExceeded(budget: Budget, kind: 'steps' | 'tokens'): Budget
         `The run reached its ${budget.maxTokens} token limit.`);
 }
 
-/** A structured output that failed to parse or validate, as a core ValidationError. */
+/**
+ * A structured output that failed to parse or validate, as a core ValidationError;
+ * the cause (JSON parse or schema error) names the offending text or field.
+ */
 export function toValidationError(error: unknown): ValidationError {
     const message = error instanceof Error ? error.message : String(error);
-    return new ValidationError(message);
+    const cause = isObject(error) && error.cause instanceof Error ? error.cause.message : undefined;
+    return new ValidationError(cause ? `${message} ${cause}` : message);
 }
 
 /**

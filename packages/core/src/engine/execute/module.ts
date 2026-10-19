@@ -103,7 +103,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const responseMessages: ModelMessage[] = [];
     // AI SDK swallows onStepEnd errors; a fatal one is kept here and stops the loop
     let fatal: { error: unknown } | undefined;
-    // set once the run settles on abort; a still running generate must not write anymore
+    // set once the run settles on abort; a still running stream must not write anymore
     let abandoned = false;
     let pendingStepEnd: Promise<void> = Promise.resolve();
     let stepStartedAt = clock.now();
