@@ -110,7 +110,7 @@ Paths are relative to `basePath` (default none).
 | `GET /runs/:id/stream` | as `GET /runs/:id` | SSE: `run.updated`, `step.appended` (`id` = step index), `ping`; ends once the run settled |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
-| `POST /hooks/:agent/:triggerId` | `agent:<agent>:run` | `202 { runId, deduplicated }`; the whole body is the payload |
+| `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }`; the whole body is the payload |
 | `GET /agents` | `run:read` | `200 { data: AgentSummary[] }`: triggers (with each webhook's `hook` path), budget, approvals, state collections |
 | `GET /schedules` | `run:read` | `200 { data: ScheduleSummary[] }`: every `cron()` trigger with its next fire time (from the definitions, not from a running scheduler) |
 | `GET /agents/:name/state/kv/:key` | `state:read` | `200 { key, value }` (`null` when unset) |
@@ -166,7 +166,7 @@ auth: [
 ## Triggers
 
 - **`http({ schema? })`** is the control-plane trigger (id `http`, at most one per agent). REST `POST /agents/:name/runs` starts runs through it (envelope source `http`), and so does MCP `run_<name>` (source `mcp`). An agent without `http()` answers 404 on REST and gets no MCP tool. `schema` (any Standard Schema) validates the payload; failures answer 400 with `issues`.
-- **`webhook({ path, schema?, idempotencyKey?, concurrencyKey? })`** (id `webhook:<path>`, many per agent) is served at `POST /hooks/:agent/:triggerId` with the URL-encoded id, e.g. `/hooks/intake/webhook%3A%2Fissues` (`GET /agents` lists each `hook` path). The body may be any JSON value. The idempotency key comes from the `Idempotency-Key` header, else from `idempotencyKey(payload)`; retried deliveries with one key create one run. The hook answers 202 right away and never runs the agent synchronously. Signature-verified webhooks (GitHub) are a separate package.
+- **`webhook({ path, schema?, idempotencyKey?, concurrencyKey? })`** (id `webhook:<path>`, many per agent) is served on its own path under the agent: `webhook({ path: '/issues' })` on agent `intake` is `POST /hooks/intake/issues`, a path of `/` is `/hooks/intake` (`GET /agents` lists each `hook` URL; the id stays internal). The match is exact, a trailing slash included. The body may be any JSON value. The idempotency key comes from the `Idempotency-Key` header, else from `idempotencyKey(payload)`; retried deliveries with one key create one run. The hook answers 202 right away and never runs the agent synchronously. Signature-verified webhooks (GitHub) are a separate package.
 
 ## MCP tools
 

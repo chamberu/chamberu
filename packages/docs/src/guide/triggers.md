@@ -17,7 +17,7 @@ A trigger describes how a run of an agent can start. At intake every trigger bec
 A `TriggerDefinition` may also carry `concurrencyKey(payload)` and `idempotencyKey(payload)` functions (`webhook()` copies them from its options). They are meant for the intake packages, which compute the envelope keys from a payload.
 
 ::: warning Firing triggers is not in core
-In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigger definitions describe intent; nothing in core fires a cron expression or listens on an HTTP path. [`@chamberu/scheduler`](/guide/scheduler) fires `cron()` triggers (with per-tick locks and the overlap policy); [`@chamberu/http`](/guide/http) serves `http()` triggers over REST and MCP and `webhook()` triggers at `/hooks/:agent/:triggerId`.
+In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigger definitions describe intent; nothing in core fires a cron expression or listens on an HTTP path. [`@chamberu/scheduler`](/guide/scheduler) fires `cron()` triggers (with per-tick locks and the overlap policy); [`@chamberu/http`](/guide/http) serves `http()` triggers over REST and MCP and `webhook()` triggers at `/hooks/:agent<path>`.
 :::
 
 ## The envelope

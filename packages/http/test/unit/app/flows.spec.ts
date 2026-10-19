@@ -155,7 +155,7 @@ describe('acceptance flows', () => {
             engine,
             store,
         } = setup();
-        const deliver = () => call(app, 'POST', `/hooks/intake/${encodeURIComponent('webhook:/issues')}`, {
+        const deliver = () => call(app, 'POST', '/hooks/intake/issues', {
             token: ADMIN_TOKEN,
             body: { id: 7 },
             headers: { 'idempotency-key': 'delivery-1' },

@@ -12,7 +12,7 @@ import type { WebhookTriggerOptions } from './types.ts';
 /**
  * A generic webhook (envelope `source: 'webhook'`), id `webhook:<path>`; an
  * agent may declare many. Served by `@chamberu/http` at
- * `POST /hooks/:agent/:triggerId`.
+ * `POST /hooks/:agent<path>` (e.g. `/hooks/intake/issues`).
  */
 export function webhook(opts: WebhookTriggerOptions): TriggerDefinition {
     if (typeof opts.path !== 'string' || !opts.path.startsWith('/')) {

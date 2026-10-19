@@ -103,7 +103,7 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | `request/` | No barrel: `readJsonBody()`, `validateBody()`, `validatePayload()`, `decodeQuery()` (rapiq), `readIdempotencyHeader()` (`helpers.ts`); validup validators `isString()`, `isBoolean()`, `isDefined()` (`validators.ts`) |
 | `health/` | No barrel: `/healthz`, `/readyz` |
 | `runs/` | Run routes (`module.ts`), `serializeRun()`, `canReadRun()`, `loadReadableRun()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `RunView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE) |
-| `hooks/` | No barrel: `POST /hooks/:agent/:triggerId` |
+| `hooks/` | No barrel: `POST /hooks/:agent<path>` |
 | `agents/` | `/agents`, `/schedules` and state routes (`module.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
 | `mcp/` | `createMcpEndpoint()`, `registerMcpRoutes()` (`module.ts`), the tools (`tools.ts`), `waitForRun()`, `toJsonSchema()` (`helpers.ts`), `RunSummary`, `RunToolResult` (`types.ts`) |
 | `plugins/` | No barrel: `installPlugins()` (CORS, Prometheus, rate limit) |

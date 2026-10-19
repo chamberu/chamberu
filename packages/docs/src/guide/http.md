@@ -15,9 +15,9 @@ Every HTTP or MCP start ends in `engine.dispatch()`; nothing runs synchronously 
 | Trigger | Served at | Envelope |
 |---|---|---|
 | `http({ schema? })` (id `http`, at most one per agent) | `POST /agents/:name/runs`, MCP `run_<name>` | `trigger: 'http'`, source `http` (REST, UI) or `mcp` |
-| `webhook({ path, schema?, idempotencyKey?, concurrencyKey? })` (id `webhook:<path>`) | `POST /hooks/:agent/:triggerId` | `trigger: 'webhook:<path>'`, source `webhook` |
+| `webhook({ path, schema?, idempotencyKey?, concurrencyKey? })` (id `webhook:<path>`) | `POST /hooks/:agent<path>` | `trigger: 'webhook:<path>'`, source `webhook` |
 
-An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger's `schema` validates the payload; a failure answers 400 with `issues` and dispatches nothing. The webhook's `:triggerId` is URL-encoded (`/hooks/intake/webhook%3A%2Fissues`); `GET /agents` lists each `hook` path. See [Triggers & the Envelope](/guide/triggers).
+An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger's `schema` validates the payload; a failure answers 400 with `issues` and dispatches nothing. A webhook is served on its own path under the agent: `webhook({ path: '/issues' })` on agent `intake` is `POST /hooks/intake/issues` (a path of `/` is `/hooks/intake`); `GET /agents` lists each `hook` URL. See [Triggers & the Envelope](/guide/triggers).
 
 ## Routes
 
@@ -29,7 +29,7 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 | `GET /runs/:id/stream` | as `GET /runs/:id` | SSE |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
-| `POST /hooks/:agent/:triggerId` | `agent:<agent>:run` | `202 { runId, deduplicated }` |
+| `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }` |
 | `GET /agents`, `GET /schedules` | `run:read` | Agent summaries; `cron()` triggers with their next fire time |
 | `GET`, `PATCH /agents/:name/state/kv/:key` | `state:read`, `state:write` | `{ key, value }` |
 | `GET /agents/:name/state/collections/:collection` | `state:read` | Documents (`{ id, ...fields }`, or `{ id, doc }` for a non-object); top-level equality filters, `page[limit]` (no offset) |

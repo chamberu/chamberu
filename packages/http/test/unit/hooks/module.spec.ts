@@ -16,8 +16,8 @@ import {
 } from '../../utils/app.ts';
 import { textModel } from '../../utils/model.ts';
 
-const ISSUES = '/hooks/intake/webhook%3A%2Fissues';
-const RAW = '/hooks/raw/webhook%3A%2Fraw';
+const ISSUES = '/hooks/intake/issues';
+const RAW = '/hooks/raw/raw';
 
 function setup() {
     const agents = [
@@ -39,7 +39,7 @@ function setup() {
             name: 'raw',
             model: textModel(),
             instructions: 'Raw.',
-            triggers: [webhook({ path: '/raw' })],
+            triggers: [webhook({ path: '/raw' }), webhook({ path: '/v1/deep/path' }), webhook({ path: '/' })],
         }),
     ];
     return createTestApp({ agents });
@@ -47,7 +47,7 @@ function setup() {
 
 type Accepted = { runId: string; deduplicated: boolean };
 
-describe('POST /hooks/:agent/:triggerId', () => {
+describe('POST /hooks/:agent/<path>', () => {
     it('dispatches through the webhook trigger without executing', async () => {
         const { app, store } = setup();
         const response = await call(app, 'POST', ISSUES, { token: ADMIN_TOKEN, body: { id: '7' } });
@@ -143,6 +143,9 @@ describe('POST /hooks/:agent/:triggerId', () => {
     it.each([
         '/hooks/intake/http',
         '/hooks/intake/webhook:/issues',
+        '/hooks/intake/webhook%3A%2Fissues',
+        '/hooks/intake/issues/',
+        '/hooks/intake',
         '/hooks/nope/x',
     ])('answers 404 for %s', async (path) => {
         const { app } = setup();
@@ -153,7 +156,19 @@ describe('POST /hooks/:agent/:triggerId', () => {
     it('names the trigger and agent in the 404', async () => {
         const { app } = setup();
         const response = await call(app, 'POST', '/hooks/intake/http', { token: ADMIN_TOKEN, body: {} });
-        expect((await response.json()).message).toBe('No webhook trigger "http" on agent "intake".');
+        expect((await response.json()).message).toBe('No webhook "/http" on agent "intake".');
+    });
+
+    it.each([
+        ['/hooks/raw/v1/deep/path', 'webhook:/v1/deep/path'],
+        ['/hooks/raw', 'webhook:/'],
+        ['/hooks/raw/', 'webhook:/'],
+    ])('routes %s on the webhook path to %s', async (path, trigger) => {
+        const { app, store } = setup();
+        const response = await call(app, 'POST', path, { token: ADMIN_TOKEN, body: {} });
+        expect(response.status).toBe(202);
+        const { runId } = await response.json() as Accepted;
+        expect((await store.getRun(runId))?.trigger.trigger).toBe(trigger);
     });
 
     it('needs agent:<agent>:run', async () => {

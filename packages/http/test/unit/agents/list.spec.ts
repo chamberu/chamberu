@@ -33,7 +33,7 @@ describe('GET /agents', () => {
                 triggers: [{
                     source: 'webhook',
                     id: 'webhook:/issues',
-                    hook: '/hooks/intake/webhook%3A%2Fissues',
+                    hook: '/hooks/intake/issues',
                 }],
                 budget: { maxSteps: 20, timeoutMs: 900_000 },
                 approvals: ['deploy'],
@@ -45,7 +45,7 @@ describe('GET /agents', () => {
     it('prefixes the hook path with basePath', async () => {
         const { app } = createTestApp({ agents: inventoryAgents(), basePath: '/api' });
         const { data } = await (await call(app, 'GET', '/api/agents', { token: READER_TOKEN })).json();
-        expect(data[1].triggers[0].hook).toBe('/api/hooks/intake/webhook%3A%2Fissues');
+        expect(data[1].triggers[0].hook).toBe('/api/hooks/intake/issues');
     });
 
     it('needs run:read', async () => {

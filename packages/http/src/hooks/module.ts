@@ -16,16 +16,18 @@ import { readIdempotencyHeader, readJsonBody, validatePayload } from '../request
 import { requireWebhookTrigger } from './helpers.ts';
 
 /**
- * `POST /hooks/:agent/:triggerId` (`:triggerId` URL-encoded, e.g.
- * `webhook%3A%2Fissues`): the whole JSON body is the payload; dispatched
- * with source `webhook` and answered `202` without waiting for the run.
+ * `POST /hooks/:agent<path>`, on the webhook's own path (`webhook({ path:
+ * '/issues' })` is `/hooks/intake/issues`; a path of `/` is `/hooks/intake`):
+ * the whole JSON body is the payload; dispatched with source `webhook` and
+ * answered `202` without waiting for the run.
  */
 export function registerHookRoutes(app: App, ctx: HttpContext): void {
-    app.post('/hooks/:agent/:triggerId', defineCoreHandler(async (event) => {
+    app.post('/hooks/:agent{/*path}', defineCoreHandler(async (event) => {
         const agentName = event.params.agent ?? '';
-        const triggerId = event.params.triggerId ?? '';
+        // the wildcard joins the decoded segments with '/'
+        const path = `/${event.params.path ?? ''}`;
         await authorize(event, ctx, agentPermission(agentName, 'run'));
-        const { trigger } = requireWebhookTrigger(ctx, agentName, triggerId);
+        const { trigger } = requireWebhookTrigger(ctx, agentName, path);
 
         const body = await readJsonBody(event, ctx.bodyLimit);
         if (body === undefined) throw new BadRequestError({ message: 'The webhook needs a JSON body.' });

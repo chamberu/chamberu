@@ -13,6 +13,7 @@ import { CronExpressionParser } from 'cron-parser';
 import { isObject } from 'smob';
 import { Container } from 'validup';
 import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
+import { webhookUrl } from '../hooks/helpers.ts';
 import { decodeQuery } from '../request/helpers.ts';
 import { isDefined } from '../request/validators.ts';
 import type { AgentSummary, KvBody, ScheduleSummary } from './types.ts';
@@ -28,7 +29,7 @@ export function summarizeAgent(agent: Agent, basePath: string): AgentSummary {
             {
                 source: trigger.source,
                 id: trigger.id,
-                hook: `${basePath}/hooks/${agent.name}/${encodeURIComponent(trigger.id)}`,
+                hook: webhookUrl(basePath, agent.name, String(trigger.options.path)),
             } :
             { source: trigger.source, id: trigger.id })),
         // defineAgent applied the defaults; the type keeps them optional
