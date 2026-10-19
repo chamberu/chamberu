@@ -58,8 +58,18 @@ describe('POST /agents/:name/runs', () => {
 
     it('rejects an Idempotency-Key header out of bounds', async () => {
         const { app } = createRunTestApp();
-        const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, headers: { 'idempotency-key': 'x'.repeat(257) } });
+        const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, headers: { 'idempotency-key': 'x'.repeat(256) } });
         expect(response.status).toBe(400);
+    });
+
+    it('bounds thread and idempotencyKey at 255 characters, the store column width', async () => {
+        const { app } = createRunTestApp();
+        for (const key of ['thread', 'idempotencyKey']) {
+            const fits = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { [key]: 'x'.repeat(255) } });
+            expect(fits.status).toBe(202);
+            const over = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { [key]: 'y'.repeat(256) } });
+            expect(over.status).toBe(400);
+        }
     });
 
     it('answers 404 for an unknown agent', async () => {

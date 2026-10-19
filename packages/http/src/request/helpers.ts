@@ -227,7 +227,7 @@ export function decodeQuery(searchParams: URLSearchParams, schema: AnySchema): D
     };
 }
 
-/** An `Idempotency-Key` header: 1 to 256 characters, else 400. */
+/** An `Idempotency-Key` header: 1 to `KEY_MAX_LENGTH` characters, else 400. */
 export function readIdempotencyHeader(request: Request): string | undefined {
     const value = request.headers.get('idempotency-key');
     if (value === null) return undefined;
@@ -235,4 +235,11 @@ export function readIdempotencyHeader(request: Request): string | undefined {
         throw new BadRequestError({ message: `The Idempotency-Key header must have 1 to ${KEY_MAX_LENGTH} characters.` });
     }
     return value;
+}
+
+/** A key a trigger derived from the payload: at most `KEY_MAX_LENGTH` characters, else 400. */
+export function assertDerivedKey(name: string, value: string | undefined): void {
+    if (value !== undefined && value.length > KEY_MAX_LENGTH) {
+        throw new BadRequestError({ message: `The ${name} derived from the payload exceeds ${KEY_MAX_LENGTH} characters.` });
+    }
 }

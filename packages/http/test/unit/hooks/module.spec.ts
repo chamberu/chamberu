@@ -67,6 +67,13 @@ describe('POST /hooks/:agent/<path>', () => {
         });
     });
 
+    it('answers 400 when a key derived from the payload exceeds 255 characters', async () => {
+        const { app, store } = setup();
+        const response = await call(app, 'POST', ISSUES, { token: ADMIN_TOKEN, body: { id: 'x'.repeat(256) } });
+        expect(response.status).toBe(400);
+        expect((await store.listRuns({})).total).toBe(0);
+    });
+
     it('dedupes a retried delivery by the trigger key', async () => {
         const { app, store } = setup();
         const first = await (await call(app, 'POST', ISSUES, { token: ADMIN_TOKEN, body: { id: '7' } })).json() as Accepted;

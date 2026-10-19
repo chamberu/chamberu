@@ -5,5 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-/** Bounds of an `idempotencyKey`, a `thread` and an `Idempotency-Key` header. */
-export const KEY_MAX_LENGTH = 256;
+/**
+ * Bounds of an `idempotencyKey`, a `thread`, an `Idempotency-Key` header and
+ * a webhook's derived keys: the width of `@chamberu/store-typeorm`'s
+ * `runs.thread` and `runs.concurrency_key` columns.
+ */
+export const KEY_MAX_LENGTH = 255;

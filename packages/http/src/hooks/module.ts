@@ -12,7 +12,12 @@ import type { App } from 'routup';
 import type { HttpContext } from '../app/types.ts';
 import { authorize } from '../auth/helpers.ts';
 import { agentPermission } from '../auth/module.ts';
-import { readIdempotencyHeader, readJsonBody, validatePayload } from '../request/helpers.ts';
+import {
+    assertDerivedKey,
+    readIdempotencyHeader,
+    readJsonBody,
+    validatePayload,
+} from '../request/helpers.ts';
 import { requireWebhookTrigger } from './helpers.ts';
 
 /**
@@ -35,6 +40,8 @@ export function registerHookRoutes(app: App, ctx: HttpContext): void {
 
         const idempotencyKey = readIdempotencyHeader(event.request) ?? trigger.idempotencyKey?.(payload);
         const concurrencyKey = trigger.concurrencyKey?.(payload);
+        assertDerivedKey('idempotency key', idempotencyKey);
+        assertDerivedKey('concurrency key', concurrencyKey);
         const result = await ctx.engine.dispatch({
             agent: agentName,
             trigger: trigger.id,
