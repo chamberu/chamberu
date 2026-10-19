@@ -32,7 +32,7 @@ export function createMcpEndpoint(ctx: HttpContext, options: McpEndpointOptions)
         // the route always passes them; a request without them cannot reach here
         if (!extra) throw new UnauthorizedError({ message: 'Authentication required.' });
         const server = new McpServer({ name: options.name, version: options.version });
-        registerTools(server, ctx, extra);
+        registerTools(server, ctx, extra, options);
         return server;
     }, { maxRequestBodySize: ctx.bodyLimit });
 }

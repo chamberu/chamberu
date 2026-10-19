@@ -5,12 +5,18 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from '@chamberu/core';
+import { ChamberuError, RunNotFoundError, RunStatus } from '@chamberu/core';
+import type { Run } from '@chamberu/core';
 import { isHTTPError } from '@ebec/http';
 import type { CallToolResult } from '@modelcontextprotocol/server';
+import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
 import { isObject } from 'smob';
 import type { HttpContext } from '../app/types.ts';
-import type { McpRequestExtra } from './types.ts';
+import type {
+    McpRequestExtra,
+    RunToolResult,
+    WaitForRunOptions,
+} from './types.ts';
 
 /** A tool result carrying `value` as JSON text and as structured content. */
 export function toolResult(value: object): CallToolResult {
@@ -47,4 +53,115 @@ export async function runTool(ctx: HttpContext, fn: () => Promise<CallToolResult
 export function readRequestExtra(extra: Record<string, unknown> | undefined): McpRequestExtra | undefined {
     if (!isObject(extra) || !isObject(extra.principal) || !(extra.signal instanceof AbortSignal)) return undefined;
     return extra as unknown as McpRequestExtra;
+}
+
+const WAIT_OVER = new Set<string>([
+    RunStatus.COMPLETED,
+    RunStatus.FAILED,
+    RunStatus.CANCELLED,
+    RunStatus.WAITING,
+]);
+
+/**
+ * Resolves with the run once it is `completed`, `failed`, `cancelled` or
+ * `waiting` (seen through `run.updated` or a store poll every `pollMs`, which
+ * covers runs executing on another replica), or with the latest stored run
+ * when `timeoutMs` elapses or `signal` aborts. Rejects when the store fails.
+ * Always unsubscribes and clears its timers.
+ */
+export function waitForRun(ctx: HttpContext, runId: string, opts: WaitForRunOptions): Promise<Run> {
+    return new Promise<Run>((resolve, reject) => {
+        let done = false;
+        let poll: { clear(): void } | undefined;
+        let timeout: { clear(): void } | undefined;
+        let unsubscribe: (() => void) | undefined;
+        const { signal } = opts;
+
+        function stop(): boolean {
+            if (done) return false;
+            done = true;
+            unsubscribe?.();
+            poll?.clear();
+            timeout?.clear();
+            signal?.removeEventListener('abort', settleLatest);
+            return true;
+        }
+
+        function settle(run: Run | undefined): void {
+            if (run) resolve(run);
+            else reject(new RunNotFoundError(runId));
+        }
+
+        /** Timeout or abort: answer with whatever the store holds now. */
+        function settleLatest(): void {
+            if (!stop()) return;
+            ctx.store.getRun(runId).then(settle, reject);
+        }
+
+        async function check(): Promise<void> {
+            try {
+                const run = await ctx.store.getRun(runId);
+                if (done) return;
+                if (!run || WAIT_OVER.has(run.status)) {
+                    stop();
+                    settle(run);
+                    return;
+                }
+                poll = ctx.clock.setTimeout(() => { void check(); }, opts.pollMs);
+            } catch (error) {
+                if (stop()) reject(error);
+            }
+        }
+
+        if (signal?.aborted) {
+            settleLatest();
+            return;
+        }
+
+        unsubscribe = ctx.engine.on('run.updated', (e) => {
+            if (e.run.id !== runId || !WAIT_OVER.has(e.run.status)) return;
+            if (stop()) resolve(e.run);
+        });
+        signal?.addEventListener('abort', settleLatest, { once: true });
+        timeout = ctx.clock.setTimeout(settleLatest, opts.timeoutMs);
+        void check();
+    });
+}
+
+/** What `run_<agent>` answers for a run; never a resume token. */
+export function toRunToolResult(run: Run, deduplicated: boolean): RunToolResult {
+    const result: RunToolResult = {
+        runId: run.id,
+        status: run.status,
+        deduplicated,
+    };
+    if (run.output !== undefined) result.output = run.output;
+    if (run.error !== undefined) result.error = run.error;
+    if (run.waiting) {
+        result.waiting = {
+            toolName: run.waiting.toolName,
+            input: run.waiting.input,
+            expiresAt: run.waiting.expiresAt.toISOString(),
+        };
+    }
+    return result;
+}
+
+type JsonSchemaCarrier = { '~standard': Partial<StandardJSONSchemaV1.Props> };
+
+/**
+ * The JSON Schema (draft-07, without `$schema`) of a Standard Schema's
+ * input, for a tool's `payload`; `{}` (anything) without a schema, a
+ * converter, or when conversion fails.
+ */
+export function toJsonSchema(schema: StandardSchemaV1 | undefined): Record<string, unknown> {
+    const converter = (schema as JsonSchemaCarrier | undefined)?.['~standard'].jsonSchema;
+    if (!converter) return {};
+    try {
+        const jsonSchema = { ...converter.input({ target: 'draft-07' }) };
+        delete jsonSchema.$schema;
+        return jsonSchema;
+    } catch {
+        return {};
+    }
 }

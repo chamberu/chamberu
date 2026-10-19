@@ -38,3 +38,11 @@ export type McpRequestExtra = {
     /** Follows the HTTP request: aborts when the client goes away. */
     signal: AbortSignal;
 };
+
+/** Options of `waitForRun`; internal. */
+export type WaitForRunOptions = {
+    timeoutMs: number;
+    pollMs: number;
+    /** Stops the wait early (the run as stored then is the answer). */
+    signal?: AbortSignal;
+};
