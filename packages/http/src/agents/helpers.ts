@@ -18,7 +18,10 @@ import { decodeQuery } from '../request/helpers.ts';
 import { isDefined } from '../request/validators.ts';
 import type { AgentSummary, KvBody, ScheduleSummary } from './types.ts';
 
-/** Any top-level filter key, no sort; values are coerced by rapiq (`'2'` -> `2`). */
+/**
+ * Any top-level filter key, no sort; values are coerced by rapiq (`2` ->
+ * `2`, `true`, `null`), and `filterValue` makes a double-quoted value a string.
+ */
 const COLLECTION_QUERY_SCHEMA = defineSchema({ sorts: { allowed: [] }, throwOnFailure: true });
 
 export function summarizeAgent(agent: Agent, basePath: string): AgentSummary {
@@ -87,6 +90,18 @@ export function createKvContainer(): Container<KvBody> {
     return container;
 }
 
+/**
+ * A collection filter value: rapiq coerces `42`, `007`, `true` and `null`
+ * (quoted or not), so one pair of double quotes marks a string that keeps
+ * its text (`"42"` -> `'42'`); everything else is rapiq's value.
+ */
+function filterValue(value: unknown): unknown {
+    if (typeof value === 'string' && value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+        return value.slice(1, -1);
+    }
+    return value;
+}
+
 /** A collection list query: top-level `eq` filters as `where`, a limit, no offset, no sort. */
 export function parseCollectionQuery(searchParams: URLSearchParams): { where: Record<string, unknown>; limit: number } {
     const decoded = decodeQuery(searchParams, COLLECTION_QUERY_SCHEMA);
@@ -95,10 +110,14 @@ export function parseCollectionQuery(searchParams: URLSearchParams): { where: Re
         if (filter.operator !== 'eq') {
             throw new BadRequestError({ message: 'Only top-level equality filters are supported.' });
         }
+        if (filter.field === 'id') {
+            // `id` on the wire is the store id, which `where` cannot match
+            throw new BadRequestError({ message: 'filter[id] is not supported: id is the store id, not a document field.' });
+        }
         if (Object.hasOwn(where, filter.field)) {
             throw new BadRequestError({ message: `filter[${filter.field}] may be given once.` });
         }
-        where[filter.field] = filter.value;
+        where[filter.field] = filterValue(filter.value);
     }
     if (decoded.offset !== undefined && decoded.offset > 0) {
         throw new BadRequestError({ message: 'page[offset] is not supported for state collections.' });

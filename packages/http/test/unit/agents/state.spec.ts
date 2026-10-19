@@ -118,6 +118,24 @@ describe('state collections', () => {
         expect(coerced.data.map((d: { id: string }) => d.id)).toEqual(['i1']);
     });
 
+    it('matches a string that looks like a scalar when the value is double-quoted', async () => {
+        const { app, store } = setup();
+        await store.docUpsert('intake', 'issues', 'a', { issue: '42', tag: 'true' });
+        await store.docUpsert('intake', 'issues', 'b', { issue: 42, tag: 'null' });
+        await store.docUpsert('intake', 'issues', 'c', { issue: '007', tag: '"x"' });
+        const ids = async (query: string) => {
+            const response = await call(app, 'GET', `${ISSUES}?${query}`, { token: ADMIN_TOKEN });
+            expect(response.status).toBe(200);
+            return (await response.json()).data.map((d: { id: string }) => d.id);
+        };
+        expect(await ids('filter[issue]=42')).toEqual(['b']);
+        expect(await ids('filter[issue]="42"')).toEqual(['a']);
+        expect(await ids('filter[issue]="007"')).toEqual(['c']);
+        expect(await ids('filter[tag]="true"')).toEqual(['a']);
+        expect(await ids('filter[tag]="null"')).toEqual(['b']);
+        expect(await ids('filter[tag]=""x""')).toEqual(['c']);
+    });
+
     it('limits the page', async () => {
         const { app } = await seeded();
         const page = await (await call(app, 'GET', `${ISSUES}?page[limit]=1`, { token: ADMIN_TOKEN })).json();
@@ -141,6 +159,7 @@ describe('state collections', () => {
 
     it.each([
         'filter[a.b]=1',
+        'filter[id]=i1',
         'filter[status]=!open',
         'filter[status]=open,closed',
         'sort=id',

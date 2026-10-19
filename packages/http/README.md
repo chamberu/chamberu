@@ -115,7 +115,7 @@ Paths are relative to `basePath` (default none).
 | `GET /schedules` | `run:read` | `200 { data: ScheduleSummary[] }`: every `cron()` trigger with its next fire time (from the definitions, not from a running scheduler) |
 | `GET /agents/:name/state/kv/:key` | `state:read` | `200 { key, value }` (`null` when unset) |
 | `PATCH /agents/:name/state/kv/:key` | `state:write` | `200 { key, value }`; body `{ value }` |
-| `GET /agents/:name/state/collections/:collection` | `state:read` | `200 { data }`, each document `{ id, ...fields }` (a non-object document as `{ id, doc }`); top-level equality filters (`filter[status]=open`), `page[limit]`; a `page[offset]` above 0 is 400 (the store pages by limit only) |
+| `GET /agents/:name/state/collections/:collection` | `state:read` | `200 { data }`, each document `{ id, ...fields }` (a non-object document as `{ id, doc }`); top-level equality filters (`filter[status]=open`; rapiq turns `42`, `007`, `true` and `null` into a number, boolean or null, so double-quote a value to match it as a string: `filter[issue]="42"`), `page[limit]`; `id` is the store id, not a document field, so `filter[id]` is 400; a `page[offset]` above 0 is 400 (the store pages by limit only) |
 | `/mcp` | authenticated | The MCP endpoint (see [MCP tools](#mcp-tools)) |
 | `GET /healthz` | none | `200 { status: 'ok' }` |
 | `GET /readyz` | none | `200`, or `503 { status: 'unavailable', reason }` with `shutting-down`, `draining` or `store-unreachable` |
