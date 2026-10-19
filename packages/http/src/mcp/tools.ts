@@ -94,9 +94,9 @@ function registerReadTools(server: McpServer, ctx: HttpContext, principal: Princ
                 agent: { type: 'string', minLength: 1 },
                 status: { type: 'array', items: { type: 'string', enum: Object.values(RunStatus) } },
                 limit: {
-                    type: 'integer', 
-                    minimum: 1, 
-                    maximum: MAX_PAGE_LIMIT, 
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: MAX_PAGE_LIMIT,
                 },
                 offset: { type: 'integer', minimum: 0 },
             },
@@ -145,9 +145,9 @@ function registerRunTool(
                     description: 'Dedupes starts over MCP; a key used over REST is a different scope.',
                 },
                 thread: {
-                    type: 'string', 
-                    minLength: 1, 
-                    maxLength: KEY_MAX_LENGTH, 
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: KEY_MAX_LENGTH,
                 },
                 waitSeconds: {
                     type: 'integer',
@@ -172,9 +172,9 @@ function registerRunTool(
         if (waitSeconds <= 0) {
             const status = deduplicated ? (await ctx.store.getRun(runId))?.status ?? RunStatus.QUEUED : RunStatus.QUEUED;
             return toolResult({
-                runId, 
-                status, 
-                deduplicated, 
+                runId,
+                status,
+                deduplicated,
             });
         }
 
@@ -197,9 +197,9 @@ function registerResumeTool(server: McpServer, ctx: HttpContext, principal: Prin
             type: 'object',
             properties: {
                 token: {
-                    type: 'string', 
-                    minLength: 1, 
-                    maxLength: RESUME_TOKEN_MAX_LENGTH, 
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: RESUME_TOKEN_MAX_LENGTH,
                 },
                 approved: { type: 'boolean' },
                 reason: { type: 'string', maxLength: RESUME_REASON_MAX_LENGTH },

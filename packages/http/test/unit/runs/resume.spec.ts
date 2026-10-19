@@ -5,11 +5,11 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { 
-    describe, 
-    expect, 
-    it, 
-    vi, 
+import {
+    describe,
+    expect,
+    it,
+    vi,
 } from 'vitest';
 import { createResumeToken } from '@chamberu/core';
 import {
@@ -38,11 +38,11 @@ async function pausedGate() {
 describe('POST /resume', () => {
     it('resumes a waiting run', async () => {
         const {
-            app, 
-            engine, 
-            store, 
-            runId, 
-            token, 
+            app,
+            engine,
+            store,
+            runId,
+            token,
         } = await pausedGate();
         const response = await call(app, 'POST', '/resume', { token: ADMIN_TOKEN, body: { token, approved: true } });
         expect(response.status).toBe(202);
@@ -54,10 +54,10 @@ describe('POST /resume', () => {
 
     it('authenticates before it looks at the token or the store', async () => {
         const {
-            app, 
-            engine, 
-            store, 
-            token, 
+            app,
+            engine,
+            store,
+            token,
         } = await pausedGate();
         const getRun = vi.spyOn(store, 'getRun');
         const inspect = vi.spyOn(engine, 'inspectResumeToken');
@@ -70,18 +70,18 @@ describe('POST /resume', () => {
 
     it('rejects forged, malformed and expired tokens before any store lookup', async () => {
         const {
-            app, 
-            engine, 
-            store, 
-            clock, 
-            runId, 
-            waiting, 
+            app,
+            engine,
+            store,
+            clock,
+            runId,
+            waiting,
         } = await pausedGate();
         const getRun = vi.spyOn(store, 'getRun');
         const claims = {
-            runId, 
-            approvalId: waiting.approvalId, 
-            tokenId: waiting.tokenId, 
+            runId,
+            approvalId: waiting.approvalId,
+            tokenId: waiting.tokenId,
         };
         const tokens = [
             'abc',
@@ -99,9 +99,9 @@ describe('POST /resume', () => {
 
     it('answers 400 for a signed token of a run that does not exist', async () => {
         const {
-            app, 
-            engine, 
-            waiting, 
+            app,
+            engine,
+            waiting,
         } = await pausedGate();
         const token = createResumeToken('test-secret', {
             runId: 'gone',
@@ -117,11 +117,11 @@ describe('POST /resume', () => {
 
     it('needs agent:<agent>:approve for the run\'s agent', async () => {
         const {
-            app, 
-            engine, 
-            store, 
-            runId, 
-            token, 
+            app,
+            engine,
+            store,
+            runId,
+            token,
         } = await pausedGate();
         const denied = await call(app, 'POST', '/resume', { token: tokenFor('agent:echo:approve'), body: { token, approved: true } });
         expect(denied.status).toBe(403);
@@ -142,9 +142,9 @@ describe('POST /resume', () => {
         [[], 'The request body must be a JSON object.'],
         [undefined, 'The request needs a JSON body.'],
         [{
-            token: 'x', 
-            approved: true, 
-            reason: 'r'.repeat(1_001), 
+            token: 'x',
+            approved: true,
+            reason: 'r'.repeat(1_001),
         }, undefined],
         [{ approved: true }, undefined],
     ])('rejects the body %j', async (body, message) => {

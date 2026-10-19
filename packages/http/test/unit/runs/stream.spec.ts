@@ -51,9 +51,9 @@ async function completedRun() {
     const steps = await ctx.store.listSteps(runId);
     expect(steps.length).toBeGreaterThan(0);
     return {
-        ...ctx, 
-        runId, 
-        steps, 
+        ...ctx,
+        runId,
+        steps,
     };
 }
 
@@ -77,9 +77,9 @@ afterEach(() => {
 describe('GET /runs/:id/stream', () => {
     it('sends a settled run with its steps, then ends', async () => {
         const {
-            app, 
-            runId, 
-            steps, 
+            app,
+            runId,
+            steps,
         } = await completedRun();
         const response = await call(app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN });
         expect(response.status).toBe(200);
@@ -114,9 +114,9 @@ describe('GET /runs/:id/stream', () => {
 
     it('skips the steps up to Last-Event-ID', async () => {
         const {
-            app, 
-            runId, 
-            steps, 
+            app,
+            runId,
+            steps,
         } = await completedRun();
         const response = await call(app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN, headers: { 'last-event-id': '0' } });
         const events = await readEvents(response);
@@ -125,9 +125,9 @@ describe('GET /runs/:id/stream', () => {
 
     it('reads a malformed Last-Event-ID as none', async () => {
         const {
-            app, 
-            runId, 
-            steps, 
+            app,
+            runId,
+            steps,
         } = await completedRun();
         const response = await call(app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN, headers: { 'last-event-id': 'abc' } });
         expect(stepIds(await readEvents(response))).toEqual(steps.map((s) => String(s.index)));
@@ -138,9 +138,9 @@ describe('GET /runs/:id/stream', () => {
         const store = new MemoryStore({ clock });
         const agents = createRunAgents();
         const { app } = createRunTestApp({
-            clock, 
-            store, 
-            agents, 
+            clock,
+            store,
+            agents,
         });
         const other = new RunEngine({
             store,

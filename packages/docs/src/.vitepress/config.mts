@@ -144,6 +144,7 @@ export default defineConfig({
                         { text: 'Concurrency, Leases & Multi-Replica', link: '/guide/concurrency' },
                         { text: 'Cancel, Drain & Recovery', link: '/guide/recovery' },
                         { text: 'Cron Scheduling', link: '/guide/scheduler' },
+                        { text: 'HTTP API & MCP', link: '/guide/http' },
                         { text: 'Notifiers', link: '/guide/notifiers' },
                         { text: 'Errors', link: '/guide/errors' },
                     ],
@@ -178,6 +179,7 @@ export default defineConfig({
                     text: 'Reference',
                     items: [
                         { text: '@chamberu/core', link: '/reference/' },
+                        { text: '@chamberu/http', link: '/reference/http' },
                         { text: '@chamberu/scheduler', link: '/reference/scheduler' },
                         { text: '@chamberu/test-kit', link: '/reference/test-kit' },
                     ],

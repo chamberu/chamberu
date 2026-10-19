@@ -50,9 +50,9 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
     }
 
     function write(message: {
-        event: string; 
-        id?: string; 
-        data: string 
+        event: string;
+        id?: string;
+        data: string
     }): boolean {
         if (ended) return false;
         if (stream.write(message)) return true;
@@ -70,9 +70,9 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
         if (step.index <= lastStep) return false;
         lastStep = step.index;
         return write({
-            event: 'step.appended', 
-            id: String(step.index), 
-            data: JSON.stringify(step), 
+            event: 'step.appended',
+            id: String(step.index),
+            data: JSON.stringify(step),
         });
     }
 

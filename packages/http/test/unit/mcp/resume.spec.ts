@@ -87,9 +87,9 @@ describe('mcp resume_run', () => {
         const client = await connectMcp(setup.app, ADMIN_TOKEN);
         expect((await callTool(client, 'resume_run', { token: 'x', approved: 'yes' })).isError).toBe(true);
         expect((await callTool(client, 'resume_run', {
-            token: 'x', 
-            approved: true, 
-            reason: 'r'.repeat(1_001), 
+            token: 'x',
+            approved: true,
+            reason: 'r'.repeat(1_001),
         })).isError).toBe(true);
         await client.close();
     });

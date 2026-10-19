@@ -76,9 +76,9 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
         return {
             data: data.map(serializeRun),
             meta: {
-                total, 
-                limit: query.limit, 
-                offset: query.offset, 
+                total,
+                limit: query.limit,
+                offset: query.offset,
             },
         };
     }));

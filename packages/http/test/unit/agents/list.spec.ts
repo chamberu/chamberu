@@ -31,9 +31,9 @@ describe('GET /agents', () => {
             {
                 name: 'intake',
                 triggers: [{
-                    source: 'webhook', 
-                    id: 'webhook:/issues', 
-                    hook: '/hooks/intake/webhook%3A%2Fissues', 
+                    source: 'webhook',
+                    id: 'webhook:/issues',
+                    hook: '/hooks/intake/webhook%3A%2Fissues',
                 }],
                 budget: { maxSteps: 20, timeoutMs: 900_000 },
                 approvals: ['deploy'],

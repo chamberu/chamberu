@@ -128,9 +128,9 @@ describe('acceptance flows', () => {
 
     it('approval, POST /resume by an authup principal, completed', async () => {
         const {
-            app, 
-            engine, 
-            notifier, 
+            app,
+            engine,
+            notifier,
         } = setup();
         const started = await call(app, 'POST', '/agents/gate/runs', { token: ADMIN_TOKEN });
         const { runId } = await started.json() as { runId: string };
@@ -151,9 +151,9 @@ describe('acceptance flows', () => {
 
     it('webhook retries with one Idempotency-Key create one run', async () => {
         const {
-            app, 
-            engine, 
-            store, 
+            app,
+            engine,
+            store,
         } = setup();
         const deliver = () => call(app, 'POST', `/hooks/intake/${encodeURIComponent('webhook:/issues')}`, {
             token: ADMIN_TOKEN,
@@ -209,9 +209,9 @@ describe('acceptance flows', () => {
             clock: base.clock,
         });
         const {
-            app, 
-            engine, 
-            clock, 
+            app,
+            engine,
+            clock,
         } = setup({
             shutdown,
             engine: base.engine,

@@ -119,9 +119,9 @@ describe('POST /hooks/:agent/:triggerId', () => {
     it('rejects an Idempotency-Key header out of bounds', async () => {
         const { app } = setup();
         const response = await call(app, 'POST', ISSUES, {
-            token: ADMIN_TOKEN, 
-            body: { id: '1' }, 
-            headers: { 'idempotency-key': 'x'.repeat(257) }, 
+            token: ADMIN_TOKEN,
+            body: { id: '1' },
+            headers: { 'idempotency-key': 'x'.repeat(257) },
         });
         expect(response.status).toBe(400);
     });

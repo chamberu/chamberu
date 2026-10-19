@@ -56,6 +56,9 @@ The `@tada5hi/*` config packages are the source of truth for lint, TS and commit
 
 - Object checks use `isObject` from `smob`, never `typeof x === 'object' && x !== null` (note that `isObject` is false for arrays).
 - Standard Schema validation goes through validup (`buildIssuesForStandardSchemaIssues` from `@validup/standard-schema`); errors carry ebec `issues`, never a custom issue field.
+- Packages that answer HTTP (`@chamberu/http`) throw `@ebec/http` errors (`BadRequestError`, `ForbiddenError`, ...) and define no error classes of their own; core errors pass through and the error handler maps them by `code`.
+- Option misconfiguration in any package's factory (`createHttpApp`, `createScheduler`, `staticTokens`, ...) throws core `InvalidAgentDefinitionError`: it covers app definitions, not only agents.
+- validup has no built-in validators: build them with `defineValidator` and reuse them (`packages/http/src/request/validators.ts`), never pull in zod for request validation (zod stays a dev dependency for specs).
 - Persistence code uses TypeORM repositories and their query builders (`insert().orIgnore()`, `orUpdate()` with an overwrite condition, `update().where().returning()`, find options). Raw SQL only where the ORM cannot express a statement, with a one-line comment saying why.
 
 ## Workflow

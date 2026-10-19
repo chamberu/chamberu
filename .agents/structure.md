@@ -17,6 +17,7 @@ chamberu/
 │   │   ├── tsconfig.json            # src + test (typecheck)
 │   │   └── tsconfig.build.json      # src only (build:types)
 │   ├── scheduler/                   # @chamberu/scheduler (same layout; aliases core, test-kit and itself to src)
+│   ├── http/                        # @chamberu/http (same layout; aliases core, test-kit and itself to src)
 │   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
 │   ├── store-typeorm/               # @chamberu/store-typeorm (same layout)
 │   │   ├── src/{entities,migrations,schema,store}/
@@ -35,7 +36,7 @@ chamberu/
 ├── .husky/commit-msg                # Runs commitlint
 ├── CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md
 ├── nx.json                          # Task orchestration and caching
-├── tsconfig.json                    # Root config, path aliases @chamberu/core, @chamberu/scheduler and @chamberu/test-kit -> packages/*/src
+├── tsconfig.json                    # Root config, path aliases @chamberu/core, @chamberu/http, @chamberu/scheduler, @chamberu/store-typeorm and @chamberu/test-kit -> packages/*/src
 ├── tsconfig.build.json              # Shared compiler options
 ├── eslint.config.js                 # @tada5hi/eslint-config flat config
 ├── commitlint.config.mjs            # Conventional Commits
@@ -49,7 +50,7 @@ chamberu/
 |---------|--------|----------------|
 | `@chamberu/core` | Exists (0.1.0) | defineAgent, run engine, checkpoints, trigger model, state API, budgets, IStore/INotifier interfaces, in-memory store |
 | `@chamberu/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`; depends on core, core never depends on it |
-| `@chamberu/http` | Planned | REST control API, webhook ingestion, SSE, MCP endpoint, auth |
+| `@chamberu/http` | Exists (0.1.0) | `createHttpApp()` (routup v6): REST control API, SSE run stream, webhook intake, MCP endpoint, authenticators (static tokens, authup, oidc), health, metrics, `createShutdown()`; peer on core |
 | `@chamberu/scheduler` | Exists (0.1.0) | `createScheduler()` (one locked hubwire component per cron trigger), `runJob()`; depends on `hubwire`, peer on core |
 | `@chamberu/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned | Workspaces for clone/exec/artifacts |
@@ -90,6 +91,23 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `tick/` | `fireCronTrigger()` (overlap check, envelope, dispatch), `readCronOptions()`; overlap check in `helpers.ts` |
 | `scheduler/` | `createScheduler()`, `SCHEDULE_LOCK_TTL_MS`; `buildComponentOptions()` (`helpers.ts`, internal) |
 | `run-job/` | `runJob()`; `resolveCronTrigger()`, `isQueuedBehindApproval()` (`helpers.ts`), `SETTLING` (`constants.ts`), both internal |
+
+## HTTP Module Map (`packages/http/src`)
+
+Folders without an `index.ts` export nothing public; other modules import the file they need.
+
+| Path | Purpose |
+|------|---------|
+| `app/` | `createHttpApp()` (`module.ts`), `HttpAppOptions` and the internal `HttpContext` (`types.ts`), defaults (`constants.ts`), `buildContext()` and the JSON error handler (`helpers.ts`) |
+| `auth/` | `Principal`, `Authenticator` (`types.ts`), `Permission` (`constants.ts`), `hasPermission()`, `agentPermission()` (`module.ts`), `authenticate()`, `authorize()`, `readBearerToken()` (`helpers.ts`, internal); `static-tokens/`, `authup/`, `oidc/` hold the built-in authenticators |
+| `request/` | No barrel: `readJsonBody()`, `validateBody()`, `validatePayload()`, `decodeQuery()` (rapiq), `readIdempotencyHeader()` (`helpers.ts`); validup validators `isString()`, `isBoolean()`, `isDefined()` (`validators.ts`) |
+| `health/` | No barrel: `/healthz`, `/readyz` |
+| `runs/` | Run routes (`module.ts`), `serializeRun()`, `canReadRun()`, `loadReadableRun()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `RunView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE) |
+| `hooks/` | No barrel: `POST /hooks/:agent/:triggerId` |
+| `agents/` | `/agents`, `/schedules` and state routes (`module.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
+| `mcp/` | `createMcpEndpoint()`, `registerMcpRoutes()` (`module.ts`), the tools (`tools.ts`), `waitForRun()`, `toJsonSchema()` (`helpers.ts`), `RunSummary`, `RunToolResult` (`types.ts`) |
+| `plugins/` | No barrel: `installPlugins()` (CORS, Prometheus, rate limit) |
+| `shutdown/` | `createShutdown()`, `IShutdown`, `ShutdownOptions`, the timeout defaults |
 
 ## Store-TypeORM Module Map (`packages/store-typeorm/src`)
 

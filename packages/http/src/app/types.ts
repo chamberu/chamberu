@@ -18,6 +18,7 @@ import type { AppOptionsInput } from 'routup';
 import type { Authenticator } from '../auth/types.ts';
 import type { IShutdown } from '../shutdown/types.ts';
 
+// #region options
 export type CorsOptions = CorsPluginOptions;
 
 export type RateLimitOptions = RateLimitPluginOptions;
@@ -59,6 +60,8 @@ export type HttpAppOptions = {
     /** Receives 5xx causes and background failures. Default: `console.error`. */
     onError?: (error: unknown) => void;
 };
+
+// #endregion options
 
 /** Shared by every route module; internal. */
 export type HttpContext = {

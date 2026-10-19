@@ -1,20 +1,20 @@
 # OpenClaw <Badge type="warning" text="Planned" />
 
 ::: warning Planned
-The OpenClaw notifier and the MCP endpoint are planned (`@chamberu/notify-openclaw`, `@chamberu/http`).
+The OpenClaw notifier is planned (`@chamberu/notify-openclaw`). The MCP endpoint ships in [`@chamberu/http`](/guide/http#mcp).
 :::
 
 OpenClaw is a personal assistant gateway that connects chat channels to agents. chamberu's integration contract is **"MCP in, hooks out"**.
 
 ## MCP in
 
-Each chamberu app serves an MCP endpoint at `/mcp` (stateless Streamable HTTP). OpenClaw lists it among its MCP servers and gets:
+Each chamberu app serves an MCP endpoint at `/mcp` (Streamable HTTP, from [`@chamberu/http`](/guide/http#mcp)). OpenClaw lists it among its MCP servers and gets:
 
-- one `run_<agent>` tool per agent, which starts a run and returns the run id (or, for short runs, waits briefly and returns the output),
+- one `run_<agent>` tool per agent with an `http()` trigger, which starts a run and returns the run id (or, with `waitSeconds`, waits up to a minute and returns the output or the pending approval),
 - `get_run` and `list_runs` for status,
 - `resume_run` to answer an approval with its token and a decision.
 
-The endpoint uses the same bearer-token authentication as the REST API. This is how the owner says "what's relevant in my mail today?" in a chat and gets a run started.
+The endpoint uses the same bearer-token authentication as the REST API; give OpenClaw a principal with `agent:<name>:run` (and `agent:<name>:approve` where it may answer approvals), which also lets it read the runs it starts. This is how the owner says "what's relevant in my mail today?" in a chat and gets a run started.
 
 ## Hooks out
 
@@ -24,7 +24,7 @@ For approvals the message includes how to answer: a link into the planned UI's a
 
 ## What works today
 
-The core side is in place: approval notifications go through any [`INotifier`](/guide/notifiers) with a stable idempotency key and are retried until delivered, and [`engine.resume()`](/guide/approvals) answers them.
+The MCP side is in place ([`@chamberu/http`](/guide/http)), and so is the core side: approval notifications go through any [`INotifier`](/guide/notifiers) with a stable idempotency key and are retried until delivered, and [`engine.resume()`](/guide/approvals) answers them. The OpenClaw notifier itself is still planned.
 
 ## In the cluster
 

@@ -45,7 +45,7 @@ flow:
 packages:
     eyebrow: Packages
     title: Small today, planned in the open.
-    lead: The engine, the cron scheduler, the TypeORM store and the test helpers ship now. The HTTP API and the rest are designed milestone by milestone.
+    lead: The engine, the cron scheduler, the HTTP and MCP API, the TypeORM store and the test helpers ship now. The rest is designed milestone by milestone.
     shipped:
         -   name: '@chamberu/core'
             body: Agents, triggers, the run engine, checkpoints, budgets, effect tools, approvals, agent state and the in-memory store.
@@ -59,10 +59,13 @@ packages:
         -   name: '@chamberu/store-typeorm'
             body: TypeORM store (PostgreSQL) for durable runs across replicas, passing the store contract suite.
             link: /stores/typeorm
-    planned:
         -   name: '@chamberu/http'
+            body: REST, server-sent events, webhooks and an MCP endpoint, with bearer, authup and OIDC authentication.
+            link: /guide/http
+    planned:
+        -   name: '@chamberu/notify-openclaw'
             milestone: M1
-            body: REST control API, server-sent events, webhook intake and an MCP endpoint.
+            body: Results and approval requests delivered into OpenClaw chats.
         -   name: '@chamberu/github'
             milestone: M1
             body: GitHub App auth, webhook triggers and issue tools with reconciliation.

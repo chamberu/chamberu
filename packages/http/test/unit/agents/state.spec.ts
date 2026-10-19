@@ -78,14 +78,14 @@ describe('state collections', () => {
     async function seeded() {
         const ctx = setup();
         await ctx.store.docUpsert('intake', 'issues', 'i1', {
-            title: 'a', 
-            status: 'open', 
-            priority: 2, 
+            title: 'a',
+            status: 'open',
+            priority: 2,
         });
         await ctx.store.docUpsert('intake', 'issues', 'i2', {
-            title: 'b', 
-            status: 'closed', 
-            priority: 1, 
+            title: 'b',
+            status: 'closed',
+            priority: 1,
         });
         return ctx;
     }
@@ -97,10 +97,10 @@ describe('state collections', () => {
         const { data } = await response.json();
         expect(data).toHaveLength(2);
         expect(data).toContainEqual({
-            id: 'i1', 
-            title: 'a', 
-            status: 'open', 
-            priority: 2, 
+            id: 'i1',
+            title: 'a',
+            status: 'open',
+            priority: 2,
         });
     });
 
@@ -108,10 +108,10 @@ describe('state collections', () => {
         const { app } = await seeded();
         const open = await (await call(app, 'GET', `${ISSUES}?filter[status]=open`, { token: ADMIN_TOKEN })).json();
         expect(open.data).toEqual([{
-            id: 'i1', 
-            title: 'a', 
-            status: 'open', 
-            priority: 2, 
+            id: 'i1',
+            title: 'a',
+            status: 'open',
+            priority: 2,
         }]);
 
         const coerced = await (await call(app, 'GET', `${ISSUES}?filter[priority]=2`, { token: ADMIN_TOKEN })).json();

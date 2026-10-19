@@ -22,9 +22,9 @@ describe('decodeQuery', () => {
     it('decodes filters, pagination and sorts from the bracket dialect', () => {
         expect(decode('filter[agent]=a&page[limit]=5&sort=createdAt')).toEqual({
             filters: [{
-                field: 'agent', 
-                operator: 'eq', 
-                value: 'a', 
+                field: 'agent',
+                operator: 'eq',
+                value: 'a',
             }],
             limit: 5,
             offset: 0,
@@ -38,9 +38,9 @@ describe('decodeQuery', () => {
 
     it('decodes the expression dialect to the same leaf', () => {
         expect(decode('filter=eq(agent,\'a\')').filters).toEqual([{
-            field: 'agent', 
-            operator: 'eq', 
-            value: 'a', 
+            field: 'agent',
+            operator: 'eq',
+            value: 'a',
         }]);
     });
 

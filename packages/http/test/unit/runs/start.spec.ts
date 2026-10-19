@@ -27,9 +27,9 @@ describe('POST /agents/:name/runs', () => {
 
         const run = await store.getRun(body.runId);
         expect(run?.trigger).toMatchObject({
-            source: 'http', 
-            trigger: 'http', 
-            payload: { n: 1 }, 
+            source: 'http',
+            trigger: 'http',
+            payload: { n: 1 },
         });
     });
 

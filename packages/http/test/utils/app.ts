@@ -172,9 +172,9 @@ export async function permissionsAuth(request: Request): Promise<Principal | und
     if (!match) return undefined;
     const permissions = match[1] ? match[1].split(',') : [];
     return {
-        id: `p:${match[1]}`, 
-        kind: 'token', 
-        permissions, 
+        id: `p:${match[1]}`,
+        kind: 'token',
+        permissions,
     };
 }
 

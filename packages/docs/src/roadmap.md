@@ -10,6 +10,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 | `@chamberu/test-kit` | `describeStoreContract`, `ControllableClock` |
 | `@chamberu/scheduler` | `createScheduler()` (one locked hubwire component per `cron()` trigger, overlap policies, timezones), `runJob()` for one-shot jobs |
 | `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |
+| `@chamberu/http` | REST control API, server-sent events, webhook intake, `/healthz`, `/readyz`, `/metrics`, the MCP endpoint, static-token, authup and OIDC authentication, graceful shutdown. See [HTTP API & MCP](/guide/http) |
 
 ## Milestones
 
@@ -31,7 +32,6 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 
 | Package | Status | Purpose |
 |---|---|---|
-| `@chamberu/http` | Planned (M1) | REST control API, server-sent events, webhook intake (202 plus run id), health and readiness, MCP endpoint, bearer-token and authup authentication |
 | `@chamberu/github` | Planned (M1) | GitHub App auth, webhook signature checks, `github.webhook()` triggers deduplicated by delivery id, issue and comment tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned (M1) | Disposable workspaces: a temp directory for development, a locked-down pod per workspace in production |
 | `@chamberu/coding` | Planned (M1) | Coding tools (read, edit, grep, bash, git diff) over a workspace |
@@ -42,7 +42,7 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 | `chamberu` (CLI and deploy kit) | Planned (M1) | Umbrella package with `createApp()` and the `dev`, `build`, `start`, `run-job` and `migrate` commands, plus a base image, a Helm chart and a template repository. See [Deployment](/deployment/) |
 | `@chamberu/mail` | Planned (M2) | IMAP connector and tools |
 
-Two changes happened or happen upstream first: a lock hook, timezone support and the scheduled time per tick shipped in [hubwire](https://github.com/tada5hi/hubwire) 0.2.2 (for the scheduler); a fetch-native token middleware in [authup](https://github.com/authup/authup) is still to come (for the HTTP API).
+Two changes happened upstream first: a lock hook, timezone support and the scheduled time per tick shipped in [hubwire](https://github.com/tada5hi/hubwire) 0.2.2 (for the scheduler), and a fetch-native token verification in [authup](https://github.com/authup/authup) 1.0.0-beta.70 (for the HTTP API).
 
 ## Stability
 

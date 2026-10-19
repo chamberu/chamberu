@@ -28,10 +28,10 @@ async function setup() {
 type ListBody = {
     data: Array<Record<string, unknown>>;
     meta: {
-        total: number; 
-        limit: number; 
-        offset: number 
-    } 
+        total: number;
+        limit: number;
+        offset: number
+    }
 };
 
 describe('GET /runs', () => {
@@ -41,9 +41,9 @@ describe('GET /runs', () => {
         expect(response.status).toBe(200);
         const body = await response.json() as ListBody;
         expect(body.meta).toEqual({
-            total: 2, 
-            limit: 50, 
-            offset: 0, 
+            total: 2,
+            limit: 50,
+            offset: 0,
         });
         expect(body.data.map((run) => run.id)).toEqual([ids[0], ids[2]]);
         for (const run of body.data) expect(run).not.toHaveProperty('claim');
@@ -54,9 +54,9 @@ describe('GET /runs', () => {
         const body = await (await call(app, 'GET', '/runs?page[limit]=1&page[offset]=1', { token: READER_TOKEN })).json() as ListBody;
         expect(body.data.map((run) => run.id)).toEqual([ids[1]]);
         expect(body.meta).toEqual({
-            total: 3, 
-            limit: 1, 
-            offset: 1, 
+            total: 3,
+            limit: 1,
+            offset: 1,
         });
     });
 

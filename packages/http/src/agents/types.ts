@@ -7,14 +7,15 @@
 
 import type { Budget, OverlapPolicy, TriggerSource } from '@chamberu/core';
 
+// #region summaries
 /** An agent as `GET /agents` lists it. */
 export type AgentSummary = {
     name: string;
     /** `hook` is the ready-made path of a `webhook()` trigger. */
     triggers: Array<{
-        source: TriggerSource; 
-        id: string; 
-        hook?: string 
+        source: TriggerSource;
+        id: string;
+        hook?: string
     }>;
     budget: Budget;
     /** Tool names that need an approval. */
@@ -34,6 +35,8 @@ export type ScheduleSummary = {
     /** ISO time of the next fire after now. */
     nextAt: string;
 };
+
+// #endregion summaries
 
 /** Body of `PATCH /agents/:name/state/kv/:key`; internal. */
 export type KvBody = {

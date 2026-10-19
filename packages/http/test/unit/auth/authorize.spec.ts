@@ -22,9 +22,9 @@ const throwing: Authenticator = async () => {
 
 function probeApp(auth: Authenticator[]) {
     const {
-        engine, 
-        store, 
-        agents, 
+        engine,
+        store,
+        agents,
     } = createTestApp();
     const ctx = buildContext({
         engine,

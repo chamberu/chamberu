@@ -27,6 +27,7 @@
     },
     "devDependencies": {
         "@chamberu/core": "*",
+        "@chamberu/http": "*",
         "@chamberu/scheduler": "*",
         "@chamberu/store-typeorm": "*",
         "@chamberu/test-kit": "*",

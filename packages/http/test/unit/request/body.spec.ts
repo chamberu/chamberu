@@ -17,9 +17,9 @@ import { createTestApp, testAuth } from '../../utils/app.ts';
 
 function echoApp() {
     const {
-        engine, 
-        store, 
-        agents, 
+        engine,
+        store,
+        agents,
     } = createTestApp();
     const ctx = buildContext({
         engine,
