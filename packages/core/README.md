@@ -141,6 +141,8 @@ The run settles `completed`, and its `output` is the text of the model's last an
 - The trigger envelope (source, trigger id, payload) becomes the run's first user message, as a JSON block.
 - `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments`, and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
 - The tool factory also gets `artifacts`, scoped to the run: `put({ mediaType, filename?, data })`, `get(id)` and `list()`. `put()` is no effect by itself; call it inside a `defineEffectTool` to store a file exactly once.
+- `output` takes an AI SDK `Output` (e.g. `Output.object({ schema })`): a completed run's `output` is then the parsed value instead of the text, and a final answer that does not parse fails the run with `validation_error`.
+- The engine streams every model call: `engine.on('run.delta', ({ delta }) => ...)` gets `{ runId, step, kind: 'text' | 'reasoning', text }` while the model writes. Deltas are never stored and reach only listeners in the process executing the run.
 
 ### Effect tools
 
@@ -263,6 +265,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval: `'user'` or a function |
 | `approvalTimeoutMs` | `number` | `86_400_000` | After this, the approval is denied |
 | `notify` | `string` | none | Name of a notifier registered on the engine |
+| `output` | `Output` | none | AI SDK structured output; a completed run's `output` is the parsed value |
 
 ## API
 

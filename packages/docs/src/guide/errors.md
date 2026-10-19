@@ -8,11 +8,12 @@ Every error chamberu throws extends `ChamberuError`, which extends ebec's `BaseE
 | `InvalidResumeTokenError` | `INVALID_RESUME_TOKEN` | `invalid_resume_token` | A resume token is malformed, forged, expired or belongs to another wait point |
 | `InvalidRunStateError` | `INVALID_RUN_STATE` | `invalid_run_state` | A run is not in the status an operation needs: resuming a run that is not waiting, cancelling a settled run, a store guard (`expectStatus`, `expectOwner`) that does not match |
 | `RunNotFoundError` | `RUN_NOT_FOUND` | `run_not_found` | `resume()`, `cancel()` or `updateRun()` for an unknown run |
+| `ArtifactNotFoundError` | `ARTIFACT_NOT_FOUND` | `artifact_not_found` | An execution cannot read an artifact its messages refer to (the run fails); `@chamberu/http` answers 404 with it for an unknown artifact |
 | `BudgetExceededError` | `BUDGET_EXCEEDED` | `BudgetExceeded` | A run hit `maxSteps` or `maxTokens` while the model still wanted tools |
 | `TimeoutError` | `TIMEOUT` | `Timeout` | An execution exceeded `timeoutMs` |
 | `FatalToolError` | `FATAL_TOOL` | `FatalToolError` (or a custom code) | A tool decides the run must fail |
 | `LeaseLostError` | `LEASE_LOST` | `lease_lost` | Reported to `onError` when an engine stops executing a run whose claim it lost; carries `runId` |
-| `ValidationError` | `VALIDATION` | `validation_error` | A state document fails its schema; carries `issues` |
+| `ValidationError` | `VALIDATION` | `validation_error` | A state document fails its schema (carries `issues`); an invalid attachment at `dispatch()` or `artifacts.put()`; a final answer that does not parse as the agent's [structured `output`](/guide/agents#structured-output) (the run fails) |
 
 ## Run errors
 

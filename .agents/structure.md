@@ -48,7 +48,7 @@ chamberu/
 
 | Package | Status | Responsibility |
 |---------|--------|----------------|
-| `@chamberu/core` | Exists (0.1.0) | defineAgent, run engine, checkpoints, trigger model, state API, budgets, IStore/INotifier interfaces, in-memory store |
+| `@chamberu/core` | Exists (0.1.0) | defineAgent, run engine (streaming, structured output), checkpoints, trigger model, run artifacts, state API, budgets, IStore/INotifier interfaces, in-memory store |
 | `@chamberu/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`; depends on core, core never depends on it |
 | `@chamberu/http` | Exists (0.1.0) | `createHttpApp()` (routup v6): REST control API, SSE run stream, webhook intake, MCP endpoint, authenticators (static tokens, authup, oidc), health, metrics, `createShutdown()`; peer on core |
 | `@chamberu/scheduler` | Exists (0.1.0) | `createScheduler()` (one locked hubwire component per cron trigger), `runJob()`; depends on `hubwire`, peer on core |
@@ -71,10 +71,11 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `errors/` | `ChamberuError` (`base.ts`), one file per subclass, `ErrorCode` (`constants.ts`) |
 | `agent/` | `defineAgent()`, `AgentDefinition`, name rules and budget defaults (`constants.ts`) |
 | `trigger/` | `TriggerDefinition`, `TriggerEnvelope` (`types.ts`); `cron/`, `http/`, `webhook/` each hold their factory (`module.ts`) and options type (`types.ts`) |
+| `artifact/` | `Artifact`, `ArtifactInput`, `IRunArtifacts` (`types.ts`); `ARTIFACT_URI_PREFIX` (`constants.ts`, internal); `createRunArtifacts()` (`module.ts`); `assertArtifactInput()`, `toFilePart()`, `hydrateMessages()` (`helpers.ts`) |
 | `run/` | `RunStatus` enum (`constants.ts`); `Run`, `RunStatusLiteral`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage` |
 | `store/types.ts` | `IStore` and its parts (see architecture) |
 | `store/memory/` | `MemoryStore` |
-| `engine/` | `RunEngine` (`module.ts`), `budget.ts` (stop conditions), `queue/` (scheduler), `execute/` (one execution) |
+| `engine/` | `RunEngine` (`module.ts`), `RunEvent`, `RunDelta`, `DispatchEnvelope` (`types.ts`), `budget.ts` (stop conditions), `queue/` (scheduler), `execute/` (one streamed execution) |
 | `effect/` | `defineEffectTool()`, `effectMarker()` (`define.ts`), `wrapToolsForRun()` (`wrap.ts`), `EFFECT` |
 | `approval/` | Signed resume tokens |
 | `notify/types.ts` | `INotifier`, `Notification` |
@@ -100,9 +101,9 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 |------|---------|
 | `app/` | `createHttpApp()` (`module.ts`), `HttpAppOptions` and the internal `HttpContext` (`types.ts`), defaults (`constants.ts`), `buildContext()` and the JSON error handler (`helpers.ts`) |
 | `auth/` | `Principal`, `Authenticator` (`types.ts`), `Permission` (`constants.ts`), `hasPermission()`, `agentPermission()` (`module.ts`), `authenticate()`, `authorize()`, `readBearerToken()` (`helpers.ts`, internal); `static-tokens/`, `authup/`, `oidc/` hold the built-in authenticators |
-| `request/` | No barrel: `readJsonBody()`, `validateBody()`, `validatePayload()`, `decodeQuery()` (rapiq), `readIdempotencyHeader()` (`helpers.ts`); validup validators `isString()`, `isBoolean()`, `isDefined()` (`validators.ts`) |
+| `request/` | No barrel: `readJsonBody()`, `validateBody()`, `validatePayload()`, `decodeQuery()` (rapiq), `readIdempotencyHeader()` (`helpers.ts`); validup validators `isString()`, `isBoolean()`, `isDefined()`, `isArray()`, `isMediaType()`, `isBase64()` (`validators.ts`) |
 | `health/` | No barrel: `/healthz`, `/readyz` |
-| `runs/` | Run routes (`module.ts`), `serializeRun()`, `canReadRun()`, `loadReadableRun()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `RunView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE) |
+| `runs/` | Run and artifact routes (`module.ts`), `serializeRun()`, `canReadRun()`, `loadReadableRun()`, `loadRunArtifact()`, `contentDisposition()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `MAX_ATTACHMENTS` (`constants.ts`, internal), `RunView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE, incl. `delta`) |
 | `hooks/` | No barrel: `POST /hooks/:agent<path>` |
 | `agents/` | `/agents`, `/schedules` and state routes (`module.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
 | `mcp/` | `createMcpEndpoint()`, `registerMcpRoutes()` (`module.ts`), the tools (`tools.ts`), `waitForRun()`, `toJsonSchema()` (`helpers.ts`), `RunSummary`, `RunToolResult` (`types.ts`) |
@@ -114,6 +115,6 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | Path | Purpose |
 |------|---------|
 | `entities/` | One TypeORM entity per table, the repositories the store queries through; `TableName` and the jsonb transformers (`JSON_VALUE_TRANSFORMER`, `OPTIONAL_JSON_TRANSFORMER`) in `constants.ts`, `toJsonParameter()` (jsonb sanitizing) in `helpers.ts` |
-| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), generated from the entities |
+| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), `1792368000000-artifacts.ts` (table `chamberu_artifacts`), generated from the entities |
 | `schema/` | `migrateStore()` (`module.ts`), `STORE_ENTITIES`, `STORE_MIGRATIONS`, `MIGRATION_LOCK_NAME` |
 | `store/` | `TypeormStore` (`module.ts`), entity to domain mapping, value builders and `RETURNING` row hydration (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |

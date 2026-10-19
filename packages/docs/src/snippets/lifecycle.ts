@@ -30,6 +30,13 @@ export async function watchRuns(model: LanguageModel) {
     });
     // #endregion events
 
+    // #region deltas
+    const offDelta = engine.on('run.delta', ({ delta }) => {
+        // text or reasoning as the model streams it; never stored
+        if (delta.kind === 'text') process.stdout.write(delta.text);
+    });
+    // #endregion deltas
+
     await engine.start();
     await engine.dispatch({
         agent: 'echo',
@@ -42,4 +49,5 @@ export async function watchRuns(model: LanguageModel) {
 
     offRun();
     offStep();
+    offDelta();
 }

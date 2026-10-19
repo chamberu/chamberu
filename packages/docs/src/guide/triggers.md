@@ -30,6 +30,16 @@ The engine renders the source, trigger id and payload as a JSON block and makes 
 
 `thread` is stored on the run. Loading the history of earlier runs of the same thread is planned for the mail digest milestone.
 
+## Attachments
+
+`dispatch()` also takes files for the model, `attachments: [{ mediaType, filename?, data }]` with `data` a `Uint8Array`:
+
+<<< @/snippets/triggers.ts#attachments
+
+Each attachment is checked before anything is written (`mediaType` of the form `type/subtype` without parameters, `data` a `Uint8Array`; `ValidationError` otherwise), then stored as an [artifact](/guide/agents#files) of the run, after the idempotency check (a deduplicated dispatch stores nothing) and before the run is created. The run's `trigger.attachments` holds their metadata. The first user message then carries the rendered envelope as text followed by one file part per attachment, so a model that reads images or PDFs gets them directly. A crash between storing the files and creating the run leaves orphan artifacts; nothing purges them yet.
+
+Over HTTP, `POST /agents/:name/runs` takes the same list with `data` as base64 (see [HTTP API](/guide/http#files)).
+
 ## Idempotency keys
 
 <<< @/snippets/triggers.ts#dispatch

@@ -39,6 +39,7 @@ On shutdown, drain the engine before destroying the data source:
 | `chamberu_effects` | Recorded effect results | PK `key` |
 | `chamberu_kv` | Agent key-value state | PK `(agent, key)` |
 | `chamberu_docs` | Agent document collections | PK `(agent, collection, id)`; GIN index on `doc` |
+| `chamberu_artifacts` | Artifact metadata and bytes (`data` `bytea`) | PK `id`; `run_id` |
 
 ## How it keeps the contract
 
@@ -49,6 +50,7 @@ On shutdown, drain the engine before destroying the data source:
   - `claimRun` and `renewClaim`: a conditional update (`UPDATE ... WHERE ...`) checked by its affected-row count.
   - The `updateRun` guards: a conditional update with `RETURNING *`; when it matches no row, the store reads the run to throw `RunNotFoundError` or `InvalidRunStateError`.
   - `saveCheckpoint`: an insert with `orUpdate()` and the overwrite condition `step_index <=` the new index.
+  - `putArtifact`: an insert with `orIgnore()` returning `id`.
 - **Time from the clock.** The injected `IClock`'s time is passed as a parameter; queries never call the database's `now()`.
 - **No aliasing.** Values are serialized into the query and parsed out again; nothing is cached in memory.
 - **Dates.** Timestamps are `timestamptz`; `trigger.receivedAt`, `waiting.expiresAt` and `waiting.notifiedAt` live in JSON and are revived as `Date`.
@@ -65,7 +67,8 @@ Expired idempotency keys and locks never block anyone, but they stay in their ta
 
 - **Opaque values are JSON.** A run's `output`, step `input`/`output`/`error`, checkpoint messages, effect results and state lose `Date`, `undefined` and `Map` fidelity, and a typed array such as `Uint8Array` comes back as an object keyed by index. A `BigInt` or a circular structure makes the write throw a `TypeError`.
 - **NUL characters and lone surrogates become U+FFFD** in opaque values, keys and strings alike, because `jsonb` cannot hold them.
-- **Identifiers have length limits** (`MemoryStore` has none): a run id 128 characters; `concurrencyKey`, `thread`, claim owners, step names, document collections and document ids 255; idempotency, lock, effect and state keys 512. A longer value makes the write fail with the driver's `value too long` error, so validate user-supplied keys before they reach `dispatch` (a rejected run with an `idempotencyKey` keeps its key reserved until the key expires).
+- **Artifact bytes are `bytea`**, never selected by `getArtifact` or `listArtifacts`, and come back from `readArtifact` as a plain `Uint8Array`. Postgres caps a `bytea` value at 1 GB and the whole value travels in one query, so keep artifacts small enough for memory. Nothing purges artifacts yet.
+- **Identifiers have length limits** (`MemoryStore` has none): run and artifact ids 128 characters; `concurrencyKey`, `thread`, claim owners, step names, document collections and document ids 255; idempotency, lock, effect and state keys 512. A longer value makes the write fail with the driver's `value too long` error, so validate user-supplied keys before they reach `dispatch` (a rejected run with an `idempotencyKey` keeps its key reserved until the key expires).
 - **`null` in an optional property reads back as absent:** a run `output` of `null`, and a step `input`, `output` or `error` of `null`, are stored as SQL `NULL`. `putEffect(key, undefined)` reads back `{ result: null }` and `docUpsert(..., undefined)` reads back `doc: null`.
 - **`docList` `where` uses `jsonb` containment (`@>`).** Primitive values match by top-level equality; a nested object or array matches by containment, where `MemoryStore` never matches. A key whose value is `undefined` matches documents that lack the key, as in `MemoryStore`. Documents come back ordered by `id`, not by insertion.
 - **`listRuns` ties** on `createdAt` are broken by the byte order of `id` (`COLLATE "C"`, so `'B' < 'a'`); identical to `MemoryStore` for lowercase ids and UUIDs.

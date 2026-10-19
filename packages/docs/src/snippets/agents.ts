@@ -1,11 +1,14 @@
-import { tool } from 'ai';
+import { Output, tool } from 'ai';
 import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import {
     cron,
     defineAgent,
+    defineEffectTool,
     http,
 } from '@chamberu/core';
+
+declare function renderChart(points: number[]): Promise<Uint8Array>;
 
 export function createReporter(model: LanguageModel) {
     // #region define
@@ -56,4 +59,52 @@ export function inspectDefaults(model: LanguageModel) {
     // #endregion defaults
 
     return agent;
+}
+
+export function createLabeler(model: LanguageModel) {
+    // #region output
+    const labeler = defineAgent({
+        name: 'labeler',
+        model,
+        instructions: 'Label the issue in the trigger payload.',
+        triggers: [http()],
+        // run.output is { label, reason } instead of the final text
+        output: Output.object({
+            schema: z.object({
+                label: z.enum(['bug', 'feature', 'question']),
+                reason: z.string(),
+            }),
+        }),
+    });
+    // #endregion output
+
+    return labeler;
+}
+
+export function createCharter(model: LanguageModel) {
+    // #region artifacts
+    const charter = defineAgent({
+        name: 'charter',
+        model,
+        instructions: 'Chart the numbers in the attached CSV.',
+        triggers: [http()],
+        tools: ({ artifacts }) => ({
+            // an effect tool: a recovered run does not store the chart twice
+            saveChart: defineEffectTool({
+                description: 'Renders the points as a PNG chart and stores it with the run.',
+                inputSchema: z.object({ points: z.array(z.number()) }),
+                execute: async ({ points }) => {
+                    const artifact = await artifacts.put({
+                        mediaType: 'image/png',
+                        filename: 'chart.png',
+                        data: await renderChart(points),
+                    });
+                    return { artifactId: artifact.id };
+                },
+            }),
+        }),
+    });
+    // #endregion artifacts
+
+    return charter;
 }

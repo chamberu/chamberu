@@ -29,6 +29,7 @@ The engine checks the rest when you construct it: agent names must be unique wit
 | `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval. See [Approvals](/guide/approvals) |
 | `approvalTimeoutMs` | `number` | `86_400_000` (24 h) | After this, a pending approval is denied |
 | `notify` | `string` | none | Name of a notifier registered on the engine |
+| `output` | `Output` | none | AI SDK structured output, e.g. `Output.object({ schema })`. See [Structured output](#structured-output) |
 
 The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` keeps the 15 minute timeout.
 
@@ -43,10 +44,27 @@ The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` ke
 | `run.agent` | `string` | Agent name |
 | `run.trigger` | `TriggerEnvelope` | The envelope that started the run |
 | `run.signal` | `AbortSignal` | Aborts on cancel, drain, a lost lease or the run timeout |
+| `artifacts` | `IRunArtifacts` | The run's files: `put()`, `get(id)`, `list()`. See [Files](#files) |
 
 A factory lets tools close over per-run data, such as the run id in an [effect key](/guide/effect-tools) or the repository named in the payload. Pass `run.signal` on to `fetch` and other cancellable work.
 
 The returned tools are plain AI SDK tools. When the agent declares `state`, the engine adds generated state tools; your tools win on a name clash. Every [effect tool](/guide/effect-tools) is then wrapped so it applies at most once per effect key.
+
+## Structured output
+
+By default a completed run's `output` is the text of the model's last answer. With `output`, an AI SDK `Output` passed to the `ToolLoopAgent` as it is, `output` is the parsed value instead:
+
+<<< @/snippets/agents.ts#output
+
+The model may call tools first; only the final answer is parsed. A final answer that is no valid JSON or fails the schema fails the run with `ValidationError` (`run.error.code` `validation_error`, the message from the AI SDK's cause). A run whose step budget an earlier execution used up parses the last answer in its checkpoint the same way.
+
+## Files
+
+A run can start with files ([attachments](/guide/triggers#attachments)) and tools can store files of their own. Both are artifacts of the run: metadata (`id`, `runId`, `agent`, `mediaType`, `filename?`, `size`, `createdAt`) plus the bytes, kept in the store's `IArtifactStore`. The `artifacts` the tool factory gets is scoped to the run: `put({ mediaType, filename?, data })` stores a `Uint8Array` and returns the `Artifact`, `get(id)` returns `{ artifact, data }` (or `undefined`, also for another run's artifact) and `list()` returns the run's artifacts by `createdAt`.
+
+<<< @/snippets/agents.ts#artifacts
+
+`put()` is not an effect by itself: a recovered run repeats the step in progress, so call it inside a [`defineEffectTool`](/guide/effect-tools) to store a file exactly once. Over HTTP, `GET /runs/:id/artifacts` lists them and `GET /runs/:id/artifacts/:artifactId` downloads one (see [HTTP API](/guide/http#files)).
 
 ## Many agents per engine
 

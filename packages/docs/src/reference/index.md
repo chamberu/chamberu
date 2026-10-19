@@ -68,9 +68,9 @@ class RunEngine {
 
 | Method | Description | Guide |
 |---|---|---|
-| `dispatch` | Stores a `queued` run; deduplicates by `idempotencyKey` | [Triggers](/guide/triggers) |
+| `dispatch` | Stores a `queued` run (and its attachments as artifacts); deduplicates by `idempotencyKey` | [Triggers](/guide/triggers) |
 | `getRun` | Reads a run from the store | [Run Lifecycle](/guide/run-lifecycle) |
-| `on` | Subscribes to `run.updated` or `step.appended`; returns an unsubscribe function | [Run Lifecycle](/guide/run-lifecycle#watching-runs) |
+| `on` | Subscribes to `run.updated`, `step.appended` or `run.delta`; returns an unsubscribe function | [Run Lifecycle](/guide/run-lifecycle#watching-runs) |
 | `start` | Recovers, starts polling and starts queued runs | [Recovery](/guide/recovery) |
 | `stop` | Stops polling only | [Recovery](/guide/recovery) |
 | `drain` | Waits for in-flight runs (default 30 s), then marks the rest `interrupted` | [Recovery](/guide/recovery#drain) |
@@ -111,7 +111,15 @@ class MemoryStore implements IStore {
 }
 ```
 
-`IStore` and its parts (`IRunStore`, `IStepStore`, `ICheckpointStore`, `IIdempotencyStore`, `ILockStore`, `IEffectStore`, `IStateStore`) are listed on the [Store Contract](/stores/) page.
+`IStore` and its parts (`IRunStore`, `IStepStore`, `ICheckpointStore`, `IIdempotencyStore`, `ILockStore`, `IEffectStore`, `IStateStore`, `IArtifactStore`) are listed on the [Store Contract](/stores/) page.
+
+## Artifacts
+
+`Artifact` (metadata), `ArtifactInput` (a file to store) and `IRunArtifacts` (the tool factory's `artifacts`):
+
+<<< ../../../core/src/artifact/types.ts{ts}
+
+See [Files](/guide/agents#files) and [Attachments](/guide/triggers#attachments).
 
 ## Effect tools
 
@@ -177,7 +185,7 @@ const systemClock: IClock;
 
 ## Errors
 
-`ChamberuError`, `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `LeaseLostError`, `ValidationError` and `ErrorCode`:
+`ChamberuError`, `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `LeaseLostError`, `ValidationError` and `ErrorCode`:
 
 <<< ../../../core/src/errors/constants.ts{ts}
 

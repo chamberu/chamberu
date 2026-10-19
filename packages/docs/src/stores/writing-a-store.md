@@ -24,6 +24,7 @@ The suite covers:
 - locks: exclusive, released by their owner only, taken over after expiry,
 - `listRuns` filters (`agent`, `status`, `concurrencyKey`), `total`, and the `createdAt`/`id` order,
 - effect and state round trips, including `where` filters,
+- artifacts: insert-if-absent, metadata and bytes round trips, copies, the `createdAt`/`id` order, unknown ids,
 - no aliasing of values passed in or returned.
 
 ## Implementation notes
@@ -33,6 +34,7 @@ The suite covers:
 - **Revive dates.** `Run`, `Step`, `Checkpoint` and `WaitPoint` carry `Date` values (`createdAt`, `trigger.receivedAt`, `waiting.expiresAt`, `claim.expiresAt`, ...). Return them as `Date` objects.
 - **Store messages as they are.** Checkpoint messages are AI SDK `ModelMessage` arrays; store them as JSON without reshaping.
 - **Only the latest checkpoint is read.** Keeping older ones is optional.
+- **Keep artifact bytes apart from their metadata.** `getArtifact` and `listArtifacts` should not load the bytes; only `readArtifact` needs them. Checkpoints refer to artifacts by id, never carry their bytes.
 
 ## Time in tests
 

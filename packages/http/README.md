@@ -104,10 +104,12 @@ Paths are relative to `basePath` (default none).
 
 | Method and path | Permission | Answer |
 |---|---|---|
-| `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, thread? }`, the key also as an `Idempotency-Key` header; the agent must declare `http()` |
+| `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, thread?, attachments? }`, the key also as an `Idempotency-Key` header; the agent must declare `http()` |
 | `GET /runs` | `run:read`, or `agent:<agent>:run` with `filter[agent]=<agent>` | `200 { data, meta: { total, limit, offset } }` |
 | `GET /runs/:id` | `run:read` or `agent:<run.agent>:run` | `200` the run plus its `steps` |
-| `GET /runs/:id/stream` | as `GET /runs/:id` | SSE: `run.updated`, `step.appended` (`id` = step index), `ping`; ends once the run settled. `Last-Event-ID` or `?after=<step index>` resumes; `503` with `Retry-After` over `stream.maxOpen` |
+| `GET /runs/:id/stream` | as `GET /runs/:id` | SSE: `run.updated`, `step.appended` (`id` = step index), `delta` (live model output, no `id`), `ping`; ends once the run settled. `Last-Event-ID` or `?after=<step index>` resumes; `503` with `Retry-After` over `stream.maxOpen` |
+| `GET /runs/:id/artifacts` | as `GET /runs/:id` | `200 { data: Artifact[] }`: the run's attachments and the files its tools stored |
+| `GET /runs/:id/artifacts/:artifactId` | as `GET /runs/:id` | `200` the bytes: stored media type, `content-disposition: attachment` (RFC 5987 `filename*` when named), `nosniff`, `private, no-store`; `404 artifact_not_found` for an unknown artifact or one of another run |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
 | `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }`; the whole body is the payload |
@@ -125,9 +127,11 @@ Paths are relative to `basePath` (default none).
 
 Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413 above, 415 for another media type). A refused body is drained (at most `bodyLimit` more bytes) so a keep-alive connection serves the next request; a longer one closes the connection. A protected route checks the bearer token before it reads the body, so an unauthenticated client cannot make the server buffer it. Unknown body keys are dropped without an error. A NUL character (U+0000, which Postgres text columns refuse) in the URL, in an `idempotencyKey`, `thread` or other string field, or in a key a webhook derives from its payload answers 400.
 
+`attachments` takes at most 16 files `{ mediaType, filename?, data }`: `mediaType` is `type/subtype` without parameters, `filename` 1 to 255 characters, `data` strict base64 (padded, standard alphabet, no whitespace); anything else is 400 `validation_error` with the field's path, and nothing is dispatched. The files are stored as artifacts of the run (see `@chamberu/core`) and handed to the model as file parts. Base64 rides in the JSON body, so `bodyLimit` bounds the files as well.
+
 `GET /runs/:id` answers 404 before 403, so any authenticated principal can tell whether a run id exists; run ids are random UUIDs. Runs on the wire never carry the internal `claim` (owner and lease).
 
-The SSE stream follows the run through `engine.on` and polls the store every `stream.pollMs` (default 2 s), so it also sees a run executing on another replica. `Last-Event-ID` resumes after a step index; the query `?after=<step index>` does the same for clients that cannot set the header (a non-negative integer, given once, else 400). When both are present a valid `Last-Event-ID` wins, since it carries the client's progress on a reconnect while the URL stays the one of the first connect; a malformed `Last-Event-ID` reads as absent and `?after` applies.
+The SSE stream follows the run through `engine.on` and polls the store every `stream.pollMs` (default 2 s), so it also sees a run executing on another replica. `delta` events (`data: { step, kind: 'text' | 'reasoning', text }`) forward the engine's `run.delta` while the model writes; they have no `id` (`Last-Event-ID` stays a step index), are never replayed and come only from the replica executing the run. `Last-Event-ID` resumes after a step index; the query `?after=<step index>` does the same for clients that cannot set the header (a non-negative integer, given once, else 400). When both are present a valid `Last-Event-ID` wins, since it carries the client's progress on a reconnect while the URL stays the one of the first connect; a malformed `Last-Event-ID` reads as absent and `?after` applies.
 
 The stream takes bearer tokens only. Browser `EventSource` cannot send an `Authorization` header, so a browser reads the stream with a fetch-based SSE reader (`fetch` plus an SSE parser over the response body) that sends `Authorization` and, when it reconnects, `Last-Event-ID` with the last `id` it saw (or `?after=`).
 
