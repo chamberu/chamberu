@@ -22,11 +22,21 @@ export function createHttpApp(options: HttpAppOptions): App {
         ...(options.trustProxy !== undefined ? { options: { trustProxy: options.trustProxy } } : {}),
     });
 
-    registerHealthRoutes(app);
+    registerHealthRoutes(app, ctx);
 
     app.use(defineCoreHandler(() => {
         throw new NotFoundError({ message: 'The requested route does not exist.' });
     }));
     app.use(createErrorHandler(ctx));
+
+    options.shutdown?.onShutdown(() => {
+        for (const close of [...ctx.closers]) {
+            try {
+                close();
+            } catch (error) {
+                ctx.onError(error);
+            }
+        }
+    });
     return app;
 }

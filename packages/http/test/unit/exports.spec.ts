@@ -13,12 +13,18 @@ describe('public api', () => {
         'agentPermission',
         'authup',
         'createHttpApp',
+        'createShutdown',
         'hasPermission',
         'oidc',
         'staticTokens',
     ])('exports %s', (name) => {
         expect(http).toHaveProperty(name);
         expect(http[name as keyof typeof http]).toBeTypeOf('function');
+    });
+
+    it('exports the shutdown defaults', () => {
+        expect(http.DEFAULT_SHUTDOWN_DRAIN_TIMEOUT_MS).toBe(30_000);
+        expect(http.DEFAULT_SHUTDOWN_CLOSE_TIMEOUT_MS).toBe(5_000);
     });
 
     it('exports Permission', () => {

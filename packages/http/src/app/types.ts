@@ -16,6 +16,7 @@ import type { Options as PrometheusPluginOptions } from '@routup/prometheus';
 import type { Options as RateLimitPluginOptions } from '@routup/rate-limit';
 import type { AppOptionsInput } from 'routup';
 import type { Authenticator } from '../auth/types.ts';
+import type { IShutdown } from '../shutdown/types.ts';
 
 export type CorsOptions = CorsPluginOptions;
 
@@ -42,6 +43,8 @@ export type HttpAppOptions = {
     basePath?: string;
     /** Which proxies `getRequestIP` trusts (and so the rate-limit key). Default: none. */
     trustProxy?: TrustProxyInput;
+    /** Fails `/readyz` once shutting down; the app ends its streams on shutdown. */
+    shutdown?: IShutdown;
     /** Bytes a request body may have. Default: 1 MiB. */
     bodyLimit?: number;
     stream?: { pollMs?: number };
@@ -68,5 +71,8 @@ export type HttpContext = {
     streamPollMs: number;
     readyTimeoutMs: number;
     clock: IClock;
+    shutdown?: IShutdown;
+    /** Ends open streams and closes handlers on shutdown. */
+    closers: Set<() => void>;
     onError: (error: unknown) => void;
 };

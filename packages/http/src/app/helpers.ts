@@ -65,6 +65,8 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         streamPollMs: options.stream?.pollMs ?? DEFAULT_STREAM_POLL_MS,
         readyTimeoutMs: options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS,
         clock: options.clock ?? systemClock,
+        shutdown: options.shutdown,
+        closers: new Set(),
         // eslint-disable-next-line no-console
         onError: options.onError ?? ((error) => console.error('[chamberu]', error)),
     };

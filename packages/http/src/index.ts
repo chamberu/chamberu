@@ -7,3 +7,4 @@
 
 export * from './app/index.ts';
 export * from './auth/index.ts';
+export * from './shutdown/index.ts';
