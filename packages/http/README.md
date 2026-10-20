@@ -63,11 +63,9 @@ export async function createAgentServer(model: LanguageModel) {
         triggers: [http()],
     });
 
-    const agents = [echo];
-    const store = new MemoryStore();
     const engine = new RunEngine({
-        store,
-        agents,
+        store: new MemoryStore(),
+        agents: [echo],
         resumeSecret: 'change-me',
     });
 
@@ -76,9 +74,8 @@ export async function createAgentServer(model: LanguageModel) {
 
     const shutdown = createShutdown({ engine });
     const app = createHttpApp({
+        // routes read the store, the agents and the clock from the engine
         engine,
-        store,
-        agents,
         auth: staticTokens({ tokens: { [token]: { id: 'ci', permissions: ['*'] } } }),
         shutdown,
     });
@@ -214,7 +211,7 @@ const shutdown = createShutdown({
     // the server is created after the app; the helper only calls close() at shutdown
     server: { close: async (force) => { await server?.close(force); } },
 });
-const app = createHttpApp({ engine, store, agents, auth, shutdown });
+const app = createHttpApp({ engine, auth, shutdown });
 server = serve(app, { port: 3000, gracefulShutdown: false });
 
 process.once('SIGTERM', () => {
@@ -230,9 +227,7 @@ process.once('SIGTERM', () => {
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Dispatches, cancels and resumes runs |
-| `store` | `IStore` | required | The engine's store: runs, steps and state are read from it |
-| `agents` | `Agent[]` | required | The engine's agents |
+| `engine` | `RunEngine` | required | Dispatches, cancels and resumes runs; its `store`, agents and `clock` serve every route (runs, steps and state are read from `engine.store`, polls, waits and timeouts run on `engine.clock`) |
 | `auth` | `Authenticator \| Authenticator[]` | required | The authenticator chain |
 | `basePath` | `string` | none | Prefix of every route, e.g. `/api` |
 | `trustProxy` | routup trust-proxy input | none | Which proxies the client address (and the rate-limit key) trusts |
@@ -245,7 +240,6 @@ process.once('SIGTERM', () => {
 | `rateLimit` | `false \| Partial<RateLimitOptions>` | 300 per minute | `@routup/rate-limit` options |
 | `metrics` | `false \| Partial<PrometheusOptions>` | `/metrics` | `@routup/prometheus` options |
 | `readyTimeoutMs` | `number` | `2_000` | How long `/readyz` waits for the store |
-| `clock` | `IClock` | `systemClock` | Drives polls, waits and timeouts |
 | `onError` | `(error) => void` | `console.error` | 5xx causes and background failures |
 | `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamberu/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter |
 
@@ -253,13 +247,12 @@ process.once('SIGTERM', () => {
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Drained during the shutdown |
+| `engine` | `RunEngine` | required | Drained during the shutdown; its `clock` drives the delays |
 | `scheduler` | `{ stop(): Promise<void> }` | none | Stopped first, e.g. `createScheduler()` from `@chamberu/scheduler` |
 | `server` | `{ close(force?): Promise<void> }` | none | The srvx server |
 | `readinessDelayMs` | `number` | `0` | Time for load balancers to see the failing readiness |
 | `drainTimeoutMs` | `number` | `30_000` | Passed to `engine.drain()` |
 | `closeTimeoutMs` | `number` | `5_000` | Wait for open connections, then close them |
-| `clock` | `IClock` | `systemClock` | Drives the delays |
 | `onError` | `(error) => void` | `console.error` | Failing callbacks and closes |
 
 ## API

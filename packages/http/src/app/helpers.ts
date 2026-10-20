@@ -9,7 +9,6 @@ import {
     ChamberuError,
     ErrorCode,
     InvalidAgentDefinitionError,
-    systemClock,
 } from '@chamberu/core';
 import type { Issue } from '@ebec/core';
 import { isHTTPError } from '@ebec/http';
@@ -78,14 +77,6 @@ function validateRoutes(options: HttpAppOptions): HttpRoute[] {
 }
 
 export function buildContext(options: HttpAppOptions): HttpContext {
-    const agents = new Map<string, HttpAppOptions['agents'][number]>();
-    for (const agent of options.agents) {
-        if (agents.has(agent.name)) {
-            throw new InvalidAgentDefinitionError(`Agent "${agent.name}" is registered twice.`);
-        }
-        agents.set(agent.name, agent);
-    }
-
     const authenticators = Array.isArray(options.auth) ? [...options.auth] : [options.auth];
     if (authenticators.length === 0) {
         throw new InvalidAgentDefinitionError('The http app needs at least one authenticator.');
@@ -98,8 +89,9 @@ export function buildContext(options: HttpAppOptions): HttpContext {
 
     return {
         engine: options.engine,
-        store: options.store,
-        agents,
+        store: options.engine.store,
+        // the engine refuses duplicate names
+        agents: new Map(options.engine.listAgents().map((agent) => [agent.name, agent])),
         authenticators,
         basePath: options.basePath ?? '',
         bodyLimit: options.bodyLimit ?? DEFAULT_BODY_LIMIT,
@@ -107,7 +99,7 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         maxOpenStreams,
         openStreams: 0,
         readyTimeoutMs: options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS,
-        clock: options.clock ?? systemClock,
+        clock: options.engine.clock,
         shutdown: options.shutdown,
         closers: new Set(),
         closed: false,

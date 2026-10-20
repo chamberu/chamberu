@@ -25,7 +25,7 @@ function setup(overrides: Partial<ShutdownOptions> = {}) {
     const drain = vi.fn<(opts?: { timeoutMs?: number }) => Promise<void>>(async () => {
         order.push('drain');
     });
-    const engine = { drain } as unknown as RunEngine;
+    const engine = { drain, clock } as unknown as RunEngine;
     const errors: unknown[] = [];
     const scheduler = {
         stop: vi.fn(async () => {
@@ -41,7 +41,6 @@ function setup(overrides: Partial<ShutdownOptions> = {}) {
         engine,
         scheduler,
         server,
-        clock,
         onError: (error) => {
             errors.push(error);
         },

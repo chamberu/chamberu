@@ -21,17 +21,8 @@ const throwing: Authenticator = async () => {
 };
 
 function probeApp(auth: Authenticator[]) {
-    const {
-        engine,
-        store,
-        agents,
-    } = createTestApp();
-    const ctx = buildContext({
-        engine,
-        store,
-        agents,
-        auth,
-    });
+    const { engine } = createTestApp();
+    const ctx = buildContext({ engine, auth });
     const app = new App();
     app.get('/probe', defineCoreHandler(async (event) => {
         const permission = event.searchParams.get('p') ?? undefined;

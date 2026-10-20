@@ -88,16 +88,10 @@ describe('/mcp', () => {
     });
 
     it('closes the mcp handler through the app closers', async () => {
-        const {
-            engine, 
-            store, 
-            agents, 
-        } = createRunTestApp();
+        const { engine } = createRunTestApp();
         const onError = vi.fn();
         const ctx = buildContext({
             engine,
-            store,
-            agents,
             auth: testAuth,
             onError,
         });

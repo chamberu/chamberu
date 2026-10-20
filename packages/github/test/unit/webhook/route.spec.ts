@@ -338,7 +338,12 @@ describe('webhook route', () => {
             agent('second', { events: ['issues'] }),
             agent('third', { events: ['issues'] }),
         ];
-        const broken = createGithubTestApp({ agents, engineAgents: [agents[0]!, agents[2]!] });
+        const broken = createGithubTestApp({ agents });
+        const dispatch = broken.engine.dispatch.bind(broken.engine);
+        broken.engine.dispatch = async (envelope) => {
+            if (envelope.agent === 'second') throw new Error('second is down');
+            return dispatch(envelope);
+        };
         const failed = await deliver(broken.app, {
             event: 'issues',
             delivery: 'd-1',
@@ -358,10 +363,7 @@ describe('webhook route', () => {
             agent('third', { events: ['issues'] }),
         ];
         let engineKnowsSecond = false;
-        const setup = createGithubTestApp({
-            agents,
-            engineAgents: agents,
-        });
+        const setup = createGithubTestApp({ agents });
         // the engine refuses `second` until it is "fixed"
         const dispatch = setup.engine.dispatch.bind(setup.engine);
         setup.engine.dispatch = async (envelope) => {

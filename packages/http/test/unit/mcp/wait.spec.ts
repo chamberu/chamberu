@@ -181,13 +181,7 @@ describe('waitForRun', () => {
             notifiers: { capture: new CapturingNotifier() },
             onError: () => {},
         });
-        const ctx = buildContext({
-            engine,
-            store,
-            agents,
-            auth: testAuth,
-            clock,
-        });
+        const ctx = buildContext({ engine, auth: testAuth });
         return {
             ctx,
             engine,

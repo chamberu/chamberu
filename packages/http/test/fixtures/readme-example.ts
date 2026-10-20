@@ -16,11 +16,9 @@ export async function createAgentServer(model: LanguageModel) {
         triggers: [http()],
     });
 
-    const agents = [echo];
-    const store = new MemoryStore();
     const engine = new RunEngine({
-        store,
-        agents,
+        store: new MemoryStore(),
+        agents: [echo],
         resumeSecret: 'change-me',
     });
 
@@ -29,9 +27,8 @@ export async function createAgentServer(model: LanguageModel) {
 
     const shutdown = createShutdown({ engine });
     const app = createHttpApp({
+        // routes read the store, the agents and the clock from the engine
         engine,
-        store,
-        agents,
         auth: staticTokens({ tokens: { [token]: { id: 'ci', permissions: ['*'] } } }),
         shutdown,
     });

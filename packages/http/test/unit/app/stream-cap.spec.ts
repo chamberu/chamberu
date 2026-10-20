@@ -182,11 +182,8 @@ describe('stream.maxOpen', () => {
             notifiers: { capture: new CapturingNotifier() },
             onError: () => {},
         });
-        const shutdown = createShutdown({ engine, clock });
+        const shutdown = createShutdown({ engine });
         const { app } = createRunTestApp({
-            clock,
-            store,
-            agents,
             engine,
             shutdown,
             stream: { maxOpen: 1 },

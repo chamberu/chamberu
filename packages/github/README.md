@@ -90,19 +90,16 @@ export async function createTriageServer(
         approvals: { github_close_issue: 'user' },
     });
 
-    const agents = [triage];
-    const store = new MemoryStore();
     const engine = new RunEngine({
-        store,
-        agents,
+        store: new MemoryStore(),
+        agents: [triage],
         resumeSecret: RESUME_SECRET,
     });
 
     const shutdown = createShutdown({ engine });
     const app = createHttpApp({
+        // the webhook route dispatches to the engine's agents
         engine,
-        store,
-        agents,
         auth: staticTokens({ tokens: { [CHAMBERU_TOKEN]: { id: 'ci', permissions: ['*'] } } }),
         // POST /webhooks/github: point the App's webhook URL here
         routes: [gh.webhookRoute()],

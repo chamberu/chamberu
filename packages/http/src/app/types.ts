@@ -35,9 +35,8 @@ export type McpOptions = {
 };
 
 export type HttpAppOptions = {
+    /** Its `store`, agents and `clock` serve every route. */
     engine: RunEngine;
-    store: IStore;
-    agents: Agent[];
     /** One authenticator or a chain; the first principal wins. */
     auth: Authenticator | Authenticator[];
     /** Prefix of every route, e.g. `/api`. Default: none. */
@@ -65,7 +64,6 @@ export type HttpAppOptions = {
     metrics?: false | Partial<PrometheusOptions>;
     /** How long `/readyz` waits for the store. Default: 2 s. */
     readyTimeoutMs?: number;
-    clock?: IClock;
     /** Receives 5xx causes and background failures. Default: `console.error`. */
     onError?: (error: unknown) => void;
     /** Extra routes other packages contribute (e.g. a GitHub webhook), served under `basePath`. */

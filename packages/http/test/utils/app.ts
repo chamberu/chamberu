@@ -15,7 +15,12 @@ import {
     http,
     webhook,
 } from '@chamberu/core';
-import type { Agent, INotifier, Notification } from '@chamberu/core';
+import type {
+    Agent,
+    INotifier,
+    IStore,
+    Notification,
+} from '@chamberu/core';
 import { ControllableClock } from '@chamberu/test-kit';
 import { createHttpApp, staticTokens } from '@chamberu/http';
 import type { HttpAppOptions, Principal } from '@chamberu/http';
@@ -33,47 +38,55 @@ export const testAuth = staticTokens({
     },
 });
 
-export type TestAppOverrides = Partial<Omit<HttpAppOptions, 'clock'>> & {
+export type TestAppOverrides = Partial<HttpAppOptions> & {
+    /** Engine construction, ignored when `engine` is given. */
     agents?: Agent[];
+    store?: IStore;
     clock?: ControllableClock;
     notifiers?: Record<string, INotifier>;
 };
 
 export function createTestApp(overrides: TestAppOverrides = {}) {
-    const clock = overrides.clock ?? new ControllableClock(new Date(1_000_000));
-    const store = overrides.store ?? new MemoryStore({ clock });
-    const agents = overrides.agents ?? [
-        defineAgent({
-            name: 'echo',
-            model: textModel(),
-            instructions: 'Echo.',
-            triggers: [http()],
-        }),
-    ];
-    const engine = overrides.engine ?? new RunEngine({
-        store,
-        agents,
+    const {
+        agents: agentsOverride,
+        store: storeOverride,
+        clock: clockOverride,
+        notifiers,
+        engine: engineOverride,
+        ...options
+    } = overrides;
+    // a given engine brings its own clock, the only one the app reads
+    const clock = (engineOverride?.clock as ControllableClock | undefined) ??
+        clockOverride ??
+        new ControllableClock(new Date(1_000_000));
+    const engine = engineOverride ?? new RunEngine({
+        store: storeOverride ?? new MemoryStore({ clock }),
+        agents: agentsOverride ?? [
+            defineAgent({
+                name: 'echo',
+                model: textModel(),
+                instructions: 'Echo.',
+                triggers: [http()],
+            }),
+        ],
         resumeSecret: 'test-secret',
         clock,
-        notifiers: overrides.notifiers,
+        notifiers,
         onError: () => {},
     });
     const app = createHttpApp({
         auth: [testAuth, permissionsAuth],
         metrics: false,
         rateLimit: false,
-        ...overrides,
+        ...options,
         engine,
-        store,
-        agents,
-        clock,
     });
     return {
         app,
         engine,
-        store,
+        store: engine.store,
         clock,
-        agents,
+        agents: engine.listAgents(),
     };
 }
 
