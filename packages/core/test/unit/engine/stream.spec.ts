@@ -278,6 +278,30 @@ describe('streaming', () => {
         expect(run?.error).toEqual({ code: 'Error', message: 'boom' });
     });
 
+    it('a failed model call leaves an llm step with finish reason error and a checkpoint', async () => {
+        const model = rawModel([[
+            { type: 'text-start', id: 't' },
+            {
+                type: 'text-delta',
+                id: 't',
+                delta: 'partial',
+            },
+            { type: 'error', error: new Error('boom') },
+        ]]);
+        const { engine, store } = make(model);
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await engine.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('failed');
+        expect(run?.error).toEqual({ code: 'Error', message: 'boom' });
+        const steps = await store.listSteps(runId);
+        expect(steps.map((step) => step.kind)).toEqual(['llm']);
+        expect(steps[0]?.output).toMatchObject({ text: 'partial', finishReason: 'error' });
+        expect(await store.latestCheckpoint(runId)).toMatchObject({ stepIndex: 0, finishReason: 'error' });
+    });
+
     it('a model error after a completed step fails the run', async () => {
         const model = mockModel([{
             parts: [{
