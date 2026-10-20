@@ -132,6 +132,8 @@ class MemoryStore implements IStore {
 
 <<< ../../../core/src/artifact/types.ts{ts}
 
+`isArtifactMediaType(value: unknown): value is string` is the media type rule `dispatch` and `artifacts.put()` apply: `type/subtype` (RFC 6838 restricted names) without parameters. An intake layer can check attachments with it before dispatching (`@chamberu/http` does).
+
 See [Files](/guide/agents#files) and [Attachments](/guide/triggers#attachments).
 
 ## Effect tools

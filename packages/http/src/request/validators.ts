@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { isArtifactMediaType } from '@chamberu/core';
 import { IssueCode, prefixIssuePath } from '@ebec/core';
 import type { Issue } from '@ebec/core';
 import {
@@ -76,14 +77,11 @@ export function isArrayOf<T extends Record<string, any>>(item: Container<T>, { m
     });
 }
 
-// RFC 6838 restricted names, no parameters (the rule core applies to artifacts)
-const MEDIA_TYPE = /^[a-z0-9][\w!#$&^.+-]{0,126}\/[a-z0-9][\w!#$&^.+-]{0,126}$/i;
-
-/** A media type `type/subtype` without parameters. */
+/** A media type `type/subtype` without parameters (core's `isArtifactMediaType`). */
 export function isMediaType(): ValidatorDescriptor {
     return defineValidator({
         run: ({ value }) => {
-            if (typeof value !== 'string' || !MEDIA_TYPE.test(value)) {
+            if (!isArtifactMediaType(value)) {
                 throw createValidupError(value, IssueCode.VALUE_INVALID, 'must be a media type of the form type/subtype');
             }
             return value;

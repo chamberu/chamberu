@@ -30,6 +30,7 @@ describe('public api', () => {
         'matchesPermission',
         'toolPermission',
         'requireToolPermission',
+        'isArtifactMediaType',
     ])('exports %s', (name) => {
         expect(core).toHaveProperty(name);
         expect(core[name as keyof typeof core]).toBeTypeOf('function');
