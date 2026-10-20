@@ -16,9 +16,9 @@ A throwing `execute` (or `alreadyApplied`) records nothing, so a later retry can
 
 ## Effect keys
 
-The default key is `<runId>:<toolName>:<sha256 of the canonical JSON input>`. Canonical means object keys are sorted, `undefined` is dropped and `toJSON` values such as `Date` are serialized through `toJSON`. Inputs with `BigInt` or cycles are not supported.
+The default key is `<ctx.run.runId>:<toolName>:<sha256 of the canonical JSON input>`. Canonical means object keys are sorted, `undefined` is dropped and `toJSON` values such as `Date` are serialized through `toJSON`. Inputs with `BigInt` or cycles are not supported.
 
-With the default key, the same call with the same input in the same run is applied once. Pass `effectKey(input, ctx)` when "the same effect" means something else, for example one comment per run and issue whatever the body says.
+With the default key, the same call with the same input in the same run is applied once. Pass `effectKey(input, ctx)` when "the same effect" means something else, for example one comment per run and issue whatever the body says. `effectKey` and `alreadyApplied(key, input, ctx)` get the same `ToolContext` as `execute` (`ctx.run.runId`, `ctx.run.trigger`, `ctx.state`, `ctx.artifacts`).
 
 ## The crash window
 
@@ -34,6 +34,10 @@ If recording the result fails after the effect happened, the call still succeeds
 
 ## Outside the engine
 
-`wrapToolsForRun(tools, ctx, store)` applies the same wrapping to a `ToolSet` outside the engine, for example in a test or a custom loop. `ctx` is a `RunContext` (`runId`, `agent`, `trigger`, `signal`) and `store` any `IEffectStore`. Tools that are not effect tools pass through unchanged.
+`wrapToolsForRun(tools, ctx, store, allow?)` applies the same wrapping to a `ToolSet` outside the engine, for example in a test or a custom loop. `ctx` is a `ToolContext` (`run`, `state`, `artifacts`), `store` any `IEffectStore`, and the optional `allow(toolName)` re-checks every call (a refused call throws `ToolNotAllowedError`). Tools that are not effect tools pass through unchanged. The wrapped tools keep their `contextSchema` and forward the call options, so pass the same `ToolContext` as `context` when you call them.
+
+## Migrating from 0.1
+
+In `@chamberu/core` 0.1 the hooks got the `RunContext`; they now get the `ToolContext`, so `ctx.runId` becomes `ctx.run.runId` (likewise `ctx.agent`, `ctx.trigger`, `ctx.signal`). In JavaScript an old `ctx.runId` reads `undefined`, which would collapse a custom key across runs. `defineEffectTool()` requires `execute`, and an effect tool defined at module scope replaces the factory closing over `run`.
 
 Streaming tools work too: when `execute` returns an async iterable, the last yielded value is the recorded result.

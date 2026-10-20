@@ -21,7 +21,7 @@ export const triage = defineAgent({
         webhook({ path: '/issues' }),
         cron('0 * * * *'),
     ],
-    tools: () => ({
+    tools: {
         // recorded per effect key: retries never relabel
         label: defineEffectTool({
             description: 'Adds a label to an issue.',
@@ -36,7 +36,7 @@ export const triage = defineAgent({
             inputSchema: z.object({ issue: z.number() }),
             execute: async ({ issue }) => closeIssue(issue),
         }),
-    }),
+    },
     // waits in `waiting` until the owner signs off
     approvals: { close: 'user' },
     notify: 'owner',

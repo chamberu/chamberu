@@ -10,7 +10,7 @@ Declare collections with any [Standard Schema](https://standardschema.dev), such
 
 <<< @/snippets/state.ts#agent
 
-The `tools` factory receives `state`, typed by the declared schema.
+A `tools` factory receives `state`, typed by the declared schema. A tool built with `defineTool()` reads it as `context.state` (`defineTool<Input, Output, typeof schema>` types it).
 
 ## The state API
 
@@ -40,4 +40,4 @@ With a `state` schema, the model gets three tools per collection:
 | `state_<collection>_upsert` | effect tool | `{ id, doc }` (the doc's JSON Schema, when the schema can produce one) |
 | `state_<collection>_remove` | effect tool | `{ id }` |
 
-An invalid document becomes a tool error the model can correct. Each write gets its own effect key, so a replayed `upsert A, upsert B, upsert A` sequence still ends on the last write. Your own tools win on a name clash. `createStateTools(state, schema)` builds these tools directly.
+An invalid document becomes a tool error the model can correct. Each write gets its own effect key, so a replayed `upsert A, upsert B, upsert A` sequence still ends on the last write. Your own tools win on a name clash. `createStateTools(schema)` builds these tools directly; they read the state from their `context.state`, so call them with a `ToolContext` (see [`wrapToolsForRun`](/guide/effect-tools#outside-the-engine)).

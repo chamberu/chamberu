@@ -69,7 +69,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | Path | Purpose |
 |------|---------|
 | `errors/` | `ChamberuError` (`base.ts`), one file per subclass, `ErrorCode` (`constants.ts`) |
-| `agent/` | `defineAgent()`, `AgentDefinition`, name rules and budget defaults (`constants.ts`) |
+| `agent/` | `defineAgent()`, `AgentDefinition`, name rules and budget defaults (`constants.ts`), `assertToolsContext()` (`helpers.ts`, internal) |
 | `trigger/` | `TriggerDefinition`, `TriggerEnvelope`, `Invoker` (`types.ts`), `toInvoker()` validation (`helpers.ts`, internal); `cron/`, `http/`, `webhook/` each hold their factory (`module.ts`) and options type (`types.ts`) |
 | `artifact/` | `Artifact`, `ArtifactInput`, `IRunArtifacts` (`types.ts`); `ARTIFACT_URI_PREFIX` (`constants.ts`, internal); `createRunArtifacts()`, `storeArtifact()`, `attachmentIds()` (`module.ts`, the latter two internal); `isArtifactMediaType()` (`media-type.ts`, public); `assertArtifactInput()`, `toFilePart()`, `hydrateMessages()` (`helpers.ts`) |
 | `run/` | `RunStatus` enum (`constants.ts`); `Run`, `RunStatusLiteral`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage` |
@@ -77,6 +77,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `store/memory/` | `MemoryStore` |
 | `engine/` | `RunEngine` (`module.ts`), `RunEvent`, `RunDelta`, `DispatchEnvelope` (`types.ts`), `budget.ts` (stop conditions), `queue/` (scheduler), `execute/` (one streamed execution) |
 | `effect/` | `defineEffectTool()`, `effectMarker()` (`define.ts`), `wrapToolsForRun()` (`wrap.ts`), `EFFECT` |
+| `tool/` | `ToolContext` (`types.ts`), `toolContextSchema` (`constants.ts`), `defineTool()` (`define.ts`), `hasToolContext()` (`helpers.ts`, internal) |
 | `approval/` | Signed resume tokens |
 | `notify/types.ts` | `INotifier`, `Notification` |
 | `permission/` | `matchesPermission()`, `hasPermission()`, `toolPermission()` (`match.ts`), `requireToolPermission()` (`policy.ts`), `RequireToolPermissionOptions` (`types.ts`), `PERMISSION_ALL` (`constants.ts`, internal) |

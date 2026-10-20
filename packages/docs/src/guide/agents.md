@@ -1,6 +1,6 @@
 # Agents
 
-An agent is a typed config object passed to `defineAgent()`. It names a model, its instructions, the triggers that may start it, a tool factory, a budget, approval policies, typed state and a notifier.
+An agent is a typed config object passed to `defineAgent()`. It names a model, its instructions, the triggers that may start it, its tools, a budget, approval policies, typed state and a notifier.
 
 <<< @/snippets/agents.ts#define
 
@@ -9,7 +9,8 @@ An agent is a typed config object passed to `defineAgent()`. It names a model, i
 `defineAgent()` validates the definition and returns `{ name, definition }` with defaults applied. It throws `InvalidAgentDefinitionError` when:
 
 - the name does not match `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase words joined by single hyphens), or is longer than 64 characters,
-- two triggers of the agent share an id.
+- two triggers of the agent share an id,
+- a `toolsContext` entry names a chamberu tool or no tool of a plain tool set (see [Third-party tools with their own context](/guide/tools#third-party-tools-with-their-own-context)).
 
 The engine checks the rest when you construct it: agent names must be unique within one `RunEngine`, and every `notify` must name a notifier registered on the engine.
 
@@ -23,7 +24,8 @@ The engine checks the rest when you construct it: agent names must be unique wit
 | `model` | `LanguageModel` | required | Any AI SDK model |
 | `instructions` | `string` | required | System instructions |
 | `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()`. See [Triggers](/guide/triggers) |
-| `tools` | `(ctx) => ToolSet` | none | Tool factory, called for each execution |
+| `tools` | `ToolSet \| (ctx) => ToolSet` | none | A plain tool set, or a factory called for each execution. See [Tools and their context](#tools-and-their-context) |
+| `toolsContext` | `Record<string, unknown>` | none | Per tool name, the context of a third-party tool. See [Tools](/guide/tools#third-party-tools-with-their-own-context) |
 | `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()`. See [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker) |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections. See [Agent State](/guide/state) |
 | `budget` | `Partial<Budget>` | `{ maxSteps: 20, timeoutMs: 900_000 }` | See [Budgets & Timeouts](/guide/budgets) |
@@ -34,22 +36,26 @@ The engine checks the rest when you construct it: agent names must be unique wit
 
 The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` keeps the 15 minute timeout.
 
-## The tools factory
+## Tools and their context
 
-`tools` is a function, not a `ToolSet`. The engine calls it once per execution with:
+`tools` is usually a plain AI SDK `ToolSet`, defined once at module scope (see the example above). Tools built with `defineTool()` (or [`defineEffectTool()`](/guide/effect-tools)) get the run context as `context`, the second argument of `execute`:
 
 | Field | Type | Description |
 |---|---|---|
-| `state` | `AgentState` | The agent's [state](/guide/state), typed by its `state` schema |
+| `state` | `AgentState` | The agent's [state](/guide/state) |
 | `run.runId` | `string` | Id of the run being executed |
 | `run.agent` | `string` | Agent name |
 | `run.trigger` | `TriggerEnvelope` | The envelope that started the run; `run.trigger.invoker` is who started it, if an authenticator knew |
 | `run.signal` | `AbortSignal` | Aborts on cancel, drain, a lost lease or the run timeout, and once the execution has ended |
 | `artifacts` | `IRunArtifacts` | The run's files: `put()`, `get(id)`, `list()`. See [Files](#files) |
 
-A factory lets tools close over per-run data, such as the run id in an [effect key](/guide/effect-tools) or the repository named in the payload. Pass `run.signal` on to `fetch` and other cancellable work.
+The engine builds one `ToolContext` per execution and hands it, through the AI SDK's `toolsContext`, to every tool whose `contextSchema` is chamberu's `toolContextSchema`, which is what `defineTool()` sets. Other tools (a plain `tool()`, a third-party tool) get no chamberu context. Every call of an execution gets the same object: treat it as immutable. Pass `context.run.signal` on to `fetch` and other cancellable work.
 
-The returned tools are plain AI SDK tools. When the agent declares `state`, the engine adds generated state tools; your tools win on a name clash. Every [effect tool](/guide/effect-tools) is then wrapped so it applies at most once per effect key.
+For typed state, name the schema: `defineTool<Input, Output, typeof schema>({ ... })` types `context.state` by the agent's collections.
+
+`tools` can also be a factory `(ctx) => ToolSet`, called once per execution with the same `ToolContext`. Use it for dynamic sets: tools from an MCP client, or descriptions built from async state (a tool's `description` function runs synchronously, so it cannot read the store itself).
+
+The tools stay plain AI SDK tools. When the agent declares `state`, the engine adds generated state tools; your tools win on a name clash. Every [effect tool](/guide/effect-tools) is then wrapped so it applies at most once per effect key.
 
 ## Structured output
 
@@ -63,7 +69,7 @@ The `ToolLoopAgent` gets your `Output` with one change: its `parsePartialOutput`
 
 ## Files
 
-A run can start with files ([attachments](/guide/triggers#attachments)) and tools can store files of their own. Both are artifacts of the run: metadata (`id`, `runId`, `agent`, `mediaType`, `filename?`, `size`, `createdAt`) plus the bytes, kept in the store's `IArtifactStore`. The `artifacts` the tool factory gets is scoped to the run: `put({ mediaType, filename?, data })` stores a `Uint8Array` and returns the `Artifact`, `get(id)` returns `{ artifact, data }` (or `undefined`, also for another run's artifact) and `list()` returns the run's artifacts by `createdAt` (attachments in the order they were given, ids `<runId>.0000`, ...; tool files get random UUIDs).
+A run can start with files ([attachments](/guide/triggers#attachments)) and tools can store files of their own. Both are artifacts of the run: metadata (`id`, `runId`, `agent`, `mediaType`, `filename?`, `size`, `createdAt`) plus the bytes, kept in the store's `IArtifactStore`. The `artifacts` of the tool context is scoped to the run: `put({ mediaType, filename?, data })` stores a `Uint8Array` and returns the `Artifact`, `get(id)` returns `{ artifact, data }` (or `undefined`, also for another run's artifact) and `list()` returns the run's artifacts by `createdAt` (attachments in the order they were given, ids `<runId>.0000`, ...; tool files get random UUIDs).
 
 <<< @/snippets/agents.ts#artifacts
 
