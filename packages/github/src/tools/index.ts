@@ -5,4 +5,15 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export type * from './types.ts';
+export type {
+    GithubClosedIssue,
+    GithubComment,
+    GithubDirectory,
+    GithubFile,
+    GithubIssue,
+    GithubIssueLabels,
+    GithubIssueSearch,
+    GithubLabel,
+    GithubPullRequest,
+    GithubRelease,
+} from './types.ts';

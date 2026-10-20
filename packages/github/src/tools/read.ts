@@ -25,7 +25,6 @@ import {
     statusOf,
     withOctokit,
 } from './helpers.ts';
-import type { NumberInput, RepoInput } from './helpers.ts';
 import type {
     GithubDirectory,
     GithubFile,
@@ -34,6 +33,8 @@ import type {
     GithubLabel,
     GithubPullRequest,
     GithubRelease,
+    NumberInput,
+    RepoInput,
 } from './types.ts';
 
 function login(user: unknown): string | null {

@@ -19,8 +19,12 @@ import {
     stepOf,
     withOctokit,
 } from './helpers.ts';
-import type { NumberInput } from './helpers.ts';
-import type { GithubClosedIssue, GithubComment, GithubIssueLabels } from './types.ts';
+import type {
+    GithubClosedIssue,
+    GithubComment,
+    GithubIssueLabels,
+    NumberInput,
+} from './types.ts';
 
 type CommentInput = NumberInput & { body: string };
 type LabelsInput = NumberInput & { labels: string[] };

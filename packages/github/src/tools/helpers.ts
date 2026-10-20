@@ -11,6 +11,7 @@ import { ChamberuError, FatalToolError, ValidationError } from '@chamberu/core';
 import type { ToolContext } from '@chamberu/core';
 import { isObject } from 'smob';
 import type { GithubOctokit, IGithubApp } from '../app/types.ts';
+import type { NumberInput, RepoInput } from './types.ts';
 import { GITHUB_REQUEST_ERROR_CODE, REPO_PATTERN } from './constants.ts';
 
 /**
@@ -28,7 +29,7 @@ export function installationIdOf(ctx: ToolContext, app: IGithubApp): number {
     throw new FatalToolError('The run has no GitHub installation: start it from a GitHub delivery or set installationId on createGithubApp().');
 }
 
-const REPO = /^([^/\s]+)\/([^/\s]+)$/;
+const REPO = new RegExp(REPO_PATTERN);
 
 /** `owner/name`; a ValidationError (a tool error the model can correct) otherwise. */
 export function parseRepo(repo: unknown): { owner: string; repo: string } {
@@ -100,7 +101,11 @@ export function toolError(error: unknown): Error {
     });
 }
 
-/** Runs `fn` with the run's installation Octokit; every failure through `toolError`. */
+/**
+ * Runs `fn` with the run's installation Octokit, every request bound to the
+ * run's signal (cancel, drain and the run timeout abort a stalled GitHub
+ * call); every failure through `toolError`.
+ */
 export async function withOctokit<T>(
     app: IGithubApp,
     ctx: ToolContext,
@@ -108,14 +113,15 @@ export async function withOctokit<T>(
 ): Promise<T> {
     try {
         const octokit = await app.octokit(installationIdOf(ctx, app));
+        const { signal } = ctx.run;
+        octokit.hook.before('request', (options) => {
+            options.request = { ...options.request, signal };
+        });
         return await fn(octokit);
     } catch (error) {
         throw toolError(error);
     }
 }
-
-export type RepoInput = { repo: string };
-export type NumberInput = RepoInput & { number: number };
 
 export const REPO_PROPERTY: JSONSchema7 = {
     type: 'string',

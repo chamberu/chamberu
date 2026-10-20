@@ -5,6 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+/** The input of a tool on a repository. */
+export type RepoInput = { repo: string };
+
+/** The input of a tool on an issue or pull request. */
+export type NumberInput = RepoInput & { number: number };
+
 /** `github_get_issue`. */
 export type GithubIssue = {
     number: number;

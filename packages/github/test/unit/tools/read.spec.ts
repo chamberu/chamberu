@@ -15,9 +15,9 @@ import {
     wrapToolsForRun,
 } from '@chamberu/core';
 import type { ToolSet } from 'ai';
-import { githubWebhook } from '@chamberu/github';
+import { createGithubApp, githubWebhook } from '@chamberu/github';
 import type { GithubAppOptions } from '@chamberu/github';
-import { createGithubFixture } from '../../utils/app.ts';
+import { WEBHOOK_SECRET, createGithubFixture } from '../../utils/app.ts';
 import { callTool, toolContext } from '../../utils/tools.ts';
 import type { ToolContextInput } from '../../utils/tools.ts';
 import { mockModel } from '../../utils/model.ts';
@@ -250,6 +250,36 @@ describe('read tools', () => {
         }
         const error = await call('github_get_issue', { repo: 'octo/demo', number: 0 }).catch((e: unknown) => e);
         expect(error).toBeInstanceOf(ValidationError);
+    });
+
+    it('aborts a pending GitHub request when the run signal aborts', async () => {
+        const fixture = createGithubFixture();
+        const started = Promise.withResolvers<void>();
+        const gh = createGithubApp({
+            appId: 123,
+            privateKey: fixture.fake.privateKey,
+            webhookSecret: WEBHOOK_SECRET,
+            clock: fixture.clock,
+            fetch: async (resource, init) => {
+                const request = new Request(resource as RequestInfo, init);
+                if (!new URL(request.url).pathname.startsWith('/repos/')) return fixture.fake.fetch(resource, init);
+                if (!init?.signal) throw new TypeError('the request carries no signal');
+                started.resolve();
+                // a stalled GitHub: answers only by rejecting on abort
+                return new Promise<Response>((_resolve, reject) => {
+                    init.signal!.addEventListener('abort', () => reject(init.signal!.reason), { once: true });
+                });
+            },
+        });
+        const controller = new AbortController();
+        const ctx = toolContext({ signal: controller.signal });
+        const tools: ToolSet = wrapToolsForRun(gh.readTools(), ctx, new MemoryStore());
+        const result = callTool(tools, 'github_get_issue', { repo: 'octo/demo', number: 5 }, ctx).catch((e: unknown) => e);
+        await started.promise;
+        controller.abort(new Error('drained'));
+        const error = await result;
+        expect(error).toBeInstanceOf(Error);
+        expect(error).not.toBeInstanceOf(FatalToolError);
     });
 
     it('does not leak the token in errors', async () => {

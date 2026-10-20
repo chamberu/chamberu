@@ -27,6 +27,8 @@ export type ToolContextInput = {
     /** Default: a GithubEvent for installation 42. */
     payload?: unknown;
     receivedAt?: Date;
+    /** The run's signal; default one that never aborts. */
+    signal?: AbortSignal;
 };
 
 /** A ToolContext of a run started by `source` (default a github delivery for installation 42). */
@@ -55,7 +57,7 @@ export function toolContext(input: ToolContextInput = {}): ToolContext {
             runId,
             agent: 'triage',
             trigger,
-            signal: new AbortController().signal,
+            signal: input.signal ?? new AbortController().signal,
         },
         state: createAgentState('triage', undefined, new MemoryStore()),
         artifacts: NO_ARTIFACTS,

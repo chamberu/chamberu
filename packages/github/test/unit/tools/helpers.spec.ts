@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { ValidationError } from '@chamberu/core';
+import { REPO_PATTERN } from '../../../src/tools/constants.ts';
 import { parseRepo, stepOf, toolError } from '../../../src/tools/helpers.ts';
 import { assistant } from '../../utils/tools.ts';
 
@@ -36,6 +37,19 @@ describe('parseRepo', () => {
         for (const repo of ['', 'octo', 'a/b/c', '/demo', 'octo/', 'a b/c', 42]) {
             expect(() => parseRepo(repo)).toThrow(ValidationError);
         }
+    });
+
+    it('refuses dot segments, which URL resolution folds into another API path', () => {
+        for (const repo of ['../x', '../..', './x', 'octo/..', 'octo/.', '../demo', '%2e%2e/x', 'octo/%2e%2e']) {
+            expect(() => parseRepo(repo)).toThrow(ValidationError);
+        }
+        expect(parseRepo('octo/.github')).toEqual({ owner: 'octo', repo: '.github' });
+    });
+
+    it('agrees with the REPO_PATTERN the input schemas carry', () => {
+        const pattern = new RegExp(REPO_PATTERN);
+        for (const repo of ['octo/demo', 'my-org/my.repo_1', 'octo/.github']) expect(pattern.test(repo)).toBe(true);
+        for (const repo of ['octo', 'a/b/c', 'a b/c', '../x', 'octo/..', 'octo/.', '%2e%2e/x']) expect(pattern.test(repo)).toBe(false);
     });
 });
 
