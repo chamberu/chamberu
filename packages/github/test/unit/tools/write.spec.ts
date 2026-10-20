@@ -146,6 +146,24 @@ describe('write tools', () => {
         expect(second).toEqual(first);
     });
 
+    it('keys the comment by the repository regardless of its casing', async () => {
+        const {
+            fake,
+            ctx,
+            wrap,
+        } = setup();
+        const tools = wrap();
+        const first = await comment(tools, ctx, 'One.', STEP_1, 'call-1');
+        const second = await callTool<{ id: number; url: string }>(tools, 'github_create_comment', {
+            repo: 'Octo/Demo',
+            number: 5,
+            body: 'Two.',
+        }, ctx, { messages: STEP_1, toolCallId: 'call-2' });
+        expect(second).toEqual(first);
+        expect(fake.requests.filter((r) => r.method === 'POST' && r.path.toLowerCase() === '/repos/octo/demo/issues/5/comments')).toHaveLength(1);
+        expect((posts(fake)[0]?.body as { body: string }).body).toContain(':github_create_comment:octo/demo#5:1 -->');
+    });
+
     it('bounds the reconciliation', async () => {
         const {
             fake,

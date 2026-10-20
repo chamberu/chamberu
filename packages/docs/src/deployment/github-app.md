@@ -63,7 +63,7 @@ Every tool acts as an installation: the delivery's for a run started by a delive
 | `github_create_comment` | effect | One comment per issue per model step, found again by its marker |
 | `github_close_issue` | effect | Closes an issue; meant to sit behind an [approval](/guide/approvals) |
 
-Write tools are [effect tools](/guide/effect-tools). A comment embeds an [`effectMarker`](/guide/effect-tools#the-crash-window) keyed by run, issue and model step (`<runId>:github_create_comment:<owner>/<repo>#<n>:<step>`), and `alreadyApplied` looks for the App's own comment with that marker before posting. A crash between posting and recording redoes the model step with a different text, and the step-based key still finds the first comment, so nothing is posted twice. A second call for the same issue in the same step returns the first comment.
+Write tools are [effect tools](/guide/effect-tools). A comment embeds an [`effectMarker`](/guide/effect-tools#the-crash-window) keyed by run, issue and model step (`<runId>:github_create_comment:<owner>/<repo>#<n>:<step>`, owner and repo lower-cased since GitHub resolves them case-insensitively), and `alreadyApplied` looks for the App's own comment with that marker before posting. A crash between posting and recording redoes the model step with a different text, and the step-based key still finds the first comment, so nothing is posted twice. A second call for the same issue in the same step returns the first comment.
 
 ## Security notes
 

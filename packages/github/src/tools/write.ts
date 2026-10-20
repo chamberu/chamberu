@@ -36,11 +36,15 @@ const RECONCILE_SKEW_MS = 3_600_000;
 
 const CLOSE_REASONS = ['completed', 'not_planned'];
 
-/** `<runId>:github_create_comment:<owner>/<repo>#<n>:<step>`: one comment per issue per model step. */
+/**
+ * `<runId>:github_create_comment:<owner>/<repo>#<n>:<step>`: one comment per
+ * issue per model step. Owner and repo are lower-cased, since GitHub
+ * resolves them case-insensitively (`Octo/Demo` is `octo/demo`).
+ */
 function commentKey(input: CommentInput, ctx: ToolContext, options: Pick<ToolExecutionOptions<unknown>, 'toolCallId' | 'messages'>): string {
     const { owner, repo } = parseRepo(input.repo);
     const issueNumber = requireInteger(input.number, 'number', 1);
-    return `${ctx.run.runId}:github_create_comment:${owner}/${repo}#${issueNumber}:${stepOf(options)}`;
+    return `${ctx.run.runId}:github_create_comment:${owner.toLowerCase()}/${repo.toLowerCase()}#${issueNumber}:${stepOf(options)}`;
 }
 
 function requireLabels(value: unknown): string[] {
