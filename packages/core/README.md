@@ -145,7 +145,13 @@ const lookup = defineTool({
 });
 ```
 
-- Only tools whose `contextSchema` is chamberu's `toolContextSchema` get that context. A third-party tool with its own `contextSchema` gets its entry of the agent's `toolsContext`, passed through by reference: `toolsContext: { search: { apiKey } }`. An entry naming a chamberu tool or no tool is an `InvalidAgentDefinitionError` (thrown by `defineAgent()` for a plain set, a failed run for a factory).
+- Only tools whose `contextSchema` is chamberu's `toolContextSchema` get that context. A third-party tool with its own `contextSchema` gets its entry of the agent's `toolsContext`, passed through by reference. An entry the tool's schema rejects fails the run with `validation_error`, without recording the value. An entry naming a chamberu tool or no tool is an `InvalidAgentDefinitionError` (thrown by `defineAgent()` for a plain set, a failed run for a factory).
+
+```typescript
+tools: { search: searchTool },
+toolsContext: { search: { apiKey: process.env.SEARCH_KEY } },
+```
+
 - `cron()`, `http()` and `webhook()` describe triggers. `cron()` validates the expression and defaults its overlap policy to `skip`. `http()` is the control-plane trigger (id `http`, at most one per agent) that REST, the UI and MCP start runs through; `webhook({ path })` is a generic webhook (id `webhook:<path>`, many per agent). In this package only `engine.dispatch()` starts runs: firing cron, HTTP and webhook triggers belongs to the scheduler and HTTP packages.
 - The trigger envelope (source, trigger id, payload) becomes the run's first user message, as a JSON block.
 - `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments` (ids `<runId>.0000`, `<runId>.0001`, ..., so a listing keeps the input order), and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.

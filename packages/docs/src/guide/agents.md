@@ -51,7 +51,7 @@ The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` ke
 
 The engine builds one `ToolContext` per execution and hands it, through the AI SDK's `toolsContext`, to every tool whose `contextSchema` is chamberu's `toolContextSchema`, which is what `defineTool()` sets. Other tools (a plain `tool()`, a third-party tool) get no chamberu context. Every call of an execution gets the same object: treat it as immutable. Pass `context.run.signal` on to `fetch` and other cancellable work.
 
-For typed state, name the schema: `defineTool<Input, Output, typeof schema>({ ... })` types `context.state` by the agent's collections.
+For typed state, name the schema: `defineTool<Input, Output, typeof schema>({ ... })` types `context.state` by the agent's collections. The agent does not check that schema against its own `state`: a tool typed for other collections still compiles, and at run time reads of an undeclared collection are empty and writes fail as tool errors.
 
 `tools` can also be a factory `(ctx) => ToolSet`, called once per execution with the same `ToolContext`. Use it for dynamic sets: tools from an MCP client, or descriptions built from async state (a tool's `description` function runs synchronously, so it cannot read the store itself).
 

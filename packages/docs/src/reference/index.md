@@ -149,7 +149,7 @@ function defineTool<I, O, S extends StateSchema = StateSchema>(
 const toolContextSchema: StandardSchemaV1<ToolContext, ToolContext>; // vendor 'chamberu'
 ```
 
-`defineTool()` is `tool()` with `contextSchema: toolContextSchema`; the engine hands the run's `ToolContext` to every tool carrying that schema (by reference, so a copy of the tool keeps it). Its `validate` returns the context unchanged and rejects a missing one, which fails the run with `No chamberu tool context: a defineTool tool runs inside a chamberu agent.` (a `defineTool` called outside a chamberu agent, or a second copy of `@chamberu/core`).
+`defineTool()` is `tool()` with `contextSchema: toolContextSchema`; the engine hands the run's `ToolContext` to every tool carrying that schema (by reference, so a copy of the tool keeps it). Its `validate` returns the context unchanged and rejects a missing one, which fails the run (`validation_error`) with `Type validation failed for tool context (<tool>): No chamberu tool context: the tool was built by another copy of @chamberu/core, or runs outside a chamberu agent.` (the marker is the schema object itself, so a tool from a second copy of `@chamberu/core` gets no context).
 
 <<< ../../../core/src/tool/types.ts{ts}
 
@@ -160,6 +160,7 @@ See [Tools and their context](/guide/agents#tools-and-their-context).
 ```ts
 function defineEffectTool<I, O, S extends StateSchema = StateSchema>(def: Tool<I, O, ToolContext<S>> & {
     execute: ToolExecuteFunction<I, O, ToolContext<S>>;
+    contextSchema?: never;
     effectKey?: (input: I, ctx: ToolContext<S>) => string;
     alreadyApplied?: (effectKey: string, input: I, ctx: ToolContext<S>) => Promise<O | undefined>;
 }): EffectTool<I, O, S>;
