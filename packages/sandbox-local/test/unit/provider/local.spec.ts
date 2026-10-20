@@ -215,6 +215,20 @@ describe('local sandbox', () => {
         }
     }, 30_000);
 
+    it('rejects an exec aborted while it checks its cwd', async () => {
+        const workspace = await createLocalSandbox({ root }).create({ runId: 'r1' });
+        try {
+            const controller = new AbortController();
+            const started = Date.now();
+            const pending = workspace.exec(['sleep', '30'], { signal: controller.signal });
+            controller.abort();
+            await expect(pending).rejects.toThrow('exec aborted');
+            expect(Date.now() - started).toBeLessThan(5_000);
+        } finally {
+            await workspace.dispose();
+        }
+    }, 40_000);
+
     it('clears the kill timer when the child exits', async () => {
         const clock = new ControllableClock();
         const workspace = await createLocalSandbox({ root, clock }).create({ runId: 'r1' });

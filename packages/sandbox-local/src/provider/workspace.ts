@@ -117,6 +117,10 @@ export class LocalWorkspace implements IWorkspace {
             throw new SandboxError(`cwd ${displayPath(cwd)} is no directory in the workspace.`);
         }
         this.assertUsable();
+        // the abort listener only sees aborts after the spawn: check the ones during the awaits
+        if (options.signal?.aborted) {
+            throw new SandboxError('exec aborted');
+        }
 
         return this.run(argv, directory, timeoutMs, options);
     }
