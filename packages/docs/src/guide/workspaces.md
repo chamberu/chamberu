@@ -34,7 +34,7 @@ The container providers use `ghcr.io/chamberu/sandbox-node:24` by default (Node.
 | `dispose_workspace` | sandbox | `{ workspace? }`: disposes one workspace |
 | `read_file` | coding | A line range of a text file (at most 2000 lines, 65 536 characters) |
 | `write_file` | coding | Replaces a file, creating directories |
-| `edit_file` | coding | Replaces an exact string, once (or every match with `replaceAll`) |
+| `edit_file` | coding | Replaces an exact string, once (or every match with `replaceAll`); edits and writes of one file run one after the other, so several in one step all apply |
 | `grep` | coding | `git grep -E` over tracked and untracked files |
 | `list_files` | coding | Tracked and untracked files, git-ignored ones skipped |
 | `bash` | coding | `sh -c <command>` inside the workspace, exit code and capped output |

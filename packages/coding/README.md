@@ -71,7 +71,7 @@ export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceMa
 |---|---|---|
 | `read_file` | `{ path, offset?, limit?, workspace? }` | `{ path, content, startLine, endLine, totalLines, truncated }`: at most 2000 lines and 65 536 characters |
 | `write_file` | `{ path, content, workspace? }` | `{ path, bytes }`: replaces the file, creates missing directories |
-| `edit_file` | `{ path, oldString, newString, replaceAll?, workspace? }` | `{ path, replacements }`: `oldString` must match exactly once unless `replaceAll` |
+| `edit_file` | `{ path, oldString, newString, replaceAll?, workspace? }` | `{ path, replacements }`: `oldString` must match exactly once unless `replaceAll`. Calls of `edit_file` and `write_file` on one file run one after the other, so several edits of a file in one step all apply |
 | `grep` | `{ pattern, path?, ignoreCase?, limit?, workspace? }` | `{ matches: [{ path, line, text }], truncated }`: `git grep -E` over tracked and untracked files, git-ignored ones skipped; default 100, at most 500 matches, lines cut at 500 characters |
 | `list_files` | `{ path?, limit?, workspace? }` | `{ files, truncated }`: tracked and untracked, not ignored, sorted; default 1000, at most 5000 |
 | `bash` | `{ command, cwd?, timeoutMs?, workspace? }` | `{ exitCode, stdout, stderr, stdoutTruncated, stderrTruncated, timedOut, durationMs }`: `sh -c` inside the workspace, 64 KiB per stream, default timeout 5 minutes, at most 30 |

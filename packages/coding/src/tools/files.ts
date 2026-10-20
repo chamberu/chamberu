@@ -20,12 +20,19 @@ import {
     requireText,
     workspaceOf,
 } from './helpers.ts';
+import type { createKeyedQueue } from './helpers.ts';
 import type {
     CodingWorkspaces,
     EditFileResult,
     ReadFileResult,
     WriteFileResult,
 } from './types.ts';
+
+/** Serializes the writes of one file: keyed by workspace id and path. */
+type FileQueue = ReturnType<typeof createKeyedQueue>;
+
+/** The queue key of a file: workspace ids are UUIDs, so no two workspaces share one. */
+const fileKey = (workspaceId: string, path: string) => `${workspaceId}:${path}`;
 
 type ReadFileInput = {
     path: string; 
@@ -113,7 +120,7 @@ export function readFileTool(workspaces: CodingWorkspaces): Tool<ReadFileInput, 
     });
 }
 
-export function writeFileTool(workspaces: CodingWorkspaces): Tool<WriteFileInput, WriteFileResult> {
+export function writeFileTool(workspaces: CodingWorkspaces, queue: FileQueue): Tool<WriteFileInput, WriteFileResult> {
     return defineTool<WriteFileInput, WriteFileResult>({
         description: 'Write a UTF-8 text file in the workspace, replacing it when it exists and creating missing directories. ' +
             'Prefer edit_file for changing part of an existing file.',
@@ -127,13 +134,13 @@ export function writeFileTool(workspaces: CodingWorkspaces): Tool<WriteFileInput
             const content = requireText(body.content, 'content');
             const workspace = workspaceOf(workspaces, body, context);
 
-            await workspace.writeFile(path, content);
+            await queue(fileKey(workspace.id, path), () => workspace.writeFile(path, content));
             return { path, bytes: Buffer.byteLength(content, 'utf8') };
         },
     });
 }
 
-export function editFileTool(workspaces: CodingWorkspaces): Tool<EditFileInput, EditFileResult> {
+export function editFileTool(workspaces: CodingWorkspaces, queue: FileQueue): Tool<EditFileInput, EditFileResult> {
     return defineTool<EditFileInput, EditFileResult>({
         description: 'Replace an exact string in a file of the workspace. oldString must match the file exactly (whitespace included) and only once, ' +
             'unless replaceAll is true; add surrounding lines to make it unique.',
@@ -158,22 +165,25 @@ export function editFileTool(workspaces: CodingWorkspaces): Tool<EditFileInput, 
             }
             const workspace = workspaceOf(workspaces, body, context);
 
-            const text = await workspace.readFile(path);
-            const parts = text.split(oldString);
-            const count = parts.length - 1;
-            if (count === 0) {
-                throw new ValidationError(`oldString not found in ${path}. Read the file and copy the text exactly.`);
-            }
-            if (count > 1 && !replaceAll) {
-                throw new ValidationError(`oldString has ${count} matches in ${path}: add surrounding text to make it unique, or pass replaceAll: true.`);
-            }
+            // read, change and write in one turn of the file's queue
+            return queue(fileKey(workspace.id, path), async () => {
+                const text = await workspace.readFile(path);
+                const parts = text.split(oldString);
+                const count = parts.length - 1;
+                if (count === 0) {
+                    throw new ValidationError(`oldString not found in ${path}. Read the file and copy the text exactly.`);
+                }
+                if (count > 1 && !replaceAll) {
+                    throw new ValidationError(`oldString has ${count} matches in ${path}: add surrounding text to make it unique, or pass replaceAll: true.`);
+                }
 
-            // split/join: replace() would expand `$&` and friends in newString
-            const updated = replaceAll ?
-                parts.join(newString) :
-                `${parts[0]}${newString}${parts.slice(1).join(oldString)}`;
-            await workspace.writeFile(path, updated);
-            return { path, replacements: replaceAll ? count : 1 };
+                // split/join: replace() would expand `$&` and friends in newString
+                const updated = replaceAll ?
+                    parts.join(newString) :
+                    `${parts[0]}${newString}${parts.slice(1).join(oldString)}`;
+                await workspace.writeFile(path, updated);
+                return { path, replacements: replaceAll ? count : 1 };
+            });
         },
     });
 }

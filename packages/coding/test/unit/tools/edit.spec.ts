@@ -37,6 +37,32 @@ describe('edit_file', () => {
         await expect(s.workspace.readFile('src/a.ts')).resolves.toBe('export const a = 3;\nexport const b = 2;\n');
     });
 
+    it('applies every edit of one file the model sends in one step', async () => {
+        await s.call('write_file', { path: 'src/c.ts', content: 'a = 1;\nb = 2;\nc = 3;\n' });
+        const results = await Promise.all([
+            ['a = 1', 'a = 10'],
+            ['b = 2', 'b = 20'],
+            ['c = 3', 'c = 30'],
+        ].map(([oldString, newString]) => s.call('edit_file', {
+            path: 'src/c.ts',
+            oldString,
+            newString,
+        })));
+        expect(results).toEqual(Array.from({ length: 3 }, () => ({ path: 'src/c.ts', replacements: 1 })));
+        await expect(s.workspace.readFile('src/c.ts')).resolves.toBe('a = 10;\nb = 20;\nc = 30;\n');
+
+        // a write and an edit of one file run one after the other too
+        await Promise.all([
+            s.call('write_file', { path: '/workspace/src/c.ts', content: 'x = 1;\n' }),
+            s.call('edit_file', {
+                path: 'src/c.ts',
+                oldString: 'x = 1',
+                newString: 'x = 2',
+            }),
+        ]);
+        await expect(s.workspace.readFile('src/c.ts')).resolves.toBe('x = 2;\n');
+    });
+
     it('inserts replacement patterns literally', async () => {
         await s.call('edit_file', {
             path: 'src/a.ts',

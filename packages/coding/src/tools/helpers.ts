@@ -113,6 +113,24 @@ export function cutText(text: string, max: number): string {
     return text.slice(0, end);
 }
 
+/**
+ * A queue per key: each call runs `fn` once every earlier call with the same
+ * key settled. The AI SDK runs the tool calls of one step at once, so this
+ * keeps two edits of one file from reading the same content.
+ */
+export function createKeyedQueue(): <T>(key: string, fn: () => Promise<T>) => Promise<T> {
+    const tails = new Map<string, Promise<void>>();
+    return <T>(key: string, fn: () => Promise<T>): Promise<T> => {
+        const run = (tails.get(key) ?? Promise.resolve()).then(fn);
+        const tail = run.then(() => undefined, () => undefined);
+        tails.set(key, tail);
+        tail.then(() => {
+            if (tails.get(key) === tail) tails.delete(key);
+        });
+        return run;
+    };
+}
+
 /** An object schema of `properties` (plus `workspace`), `required` ones required. */
 export function objectSchema<T>(properties: Record<string, JSONSchema7>, required: string[] = []) {
     return jsonSchema<T>({
