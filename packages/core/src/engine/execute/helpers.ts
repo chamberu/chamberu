@@ -16,12 +16,18 @@ import type {
     ToolLoopAgentSettings,
     ToolSet,
 } from 'ai';
+import { NoSuchToolError } from 'ai';
 import { isObject } from 'smob';
 import type { ApprovalPolicy } from '../../agent/types.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
-import { BudgetExceededError, IncompleteResponseError, ValidationError } from '../../errors/index.ts';
+import {
+    BudgetExceededError,
+    IncompleteResponseError,
+    ToolNotAllowedError,
+    ValidationError,
+} from '../../errors/index.ts';
 import type { Budget, Checkpoint, RunContext } from '../../run/types.ts';
 import { createAgentState } from '../../state/module.ts';
 import { createStateTools } from '../../state/tools.ts';
@@ -93,6 +99,25 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         tools: wrapToolsForRun(tools, runContext, ctx.store, allow),
         activeTools: Object.keys(tools).filter(allow),
     };
+}
+
+/**
+ * The error to record for a model's call to a tool the toolPolicy refused: the
+ * AI SDK never offered it (not in `activeTools`) and answered the call with a
+ * NoSuchToolError; the step records ToolNotAllowedError instead. Undefined for
+ * any other tool error, a genuinely unknown tool included.
+ */
+export function refusedCallError(
+    step: StepResult<ToolSet>,
+    part: { toolCallId: string; toolName: string },
+    tools: ToolSet,
+    activeTools: string[] | undefined,
+): ToolNotAllowedError | undefined {
+    if (!activeTools || !Object.hasOwn(tools, part.toolName) || activeTools.includes(part.toolName)) return undefined;
+    // an invalid (unparsable) call carries the parse error
+    const call = step.toolCalls.find((c) => c.toolCallId === part.toolCallId);
+    const error = call && 'error' in call ? call.error : undefined;
+    return NoSuchToolError.isInstance(error) ? new ToolNotAllowedError(part.toolName) : undefined;
 }
 
 export function toApprovalStatus(decision: 'user' | 'allow' | 'deny'): ToolApprovalStatus {

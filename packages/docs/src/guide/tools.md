@@ -36,5 +36,6 @@ A run started through `@chamberu/http` (REST or MCP) carries its **invoker**, `r
 
 - The policy covers the whole tool set, the generated [state tools](/guide/state) included.
 - The invoker is a snapshot taken at dispatch. A run keeps it across approvals and restarts, so its tool set stays the same; revoking a grant later does not reach a run that already holds it.
-- The engine re-checks every call when it executes. A call to a refused tool (only possible from an older history, e.g. a policy tightened before an approval was answered) gets a `ToolNotAllowedError` tool error and the run goes on.
+- A model that calls a refused tool anyway gets the AI SDK's unavailable-tool error as the tool result; the tool step records it with code `tool_not_allowed`. The run goes on.
+- The engine re-checks every call when it executes. An approved call from an older history (e.g. a policy tightened before the approval was answered) gets a `ToolNotAllowedError` tool error and the run goes on.
 - The invoker only ever comes from an authenticator, never from a request body or payload.

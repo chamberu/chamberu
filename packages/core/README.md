@@ -238,7 +238,7 @@ await engine.resume(token, { approved: true, approver: { id: 'u-7', kind: 'user'
 
 - The invoker (`{ id, kind, name?, permissions }`) is a snapshot taken at dispatch. A run keeps it across approvals and restarts; revoking a grant later does not reach a run that already holds it.
 - Tool code sees it as `run.trigger.invoker` in the tool factory and `ctx.trigger.invoker` in effect hooks; approval policies see it as `runtimeContext.trigger.invoker`.
-- The policy covers state tools too. A call to a refused tool that still arrives is answered with a `ToolNotAllowedError` tool result; the run goes on.
+- The policy covers state tools too. A call to a refused tool that still arrives fails as a tool error and the run goes on: the step records it as `tool_not_allowed` (`ToolNotAllowedError`), whether the model called it anyway (the model sees the AI SDK's unavailable-tool error) or an approved call from an older history reached the engine's re-check.
 - Permissions are `:`-separated: `*` alone grants everything, a `*` segment matches one segment, and segment counts must match. `requireToolPermission({ withoutInvoker: 'allow' })` lets runs without an invoker use every tool.
 
 ### Agent state
@@ -325,7 +325,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `ChamberuError` | class | Base class of every error below |
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `IncompleteResponseError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
-| `ToolNotAllowedError` | class | Returned to the model as a tool error when a call reaches a tool the `toolPolicy` refuses |
+| `ToolNotAllowedError` | class | The tool error recorded for a call to a tool the `toolPolicy` refuses |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 

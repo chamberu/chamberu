@@ -34,6 +34,7 @@ import {
     lastAssistantText,
     outputContext,
     pendingApproval,
+    refusedCallError,
     toRunError,
     toToolApproval,
     toValidationError,
@@ -121,6 +122,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         signal,
     };
 
+    const { tools, activeTools } = assembleTools(ctx, runContext);
+
     const responseMessages: ModelMessage[] = [];
     // AI SDK swallows onStepEnd errors; a fatal one is kept here and stops the loop
     let fatal: { error: unknown } | undefined;
@@ -201,7 +204,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                         kind: 'tool',
                         name: part.toolName,
                         input: part.input,
-                        error: toRunError(part.error),
+                        error: toRunError(refusedCallError(step, part, tools, activeTools) ?? part.error),
                         startedAt: stepStartedAt,
                         finishedAt,
                     });
@@ -300,7 +303,6 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const spentTokens = run.usage.inputTokens + run.usage.outputTokens;
     if (budget.maxTokens !== undefined) stopWhen.push(tokensExceeded(budget.maxTokens, spentTokens));
 
-    const { tools, activeTools } = assembleTools(ctx, runContext);
     const loop = new ToolLoopAgent({
         model: agent.definition.model,
         instructions: agent.definition.instructions,

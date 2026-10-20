@@ -287,6 +287,43 @@ describe('tool policy', () => {
         expect(prompt).toContain('not allowed');
     });
 
+    it.each([
+        ['a refused tool', 'deploy', 'tool_not_allowed'],
+        ['an unknown tool', 'nope', 'Error'],
+    ])('records a model call to %s (%s) with code %s', async (_, toolName, code) => {
+        let executed = 0;
+        const model = mockModel([callTool(toolName), text('done')]);
+        const { engine, store } = setup({
+            model,
+            tools: () => ({
+                deploy: tool({
+                    inputSchema: z.object({}),
+                    execute: async () => {
+                        executed++;
+                        return 'deployed';
+                    },
+                }),
+                rollback: tool({
+                    inputSchema: z.object({}),
+                    execute: async () => 'rolled back',
+                }),
+            }),
+            toolPolicy: (name) => name === 'rollback',
+        });
+        await engine.start();
+        const { runId } = await engine.dispatch(env(alice));
+        await engine.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('completed');
+        expect(executed).toBe(0);
+        const step = (await store.listSteps(runId)).find((s) => s.kind === 'tool');
+        expect(step?.name).toBe(toolName);
+        const error = step?.error as { code: string; message: string } | undefined;
+        expect(error?.code).toBe(code);
+        if (code === 'Error') expect(error?.message).toMatch(/unavailable tool/);
+    });
+
     it('keeps the tool set stable across an approval resume and records the approver', async () => {
         let deployed = 0;
         const model = mockModel([callTool('deploy'), text('done')]);
