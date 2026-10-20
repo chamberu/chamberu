@@ -54,6 +54,17 @@ export function oidc(options: OidcOptions): Authenticator {
 
         const principal = await options.principal(result);
         if (!principal) throw new UnauthorizedError({ message: 'The token is not allowed.' });
+        if (
+            typeof principal.id !== 'string' ||
+            principal.id.length === 0 ||
+            !Array.isArray(principal.permissions) ||
+            principal.permissions.some((permission) => typeof permission !== 'string')
+        ) {
+            // a server misconfiguration (500 and onError), not a client error
+            throw new InvalidAgentDefinitionError(
+                `The oidc() principal mapper of issuer "${result.issuer.id}" must return a non-empty id and a permissions array of strings.`,
+            );
+        }
         return principal;
     };
 }

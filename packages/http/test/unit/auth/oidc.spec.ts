@@ -136,4 +136,31 @@ describe('oidc', () => {
             message: 'The token is not allowed.',
         });
     });
+
+    it.each([
+        ['an empty id', {
+            id: '', 
+            kind: 'oidc', 
+            permissions: [], 
+        }],
+        ['a non-string id', {
+            id: 42, 
+            kind: 'oidc', 
+            permissions: [], 
+        }],
+        ['permissions that are no array', {
+            id: 'ci', 
+            kind: 'oidc', 
+            permissions: 'agent:deploy:run', 
+        }],
+        ['a non-string permission', {
+            id: 'ci', 
+            kind: 'oidc', 
+            permissions: [42], 
+        }],
+    ])('treats a mapper result with %s as a server misconfiguration', async (_name, principal) => {
+        const token = await signToken(key.privateKey, claims());
+        const auth = make(() => principal as unknown as Principal);
+        await expect(auth(request(token))).rejects.toBeInstanceOf(InvalidAgentDefinitionError);
+    });
 });
