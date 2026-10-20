@@ -17,7 +17,7 @@ const DEFAULT_GITHUB_API_URL: 'https://api.github.com';
 const DEFAULT_WEBHOOK_PATH: '/webhooks/github';
 ```
 
-Throws `InvalidAgentDefinitionError` for an empty `appId`, a key that is no RSA private key, an empty webhook secret, an `installationId` that is no positive integer, a `baseUrl` that is no absolute http(s) URL without query (empty means `https://api.github.com`) and a `slug` that is not the App's lower-case slug (`^[a-z0-9]+(-[a-z0-9]+)*$`, as in the App's URL; a miscased one would silently disable the self guard).
+Throws `InvalidAgentDefinitionError` for an empty `appId`, a key that is no RSA private key, an empty webhook secret, an `installationId` that is no positive integer, a `baseUrl` that is no absolute https URL without query (empty means `https://api.github.com`) and a `slug` that is not the App's lower-case slug (`^[a-z0-9]+(-[a-z0-9]+)*$`, as in the App's URL; a miscased one would silently disable the self guard).
 
 <<< ../../../github/src/app/types.ts{ts}
 

@@ -195,11 +195,11 @@ Approvals live on the agent: `approvals: { github_close_issue: 'user' }` pauses 
 | `webhookSecret` | `string \| string[]` | required | A delivery verifies under any of them |
 | `installationId` | `number` | none | For runs not started by a delivery |
 | `slug` | `string` | `GET /app` once | The App's slug as in `github.com/apps/<slug>` (lower case), for the bot login `<slug>[bot]` |
-| `baseUrl` | `string` | `https://api.github.com` | GitHub Enterprise Server: `https://<host>/api/v3` (absolute http(s) URL; empty means the default) |
+| `baseUrl` | `string` | `https://api.github.com` | GitHub Enterprise Server: `https://<host>/api/v3` (absolute https URL; empty means the default) |
 | `clock` | `IClock` | `systemClock` | Token expiry and JWT times |
 | `fetch` | `typeof fetch` | global `fetch` | Every GitHub request |
 
-`createGithubApp` throws `InvalidAgentDefinitionError` for an empty `appId`, a key that is no RSA private key, an empty secret, an `installationId` that is no positive integer, a `baseUrl` that is no absolute http(s) URL (or has a query or hash) and a `slug` that is not the App's lower-case slug (`^[a-z0-9]+(-[a-z0-9]+)*$`, as in `github.com/apps/<slug>`; a miscased one would silently disable the self guard).
+`createGithubApp` throws `InvalidAgentDefinitionError` for an empty `appId`, a key that is no RSA private key, an empty secret, an `installationId` that is no positive integer, a `baseUrl` that is no absolute https URL (or has a query or hash) and a `slug` that is not the App's lower-case slug (`^[a-z0-9]+(-[a-z0-9]+)*$`, as in `github.com/apps/<slug>`; a miscased one would silently disable the self guard).
 
 ## API
 

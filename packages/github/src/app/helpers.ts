@@ -59,8 +59,9 @@ export function isSameLogin(a: unknown, b: string): boolean {
 }
 
 /**
- * The REST API root without trailing slashes: an absolute http(s) URL
- * without query or hash, else InvalidAgentDefinitionError. Absent or empty
+ * The REST API root without trailing slashes: an absolute https URL
+ * without query or hash (plain http would send the App JWT and installation
+ * tokens in cleartext), else InvalidAgentDefinitionError. Absent or empty
  * is GitHub's API (`DEFAULT_GITHUB_API_URL`), as Octokit treats it.
  */
 export function normalizeBaseUrl(input: string | undefined): string {
@@ -71,8 +72,8 @@ export function normalizeBaseUrl(input: string | undefined): string {
     } catch {
         url = undefined;
     }
-    if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:') || url.search !== '' || url.hash !== '' || input.includes('?') || input.includes('#')) {
-        throw new InvalidAgentDefinitionError(`baseUrl must be an absolute http(s) URL without query, e.g. https://ghe.example.com/api/v3, got ${JSON.stringify(input)}.`);
+    if (!url || url.protocol !== 'https:' || url.search !== '' || url.hash !== '' || input.includes('?') || input.includes('#')) {
+        throw new InvalidAgentDefinitionError(`baseUrl must be an absolute https URL without query, e.g. https://ghe.example.com/api/v3, got ${JSON.stringify(input)}.`);
     }
     return input.replace(/\/+$/, '');
 }

@@ -51,6 +51,7 @@ describe('createGithubApp', () => {
         ['a slug with the [bot] suffix', { slug: 'chamberu-test[bot]' }],
         ['a scheme-less baseUrl', { baseUrl: 'ghe.example.com/api/v3' }],
         ['a non-http baseUrl', { baseUrl: 'ftp://ghe.example.com/api/v3' }],
+        ['a plain http baseUrl', { baseUrl: 'http://ghe.example.com/api/v3' }],
         ['a baseUrl with a query', { baseUrl: 'https://ghe.example.com/api/v3?x=1' }],
         ['a baseUrl with a hash', { baseUrl: 'https://ghe.example.com/api/v3#x' }],
         ['a non-RSA privateKey', { privateKey: generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString() }],
