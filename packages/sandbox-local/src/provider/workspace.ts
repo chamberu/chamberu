@@ -7,12 +7,15 @@
 
 import { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
 import {
+    chmod,
     lstat,
     mkdir,
     open,
     realpath,
+    rename,
     rm,
     stat,
     writeFile,
@@ -197,10 +200,17 @@ export class LocalWorkspace implements IWorkspace {
         // mkdir would bring a removed workspace directory back
         await this.assertRoot();
         const file = await this.realPath(relative);
+        // into a temporary file next to it with the old file's mode, then
+        // renamed over it: a reader or a second writer never sees a cut file
+        const temporary = join(dirname(file), `.chamberu-write-${randomBytes(8).toString('hex')}`);
         try {
             await mkdir(dirname(file), { recursive: true });
-            await writeFile(file, content, 'utf8');
+            const mode = await stat(file).then((stats) => stats.mode & 0o7777, () => undefined);
+            await writeFile(temporary, content, 'utf8');
+            if (mode !== undefined) await chmod(temporary, mode);
+            await rename(temporary, file);
         } catch (error) {
+            await rm(temporary, { force: true }).catch(() => undefined);
             throw new SandboxError(`cannot write ${displayPath(relative)} (${errnoCode(error) ?? 'unknown error'}).`, { cause: error });
         }
     }
