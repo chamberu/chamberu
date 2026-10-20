@@ -3,5 +3,6 @@
     "packages/test-kit": "0.1.0",
     "packages/scheduler": "0.1.0",
     "packages/store-typeorm": "0.1.0",
-    "packages/http": "0.1.0"
+    "packages/http": "0.1.0",
+    "packages/github": "0.1.0"
 }
