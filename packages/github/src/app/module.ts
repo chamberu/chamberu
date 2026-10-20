@@ -10,10 +10,10 @@ import { ChamberuError, systemClock } from '@chamberu/core';
 import { GITHUB_USER_AGENT } from '../auth/constants.ts';
 import { normalizePrivateKey } from '../auth/helpers.ts';
 import { createInstallationTokens } from '../auth/module.ts';
-import { DEFAULT_GITHUB_API_URL } from './constants.ts';
 import {
     PaginatedOctokit,
     normalizeAppId,
+    normalizeBaseUrl,
     normalizeInstallationId,
     normalizeSecrets,
     normalizeSlug,
@@ -38,7 +38,7 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
     const installationId = normalizeInstallationId(options.installationId);
     const slug = normalizeSlug(options.slug);
     const clock = options.clock ?? systemClock;
-    const baseUrl = (options.baseUrl ?? DEFAULT_GITHUB_API_URL).replace(/\/+$/, '');
+    const baseUrl = normalizeBaseUrl(options.baseUrl);
     const request = options.fetch ? { fetch: options.fetch } : {};
 
     const tokens = createInstallationTokens({

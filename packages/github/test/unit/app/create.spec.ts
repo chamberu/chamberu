@@ -49,6 +49,10 @@ describe('createGithubApp', () => {
         ['a slug with a trailing space', { slug: 'chamberu-test ' }],
         ['an empty slug', { slug: '' }],
         ['a slug with the [bot] suffix', { slug: 'chamberu-test[bot]' }],
+        ['a scheme-less baseUrl', { baseUrl: 'ghe.example.com/api/v3' }],
+        ['a non-http baseUrl', { baseUrl: 'ftp://ghe.example.com/api/v3' }],
+        ['a baseUrl with a query', { baseUrl: 'https://ghe.example.com/api/v3?x=1' }],
+        ['a baseUrl with a hash', { baseUrl: 'https://ghe.example.com/api/v3#x' }],
         ['a non-RSA privateKey', { privateKey: generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString() }],
     ])('refuses %s', (_name, overrides) => {
         expect(() => createGithubApp(options(overrides))).toThrow(InvalidAgentDefinitionError);
@@ -90,5 +94,22 @@ describe('createGithubApp', () => {
         await expect(gh.botLogin()).rejects.toThrow(/slug/);
         slug = 'chamberu-test';
         expect(await gh.botLogin()).toBe('chamberu-test[bot]');
+    });
+
+    it.each([
+        ['https://ghe.example.com/api/v3/', 'https://ghe.example.com/api/v3/app/installations/42/access_tokens'],
+        ['', 'https://api.github.com/app/installations/42/access_tokens'],
+    ])('sends requests to the baseUrl %j', async (baseUrl, expected) => {
+        const urls: string[] = [];
+        const fetch: typeof globalThis.fetch = async (input) => {
+            urls.push(input instanceof Request ? input.url : String(input));
+            return new Response(JSON.stringify({ token: 'ghs_test', expires_at: '2026-10-20T11:00:00Z' }), {
+                status: 201,
+                headers: { 'content-type': 'application/json' },
+            });
+        };
+        const gh = createGithubApp(options({ baseUrl, fetch }));
+        await gh.octokit(42);
+        expect(urls[0]).toBe(expected);
     });
 });

@@ -8,6 +8,7 @@
 import { InvalidAgentDefinitionError } from '@chamberu/core';
 import { Octokit } from '@octokit/core';
 import { paginateRest } from '@octokit/plugin-paginate-rest';
+import { DEFAULT_GITHUB_API_URL } from './constants.ts';
 
 export const PaginatedOctokit = Octokit.plugin(paginateRest);
 
@@ -55,4 +56,23 @@ export function normalizeSlug(input: string | undefined): string | undefined {
 /** True when two GitHub logins name the same account (logins are case-insensitive). */
 export function isSameLogin(a: unknown, b: string): boolean {
     return typeof a === 'string' && a.toLowerCase() === b.toLowerCase();
+}
+
+/**
+ * The REST API root without trailing slashes: an absolute http(s) URL
+ * without query or hash, else InvalidAgentDefinitionError. Absent or empty
+ * is GitHub's API (`DEFAULT_GITHUB_API_URL`), as Octokit treats it.
+ */
+export function normalizeBaseUrl(input: string | undefined): string {
+    if (input === undefined || input === '') return DEFAULT_GITHUB_API_URL;
+    let url: URL | undefined;
+    try {
+        url = new URL(input);
+    } catch {
+        url = undefined;
+    }
+    if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:') || url.search !== '' || url.hash !== '' || input.includes('?') || input.includes('#')) {
+        throw new InvalidAgentDefinitionError(`baseUrl must be an absolute http(s) URL without query, e.g. https://ghe.example.com/api/v3, got ${JSON.stringify(input)}.`);
+    }
+    return input.replace(/\/+$/, '');
 }
