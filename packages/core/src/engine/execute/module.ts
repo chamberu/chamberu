@@ -39,6 +39,7 @@ import {
     toValidationError,
     unansweredToolNames,
     untilAborted,
+    withoutPartialOutput,
     withoutToolCalls,
 } from './helpers.ts';
 import type { ApprovalRequest, ExecuteContext } from './types.ts';
@@ -313,7 +314,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
             modelCallEnded = true;
         },
         onStepEnd,
-        output: agent.definition.output,
+        output: agent.definition.output ? withoutPartialOutput(agent.definition.output) : undefined,
     });
 
     // stream steps seen so far; a step's deltas belong to the checkpoint index it is saved under

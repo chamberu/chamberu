@@ -10,6 +10,7 @@ import type {
     LanguageModelResponseMetadata,
     LanguageModelUsage,
     ModelMessage,
+    OutputInterface,
     StepResult,
     ToolApprovalStatus,
     ToolLoopAgentSettings,
@@ -285,4 +286,17 @@ export function outputContext(checkpoint: Checkpoint, now: Date): {
         },
         finishReason: (checkpoint.finishReason ?? 'other') as FinishReason,
     };
+}
+
+/**
+ * `output` for the stream: parsePartialOutput hands back the accumulated text
+ * instead of parsing it, so the AI SDK does not re-parse the whole answer on
+ * every delta (nobody reads the partial output) and still publishes each delta
+ * (a returned undefined would hold the deltas back until the text ends).
+ * parseCompleteOutput and responseFormat are the agent's own.
+ */
+export function withoutPartialOutput(output: OutputInterface): OutputInterface {
+    const copy: OutputInterface = Object.create(output);
+    copy.parsePartialOutput = async ({ text }: { text: string }) => ({ partial: text });
+    return copy;
 }

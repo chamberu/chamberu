@@ -8,6 +8,7 @@
 import type { LanguageModelV4StreamPart } from '@ai-sdk/provider';
 import { Output, simulateReadableStream, tool } from 'ai';
 import type { LanguageModel, ToolSet } from 'ai';
+import type { RunDelta } from '@chamberu/core';
 import {
     afterEach,
     describe,
@@ -262,5 +263,64 @@ describe('structured output', () => {
         expect(run?.error?.message).toMatch(/could not parse/);
         expect(run?.error?.message).toMatch(/x…$/);
         expect(run?.error?.message.length).toBeLessThan(600);
+    });
+
+    it('does not parse partial output while streaming, but emits every delta', async () => {
+        let partialParses = 0;
+        const counted: typeof output = {
+            ...output,
+            parsePartialOutput: async (options) => {
+                partialParses++;
+                return output.parsePartialOutput(options);
+            },
+        };
+        const pieces = ['{"label":', '"bu', 'g"', '}'];
+        const model = new MockLanguageModelV4({
+            doStream: async () => ({
+                stream: simulateReadableStream<LanguageModelV4StreamPart>({
+                    chunks: [
+                        { type: 'stream-start', warnings: [] },
+                        { type: 'text-start', id: 't' },
+                        ...pieces.map((delta): LanguageModelV4StreamPart => ({
+                            type: 'text-delta',
+                            id: 't',
+                            delta,
+                        })),
+                        { type: 'text-end', id: 't' },
+                        {
+                            type: 'finish',
+                            finishReason: { unified: 'stop', raw: undefined },
+                            usage: {
+                                inputTokens: {
+                                    total: 1,
+                                    noCache: 1,
+                                    cacheRead: undefined,
+                                    cacheWrite: undefined,
+                                },
+                                outputTokens: {
+                                    total: 1,
+                                    text: 1,
+                                    reasoning: undefined,
+                                },
+                            },
+                        },
+                    ],
+                }),
+            }),
+        });
+        const { engine, store } = make(model, { output: counted });
+        const deltas: RunDelta[] = [];
+        engine.on('run.delta', (e) => {
+            deltas.push(e.delta);
+        });
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await engine.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('completed');
+        expect(run?.output).toEqual({ label: 'bug' });
+        expect(partialParses).toBe(0);
+        expect(deltas.map((d) => d.text)).toEqual(pieces);
     });
 });

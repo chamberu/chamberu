@@ -53,11 +53,13 @@ The returned tools are plain AI SDK tools. When the agent declares `state`, the 
 
 ## Structured output
 
-By default a completed run's `output` is the text of the model's last answer. With `output`, an AI SDK `Output` passed to the `ToolLoopAgent` as it is, `output` is the parsed value instead:
+By default a completed run's `output` is the text of the model's last answer. With `output`, an AI SDK `Output`, `output` is the parsed value instead:
 
 <<< @/snippets/agents.ts#output
 
 The model may call tools first; only the final answer is parsed. A final answer that is no valid JSON or fails the schema fails the run with `ValidationError` (`run.error.code` `validation_error`, the message from the AI SDK's cause, its quoted text cut to 500 characters; the whole answer stays in the `llm` step). Two loop ends have no answer to parse and fail the run with `IncompleteResponseError` (`incomplete_response`) instead: an answer cut off at the output token limit (finish reason `length`), and a loop that ended on a tool call nothing executed (a tool without `execute`, outside a budget stop). A run whose step budget an earlier execution used up parses the last answer in its checkpoint the same way. An agent without `output` keeps completing with the text it got in both cases.
+
+The `ToolLoopAgent` gets your `Output` with one change: its `parsePartialOutput` is not called while the answer streams (chamberu reads no partial output, and re-parsing the growing answer on every delta costs time). `run.delta` events arrive per model delta, as without `output`.
 
 ## Files
 
