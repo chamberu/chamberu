@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { ToolSet } from 'ai';
 import { systemClock } from '@chamberu/core';
 import { GITHUB_USER_AGENT } from '../auth/constants.ts';
 import { normalizePrivateKey } from '../auth/helpers.ts';
@@ -16,6 +17,7 @@ import {
     normalizeInstallationId,
     normalizeSecrets,
 } from './helpers.ts';
+import { createReadTools } from '../tools/read.ts';
 import { verifySignature } from '../webhook/helpers.ts';
 import { createWebhookRoute } from '../webhook/module.ts';
 import type { GithubWebhookRouteOptions } from '../webhook/types.ts';
@@ -76,6 +78,9 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
         },
         webhookRoute(routeOptions?: GithubWebhookRouteOptions) {
             return createWebhookRoute(app, routeOptions);
+        },
+        readTools(): ToolSet {
+            return createReadTools(app);
         },
     };
     return app;

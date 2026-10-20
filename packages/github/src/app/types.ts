@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { ToolSet } from 'ai';
 import type { IClock } from '@chamberu/core';
 import type { HttpRoute } from '@chamberu/http';
 import type { GithubWebhookRouteOptions } from '../webhook/types.ts';
@@ -40,4 +41,6 @@ export interface IGithubApp {
     verifySignature(body: Uint8Array, signature: string | null): boolean;
     /** The webhook route for `createHttpApp({ routes })`: `POST /webhooks/github` unless `path` is given. */
     webhookRoute(options?: GithubWebhookRouteOptions): HttpRoute;
+    /** The read-only tools (`github_get_issue`, `github_search_issues`, ...), acting as the run's installation. */
+    readTools(): ToolSet;
 }

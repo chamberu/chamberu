@@ -1,0 +1,311 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { describe, expect, it } from 'vitest';
+import {
+    FatalToolError,
+    MemoryStore,
+    RunEngine,
+    ValidationError,
+    defineAgent,
+    wrapToolsForRun,
+} from '@chamberu/core';
+import type { ToolSet } from 'ai';
+import { githubWebhook } from '@chamberu/github';
+import type { GithubAppOptions } from '@chamberu/github';
+import { createGithubFixture } from '../../utils/app.ts';
+import { callTool, toolContext } from '../../utils/tools.ts';
+import type { ToolContextInput } from '../../utils/tools.ts';
+import { mockModel } from '../../utils/model.ts';
+
+const ISSUE = {
+    number: 5,
+    title: 'Crash when the config file is empty',
+    body: 'It throws.',
+    state: 'open',
+    labels: [{ name: 'bug' }, 'triage'],
+    user: { login: 'alice', type: 'User' },
+    html_url: 'https://github.com/octo/demo/issues/5',
+    created_at: '2026-10-20T09:58:00Z',
+    comments: 2,
+    node_id: 'I_kw',
+    reactions: { total_count: 0 },
+};
+
+function setup(github: Partial<GithubAppOptions> = {}, context: ToolContextInput = {}) {
+    const fixture = createGithubFixture(github);
+    const ctx = toolContext(context);
+    const tools: ToolSet = wrapToolsForRun(fixture.gh.readTools(), ctx, new MemoryStore());
+    const call = <T = unknown>(name: string, input: unknown) => callTool<T>(tools, name, input, ctx);
+    return {
+        ...fixture,
+        ctx,
+        tools,
+        call,
+    };
+}
+
+describe('read tools', () => {
+    it('offers the read tools only', () => {
+        const { gh } = createGithubFixture();
+        expect(Object.keys(gh.readTools()).sort()).toEqual([
+            'github_get_file',
+            'github_get_issue',
+            'github_get_latest_release',
+            'github_get_pull_request',
+            'github_list_labels',
+            'github_search_issues',
+        ]);
+    });
+
+    it('github_get_issue returns a slim issue', async () => {
+        const { fake, call } = setup();
+        fake.issues.set('octo/demo#5', { ...ISSUE });
+        fake.issues.set('octo/demo#6', {
+            ...ISSUE, 
+            number: 6, 
+            pull_request: { url: 'x' }, 
+        });
+        expect(await call('github_get_issue', { repo: 'octo/demo', number: 5 })).toEqual({
+            number: 5,
+            title: 'Crash when the config file is empty',
+            body: 'It throws.',
+            state: 'open',
+            labels: ['bug', 'triage'],
+            author: 'alice',
+            url: 'https://github.com/octo/demo/issues/5',
+            createdAt: '2026-10-20T09:58:00Z',
+            comments: 2,
+            isPullRequest: false,
+        });
+        expect(await call('github_get_issue', { repo: 'octo/demo', number: 6 })).toMatchObject({ isPullRequest: true });
+        expect(fake.requests.at(-1)).toMatchObject({ method: 'GET', path: '/repos/octo/demo/issues/6' });
+        expect(fake.tokenInstallations).toEqual([42]);
+    });
+
+    it('github_search_issues sends the query and limit', async () => {
+        const { fake, call } = setup();
+        fake.issues.set('octo/demo#5', { ...ISSUE, repository_url: 'https://api.github.com/repos/octo/demo' });
+        const result = await call('github_search_issues', { query: 'Crash' });
+        expect(result).toEqual({
+            total: 1,
+            items: [{
+                repo: 'octo/demo',
+                number: 5,
+                title: ISSUE.title,
+                state: 'open',
+                url: ISSUE.html_url,
+            }],
+        });
+        expect(fake.requests.at(-1)).toMatchObject({
+            path: '/search/issues',
+            query: {
+                q: 'Crash',
+                per_page: '10',
+                advanced_search: 'true',
+            },
+        });
+        await call('github_search_issues', { query: 'x', limit: 20 });
+        expect(fake.requests.at(-1)?.query.per_page).toBe('20');
+        await expect(call('github_search_issues', { query: 'x', limit: 21 })).rejects.toBeInstanceOf(ValidationError);
+    });
+
+    it('github_list_labels pages through every label', async () => {
+        const { fake, call } = setup();
+        fake.labels.set('octo/demo', Array.from({ length: 150 }, (_, i) => ({
+            id: i,
+            name: `l${i}`,
+            description: i === 0 ? null : `d${i}`,
+            color: 'fff',
+        })));
+        const labels = await call<Array<{ name: string; description: string | null }>>('github_list_labels', { repo: 'octo/demo' });
+        expect(labels).toHaveLength(150);
+        expect(labels[0]).toEqual({ name: 'l0', description: null });
+        expect(labels[149]).toEqual({ name: 'l149', description: 'd149' });
+        const pages = fake.requests.filter((r) => r.path === '/repos/octo/demo/labels');
+        expect(pages.map((r) => r.query.per_page)).toEqual(['100', '100']);
+    });
+
+    it('github_get_pull_request returns a slim pull request', async () => {
+        const { fake, call } = setup();
+        fake.pulls.set('octo/demo#7', {
+            number: 7,
+            title: 'Fix the crash',
+            body: 'Fixes #5',
+            state: 'open',
+            draft: false,
+            merged: false,
+            base: { ref: 'main', sha: 'a' },
+            head: { ref: 'fix/crash', sha: 'b' },
+            user: { login: 'bob' },
+            html_url: 'https://github.com/octo/demo/pull/7',
+            changed_files: 3,
+        });
+        expect(await call('github_get_pull_request', { repo: 'octo/demo', number: 7 })).toEqual({
+            number: 7,
+            title: 'Fix the crash',
+            body: 'Fixes #5',
+            state: 'open',
+            draft: false,
+            merged: false,
+            base: 'main',
+            head: 'fix/crash',
+            author: 'bob',
+            url: 'https://github.com/octo/demo/pull/7',
+            changedFiles: 3,
+        });
+    });
+
+    it('github_get_file reads a file, truncates large files and lists directories', async () => {
+        const { fake, call } = setup();
+        const file = (path: string, text: string) => ({
+            type: 'file',
+            name: path.split('/').at(-1),
+            path,
+            size: Buffer.byteLength(text),
+            encoding: 'base64',
+            content: Buffer.from(text).toString('base64'),
+        });
+        fake.files.set('octo/demo:src/index.ts', file('src/index.ts', 'export {};\n'));
+        fake.files.set('octo/demo:src/big.txt', file('src/big.txt', 'é'.repeat(70_000)));
+        fake.files.set('octo/demo:src/lib/a.ts', file('src/lib/a.ts', 'a'));
+
+        expect(await call('github_get_file', {
+            repo: 'octo/demo', 
+            path: 'src/index.ts', 
+            ref: 'main', 
+        })).toEqual({
+            path: 'src/index.ts',
+            size: 11,
+            content: 'export {};\n',
+            truncated: false,
+        });
+        // Octokit encodes the slashes of the path parameter; GitHub decodes them
+        expect(decodeURIComponent(fake.requests.at(-1)!.path)).toBe('/repos/octo/demo/contents/src/index.ts');
+        expect(fake.requests.at(-1)?.query).toEqual({ ref: 'main' });
+
+        const big = await call<{ content: string; truncated: boolean }>('github_get_file', { repo: 'octo/demo', path: 'src/big.txt' });
+        expect(big.truncated).toBe(true);
+        expect(big.content).toHaveLength(65_536);
+
+        expect(await call('github_get_file', { repo: 'octo/demo', path: 'src' })).toEqual({
+            path: 'src',
+            entries: [
+                {
+                    name: 'index.ts', 
+                    type: 'file', 
+                    path: 'src/index.ts', 
+                },
+                {
+                    name: 'big.txt', 
+                    type: 'file', 
+                    path: 'src/big.txt', 
+                },
+            ],
+        });
+    });
+
+    it('github_get_latest_release returns the release or none', async () => {
+        const { fake, call } = setup();
+        expect(await call('github_get_latest_release', { repo: 'octo/demo' })).toEqual({ none: true });
+        fake.releases.set('octo/demo', [{
+            tag_name: 'v1.2.0',
+            name: '1.2.0',
+            published_at: '2026-10-01T00:00:00Z',
+            html_url: 'https://github.com/octo/demo/releases/tag/v1.2.0',
+            body: 'Notes',
+            assets: [],
+        }]);
+        expect(await call('github_get_latest_release', { repo: 'octo/demo' })).toEqual({
+            tag: 'v1.2.0',
+            name: '1.2.0',
+            publishedAt: '2026-10-01T00:00:00Z',
+            url: 'https://github.com/octo/demo/releases/tag/v1.2.0',
+            body: 'Notes',
+        });
+    });
+
+    it('uses the configured installation for non-github runs', async () => {
+        const { fake, call } = setup({ installationId: 7 }, { source: 'cron' });
+        fake.issues.set('octo/demo#5', { ...ISSUE });
+        await call('github_get_issue', { repo: 'octo/demo', number: 5 });
+        expect(fake.tokenInstallations).toEqual([7]);
+    });
+
+    it('fails the run without an installation', async () => {
+        const { call } = setup({}, { source: 'http' });
+        await expect(call('github_get_issue', { repo: 'octo/demo', number: 5 })).rejects.toBeInstanceOf(FatalToolError);
+    });
+
+    it('rejects a malformed repo as a tool error', async () => {
+        const { call } = setup();
+        for (const repo of ['octo', 'a/b/c', 'a /b']) {
+            const error = await call('github_get_issue', { repo, number: 5 }).catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(ValidationError);
+            expect(error).not.toBeInstanceOf(FatalToolError);
+        }
+        const error = await call('github_get_issue', { repo: 'octo/demo', number: 0 }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(ValidationError);
+    });
+
+    it('does not leak the token in errors', async () => {
+        const {
+            clock, 
+            fake, 
+            gh, 
+        } = createGithubFixture();
+        const store = new MemoryStore({ clock });
+        const agent = defineAgent({
+            name: 'triage',
+            model: mockModel([
+                {
+                    parts: [{
+                        type: 'tool-call', 
+                        toolName: 'github_get_issue', 
+                        input: { repo: 'octo/demo', number: 99 }, 
+                    }], 
+                },
+                { parts: [{ type: 'text', text: 'no such issue' }] },
+            ]),
+            instructions: 'Triage.',
+            triggers: [githubWebhook({ events: ['issues.opened'] })],
+            tools: () => gh.readTools(),
+        });
+        const engine = new RunEngine({
+            store,
+            agents: [agent],
+            resumeSecret: 'test-secret',
+            clock,
+            onError: () => {},
+        });
+        const { runId } = await engine.dispatch({
+            agent: 'triage',
+            trigger: 'github:issues.opened',
+            source: 'github',
+            payload: {
+                name: 'issues',
+                action: 'opened',
+                delivery: 'd-1',
+                installationId: 42,
+                payload: {},
+            },
+        });
+        await engine.start();
+        await engine.idle();
+        await engine.drain();
+
+        expect((await store.getRun(runId))?.status).toBe('completed');
+        expect(fake.requests.some((r) => r.path === '/repos/octo/demo/issues/99' && r.authorization === 'token ghs_1')).toBe(true);
+        const steps = await store.listSteps(runId);
+        const toolStep = steps.find((s) => s.kind === 'tool');
+        expect(toolStep?.error).toMatchObject({ message: expect.stringContaining('GitHub 404') });
+        const checkpoint = await store.latestCheckpoint(runId);
+        const stored = JSON.stringify({ steps, checkpoint });
+        expect(stored).not.toContain('ghs_');
+        expect(stored.toLowerCase()).not.toContain('authorization');
+    });
+});
