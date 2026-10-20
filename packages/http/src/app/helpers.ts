@@ -62,13 +62,15 @@ function validateRoutes(options: HttpAppOptions): HttpRoute[] {
         if (!STATIC_ROUTE_PATH.test(route.path)) {
             throw new InvalidAgentDefinitionError(`Route path "${route.path}" must be a static path starting with "/".`);
         }
-        const segment = route.path.split('/')[1] ?? '';
-        if (RESERVED_ROUTE_SEGMENTS.includes(segment) || route.path === metricsPath) {
+        // routup matches paths case-insensitively
+        const path = route.path.toLowerCase();
+        const segment = path.split('/')[1] ?? '';
+        if (RESERVED_ROUTE_SEGMENTS.includes(segment) || path === metricsPath?.toLowerCase()) {
             throw new InvalidAgentDefinitionError(`Route path "${route.path}" collides with a built-in route.`);
         }
-        const key = `${route.method} ${route.path}`;
+        const key = `${route.method} ${path}`;
         if (seen.has(key)) {
-            throw new InvalidAgentDefinitionError(`Route "${key}" is registered twice.`);
+            throw new InvalidAgentDefinitionError(`Route "${route.method} ${route.path}" is registered twice.`);
         }
         seen.add(key);
     }

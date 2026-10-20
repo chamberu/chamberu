@@ -106,7 +106,7 @@ This is the "MCP in" half of the [OpenClaw](/deployment/openclaw) integration.
 
 ## Extra routes
 
-`routes` adds routes that other packages provide, served under `basePath` beside the built-in ones. A route is a static path with a method and a fetch-style handler: it gets the request and a `readBody()` that returns the raw bytes (the app's `bodyLimit`, 413 and 415 apply), and answers `{ status, body? }`. Extra routes are not authenticated by `auth`: they check their own credentials, as a webhook checks its signature. Thrown errors render like those of every other route. `rateLimit: false` takes a route out of the rate limit, for senders that never retry a refused request.
+`routes` adds routes that other packages provide, served under `basePath` beside the built-in ones. A route is a static path with a method and a fetch-style handler: it gets the request and a `readBody()` that returns the raw bytes (the app's `bodyLimit`, 413 and 415 apply), and answers `{ status, body? }` (an object, array, number or boolean as JSON, a string as `text/plain`, no `body` or `null` as an empty body). Extra routes are not authenticated by `auth`: they check their own credentials, as a webhook checks its signature. Thrown errors render like those of every other route. `rateLimit: false` takes a route out of the rate limit, for senders that never retry a refused request. Paths match case-insensitively, like routup's routing: a route may not differ from a built-in segment or another route only by case.
 
 ## Operations
 

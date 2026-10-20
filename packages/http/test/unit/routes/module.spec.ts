@@ -90,6 +90,21 @@ describe('extra routes', () => {
         expect((await send(app, '/limited')).status).toBe(429);
     });
 
+    it('skips the rate limiter whatever the case of the request path (routup matches case-insensitively)', async () => {
+        const { app } = createTestApp({
+            basePath: '/api',
+            rateLimit: { max: 1 },
+            routes: [
+                route({ path: '/open', rateLimit: false }),
+                route({ path: '/Mixed', rateLimit: false }),
+            ],
+        });
+        expect((await send(app, '/API/Open')).status).toBe(202);
+        expect((await send(app, '/api/OPEN')).status).toBe(202);
+        expect((await send(app, '/api/mixed')).status).toBe(202);
+        expect((await send(app, '/Api/MIXED')).status).toBe(202);
+    });
+
     it('hands the raw body bytes', async () => {
         let received: string | undefined;
         const { app } = createTestApp({
@@ -192,6 +207,9 @@ describe('extra routes', () => {
         ...['agents', 'runs', 'resume', 'hooks', 'mcp', 'healthz', 'readyz', 'schedules']
             .map((segment): [string, HttpRoute[]] => [`the reserved segment ${segment}`, [route({ path: `/${segment}/x` })]]),
         ['the metrics path', [route({ method: 'GET', path: '/metrics' })]],
+        ['a reserved segment in another case', [route({ path: '/AGENTS/x' })]],
+        ['the metrics path in another case', [route({ method: 'GET', path: '/Metrics' })]],
+        ['a duplicate path in another case', [route(), route({ path: '/EXTRA' })]],
     ])('refuses %s at construction', (_name, routes) => {
         expect(() => createTestApp({ metrics: undefined, routes })).toThrow(InvalidAgentDefinitionError);
     });

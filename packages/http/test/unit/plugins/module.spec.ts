@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { App, IAppEvent } from 'routup';
-import { routeLabel } from '../../../src/plugins/helpers.ts';
+import { isOperationalPath, isStreamRequest, routeLabel } from '../../../src/plugins/helpers.ts';
 import {
     ADMIN_TOKEN,
     call,
@@ -219,5 +219,20 @@ describe('route labels', () => {
     it('labels an extra route under basePath', () => {
         const event = { method: 'POST', path: '/api/webhooks/github' } as IAppEvent;
         expect(routeLabel(event, '/api', '/metrics', ['/webhooks/github'])).toBe('/webhooks/github');
+    });
+
+    it('labels a path in another case like routup matches it', () => {
+        const label = (path: string, basePath = '', extra: string[] = []) => routeLabel({ method: 'POST', path } as IAppEvent, basePath, '/metrics', extra);
+        expect(label('/Webhooks/GitHub', '', ['/webhooks/github'])).toBe('/webhooks/github');
+        expect(label('/API/webhooks/github', '/api', ['/webhooks/github'])).toBe('/webhooks/github');
+        expect(label('/RUNS/abc')).toBe('/runs/:id');
+        expect(label('/HEALTHZ')).toBe('/healthz');
+    });
+
+    it('treats operational paths and the stream in any case', () => {
+        const event = (method: string, path: string) => ({ method, path } as IAppEvent);
+        expect(isOperationalPath(event('GET', '/HEALTHZ'), '', '/metrics')).toBe(true);
+        expect(isOperationalPath(event('GET', '/Api/Metrics'), '/api', '/metrics')).toBe(true);
+        expect(isStreamRequest(event('GET', '/RUNS/abc/Stream'), '')).toBe(true);
     });
 });

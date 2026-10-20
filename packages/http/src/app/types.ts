@@ -91,7 +91,10 @@ export type HttpRouteRequest = {
 
 export type HttpRouteResult = {
     status: number;
-    /** Sent as JSON; none for an empty body. */
+    /**
+     * Objects, arrays, numbers and booleans are sent as JSON, a string as
+     * `text/plain`; `undefined` or `null` answer an empty body.
+     */
     body?: unknown;
 };
 
