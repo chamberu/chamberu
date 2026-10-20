@@ -30,6 +30,8 @@ The engine renders the source, trigger id and payload as a JSON block and makes 
 
 `thread` is stored on the run. Loading the history of earlier runs of the same thread is planned for the mail digest milestone.
 
+`invoker` is who started the run. Only an intake layer sets it, from its authenticated caller (`@chamberu/http` fills it from the principal), never from a payload. It is not part of the rendered block, so the model never sees it. See [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker).
+
 ## Attachments
 
 `dispatch()` also takes files for the model, `attachments: [{ mediaType, filename?, data }]` with `data` a `Uint8Array`:

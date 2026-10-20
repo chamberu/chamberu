@@ -37,4 +37,8 @@ describe('staticTokens', () => {
         expect(() => staticTokens({ tokens: { short: { id: 'x', permissions: [] } } })).toThrow(InvalidAgentDefinitionError);
         expect(() => staticTokens({ tokens: {} })).toThrow(InvalidAgentDefinitionError);
     });
+
+    it('rejects a token without an id', () => {
+        expect(() => staticTokens({ tokens: { [TOKEN]: { id: '', permissions: [] } } })).toThrow(InvalidAgentDefinitionError);
+    });
 });
