@@ -10,5 +10,6 @@ export * from './manager/index.ts';
 export * from './output/index.ts';
 export * from './path/index.ts';
 export * from './provider/index.ts';
+export * from './remote/index.ts';
 export * from './repo/index.ts';
 export * from './workspace/index.ts';

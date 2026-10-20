@@ -20,6 +20,7 @@ describe('public api', () => {
         'parseMemory',
         'assertSandboxEnv',
         'createWorkspaceManager',
+        'createRemoteWorkspace',
     ])('exports %s', (name) => {
         expect(sandbox).toHaveProperty(name);
         expect(sandbox[name as keyof typeof sandbox]).toBeTypeOf('function');
@@ -68,6 +69,11 @@ describe('public api', () => {
         expect(sandbox.GC_INTERVAL_MS).toBe(600_000);
     });
 
+    it('exports the remote constants', () => {
+        expect(sandbox.TIMEOUT_KILL_AFTER_SECONDS).toBe(5);
+        expect(sandbox.EXEC_GRACE_MS).toBe(15_000);
+    });
+
     it('freezes the shared constants', () => {
         expect(Object.isFrozen(sandbox.SANDBOX_ENV)).toBe(true);
         expect(Object.isFrozen(sandbox.SANDBOX_LABELS)).toBe(true);
@@ -77,6 +83,8 @@ describe('public api', () => {
     it.each([
         'checkoutCommands',
         'createWorkspaceTools',
+        'wrapTimeout',
+        'isTimeoutExit',
     ])('keeps %s internal', (name) => {
         expect(sandbox).not.toHaveProperty(name);
     });
