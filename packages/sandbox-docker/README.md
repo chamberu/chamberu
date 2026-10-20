@@ -101,7 +101,7 @@ Every command runs as `timeout -k 5 <seconds> <argv>`; GNU `timeout` signals its
 
 An abort (`signal`) **detaches**: dockerode tears down the exec stream, and the command runs on until its `timeout` fires or the workspace is disposed. Every settled run disposes its workspaces (`manager.attach(engine)`), and a drain is followed by `manager.close()`, so nothing outlives the run for long. A dispose removes the container, which kills whatever still runs.
 
-dockerode sets no request timeout by default, so a hanging daemon stalls a create or a removal. `manager.close()` gives up after its `timeoutMs` (30 s) and reports what is left; to bound every request, pass a client with a timeout: `createDockerSandbox({ docker: new Docker({ timeout: 60_000 }) })` (in ms, longer than your slowest image pull).
+A create's `signal` (aborted by `release(runId)` and `manager.close()`) drops its requests: the image pull (the daemon may finish it on its own), the container create (a container the daemon made anyway is removed) and the start. dockerode sets no request timeout by default, so a hanging daemon stalls a create or a removal. `manager.close()` gives up after its `timeoutMs` (30 s) and reports what is left; to bound every request, pass a client with a timeout: `createDockerSandbox({ docker: new Docker({ timeout: 60_000 }) })` (in ms, longer than your slowest image pull).
 
 ## Garbage collection
 

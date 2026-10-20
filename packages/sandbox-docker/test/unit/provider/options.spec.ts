@@ -5,11 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { 
-    describe, 
-    expect, 
-    it, 
-    vi, 
+import { PassThrough } from 'node:stream';
+import {
+    describe,
+    expect,
+    it,
+    vi,
 } from 'vitest';
 import { InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
 import { createDockerSandbox } from '@chamberu/sandbox-docker';
@@ -72,5 +73,87 @@ describe('docker sandbox create without a daemon', () => {
             .rejects.toThrow('workspace creation aborted');
         expect(docker.pull).not.toHaveBeenCalled();
         expect(docker.createContainer).not.toHaveBeenCalled();
+    });
+});
+
+/** Rejects like dockerode once `signal` aborts; never settles before. */
+function untilAborted(signal: AbortSignal | undefined): Promise<never> {
+    return new Promise<never>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })), { once: true });
+    });
+}
+
+describe('docker sandbox create aborted in flight', () => {
+    it('stops an image pull', async () => {
+        const stream = new PassThrough();
+        const docker = {
+            createContainer: vi.fn(async () => { throw new Error('create must not run'); }),
+            getContainer: vi.fn(),
+            listContainers: vi.fn(async () => []),
+            pull: vi.fn<(image: string, options: { abortSignal?: AbortSignal }) => Promise<PassThrough>>(async () => stream),
+            modem: {
+                demuxStream: vi.fn(),
+                // like docker-modem: done once the progress stream ends
+                followProgress: vi.fn((progress: PassThrough, done: (error: Error | null, output: unknown[]) => void) => {
+                    progress.on('end', () => done(null, []));
+                }),
+            },
+        };
+        const controller = new AbortController();
+        const provider = createDockerSandbox({ docker: docker as never, pull: 'always' });
+
+        const creating = provider.create({ runId: 'run-1', signal: controller.signal });
+        await vi.waitFor(() => expect(docker.modem.followProgress).toHaveBeenCalled());
+        controller.abort();
+        await expect(creating).rejects.toThrow('workspace creation aborted');
+        expect(docker.pull.mock.calls[0]![1].abortSignal).toBeInstanceOf(AbortSignal);
+        expect(stream.destroyed).toBe(true);
+        expect(docker.createContainer).not.toHaveBeenCalled();
+    });
+
+    it('stops a container start and removes the container', async () => {
+        const remove = vi.fn(async () => undefined);
+        const container = {
+            id: 'c1',
+            start: vi.fn((options?: { abortSignal?: AbortSignal }) => untilAborted(options?.abortSignal)),
+            remove,
+        };
+        const docker = {
+            createContainer: vi.fn<(options: { abortSignal?: AbortSignal }) => Promise<typeof container>>(async () => container),
+            getContainer: vi.fn(() => container),
+            listContainers: vi.fn(async () => []),
+            pull: vi.fn(),
+            modem: { demuxStream: vi.fn(), followProgress: vi.fn() },
+        };
+        const controller = new AbortController();
+        const provider = createDockerSandbox({ docker: docker as never, pull: 'never' });
+
+        const creating = provider.create({ runId: 'run-1', signal: controller.signal });
+        await vi.waitFor(() => expect(container.start).toHaveBeenCalled());
+        controller.abort();
+        await expect(creating).rejects.toThrow('workspace creation aborted');
+        expect(docker.createContainer.mock.calls[0]![0].abortSignal).toBeInstanceOf(AbortSignal);
+        expect(remove).toHaveBeenCalled();
+    });
+
+    it('removes a container whose create request was aborted', async () => {
+        const remove = vi.fn(async () => undefined);
+        const docker = {
+            createContainer: vi.fn((options: { abortSignal?: AbortSignal }) => untilAborted(options.abortSignal)),
+            getContainer: vi.fn(() => ({ remove })),
+            listContainers: vi.fn(async () => []),
+            pull: vi.fn(),
+            modem: { demuxStream: vi.fn(), followProgress: vi.fn() },
+        };
+        const controller = new AbortController();
+        const provider = createDockerSandbox({ docker: docker as never, pull: 'never' });
+
+        const creating = provider.create({ runId: 'run-1', signal: controller.signal });
+        await vi.waitFor(() => expect(docker.createContainer).toHaveBeenCalled());
+        controller.abort();
+        await expect(creating).rejects.toThrow('workspace creation aborted');
+        // the daemon may have made it before the request was dropped
+        expect(docker.getContainer).toHaveBeenCalledWith(expect.stringMatching(/^chamberu-ws-/));
+        expect(remove).toHaveBeenCalledWith({ force: true, v: true });
     });
 });

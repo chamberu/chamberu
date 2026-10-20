@@ -27,6 +27,7 @@ import Docker from 'dockerode';
 import { createDockerTransport } from '../transport/module.ts';
 import { DEFAULT_NETWORK } from './constants.ts';
 import {
+    abortedCreate,
     assertDockerOptions,
     buildContainerOptions,
     collectionError,
@@ -54,21 +55,39 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
     const clock = options.clock ?? systemClock;
     const live = new Map<string, IWorkspace>();
 
-    async function createContainer(createOptions: Docker.ContainerCreateOptions, imageName: string): Promise<Docker.Container> {
-        if (pull === 'always') await pullImage(docker, imageName);
+    /** Creates the container, pulling its image first as `pull` says; `signal` drops every request. */
+    async function createContainer(
+        createOptions: Docker.ContainerCreateOptions,
+        imageName: string,
+        signal: AbortSignal | undefined,
+    ): Promise<Docker.Container> {
+        const attempt = async (): Promise<Docker.Container> => {
+            try {
+                return await docker.createContainer(signal ? { ...createOptions, abortSignal: signal } : createOptions);
+            } catch (error) {
+                if (!signal?.aborted) throw error;
+                // the daemon may have made it before the request was dropped
+                if (createOptions.name) await removeContainer(docker.getContainer(createOptions.name)).catch(() => undefined);
+                throw abortedCreate(error);
+            }
+        };
+
+        if (pull === 'always') await pullImage(docker, imageName, signal);
         try {
-            return await docker.createContainer(createOptions);
+            return await attempt();
         } catch (error) {
+            if (error instanceof SandboxError) throw error;
             if (pull !== 'missing' || !isMissingImage(error)) {
                 throw new SandboxError(`cannot create a workspace container from ${imageName}: ${dockerMessage(error)}`, { cause: error });
             }
         }
 
         // the image is not present: pull it once, then try again
-        await pullImage(docker, imageName);
+        await pullImage(docker, imageName, signal);
         try {
-            return await docker.createContainer(createOptions);
+            return await attempt();
         } catch (error) {
+            if (error instanceof SandboxError) throw error;
             throw new SandboxError(`cannot create a workspace container from ${imageName}: ${dockerMessage(error)}`, { cause: error });
         }
     }
@@ -101,7 +120,7 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
                 env: { ...options.env, ...input.env },
                 limits,
                 expiresAt,
-            }), imageName);
+            }), imageName, input.signal);
 
             const info: WorkspaceInfo = {
                 runId: input.runId,
@@ -135,9 +154,9 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
             live.set(id, workspace);
 
             try {
-                await container.start();
+                await container.start(input.signal ? { abortSignal: input.signal } : {});
                 if (input.signal?.aborted) {
-                    throw new SandboxError('workspace creation aborted');
+                    throw abortedCreate();
                 }
                 const { commit } = await prepareWorkspace(workspace, {
                     repo: input.repo,
@@ -148,6 +167,7 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
             } catch (error) {
                 await workspace.dispose().catch(() => undefined);
                 if (error instanceof ChamberuError) throw error;
+                if (input.signal?.aborted) throw abortedCreate(error);
                 throw new SandboxError(`cannot start workspace container ${id}: ${dockerMessage(error)}`, { cause: error });
             }
             return workspace;

@@ -97,12 +97,31 @@ export async function removeContainer(container: Dockerode.Container): Promise<v
     }
 }
 
-/** Pulls an image to the end of its progress stream; SandboxError naming the image on any failure. */
-export async function pullImage(docker: Dockerode, image: string): Promise<void> {
+/** The error of a create that `signal` stopped. */
+export function abortedCreate(cause?: unknown): SandboxError {
+    return new SandboxError('workspace creation aborted', cause === undefined ? undefined : { cause });
+}
+
+/**
+ * Pulls an image to the end of its progress stream; SandboxError naming the
+ * image on any failure. `signal` drops the request and the progress stream
+ * (the daemon may finish the pull on its own).
+ */
+export async function pullImage(docker: Dockerode, image: string, signal?: AbortSignal): Promise<void> {
     try {
-        const stream = await docker.pull(image) as NodeJS.ReadableStream;
+        const stream = await docker.pull(image, signal ? { abortSignal: signal } : {}) as NodeJS.ReadableStream & { destroy?(): void };
         await new Promise<void>((resolve, reject) => {
+            const onAbort = () => {
+                stream.destroy?.();
+                reject(abortedCreate());
+            };
+            if (signal?.aborted) {
+                onAbort();
+                return;
+            }
+            signal?.addEventListener('abort', onAbort, { once: true });
             docker.modem.followProgress(stream, (error: Error | null, output: Array<{ error?: unknown }>) => {
+                signal?.removeEventListener('abort', onAbort);
                 const failed = (output ?? []).find((event) => typeof event?.error === 'string');
                 if (error) {
                     reject(error);
@@ -114,6 +133,7 @@ export async function pullImage(docker: Dockerode, image: string): Promise<void>
             });
         });
     } catch (error) {
+        if (signal?.aborted) throw abortedCreate(error);
         throw new SandboxError(`cannot pull the image ${image}: ${dockerMessage(error)}`, { cause: error });
     }
 }
