@@ -5,7 +5,14 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+export type StaticToken = {
+    /** The bearer token, at least 16 characters; unique across the list. */
+    value: string;
+    /** The principal it stands for; several tokens may share one (rotation). */
+    id: string;
+    permissions: readonly string[];
+};
+
 export type StaticTokensOptions = {
-    /** Bearer token (at least 16 characters) to the principal it stands for. */
-    tokens: Record<string, { id: string; permissions: readonly string[] }>;
+    tokens: StaticToken[];
 };

@@ -54,10 +54,18 @@ describe('POST /agents/:name/runs', () => {
         const high = 'high-runner-token-0123456789';
         const { app, store } = createRunTestApp({
             auth: [staticTokens({
-                tokens: {
-                    [low]: { id: 'u-low', permissions: ['agent:echo:run'] },
-                    [high]: { id: 'u-high', permissions: ['agent:echo:run', 'tool:echo:*'] },
-                },
+                tokens: [
+                    {
+                        value: low,
+                        id: 'u-low',
+                        permissions: ['agent:echo:run'],
+                    },
+                    {
+                        value: high,
+                        id: 'u-high',
+                        permissions: ['agent:echo:run', 'tool:echo:*'],
+                    },
+                ],
             })],
         });
         const start = async (token: string) => (await call(app, 'POST', '/agents/echo/runs', { token, body: { idempotencyKey: 'issue-42' } })).json();

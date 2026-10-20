@@ -72,9 +72,9 @@ export function createGithubFixture(github: Partial<GithubAppOptions> = {}) {
  */
 export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
     const {
-        clock, 
-        fake, 
-        gh, 
+        clock,
+        fake,
+        gh,
     } = createGithubFixture(input.github);
     const agents = typeof input.agents === 'function' ? input.agents(gh) : input.agents;
     const engineAgents = typeof input.engineAgents === 'function' ?
@@ -99,7 +99,13 @@ export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
         store,
         agents,
         clock,
-        auth: [staticTokens({ tokens: { 'admin-token-0123456789': { id: 'admin', permissions: ['*'] } } })],
+        auth: [staticTokens({
+            tokens: [{
+                value: 'admin-token-0123456789',
+                id: 'admin',
+                permissions: ['*'],
+            }],
+        })],
         metrics: false,
         rateLimit: input.rateLimit ?? false,
         ...(input.bodyLimit !== undefined ? { bodyLimit: input.bodyLimit } : {}),

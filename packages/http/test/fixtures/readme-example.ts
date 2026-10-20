@@ -32,7 +32,13 @@ export async function createAgentServer(model: LanguageModel) {
         engine,
         store,
         agents,
-        auth: staticTokens({ tokens: { [token]: { id: 'ci', permissions: ['*'] } } }),
+        auth: staticTokens({
+            tokens: [{
+                value: token,
+                id: 'ci',
+                permissions: ['*'],
+            }],
+        }),
         shutdown,
     });
 
