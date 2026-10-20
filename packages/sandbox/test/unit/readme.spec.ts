@@ -7,7 +7,7 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MemoryStore, RunEngine } from '@chamberu/core';
+import { Engine, MemoryStore } from '@chamberu/core';
 import { createWorkspaces } from '../fixtures/readme-example.ts';
 import { createFakeProvider } from '../utils/provider.ts';
 
@@ -21,7 +21,7 @@ describe('README example', () => {
     });
 
     it('builds a manager attached to the engine', async () => {
-        const engine = new RunEngine({
+        const engine = new Engine({
             store: new MemoryStore(),
             agents: [],
             resumeSecret: 'readme-resume-secret',

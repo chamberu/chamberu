@@ -1,6 +1,6 @@
 import type { LanguageModel } from 'ai';
 import type { IStore } from '@chamberu/core';
-import { RunEngine, defineAgent, http } from '@chamberu/core';
+import { Engine, defineAgent, http } from '@chamberu/core';
 import { codingTools } from '@chamberu/coding';
 import { createWorkspaceManager } from '@chamberu/sandbox';
 import type { ISandboxProvider } from '@chamberu/sandbox';
@@ -25,7 +25,7 @@ export async function serve(store: IStore, model: LanguageModel, provider: ISand
         approvals: { bash: 'user' },
     });
 
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [repro],
         resumeSecret: 'change-me',

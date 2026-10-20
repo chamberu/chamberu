@@ -56,13 +56,13 @@ The coding tools (`read_file`, `edit_file`, `bash`, `git_diff`, ...) live in [`@
 `createWorkspaceManager()` holds a run's workspaces; `attach(engine)` disposes them once the run completed, failed or was cancelled:
 
 ```typescript
-import type { RunEngine } from '@chamberu/core';
+import type { Engine } from '@chamberu/core';
 import { createWorkspaceManager } from '@chamberu/sandbox';
 import type { ISandboxProvider, IWorkspaceManager } from '@chamberu/sandbox';
 
 export function createWorkspaces(
     provider: ISandboxProvider,
-    engine: Pick<RunEngine, 'on'>,
+    engine: Pick<Engine, 'on'>,
 ): IWorkspaceManager {
     const workspaces = createWorkspaceManager({
         provider,

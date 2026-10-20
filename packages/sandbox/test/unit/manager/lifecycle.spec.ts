@@ -12,8 +12,8 @@ import {
     it, 
 } from 'vitest';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     RunStatus,
     SandboxError,
     defineAgent,
@@ -26,7 +26,7 @@ import type { MockResponse } from '../../utils/model.ts';
 import { createFakeProvider } from '../../utils/provider.ts';
 import type { FakeProvider } from '../../utils/provider.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 afterEach(() => {
     for (const engine of engines) engine.stop();
@@ -66,7 +66,7 @@ async function run(s: Setup) {
         tools: manager.tools(),
         approvals: s.approvals,
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret: 'secret',
@@ -100,7 +100,7 @@ function fakeEngine() {
         on: ((type: string, listener: (e: Extract<RunEvent, { type: 'run.updated' }>) => void) => {
             if (type === 'run.updated') listeners.add(listener);
             return () => { listeners.delete(listener); };
-        }) as RunEngine['on'],
+        }) as Engine['on'],
         emit(run: Pick<Run, 'id' | 'status'>) {
             for (const listener of listeners) listener({ type: 'run.updated', run: run as Run });
         },

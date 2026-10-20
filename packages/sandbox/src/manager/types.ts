@@ -6,7 +6,7 @@
  */
 
 import type { ToolSet } from 'ai';
-import type { IClock, RunEngine } from '@chamberu/core';
+import type { Engine, IClock } from '@chamberu/core';
 import type { ISandboxProvider, SandboxLimits } from '../provider/types.ts';
 import type { IWorkspace } from '../workspace/types.ts';
 
@@ -71,7 +71,7 @@ export interface IWorkspaceManager {
      * Disposes a run's workspaces on completed | failed | cancelled. Returns the
      * unsubscribe; after close() it subscribes nothing.
      */
-    attach(engine: Pick<RunEngine, 'on'>): () => void;
+    attach(engine: Pick<Engine, 'on'>): () => void;
     /** `create_workspace` and `dispose_workspace`. */
     tools(): ToolSet;
     /** Disposes the manager's expired workspaces, then runs the provider's collection; returns how many went. */

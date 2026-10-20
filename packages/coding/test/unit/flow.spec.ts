@@ -15,7 +15,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import { MemoryStore, RunEngine, defineAgent } from '@chamberu/core';
+import { Engine, MemoryStore, defineAgent } from '@chamberu/core';
 import { codingTools } from '@chamberu/coding';
 import { createWorkspaceManager } from '@chamberu/sandbox';
 import type { ExecResult } from '@chamberu/sandbox';
@@ -63,7 +63,7 @@ describe('coding flow (local)', () => {
             tools: { ...manager.tools(), ...codingTools(manager) },
         });
         const store = new MemoryStore();
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents: [agent],
             resumeSecret: 'secret',
