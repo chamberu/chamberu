@@ -20,6 +20,19 @@ export function killGroup(pid: number): void {
     }
 }
 
+/**
+ * Whether the process group led by `pid` still has a member this user may
+ * signal. A group of another user (EPERM) is not ours: its id was reused.
+ */
+export function groupAlive(pid: number): boolean {
+    try {
+        process.kill(-pid, 0);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /** The exit code a shell reports: the code, or 128 + the signal number. */
 export function exitCodeOf(code: number | null, signal: NodeJS.Signals | null): number {
     if (code !== null) return code;

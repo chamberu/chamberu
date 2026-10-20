@@ -23,6 +23,14 @@ export const REPO_DIR = 'repo';
  */
 export const KILL_GRACE_MS = 2_000;
 
+/**
+ * How often a workspace checks that the process groups of its background
+ * jobs still exist, and forgets the ended ones: a group id is only reused
+ * once every member of the group is gone, so the dispose never kills a
+ * group that is no longer the command's.
+ */
+export const LINGER_CHECK_MS = 1_000;
+
 /** PATH when the host has none. */
 export const FALLBACK_PATH = '/usr/local/bin:/usr/bin:/bin';
 

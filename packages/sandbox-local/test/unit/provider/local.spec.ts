@@ -25,6 +25,7 @@ import {
 import { InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
 import { createLocalSandbox } from '@chamberu/sandbox-local';
 import { ControllableClock, createGitFixture } from '@chamberu/test-kit';
+import { KILL_GRACE_MS, LINGER_CHECK_MS } from '../../../src/provider/constants.ts';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
@@ -159,6 +160,57 @@ describe('local sandbox', () => {
             await workspace.dispose();
             await waitFor(async () => (isAlive(pid) ? undefined : true), 2_000);
         } finally {
+            await workspace.dispose();
+        }
+    }, 30_000);
+
+    it('kills a background job with redirected output on dispose', async () => {
+        const workspace = await createLocalSandbox({ root }).create({ runId: 'r1' });
+        const pidFile = join(tmp, 'pid');
+        try {
+            const result = await workspace.exec(['sh', '-c', 'sleep 60 > /dev/null 2>&1 & echo $! > "$1"', 'sh', pidFile]);
+            expect(result.exitCode).toBe(0);
+
+            const pid = Number((await readFile(pidFile, 'utf8')).trim());
+            expect(isAlive(pid)).toBe(true);
+            await workspace.dispose();
+            await waitFor(async () => (isAlive(pid) ? undefined : true), 2_000);
+        } finally {
+            await workspace.dispose();
+        }
+    }, 30_000);
+
+    it('forgets the group of a background job once it ended, so a reused id is never killed', async () => {
+        const clock = new ControllableClock();
+        const workspace = await createLocalSandbox({ root, clock }).create({ runId: 'r1' });
+        const pidFile = join(tmp, 'pid');
+        try {
+            // the job holds the output past the grace: the exec settles on the clock
+            const pending = workspace.exec(['sh', '-c', 'echo $$ > "$1"; sleep 1 &', 'sh', pidFile]);
+            const group = await waitFor(async () => {
+                const text = await readFile(pidFile, 'utf8').catch(() => '');
+                return text.trim() ? Number(text.trim()) : undefined;
+            });
+            await sleep(300);
+            clock.advance(KILL_GRACE_MS);
+            expect((await pending).exitCode).toBe(0);
+
+            // the job ends, and with it its group
+            await waitFor(async () => {
+                try {
+                    process.kill(-group, 0);
+                    return undefined;
+                } catch {
+                    return true;
+                }
+            }, 5_000);
+            clock.advance(LINGER_CHECK_MS);
+
+            const kill = vi.spyOn(process, 'kill');
+            await workspace.dispose();
+            expect(kill).not.toHaveBeenCalledWith(-group, 'SIGKILL');
+        } finally {
+            vi.restoreAllMocks();
             await workspace.dispose();
         }
     }, 30_000);

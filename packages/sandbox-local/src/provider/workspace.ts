@@ -32,12 +32,13 @@ import type {
     IWorkspace,
     WorkspaceInfo,
 } from '@chamberu/sandbox';
-import { KILL_GRACE_MS, REPO_DIR } from './constants.ts';
+import { KILL_GRACE_MS, LINGER_CHECK_MS, REPO_DIR } from './constants.ts';
 import {
     assertArgv,
     displayPath,
     errnoCode,
     exitCodeOf,
+    groupAlive,
     killGroup,
 } from './helpers.ts';
 import type { LocalWorkspaceInput } from './types.ts';
@@ -49,8 +50,11 @@ type LiveExec = { fail(error: SandboxError): void };
  * (`detached`), so a timeout, an abort or a dispose kills every process the
  * command started. A command that exits while a background job of it holds
  * its output settles `KILL_GRACE_MS` later with its own exit code; the job
- * runs on until the dispose, as on Docker and Kubernetes. No isolation: the
- * command runs as the host user.
+ * runs on until the dispose, as on Docker and Kubernetes. The workspace
+ * remembers the group of every command that exited while a job of it still
+ * ran and forgets it once the group ended (checked every `LINGER_CHECK_MS`),
+ * so the dispose kills the jobs but never a group that reused the id. No
+ * isolation: the command runs as the host user.
  */
 export class LocalWorkspace implements IWorkspace {
     readonly id: string;
@@ -69,8 +73,11 @@ export class LocalWorkspace implements IWorkspace {
 
     protected readonly live = new Set<LiveExec>();
 
-    /** Process groups of finished execs whose background jobs held the output; the dispose kills them. */
+    /** Process groups of finished execs whose background jobs still ran; the dispose kills them. */
     protected readonly lingering = new Set<number>();
+
+    /** Forgets the lingering groups that ended, while there are any. */
+    protected lingerTimer: { clear(): void } | undefined;
 
     protected disposing: Promise<void> | undefined;
 
@@ -196,7 +203,11 @@ export class LocalWorkspace implements IWorkspace {
         for (const entry of [...this.live]) {
             entry.fail(new SandboxError('workspace disposed'));
         }
-        for (const pid of this.lingering) killGroup(pid);
+        this.lingerTimer?.clear();
+        this.lingerTimer = undefined;
+        for (const pid of this.lingering) {
+            if (groupAlive(pid)) killGroup(pid);
+        }
         this.lingering.clear();
         this.onDispose();
         try {
@@ -232,6 +243,24 @@ export class LocalWorkspace implements IWorkspace {
 
     protected goneMessage(): string {
         return `workspace ${this.id} is gone (its directory was removed); call create_workspace for a new one.`;
+    }
+
+    /** Remembers the group of an exec whose command exited while a job of it runs on. */
+    protected linger(pid: number): void {
+        // the leader was reaped: a live member is a job, and the id cannot be reused while it lives
+        if (this.disposing || !groupAlive(pid)) return;
+        this.lingering.add(pid);
+        this.lingerTimer ??= this.clock.setTimeout(() => this.checkLingering(), LINGER_CHECK_MS);
+    }
+
+    protected checkLingering(): void {
+        this.lingerTimer = undefined;
+        for (const pid of this.lingering) {
+            if (!groupAlive(pid)) this.lingering.delete(pid);
+        }
+        if (this.lingering.size > 0 && !this.disposing) {
+            this.lingerTimer = this.clock.setTimeout(() => this.checkLingering(), LINGER_CHECK_MS);
+        }
     }
 
     /** The requested timeout (default `EXEC_TIMEOUT_MS`), at most `EXEC_TIMEOUT_MAX_MS` and never past the expiry. */
@@ -340,12 +369,10 @@ export class LocalWorkspace implements IWorkspace {
             child.on('exit', () => {
                 if (settled || timedOut) return;
                 // the command finished on its own: no timeout any more, but a
-                // background job it started may hold the pipes open
+                // background job it started may run on and hold the pipes open
                 killTimer?.clear();
-                pipeTimer = this.clock.setTimeout(() => {
-                    if (child.pid !== undefined) this.lingering.add(child.pid);
-                    closePipes();
-                }, KILL_GRACE_MS);
+                if (child.pid !== undefined) this.linger(child.pid);
+                pipeTimer = this.clock.setTimeout(closePipes, KILL_GRACE_MS);
             });
 
             child.on('close', (code, closeSignal) => {
