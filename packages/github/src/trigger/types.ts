@@ -38,7 +38,11 @@ export type GithubWebhookTriggerOptions = {
     id?: string;
     /** Runs after the event match; a delivery it refuses starts no run of this trigger. */
     filter?: (event: GithubEvent) => boolean;
-    /** Default: the delivery id (applied by the route). */
+    /**
+     * Default: the delivery id (applied by the route). The signature does not
+     * cover that header, so a replayed body under a new id is a new run;
+     * derive the key from the content on an exposed endpoint.
+     */
     idempotencyKey?: (event: GithubEvent) => string | undefined;
     /** Default: `<full_name>#<issue|pull_request number>`, else `<full_name>`. */
     concurrencyKey?: (event: GithubEvent) => string | undefined;
