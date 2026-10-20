@@ -16,6 +16,9 @@ import {
     normalizeInstallationId,
     normalizeSecrets,
 } from './helpers.ts';
+import { verifySignature } from '../webhook/helpers.ts';
+import { createWebhookRoute } from '../webhook/module.ts';
+import type { GithubWebhookRouteOptions } from '../webhook/types.ts';
 import type { GithubAppOptions, GithubOctokit, IGithubApp } from './types.ts';
 
 /**
@@ -26,7 +29,7 @@ import type { GithubAppOptions, GithubOctokit, IGithubApp } from './types.ts';
 export function createGithubApp(options: GithubAppOptions): IGithubApp {
     const appId = normalizeAppId(options.appId);
     const key = normalizePrivateKey(options.privateKey);
-    normalizeSecrets(options.webhookSecret);
+    const secrets = normalizeSecrets(options.webhookSecret);
     const installationId = normalizeInstallationId(options.installationId);
     const clock = options.clock ?? systemClock;
     const baseUrl = (options.baseUrl ?? DEFAULT_GITHUB_API_URL).replace(/\/+$/, '');
@@ -42,7 +45,7 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
 
     let login: Promise<string> | undefined = options.slug ? Promise.resolve(`${options.slug}[bot]`) : undefined;
 
-    return {
+    const app: IGithubApp = {
         appId,
         ...(installationId !== undefined ? { installationId } : {}),
         async octokit(id: number): Promise<GithubOctokit> {
@@ -68,5 +71,12 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
             }
             return login;
         },
+        verifySignature(body: Uint8Array, signature: string | null): boolean {
+            return verifySignature(secrets, body, signature);
+        },
+        webhookRoute(routeOptions?: GithubWebhookRouteOptions) {
+            return createWebhookRoute(app, routeOptions);
+        },
     };
+    return app;
 }

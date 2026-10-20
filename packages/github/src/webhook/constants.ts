@@ -1,0 +1,15 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+/** `X-GitHub-Event`: GitHub's event names are lower case with underscores. */
+export const EVENT_HEADER_PATTERN = /^[a-z_]+$/;
+
+/** Longest delivery id and derived key; the store's key columns are varchar(255). */
+export const KEY_MAX_LENGTH = 255;
+
+/** `X-Hub-Signature-256`: `sha256=` and 64 lower-case hex digits. */
+export const SIGNATURE_PATTERN = /^sha256=([0-9a-f]{64})$/;

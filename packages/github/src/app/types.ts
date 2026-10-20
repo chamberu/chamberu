@@ -6,6 +6,8 @@
  */
 
 import type { IClock } from '@chamberu/core';
+import type { HttpRoute } from '@chamberu/http';
+import type { GithubWebhookRouteOptions } from '../webhook/types.ts';
 import type { PaginatedOctokit } from './helpers.ts';
 
 export type GithubAppOptions = {
@@ -34,4 +36,8 @@ export interface IGithubApp {
     octokit(installationId: number): Promise<GithubOctokit>;
     /** `<slug>[bot]`, from `slug` or one `GET /app`; cached, single-flight. */
     botLogin(): Promise<string>;
+    /** `sha256=<hex>` of the raw body under any webhook secret, compared in constant time. */
+    verifySignature(body: Uint8Array, signature: string | null): boolean;
+    /** The webhook route for `createHttpApp({ routes })`: `POST /webhooks/github` unless `path` is given. */
+    webhookRoute(options?: GithubWebhookRouteOptions): HttpRoute;
 }
