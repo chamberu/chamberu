@@ -146,11 +146,9 @@ describe('attachments at dispatch', () => {
         }));
         const run = (await ctx.store.getRun(runId))!;
         const listed = await ctx.store.listArtifacts(runId);
-        expect(listed).toHaveLength(2);
-        // equal createdAt: the listing breaks the tie by id
-        expect(listed).toEqual(expect.arrayContaining(run.trigger.attachments!));
+        expect(listed).toEqual(run.trigger.attachments);
         expect(run.trigger.attachments?.[0]).toEqual({
-            id: expect.any(String),
+            id: `${runId}.0000`,
             runId,
             agent: 'vision',
             mediaType: 'image/png',
@@ -161,6 +159,59 @@ describe('attachments at dispatch', () => {
         expect(run.trigger.attachments?.[1]?.filename).toBeUndefined();
         expect(Array.from((await ctx.store.readArtifact(run.trigger.attachments![0]!.id))!)).toEqual(Array.from(PNG));
         expect(run.trigger).not.toHaveProperty('attachments.0.data');
+    });
+
+    it('lists the attachments in input order', async () => {
+        const ctx = setup([text('ok')]);
+        const attachments = Array.from({ length: 12 }, (_, i) => ({
+            mediaType: 'text/plain',
+            filename: `f${i}.txt`,
+            data: new Uint8Array([i]),
+        }));
+        const { runId } = await ctx.engine.dispatch(env({ attachments }));
+        const listed = await ctx.store.listArtifacts(runId);
+        expect(listed.map((a) => a.filename)).toEqual(attachments.map((a) => a.filename));
+        expect(listed.map((a) => a.id)).toEqual(attachments.map((_, i) => `${runId}.${String(i).padStart(4, '0')}`));
+    });
+
+    it('keeps input order beyond 10000 attachments (the index widens for the whole dispatch)', async () => {
+        const ctx = setup([text('ok')]);
+        const attachments = Array.from({ length: 10_001 }, () => ({ mediaType: 'text/plain', data: new Uint8Array([1]) }));
+        const { runId } = await ctx.engine.dispatch(env({ attachments }));
+        const listed = await ctx.store.listArtifacts(runId);
+        expect(listed[0]!.id).toBe(`${runId}.00000`);
+        expect(listed.at(-1)!.id).toBe(`${runId}.10000`);
+        expect(listed.map((a) => a.id)).toEqual((await ctx.store.getRun(runId))!.trigger.attachments!.map((a) => a.id));
+    });
+
+    it('leaves no extra artifacts when two healers of one key race', async () => {
+        /** A store whose artifact writes take a round trip, like a database. */
+        class SlowArtifactStore extends MemoryStore {
+            override async putArtifact(...args: Parameters<MemoryStore['putArtifact']>): Promise<boolean> {
+                await new Promise<void>((resolve) => { setImmediate(resolve); });
+                return super.putArtifact(...args);
+            }
+        }
+        const ctx = setup([text('ok')], { store: new SlowArtifactStore() });
+        const attachment = (text: string) => ({
+            mediaType: 'text/plain',
+            filename: `${text}.txt`,
+            data: new TextEncoder().encode(text),
+        });
+        const [a, b] = await Promise.all([
+            ctx.engine.dispatch(env({ idempotencyKey: 'k', attachments: [attachment('first')] })),
+            ctx.engine.dispatch(env({ idempotencyKey: 'k', attachments: [attachment('second')] })),
+        ]);
+        expect(a.runId).toBe(b.runId);
+        expect([a.deduplicated, b.deduplicated].sort()).toEqual([false, true]);
+
+        const run = (await ctx.store.getRun(a.runId))!;
+        const listed = await ctx.store.listArtifacts(a.runId);
+        expect(listed).toHaveLength(1);
+        // the run names the artifact that was stored: metadata and bytes agree
+        expect(run.trigger.attachments).toEqual(listed);
+        const bytes = await ctx.store.readArtifact(listed[0]!.id);
+        expect(new TextDecoder().decode(bytes)).toBe(listed[0]!.filename!.replace('.txt', ''));
     });
 
     it('leaves the envelope without attachments when none are given', async () => {

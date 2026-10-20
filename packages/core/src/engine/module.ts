@@ -11,7 +11,7 @@ import { pid } from 'node:process';
 import type { Agent } from '../agent/types.ts';
 import { createResumeToken, verifyResumeToken } from '../approval/module.ts';
 import { assertArtifactInput } from '../artifact/helpers.ts';
-import { storeArtifact } from '../artifact/module.ts';
+import { attachmentIds, storeArtifact } from '../artifact/module.ts';
 import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
 import type { IClock } from '../clock/index.ts';
@@ -171,10 +171,12 @@ export class RunEngine {
         }
 
         if (attachments?.length) {
-            // stored before the run, so an executing run finds them; a crash in between leaves orphans
+            // stored before the run, so an executing run finds them; a crash in between leaves orphans.
+            // Ids derive from the run id: a concurrent healer of the same run writes no-ops.
+            const ids = attachmentIds(runId, attachments.length);
             trigger.attachments = [];
-            for (const attachment of attachments) {
-                trigger.attachments.push(await storeArtifact(this.store, { id: runId, agent: trigger.agent }, attachment, now));
+            for (const [i, attachment] of attachments.entries()) {
+                trigger.attachments.push(await storeArtifact(this.store, { id: runId, agent: trigger.agent }, attachment, now, ids[i]));
             }
         }
 
