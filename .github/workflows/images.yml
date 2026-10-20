@@ -44,7 +44,6 @@ jobs:
               id: short-sha
               run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-            # `platforms` needs the craneship release that adds it (buildx when set)
             - name: Publish
               if: github.event_name != 'pull_request'
               uses: tada5hi/craneship@v4
