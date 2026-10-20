@@ -7,7 +7,7 @@
 
 import { constants } from 'node:os';
 import { join } from 'node:path';
-import { ValidationError } from '@chamberu/core';
+import { SandboxError, ValidationError } from '@chamberu/core';
 import { SANDBOX_ENV, WORKSPACE_ROOT } from '@chamberu/sandbox';
 import { FALLBACK_PATH } from './constants.ts';
 
@@ -66,4 +66,17 @@ export function displayPath(relative: string): string {
 export function errnoCode(error: unknown): string | undefined {
     const { code } = (error ?? {}) as { code?: unknown };
     return typeof code === 'string' ? code : undefined;
+}
+
+/**
+ * One SandboxError for the removals a garbage collection could not do (the
+ * others went on): the count, the first message, every failure in the cause.
+ */
+export function collectionError(count: number, failures: readonly unknown[]): SandboxError {
+    const [first] = failures;
+    const message = first instanceof Error ? first.message : String(first);
+    return new SandboxError(
+        `garbage collection removed ${count} workspaces, ${failures.length} failed (first: ${message})`,
+        { cause: new AggregateError(failures) },
+    );
 }

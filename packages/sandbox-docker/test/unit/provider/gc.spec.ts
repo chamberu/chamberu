@@ -12,7 +12,7 @@ import {
     expect,
     it,
 } from 'vitest';
-import { systemClock } from '@chamberu/core';
+import { SandboxError, systemClock } from '@chamberu/core';
 import type { IWorkspace } from '@chamberu/sandbox';
 import { CONTAINER_NAME_PREFIX, createDockerSandbox } from '@chamberu/sandbox-docker';
 import { ControllableClock } from '@chamberu/test-kit';
@@ -67,6 +67,46 @@ describeDocker('docker garbage collection', () => {
             .rejects.toSatisfy((error) => statusCode(error) === 404);
         const info = await docker.getContainer(`${CONTAINER_NAME_PREFIX}${second.id}`).inspect();
         expect(info.State.Running).toBe(true);
+    });
+
+    it('keeps collecting past a container it cannot remove and reports it once', async () => {
+        // expired at the epoch, left behind by no process of this run
+        const runId = `test-${randomUUID()}`;
+        const containers: Docker.Container[] = [];
+        for (let index = 0; index < 3; index++) {
+            const container = await docker.createContainer({
+                Image: dockerImage,
+                Cmd: ['sleep', '60'],
+                Labels: {
+                    'app.kubernetes.io/managed-by': 'chamberu',
+                    'app.kubernetes.io/component': 'sandbox',
+                    'chamberu.dev/run': runId,
+                    'chamberu.dev/workspace': randomUUID(),
+                    'chamberu.dev/expires-at': '1',
+                },
+            });
+            containers.push(container);
+            strangers.push(container);
+        }
+        const stuck = containers[1]!.id;
+        // a client whose removal of one container fails like a busy filesystem
+        const failing = Object.create(docker) as Docker;
+        failing.getContainer = (id: string) => {
+            const container = docker.getContainer(id);
+            if (id !== stuck) return container;
+            container.remove = async () => {
+                throw Object.assign(new Error('(HTTP code 500) unable to remove filesystem: device or resource busy'), { statusCode: 500 });
+            };
+            return container;
+        };
+
+        const error = await createDockerSandbox({ docker: failing, image: dockerImage })
+            .collectGarbage()
+            .catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(SandboxError);
+        expect((error as Error).message).toMatch(/1 failed.*resource busy/);
+        const left = await docker.listContainers({ all: true, filters: { label: [`chamberu.dev/run=${runId}`] } });
+        expect(left.map((info) => info.Id)).toEqual([stuck]);
     });
 
     it('never touches containers without the managed-by label', async () => {

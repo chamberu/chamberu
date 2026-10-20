@@ -105,7 +105,7 @@ dockerode sets no request timeout by default, so a hanging daemon stalls a creat
 
 ## Garbage collection
 
-`collectGarbage()` lists the daemon's containers with the managed labels and removes every one past its `chamberu.dev/expires-at` (open workspaces of this process are disposed first), including those of crashed processes and other replicas sharing the daemon. The manager calls it from `acquire` at most every 10 minutes.
+`collectGarbage()` lists the daemon's containers with the managed labels and removes every one past its `chamberu.dev/expires-at` (open workspaces of this process are disposed first), including those of crashed processes and other replicas sharing the daemon. The manager calls it from `acquire` at most every 10 minutes. A container that cannot be removed does not stop the pass: the others go, and one `SandboxError` with the count and the first failure is thrown at the end.
 
 ## Options
 

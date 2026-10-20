@@ -6,6 +6,7 @@
  */
 
 import {
+    chmod,
     mkdir,
     mkdtemp,
     readdir,
@@ -64,6 +65,27 @@ describe('local garbage collection', () => {
 
         expect(await createLocalSandbox({ root, clock }).collectGarbage()).toBe(1);
         expect(await readdir(root)).toEqual(['broken']);
+    });
+
+    it.skipIf(process.getuid?.() === 0)('keeps collecting past a folder it cannot delete and reports it once', async () => {
+        const clock = new ControllableClock(new Date(10_000));
+        const ids = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'];
+        for (const id of ids) {
+            await mkdir(join(root, id, 'repo', 'locked'), { recursive: true });
+            await writeFile(join(root, id, 'repo', 'locked', 'file'), 'x');
+            await writeFile(join(root, id, 'workspace.json'), JSON.stringify({ runId: 'r0', expiresAt: new Date(5_000).toISOString() }));
+        }
+        const locked = join(root, ids[1]!, 'repo', 'locked');
+        await chmod(locked, 0o500);
+        try {
+            const error = await createLocalSandbox({ root, clock }).collectGarbage().catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(SandboxError);
+            expect((error as Error).message).toMatch(/removed 2 .*1 failed/);
+            expect((error as Error).message).toContain(ids[1]);
+            expect(await readdir(root)).toEqual([ids[1]]);
+        } finally {
+            await chmod(locked, 0o700);
+        }
     });
 
     it('collects nothing without a root directory', async () => {

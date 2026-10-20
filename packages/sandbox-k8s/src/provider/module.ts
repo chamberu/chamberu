@@ -32,6 +32,7 @@ import {
 import {
     assertKubernetesOptions,
     buildPod,
+    collectionError,
     delay,
     guard,
     isExpired,
@@ -166,6 +167,8 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
             const pods = await guard('list the workspace pods', () => client.list(MANAGED_SELECTOR));
             const now = clock.now().getTime();
             let count = 0;
+            // one pod that cannot go never keeps the others
+            const failures: unknown[] = [];
             for (const pod of pods) {
                 const name = pod.metadata?.name;
                 if (!name) continue;
@@ -174,9 +177,15 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
 
                 // one open here is disposed, so its in-flight commands settle too
                 const workspace = live.get(pod.metadata?.labels?.[WORKSPACE_LABEL] ?? '');
-                await guard(`delete workspace pod ${name}`, () => (workspace ? workspace.dispose() : client.delete(name)));
+                try {
+                    await guard(`delete workspace pod ${name}`, () => (workspace ? workspace.dispose() : client.delete(name)));
+                } catch (error) {
+                    failures.push(error);
+                    continue;
+                }
                 count++;
             }
+            if (failures.length > 0) throw collectionError(count, failures);
             return count;
         },
     };

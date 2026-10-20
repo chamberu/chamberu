@@ -29,6 +29,7 @@ import { DEFAULT_NETWORK } from './constants.ts';
 import {
     assertDockerOptions,
     buildContainerOptions,
+    collectionError,
     dockerMessage,
     isMissingImage,
     pullImage,
@@ -165,6 +166,8 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
 
             const now = clock.now().getTime();
             let count = 0;
+            // one container that cannot go never keeps the others
+            const failures: SandboxError[] = [];
             for (const container of containers) {
                 const labels = container.Labels ?? {};
                 const expiresAt = Number(labels[EXPIRES_AT_KEY]);
@@ -179,11 +182,14 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
                         await removeContainer(docker.getContainer(container.Id));
                     }
                 } catch (error) {
-                    if (error instanceof SandboxError) throw error;
-                    throw new SandboxError(`cannot remove workspace container ${container.Id}: ${dockerMessage(error)}`, { cause: error });
+                    failures.push(error instanceof SandboxError ?
+                        error :
+                        new SandboxError(`cannot remove workspace container ${container.Id}: ${dockerMessage(error)}`, { cause: error }));
+                    continue;
                 }
                 count++;
             }
+            if (failures.length > 0) throw collectionError(count, failures);
             return count;
         },
     };

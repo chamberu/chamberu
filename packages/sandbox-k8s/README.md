@@ -114,7 +114,7 @@ Stdin is closed only on the `v5.channel.k8s.io` exec protocol (Kubernetes 1.30+)
 
 ## Garbage collection
 
-`collectGarbage()` lists the namespace's pods with the managed labels and deletes those past their `chamberu.dev/expires-at` annotation and those in phase `Failed` or `Succeeded` (open workspaces of this process are disposed first). The manager calls it from `acquire` at most every 10 minutes; `activeDeadlineSeconds` stops a pod at expiry even when no collection runs.
+`collectGarbage()` lists the namespace's pods with the managed labels and deletes those past their `chamberu.dev/expires-at` annotation and those in phase `Failed` or `Succeeded` (open workspaces of this process are disposed first). The manager calls it from `acquire` at most every 10 minutes; `activeDeadlineSeconds` stops a pod at expiry even when no collection runs. A pod that cannot be removed does not stop the pass: the others go, and one `SandboxError` with the count and the first failure is thrown at the end.
 
 ## Options
 

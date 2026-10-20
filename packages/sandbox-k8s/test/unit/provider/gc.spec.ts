@@ -84,6 +84,28 @@ describe('kubernetes garbage collection', () => {
         expect(client.deleted).toHaveLength(1);
     });
 
+    it('keeps collecting past a pod it cannot delete and reports it once', async () => {
+        const { client, provider } = setup();
+        for (const seeded of [
+            pod('stuck', START, 'Running'),
+            pod('expired', START, 'Running'),
+            pod('failed', START + 60_000, 'Failed'),
+        ]) {
+            client.pods.set(seeded.metadata!.name!, seeded);
+        }
+        const remove = client.delete.bind(client);
+        client.delete = async (name) => {
+            if (name === 'stuck') throw new SandboxError('cannot delete pod stuck: etcd timeout');
+            await remove(name);
+        };
+
+        const error = await provider.collectGarbage().catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(SandboxError);
+        expect((error as Error).message).toMatch(/removed 2 .*1 failed.*etcd timeout/);
+        expect(client.deleted).toEqual(['expired', 'failed']);
+        expect(client.pods.keys().toArray()).toEqual(['stuck']);
+    });
+
     it('reports a failed list as SandboxError', async () => {
         const { client, provider } = setup();
         client.list = async () => {

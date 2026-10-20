@@ -37,6 +37,10 @@ export interface ISandboxProvider {
      * (via `prepareWorkspace`, then `info.commit = commit`).
      */
     create(options: WorkspaceCreateOptions): Promise<IWorkspace>;
-    /** Deletes this provider's workspaces past their expiry; returns how many. */
+    /**
+     * Deletes this provider's workspaces past their expiry; returns how many.
+     * One that cannot be removed never keeps the others: the pass goes on and
+     * rejects with one SandboxError at the end.
+     */
     collectGarbage(): Promise<number>;
 }

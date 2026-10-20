@@ -11,7 +11,7 @@ import type { IClock } from '@chamberu/core';
 import { SandboxError } from '@chamberu/core';
 import type { IWorkspace } from '@chamberu/sandbox';
 import { WORKSPACE_ID_PATTERN, WORKSPACE_RECORD } from './constants.ts';
-import { errnoCode } from './helpers.ts';
+import { collectionError, errnoCode } from './helpers.ts';
 
 /** Expiry (epoch ms) from a workspace folder's record; undefined when it has none. */
 async function readExpiry(dir: string): Promise<number | undefined> {
@@ -29,7 +29,8 @@ async function readExpiry(dir: string): Promise<number | undefined> {
  * Deletes every workspace folder under `root` whose record says it expired
  * (`expiresAt <= now`). A workspace still open in this process is disposed,
  * so its running commands die too. Folders that are no workspace (no uuid
- * name, no readable record) are left alone. Returns how many were deleted.
+ * name, no readable record) are left alone. Returns how many were deleted;
+ * a folder that cannot go never keeps the others (one SandboxError at the end).
  */
 export async function collectExpired(
     root: string,
@@ -46,6 +47,7 @@ export async function collectExpired(
 
     const now = clock.now().getTime();
     let count = 0;
+    const failures: SandboxError[] = [];
     for (const name of names) {
         if (!WORKSPACE_ID_PATTERN.test(name)) continue;
         const dir = join(root, name);
@@ -64,10 +66,13 @@ export async function collectExpired(
                 });
             }
         } catch (error) {
-            if (error instanceof SandboxError) throw error;
-            throw new SandboxError(`cannot remove workspace ${name} (${errnoCode(error) ?? 'unknown error'}).`, { cause: error });
+            failures.push(error instanceof SandboxError ?
+                error :
+                new SandboxError(`cannot remove workspace ${name} (${errnoCode(error) ?? 'unknown error'}).`, { cause: error }));
+            continue;
         }
         count++;
     }
+    if (failures.length > 0) throw collectionError(count, failures);
     return count;
 }
