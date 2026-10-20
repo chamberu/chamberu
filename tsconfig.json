@@ -7,6 +7,7 @@
             "@chamberu/github": ["./packages/github/src/index.ts"],
             "@chamberu/http": ["./packages/http/src/index.ts"],
             "@chamberu/sandbox": ["./packages/sandbox/src/index.ts"],
+            "@chamberu/sandbox-docker": ["./packages/sandbox-docker/src/index.ts"],
             "@chamberu/sandbox-local": ["./packages/sandbox-local/src/index.ts"],
             "@chamberu/scheduler": ["./packages/scheduler/src/index.ts"],
             "@chamberu/store-typeorm": ["./packages/store-typeorm/src/index.ts"],

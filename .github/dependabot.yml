@@ -34,3 +34,11 @@ updates:
               update-types:
                   - "patch"
                   - "minor"
+
+    # Maintain the base image of the sandbox image
+    - package-ecosystem: "docker"
+      directory: "/images/sandbox-node"
+      schedule:
+          interval: "daily"
+      commit-message:
+          prefix: "build"

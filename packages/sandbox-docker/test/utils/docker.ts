@@ -1,0 +1,82 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { PassThrough } from 'node:stream';
+import type Docker from 'dockerode';
+import { describe, inject } from 'vitest';
+
+export type DockerContext = {
+    /** The sandbox image built from `images/sandbox-node` by the global setup. */
+    image: string;
+};
+
+declare module 'vitest' {
+    export interface ProvidedContext {
+        docker: DockerContext;
+    }
+}
+
+const context: DockerContext | undefined = inject('docker');
+
+/** The test image, `undefined` when Docker is not available. */
+export const dockerImage: string | undefined = context?.image;
+
+/** A `describe` that skips when the global setup found no Docker daemon. */
+export function describeDocker(name: string, fn: () => void): void {
+    describe.skipIf(!context)(name, fn);
+}
+
+export type ContainerExecResult = {
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+};
+
+function collect(stream: PassThrough): () => string {
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+    });
+    return () => Buffer.concat(chunks).toString('utf8');
+}
+
+/** Runs argv in a started container through the Docker API (no provider involved). */
+export async function execInContainer(
+    docker: Docker,
+    container: Docker.Container,
+    argv: string[],
+): Promise<ContainerExecResult> {
+    const exec = await container.exec({
+        Cmd: argv,
+        AttachStdout: true,
+        AttachStderr: true,
+        Tty: false,
+    });
+    const stream = await exec.start({ hijack: true, stdin: false });
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const readStdout = collect(stdout);
+    const readStderr = collect(stderr);
+    docker.modem.demuxStream(stream, stdout, stderr);
+    await new Promise<void>((resolve, reject) => {
+        stream.on('end', () => resolve());
+        stream.on('close', () => resolve());
+        stream.on('error', reject);
+    });
+
+    let info = await exec.inspect();
+    for (let i = 0; info.Running && i < 100; i++) {
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        info = await exec.inspect();
+    }
+
+    return {
+        exitCode: info.ExitCode ?? -1,
+        stdout: readStdout(),
+        stderr: readStderr(),
+    };
+}
