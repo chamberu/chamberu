@@ -101,15 +101,13 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
     const collectGarbage = async (): Promise<number> => {
         lastGcAt = clock.now().getTime();
         const expired = runs.keys().toArray().flatMap((runId) => sweep(runId));
-        const [collected, ...disposed] = await Promise.allSettled([
-            provider.collectGarbage(),
-            ...expired.map((workspace) => disposeOrThrow(workspace)),
-        ]);
+        // own disposals first: the provider's collection would find the same
+        // expired workspaces, count them twice and dispose them concurrently
+        const disposed = await Promise.allSettled(expired.map((workspace) => disposeOrThrow(workspace)));
         for (const result of disposed) {
             if (result.status === 'rejected') onError(result.reason);
         }
-        if (collected!.status === 'rejected') throw collected!.reason;
-        return expired.length + (collected!.value as number);
+        return expired.length + await provider.collectGarbage();
     };
 
     const maybeCollectGarbage = (): void => {
@@ -186,11 +184,19 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         return { workspace: await entry.pending, reused: false };
     };
 
+    const expiredError = (workspace: IWorkspace): SandboxError => new SandboxError(
+        `workspace ${workspace.id} expired at ${workspace.info.expiresAt.toISOString()} and was disposed; call create_workspace for a new one.`,
+    );
+
     const get = (runId: string, workspaceId?: string): IWorkspace => {
         let entry: Entry | undefined;
         if (workspaceId === undefined) {
+            // only live workspaces count when picking the run's one workspace
+            const expired = sweep(runId);
+            for (const workspace of expired) disposeInBackground(workspace);
             const held = heldEntries(runId);
             if (held.length === 0) {
+                if (expired.length > 0) throw expiredError(expired[0]!);
                 throw new SandboxError('This run has no workspace; call create_workspace first.');
             }
             if (held.length > 1) {
@@ -207,7 +213,7 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         if (isExpired(workspace, clock.now())) {
             forget(runId, entry!);
             disposeInBackground(workspace);
-            throw new SandboxError(`workspace ${workspace.id} expired at ${workspace.info.expiresAt.toISOString()} and was disposed; call create_workspace for a new one.`);
+            throw expiredError(workspace);
         }
         return workspace;
     };
@@ -232,6 +238,8 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
     };
 
     const attach = (engine: Parameters<IWorkspaceManager['attach']>[0]): () => void => {
+        // a closed manager holds nothing and acquires nothing: nothing to dispose
+        if (closed) return () => {};
         const off = engine.on('run.updated', ({ run }) => {
             if (isTerminal(run.status)) release(run.id).catch(onError);
         });

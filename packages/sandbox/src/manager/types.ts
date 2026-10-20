@@ -57,8 +57,8 @@ export interface IWorkspaceManager {
      */
     acquire(runId: string, input: AcquireInput): Promise<AcquireResult>;
     /**
-     * The run's workspace by id, or its only one when id is omitted.
-     * SandboxError: unknown, expired (disposed then), none; ValidationError:
+     * The run's workspace by id, or its only live one when id is omitted
+     * (expired ones are disposed first). SandboxError: unknown, expired (disposed then), none; ValidationError:
      * several and no id.
      */
     get(runId: string, workspaceId?: string): IWorkspace;
@@ -67,13 +67,19 @@ export interface IWorkspaceManager {
      * not hold, like get), or all of the run (never rejects for none).
      */
     release(runId: string, workspaceId?: string): Promise<void>;
-    /** Disposes a run's workspaces on completed | failed | cancelled. Returns the unsubscribe. */
+    /**
+     * Disposes a run's workspaces on completed | failed | cancelled. Returns the
+     * unsubscribe; after close() it subscribes nothing.
+     */
     attach(engine: Pick<RunEngine, 'on'>): () => void;
     /** `create_workspace` and `dispose_workspace`. */
     tools(): ToolSet;
-    /** Disposes the manager's expired workspaces and runs the provider's collection; returns how many went. */
+    /** Disposes the manager's expired workspaces, then runs the provider's collection; returns how many went. */
     collectGarbage(): Promise<number>;
-    /** Unsubscribes every attach and disposes every workspace (call after engine.drain()). */
+    /**
+     * Unsubscribes every attach and disposes every workspace (call after
+     * engine.drain()); afterwards acquire rejects and attach subscribes nothing.
+     */
     close(): Promise<void>;
 }
 

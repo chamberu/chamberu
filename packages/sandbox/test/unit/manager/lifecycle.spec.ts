@@ -212,6 +212,15 @@ describe('workspace manager: run lifecycle', () => {
         await expect(manager.close()).resolves.toBeUndefined();
     });
 
+    it('subscribes nothing when attached after close()', async () => {
+        const { manager } = await run({ script: [text('done')] });
+        await manager.close();
+        const engine = fakeEngine();
+        const unsubscribe = manager.attach(engine);
+        expect(engine.listeners.size).toBe(0);
+        unsubscribe();
+    });
+
     it('unsubscribes one attach', async () => {
         const { manager } = await run({ script: [text('done')] });
         const engine = fakeEngine();

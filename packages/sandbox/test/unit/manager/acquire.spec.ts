@@ -281,6 +281,49 @@ describe('workspace manager: acquire', () => {
         expect(provider.disposed).toEqual([workspace.id]);
     });
 
+    it('disposes its own expired workspaces before the provider collects', async () => {
+        const {
+            clock,
+            provider,
+            manager,
+        } = setup({ limits: { timeoutMs: 60_000 }, gcIntervalMs: 0 });
+        const { workspace } = await manager.acquire('r1', {});
+        clock.advance(60_000);
+        const collect = provider.collectGarbage.bind(provider);
+        let disposedBeforeGc: string[] | undefined;
+        provider.collectGarbage = async () => {
+            disposedBeforeGc = [...provider.disposed];
+            return collect();
+        };
+        await expect(manager.collectGarbage()).resolves.toBe(1);
+        expect(disposedBeforeGc).toEqual([workspace.id]);
+    });
+
+    it('picks the only live workspace when another one expired', async () => {
+        const {
+            clock,
+            provider,
+            manager,
+            errors,
+        } = setup({ limits: { timeoutMs: 60_000 }, gcIntervalMs: 0 });
+        const old = await manager.acquire('r1', { repo: 'octo/demo' });
+        clock.advance(30_000);
+        const live = await manager.acquire('r1', { repo: 'octo/other' });
+        clock.advance(30_000);
+        expect(manager.get('r1')).toBe(live.workspace);
+        await flush();
+        expect(provider.disposed).toEqual([old.workspace.id]);
+        expect(errors).toEqual([]);
+    });
+
+    it('reports the only workspace as expired when get has no id', async () => {
+        const { clock, manager } = setup({ limits: { timeoutMs: 60_000 } });
+        await manager.acquire('r1', {});
+        clock.advance(60_000);
+        expect(() => manager.get('r1')).toThrow(/expired/);
+        expect(() => manager.get('r1')).toThrow(/create_workspace first/);
+    });
+
     it('refuses to acquire after close', async () => {
         const { provider, manager } = setup();
         const { workspace } = await manager.acquire('r1', {});
