@@ -25,10 +25,10 @@ describe('toolContextSchema', () => {
         expect(toolContextSchema['~standard'].version).toBe(1);
     });
 
-    it('validate rejects a missing context with a message naming defineTool', () => {
+    it('validate rejects a missing context with a message naming both causes', () => {
         for (const v of [undefined, null, 'x', []]) {
             const result = toolContextSchema['~standard'].validate(v) as { issues: Array<{ message: string }> };
-            expect(result.issues[0]!.message).toMatch(/defineTool.*chamberu agent/);
+            expect(result.issues[0]!.message).toMatch(/another copy of @chamberu\/core, or runs outside a chamberu agent/);
         }
     });
 });

@@ -416,9 +416,11 @@ describe('tool context', () => {
                 return 'ok';
             },
         });
+        const expected = 'Type validation failed for tool context (third): ' +
+            'the agent has no toolsContext entry for it, and its contextSchema requires one.';
         const first = await runOnce({ model: mockModel([callTool('third'), text('done')]), tools: { third } });
         expect(first.run?.status).toBe('failed');
-        expect(first.run?.error?.message).toMatch(/Type validation failed for tool context \(third\)/);
+        expect(first.run?.error).toEqual({ code: 'validation_error', message: expected });
         expect(executed).toBe(0);
         expect((await first.store.listSteps(first.runId)).map((s) => s.kind)).toEqual(['llm']);
 
@@ -428,9 +430,42 @@ describe('tool context', () => {
             approvals: { third: () => 'allow' },
         });
         expect(second.run?.status).toBe('failed');
-        expect(second.run?.error?.message).toMatch(/Type validation failed for tool context \(third\)/);
+        expect(second.run?.error).toEqual({ code: 'validation_error', message: expected });
         expect(executed).toBe(0);
         expect(await second.store.listSteps(second.runId)).toEqual([]);
+    });
+
+    it('keeps a rejected toolsContext entry out of the run error', async () => {
+        const search = tool({
+            inputSchema: z.object({}),
+            contextSchema: z.object({ apiKey: z.string() }),
+            execute: async () => 'ok',
+        });
+        // a schema whose issue message echoes the value, as some validators do
+        const echoing: StandardSchemaV1<{ apiKey: string }, { apiKey: string }> = {
+            '~standard': {
+                version: 1,
+                vendor: 'test',
+                validate: (value) => ({ issues: [{ message: `received ${JSON.stringify(value)}`, path: [{ key: 'apiKey' }] }] }),
+            },
+        };
+        const echo = tool({
+            inputSchema: z.object({}),
+            contextSchema: echoing,
+            execute: async () => 'ok',
+        });
+        for (const [name, t] of [['search', search], ['echo', echo]] as const) {
+            const { run } = await runOnce({
+                model: mockModel([callTool(name), text('done')]),
+                tools: { [name]: t },
+                toolsContext: { [name]: { apikey: 'sk-SECRET-123' } },
+            });
+            expect(run?.status).toBe('failed');
+            expect(run?.error?.code).toBe('validation_error');
+            expect(run?.error?.message).toBe(`Type validation failed for tool context (${name}): ` +
+                'the agent\'s toolsContext entry does not match the tool\'s contextSchema (at apiKey).');
+            expect(JSON.stringify(run)).not.toContain('sk-SECRET-123');
+        }
     });
 
     it('injects nothing for a look-alike schema object', async () => {
@@ -452,7 +487,11 @@ describe('tool context', () => {
         });
         const { run } = await runOnce({ model: mockModel([callTool('copy'), text('done')]), tools: { copy } });
         expect(run?.status).toBe('failed');
-        expect(run?.error?.message).toContain('No chamberu tool context: a defineTool tool runs inside a chamberu agent.');
+        expect(run?.error).toEqual({
+            code: 'validation_error',
+            message: 'Type validation failed for tool context (copy): No chamberu tool context: ' +
+                'the tool was built by another copy of @chamberu/core, or runs outside a chamberu agent.',
+        });
         expect(executed).toBe(0);
     });
 

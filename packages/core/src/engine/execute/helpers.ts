@@ -16,7 +16,7 @@ import type {
     ToolLoopAgentSettings,
     ToolSet,
 } from 'ai';
-import { NoSuchToolError } from 'ai';
+import { NoSuchToolError, TypeValidationError } from 'ai';
 import { isObject } from 'smob';
 import { assertToolsContext } from '../../agent/helpers.ts';
 import type { ApprovalPolicy } from '../../agent/types.ts';
@@ -32,6 +32,7 @@ import {
 import type { Budget, Checkpoint, RunContext } from '../../run/types.ts';
 import { createAgentState } from '../../state/module.ts';
 import { createStateTools } from '../../state/tools.ts';
+import { TOOL_CONTEXT_MISSING } from '../../tool/constants.ts';
 import { hasToolContext } from '../../tool/helpers.ts';
 import type { ToolContext } from '../../tool/types.ts';
 import type { TriggerEnvelope } from '../../trigger/types.ts';
@@ -60,8 +61,52 @@ export function initialMessage(envelope: TriggerEnvelope): ModelMessage {
     };
 }
 
-/** `{ code, message }` of anything thrown; code falls back to 'Error'. */
+/**
+ * The issues at the bottom of a validation error's cause chain: a Standard
+ * Schema issue list, or the `issues` of an error such as a ZodError.
+ */
+function causeIssues(error: unknown): unknown[] {
+    let cause = error;
+    while (TypeValidationError.isInstance(cause)) cause = cause.cause;
+    if (Array.isArray(cause)) return cause;
+    if (isObject(cause) && Array.isArray(cause.issues)) return cause.issues;
+    return [];
+}
+
+/** An issue's path as `a.b.0`, undefined at the root. */
+function issuePath(issue: unknown): string | undefined {
+    if (!isObject(issue) || !Array.isArray(issue.path) || issue.path.length === 0) return undefined;
+    return issue.path.map((segment) => String(isObject(segment) ? segment.key : segment)).join('.');
+}
+
+/**
+ * A ValidationError for a tool context the AI SDK refused. The SDK's own
+ * message holds the whole value (a toolsContext entry may carry a secret) and
+ * issue messages may echo it too, so only the tool name and the issue paths
+ * are kept; chamberu's own missing-context issue keeps its message.
+ */
+function toolContextError(error: TypeValidationError): ValidationError {
+    const prefix = `Type validation failed for tool context (${error.context?.entityName ?? 'unknown'}): `;
+    const issues = causeIssues(error);
+    if (issues.some((issue) => isObject(issue) && issue.message === TOOL_CONTEXT_MISSING)) {
+        return new ValidationError(prefix + TOOL_CONTEXT_MISSING);
+    }
+    if (error.value === undefined) {
+        return new ValidationError(`${prefix}the agent has no toolsContext entry for it, and its contextSchema requires one.`);
+    }
+    const paths = [...new Set(issues.map(issuePath).filter((path) => path !== undefined))];
+    const at = paths.length > 0 ? ` (at ${paths.join(', ')})` : '';
+    return new ValidationError(`${prefix}the agent's toolsContext entry does not match the tool's contextSchema${at}.`);
+}
+
+/**
+ * `{ code, message }` of anything thrown; code falls back to 'Error'. A refused
+ * tool context is recorded without its value.
+ */
 export function toRunError(error: unknown): { code: string; message: string } {
+    if (TypeValidationError.isInstance(error) && error.context?.field === 'tool context') {
+        return toRunError(toolContextError(error));
+    }
     const code = isObject(error) ? error.code : undefined;
     return {
         code: typeof code === 'string' ? code : 'Error',
