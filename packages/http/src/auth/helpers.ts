@@ -5,12 +5,33 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { Invoker } from '@chamberu/core';
 import { ForbiddenError, UnauthorizedError } from '@ebec/http';
 import type { IAppEvent } from 'routup';
 import type { HttpContext } from '../app/types.ts';
 import { PRINCIPAL } from './constants.ts';
 import { hasPermission } from './module.ts';
 import type { Principal } from './types.ts';
+
+/** Claims read as the invoker's display name, first non-empty string wins. */
+const NAME_CLAIMS = ['name', 'preferred_username', 'email'] as const;
+
+/**
+ * The run invoker (or approver) for a principal: a snapshot of `id`,
+ * `kind` and `permissions`, plus a display `name` from the claims (`name`,
+ * `preferred_username`, then `email`). Never carries the claims themselves.
+ */
+export function toInvoker(principal: Principal): Invoker {
+    const name = NAME_CLAIMS
+        .map((key) => principal.claims?.[key])
+        .find((value): value is string => typeof value === 'string' && value.length > 0);
+    return {
+        id: principal.id,
+        kind: principal.kind,
+        ...(name !== undefined ? { name } : {}),
+        permissions: [...principal.permissions],
+    };
+}
 
 /**
  * The bearer token of a request: `undefined` without an authorization

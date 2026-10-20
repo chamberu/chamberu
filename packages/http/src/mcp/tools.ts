@@ -13,6 +13,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '../app/constants.ts';
 import { acquireStreamSlot } from '../app/helpers.ts';
 import type { HttpContext } from '../app/types.ts';
+import { toInvoker } from '../auth/helpers.ts';
 import { agentPermission, hasPermission } from '../auth/module.ts';
 import type { Principal } from '../auth/types.ts';
 import { KEY_MAX_LENGTH } from '../request/constants.ts';
@@ -236,6 +237,7 @@ function registerRunTool(
             payload,
             ...(args.idempotencyKey !== undefined ? { idempotencyKey: args.idempotencyKey } : {}),
             ...(args.thread !== undefined ? { thread: args.thread } : {}),
+            invoker: toInvoker(extra.principal),
         });
 
         const waitSeconds = Math.min(args.waitSeconds ?? 0, options.maxWaitSeconds);
@@ -275,6 +277,7 @@ function registerResumeTool(server: McpServer, ctx: HttpContext, principal: Prin
         await ctx.engine.resume(args.token, {
             approved: args.approved,
             ...(args.reason !== undefined ? { reason: args.reason } : {}),
+            approver: toInvoker(principal),
         });
         return toolResult({ runId: run.id, status: RunStatus.QUEUED });
     }));

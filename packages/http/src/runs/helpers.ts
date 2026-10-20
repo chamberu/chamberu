@@ -15,8 +15,10 @@ import type {
     Agent,
     Artifact,
     ArtifactInput,
+    Invoker,
     Run,
     RunStatusLiteral,
+    Step,
     TriggerDefinition,
 } from '@chamberu/core';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@ebec/http';
@@ -47,17 +49,37 @@ import {
     RESUME_TOKEN_MAX_LENGTH,
 } from './constants.ts';
 import type {
+    InvokerView,
     ResumeBody,
     RunListQuery,
     RunView,
     StartRunBody,
 } from './types.ts';
 
-/** Drops the internal `claim` (owner and lease expiry) from a run. */
+/** An invoker without its `permissions`: a reader must not learn another principal's grants. */
+function viewInvoker(invoker: Invoker): InvokerView {
+    const view: InvokerView & { permissions?: unknown } = { ...invoker };
+    delete view.permissions;
+    return view;
+}
+
+/**
+ * Drops the internal `claim` (owner and lease expiry) and the invoker's
+ * `permissions` from a run.
+ */
 export function serializeRun(run: Run): RunView {
     const view: RunView & { claim?: unknown } = { ...run };
     delete view.claim;
+    if (run.trigger.invoker) view.trigger = { ...run.trigger, invoker: viewInvoker(run.trigger.invoker) };
     return view;
+}
+
+/** A step as it leaves the package: a `wait` step's approver without its `permissions`. */
+export function serializeStep(step: Step): Step {
+    if (step.kind !== 'wait' || !isObject(step.output)) return step;
+    const { approver } = step.output as { approver?: unknown };
+    if (!isObject(approver)) return step;
+    return { ...step, output: { ...step.output, approver: viewInvoker(approver as Invoker) } };
 }
 
 /** `run:read`, or `agent:<run.agent>:run`. */
