@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { assertTriggerKey } from '@chamberu/core';
 import { flattenIssueItems } from '@ebec/core';
 import type { Issue } from '@ebec/core';
 import {
@@ -29,7 +30,8 @@ import { MAX_PAGE_LIMIT } from '../app/constants.ts';
 import { KEY_MAX_LENGTH, RECEIVED_MAX_LENGTH } from './constants.ts';
 import type { DecodedQuery } from './types.ts';
 
-function isJsonMediaType(contentType: string | null): boolean {
+/** `application/json` or a `+json` media type (parameters ignored). */
+export function isJsonMediaType(contentType: string | null): boolean {
     if (!contentType) return false;
     const type = (contentType.split(';')[0] ?? '').trim().toLowerCase();
     return type === 'application/json' || /^[a-z0-9.+-]+\/[a-z0-9.+-]+\+json$/.test(type);
@@ -264,14 +266,9 @@ export function readIdempotencyHeader(request: Request): string | undefined {
     return value;
 }
 
-/** A key a trigger derived from the payload: at most `KEY_MAX_LENGTH` characters and no NUL, else 400. */
+/** A key a trigger derived from the payload: core's `assertTriggerKey` (400 `validation_error`). */
 export function assertDerivedKey(name: string, value: string | undefined): void {
-    if (value !== undefined && value.length > KEY_MAX_LENGTH) {
-        throw new BadRequestError({ message: `The ${name} derived from the payload exceeds ${KEY_MAX_LENGTH} characters.` });
-    }
-    if (value?.includes('\u0000')) {
-        throw new BadRequestError({ message: `The ${name} derived from the payload contains a NUL character.` });
-    }
+    assertTriggerKey(`${name} derived from the payload`, value);
 }
 
 /**

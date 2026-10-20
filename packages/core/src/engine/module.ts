@@ -33,6 +33,7 @@ import type {
 } from '../run/types.ts';
 import type { IStore } from '../store/types.ts';
 import { idempotencyScope, toInvoker } from '../trigger/helpers.ts';
+import { assertTriggerKey } from '../trigger/key.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 import {
     APPROVAL_TIMED_OUT,
@@ -145,6 +146,9 @@ export class RunEngine {
             throw new ValidationError('The attachments must be an array.');
         }
         attachments?.forEach((attachment, i) => assertArtifactInput(attachment, `attachment ${i}`));
+        assertTriggerKey('idempotency key', envelope.idempotencyKey);
+        assertTriggerKey('concurrency key', envelope.concurrencyKey);
+        assertTriggerKey('thread', envelope.thread);
         const snapshot = invoker !== undefined ? toInvoker(invoker) : undefined;
         const now = this.nextCreatedAt();
         const trigger: TriggerEnvelope = {

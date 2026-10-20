@@ -247,6 +247,7 @@ process.once('SIGTERM', () => {
 | `readyTimeoutMs` | `number` | `2_000` | How long `/readyz` waits for the store |
 | `clock` | `IClock` | `systemClock` | Drives polls, waits and timeouts |
 | `onError` | `(error) => void` | `console.error` | 5xx causes and background failures |
+| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamberu/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter |
 
 `createShutdown(options)`:
 

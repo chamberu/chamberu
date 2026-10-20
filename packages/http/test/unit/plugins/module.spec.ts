@@ -6,7 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { App } from 'routup';
+import type { App, IAppEvent } from 'routup';
+import { isOperationalPath, isStreamRequest, routeLabel } from '../../../src/plugins/helpers.ts';
 import {
     ADMIN_TOKEN,
     call,
@@ -205,5 +206,33 @@ describe('rate limit', () => {
 
         expect(await spoof(createTestApp({ rateLimit: { max: 2 } }).app)).toEqual([200, 200, 429]);
         expect(await spoof(createTestApp({ rateLimit: { max: 2 }, trustProxy: true }).app)).toEqual([200, 200, 200]);
+    });
+});
+
+describe('route labels', () => {
+    it('labels an extra route by its path', () => {
+        const event = { method: 'POST', path: '/webhooks/github' } as IAppEvent;
+        expect(routeLabel(event, '', '/metrics', ['/webhooks/github'])).toBe('/webhooks/github');
+        expect(routeLabel(event, '', '/metrics', [])).toBe('/_unmatched');
+    });
+
+    it('labels an extra route under basePath', () => {
+        const event = { method: 'POST', path: '/api/webhooks/github' } as IAppEvent;
+        expect(routeLabel(event, '/api', '/metrics', ['/webhooks/github'])).toBe('/webhooks/github');
+    });
+
+    it('labels a path in another case like routup matches it', () => {
+        const label = (path: string, basePath = '', extra: string[] = []) => routeLabel({ method: 'POST', path } as IAppEvent, basePath, '/metrics', extra);
+        expect(label('/Webhooks/GitHub', '', ['/webhooks/github'])).toBe('/webhooks/github');
+        expect(label('/API/webhooks/github', '/api', ['/webhooks/github'])).toBe('/webhooks/github');
+        expect(label('/RUNS/abc')).toBe('/runs/:id');
+        expect(label('/HEALTHZ')).toBe('/healthz');
+    });
+
+    it('treats operational paths and the stream in any case', () => {
+        const event = (method: string, path: string) => ({ method, path } as IAppEvent);
+        expect(isOperationalPath(event('GET', '/HEALTHZ'), '', '/metrics')).toBe(true);
+        expect(isOperationalPath(event('GET', '/Api/Metrics'), '/api', '/metrics')).toBe(true);
+        expect(isStreamRequest(event('GET', '/RUNS/abc/Stream'), '')).toBe(true);
     });
 });

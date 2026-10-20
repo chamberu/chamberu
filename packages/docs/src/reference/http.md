@@ -14,9 +14,13 @@ npm install @chamberu/http @chamberu/core --save
 function createHttpApp(options: HttpAppOptions): App; // routup App
 ```
 
-Throws `InvalidAgentDefinitionError` for duplicate agent names and an empty `auth` array.
+Throws `InvalidAgentDefinitionError` for duplicate agent names, an empty `auth` array and an invalid `routes` entry (a path that is not static, a duplicate method and path, a first segment of a built-in route such as `agents`, `runs` or `hooks`, or the metrics path, all compared case-insensitively).
 
 <<< ../../../http/src/app/types.ts#options{ts}
+
+`routes` takes extra routes from other packages, such as the GitHub webhook of `@chamberu/github`:
+
+<<< ../../../http/src/app/types.ts#routes{ts}
 
 ## Authenticators
 

@@ -20,12 +20,14 @@ import { isValidupError } from 'validup';
 import {
     DEFAULT_BODY_LIMIT,
     DEFAULT_MAX_OPEN_STREAMS,
+    DEFAULT_METRICS_PATH,
     DEFAULT_READY_TIMEOUT_MS,
     DEFAULT_STREAM_POLL_MS,
+    RESERVED_ROUTE_SEGMENTS,
     STREAM_RETRY_AFTER_SECONDS,
 } from './constants.ts';
 import { boundIssues } from '../request/helpers.ts';
-import type { HttpAppOptions, HttpContext } from './types.ts';
+import type { HttpAppOptions, HttpContext, HttpRoute } from './types.ts';
 
 type ErrorBody = {
     status: number;
@@ -43,6 +45,37 @@ const CORE_STATUS: Record<string, number> = {
 };
 
 const APP_ERROR_CODE = 'APP_ERROR';
+
+const STATIC_ROUTE_PATH = /^(?:\/[\w.~-]+)+$/;
+
+/**
+ * Extra routes: static paths, unique per method, never under a built-in
+ * route's first segment or on the metrics path.
+ */
+function validateRoutes(options: HttpAppOptions): HttpRoute[] {
+    const routes = [...(options.routes ?? [])];
+    const metricsPath = options.metrics === false ?
+        undefined :
+        options.metrics?.metricsPath ?? DEFAULT_METRICS_PATH;
+    const seen = new Set<string>();
+    for (const route of routes) {
+        if (!STATIC_ROUTE_PATH.test(route.path)) {
+            throw new InvalidAgentDefinitionError(`Route path "${route.path}" must be a static path starting with "/".`);
+        }
+        // routup matches paths case-insensitively
+        const path = route.path.toLowerCase();
+        const segment = path.split('/')[1] ?? '';
+        if (RESERVED_ROUTE_SEGMENTS.includes(segment) || path === metricsPath?.toLowerCase()) {
+            throw new InvalidAgentDefinitionError(`Route path "${route.path}" collides with a built-in route.`);
+        }
+        const key = `${route.method} ${path}`;
+        if (seen.has(key)) {
+            throw new InvalidAgentDefinitionError(`Route "${route.method} ${route.path}" is registered twice.`);
+        }
+        seen.add(key);
+    }
+    return routes;
+}
 
 export function buildContext(options: HttpAppOptions): HttpContext {
     const agents = new Map<string, HttpAppOptions['agents'][number]>();
@@ -78,6 +111,7 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         shutdown: options.shutdown,
         closers: new Set(),
         closed: false,
+        routes: validateRoutes(options),
         // eslint-disable-next-line no-console
         onError: options.onError ?? ((error) => console.error('[chamberu]', error)),
     };

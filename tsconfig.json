@@ -3,6 +3,7 @@
     "compilerOptions": {
         "paths": {
             "@chamberu/core": ["./packages/core/src/index.ts"],
+            "@chamberu/github": ["./packages/github/src/index.ts"],
             "@chamberu/http": ["./packages/http/src/index.ts"],
             "@chamberu/scheduler": ["./packages/scheduler/src/index.ts"],
             "@chamberu/store-typeorm": ["./packages/store-typeorm/src/index.ts"],

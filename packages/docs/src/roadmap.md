@@ -11,6 +11,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 | `@chamberu/scheduler` | `createScheduler()` (one locked hubwire component per `cron()` trigger, overlap policies, timezones), `runJob()` for one-shot jobs |
 | `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |
 | `@chamberu/http` | REST control API, server-sent events, webhook intake, `/healthz`, `/readyz`, `/metrics`, the MCP endpoint, static-token, authup and OIDC authentication, graceful shutdown. See [HTTP API & MCP](/guide/http) |
+| `@chamberu/github` | GitHub App auth with an installation-token cache, the signed webhook route, `githubWebhook()` triggers deduplicated by delivery id, read tools and effect write tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
 
 ## Milestones
 
@@ -32,7 +33,6 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 
 | Package | Status | Purpose |
 |---|---|---|
-| `@chamberu/github` | Planned (M1) | GitHub App auth, webhook signature checks, `github.webhook()` triggers deduplicated by delivery id, issue and comment tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned (M1) | Disposable workspaces: a temp directory for development, a locked-down pod per workspace in production |
 | `@chamberu/coding` | Planned (M1) | Coding tools (read, edit, grep, bash, git diff) over a workspace |
 | `@chamberu/coding-claude-code` | Planned (M3) | A coding backend that runs Claude Code inside the sandbox |

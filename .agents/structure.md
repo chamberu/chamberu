@@ -19,6 +19,8 @@ chamberu/
 │   ├── scheduler/                   # @chamberu/scheduler (same layout; aliases core, test-kit and itself to src)
 │   ├── http/                        # @chamberu/http (same layout; aliases core, test-kit and itself to src)
 │   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
+│   ├── github/                      # @chamberu/github (same layout; aliases core, http, test-kit and itself to src)
+│   │   └── test/fixtures/deliveries/ # Recorded GitHub webhook bodies (issues.opened, a bot's issue_comment)
 │   ├── store-typeorm/               # @chamberu/store-typeorm (same layout)
 │   │   ├── src/{entities,migrations,schema,store}/
 │   │   └── test/global-setup.ts     # Starts postgres:18-alpine via testcontainers for the suite
@@ -36,7 +38,7 @@ chamberu/
 ├── .husky/commit-msg                # Runs commitlint
 ├── CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md
 ├── nx.json                          # Task orchestration and caching
-├── tsconfig.json                    # Root config, path aliases @chamberu/core, @chamberu/http, @chamberu/scheduler, @chamberu/store-typeorm and @chamberu/test-kit -> packages/*/src
+├── tsconfig.json                    # Root config, path aliases @chamberu/core, @chamberu/github, @chamberu/http, @chamberu/scheduler, @chamberu/store-typeorm and @chamberu/test-kit -> packages/*/src
 ├── tsconfig.build.json              # Shared compiler options
 ├── eslint.config.js                 # @tada5hi/eslint-config flat config
 ├── commitlint.config.mjs            # Conventional Commits
@@ -55,7 +57,7 @@ chamberu/
 | `@chamberu/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |
 | `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned | Workspaces for clone/exec/artifacts |
 | `@chamberu/coding`, `@chamberu/coding-claude-code` | Planned | Coding tools and Claude Code backend |
-| `@chamberu/github` | Planned | GitHub App auth, webhooks, tools |
+| `@chamberu/github` | Exists (0.1.0) | `createGithubApp()` (App JWT, `IClock` installation-token cache, Octokit per installation), `githubWebhook()` trigger, the signed webhook route for `createHttpApp({ routes })`, read tools and effect write tools; depends on `@octokit/core` + `plugin-paginate-rest`, peer on core, http (types only) and `ai` |
 | `@chamberu/notify-openclaw`, `@chamberu/notify-github` | Planned | Notifiers |
 | `@chamberu/ui` | Planned | Vue 3 dashboard |
 | `chamberu` | Planned | Umbrella package and CLI |
@@ -101,16 +103,27 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 
 | Path | Purpose |
 |------|---------|
-| `app/` | `createHttpApp()` (`module.ts`), `HttpAppOptions` and the internal `HttpContext` (`types.ts`), defaults (`constants.ts`), `buildContext()` and the JSON error handler (`helpers.ts`) |
+| `app/` | `createHttpApp()` (`module.ts`), `HttpAppOptions`, the `HttpRoute*` types and the internal `HttpContext` (`types.ts`), defaults and `RESERVED_ROUTE_SEGMENTS` (`constants.ts`), `buildContext()` (incl. `validateRoutes()`) and the JSON error handler (`helpers.ts`) |
 | `auth/` | `Principal`, `Authenticator` (`types.ts`), `Permission` (`constants.ts`), `agentPermission()` (`module.ts`; permission matching is core's `hasPermission(principal.permissions, ...)`), `authenticate()`, `authorize()`, `readBearerToken()`, `toInvoker()` (`helpers.ts`, internal; display name from `name` or `preferred_username`, never `email`); `static-tokens/`, `authup/`, `oidc/` hold the built-in authenticators |
 | `request/` | No barrel: `readJsonBody()`, `validateBody()`, `validatePayload()`, `decodeQuery()` (rapiq), `readIdempotencyHeader()`, `boundReceived()`, `boundIssues()` (`helpers.ts`); `KEY_MAX_LENGTH`, `RECEIVED_MAX_LENGTH` (`constants.ts`); validup validators `isString()`, `isBoolean()`, `isDefined()`, `isArrayOf()`, `isMediaType()`, `isBase64()` (`validators.ts`) |
 | `health/` | No barrel: `/healthz`, `/readyz` |
 | `runs/` | Run and artifact routes (`module.ts`), `serializeRun()`, `serializeStep()`, `canReadRun()`, `loadReadableRun()`, `loadRunArtifact()`, `contentDisposition()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `MAX_ATTACHMENTS` (`constants.ts`, internal), `RunView`, `InvokerView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE, incl. `delta`) |
 | `hooks/` | No barrel: `POST /hooks/:agent<path>` |
+| `routes/` | No barrel: `registerRoutes()` serves `HttpAppOptions.routes` (extra routes of other packages) |
 | `agents/` | `/agents`, `/schedules` and state routes (`module.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
 | `mcp/` | `createMcpEndpoint()`, `registerMcpRoutes()` (`module.ts`), the tools (`tools.ts`), `waitForRun()`, `toJsonSchema()` (`helpers.ts`), `RunSummary`, `RunToolResult` (`types.ts`) |
 | `plugins/` | No barrel: `installPlugins()` (CORS, Prometheus, rate limit) |
 | `shutdown/` | `createShutdown()`, `IShutdown`, `ShutdownOptions`, the timeout defaults |
+
+## GitHub Module Map (`packages/github/src`)
+
+| Path | Purpose |
+|------|---------|
+| `app/` | `createGithubApp()` (`module.ts`), `GithubAppOptions`, `IGithubApp`, `GithubOctokit` (`types.ts`), `DEFAULT_WEBHOOK_PATH`, `DEFAULT_GITHUB_API_URL` (`constants.ts`), `PaginatedOctokit` and option normalizers (`helpers.ts`, internal) |
+| `auth/` | No barrel: `createInstallationTokens()` (`module.ts`, token cache), `createAppJwt()`, `normalizePrivateKey()` (`helpers.ts`), `JWT_*`, `TOKEN_REFRESH_MARGIN_MS`, `GITHUB_USER_AGENT` (`constants.ts`) |
+| `trigger/` | `githubWebhook()` (`module.ts`), `GithubEvent`, `GithubPayload`, `GithubWebhookTriggerOptions` (`types.ts`); `matchesGithubTrigger()`, `defaultConcurrencyKey()` (`helpers.ts`, internal) |
+| `webhook/` | `createWebhookRoute()` (`module.ts`, internal), `verifySignature()`, `readHeaders()`, `toGithubEvent()`, `assertDerivedKey()` (`helpers.ts`), `GithubWebhookRouteOptions`, `GithubWebhookResult` (`types.ts`, the only exports) |
+| `tools/` | `createReadTools()` (`read.ts`), `createWriteTools()` (`write.ts`), `installationIdOf()`, `parseRepo()`, `stepOf()`, `toolError()`, `withOctokit()` and the input schema builders (`helpers.ts`), limits and `REPO_PATTERN` (`constants.ts`), result shapes (`types.ts`, the only exports) and the internal `RepoInput`/`NumberInput` |
 
 ## Store-TypeORM Module Map (`packages/store-typeorm/src`)
 

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Tool, ToolExecuteFunction } from 'ai';
+import type { Tool, ToolExecuteFunction, ToolExecutionOptions } from 'ai';
 import type { StateSchema } from '../state/types.ts';
 import { defineTool } from '../tool/define.ts';
 import type { ToolContext } from '../tool/types.ts';
@@ -24,8 +24,11 @@ export function effectMarker(effectKey: string): string {
 export function defineEffectTool<I, O, S extends StateSchema = StateSchema>(def: Tool<I, O, ToolContext<S>> & {
     execute: ToolExecuteFunction<I, O, ToolContext<S>>;
     contextSchema?: never;
-    /** Default: `${ctx.run.runId}:${toolName}:${stableHash(input)}`. */
-    effectKey?: (input: I, ctx: ToolContext<S>) => string;
+    /**
+     * Default: `${ctx.run.runId}:${toolName}:${stableHash(input)}`.
+     * `options` are the AI SDK call options (`toolCallId`, `messages`), e.g. to key by model step.
+     */
+    effectKey?: (input: I, ctx: ToolContext<S>, options: ToolExecutionOptions<ToolContext<S>>) => string;
     /** Remote reconciliation (e.g. find a comment by its hidden marker). */
     alreadyApplied?: (effectKey: string, input: I, ctx: ToolContext<S>) => Promise<O | undefined>;
 }): EffectTool<I, O, S> {

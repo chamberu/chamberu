@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { ToolSet } from 'ai';
+import type { ToolExecutionOptions, ToolSet } from 'ai';
 import { isObject } from 'smob';
 import { ToolNotAllowedError } from '../errors/index.ts';
 import type { IEffectStore } from '../store/types.ts';
@@ -88,7 +88,7 @@ export function wrapToolsForRun(
             execute: async (input: unknown, options: unknown) => {
                 if (allow && !allow(name)) throw new ToolNotAllowedError(name);
                 const key = hooks?.effectKey ?
-                    hooks.effectKey(input, ctx) :
+                    hooks.effectKey(input, ctx, options as ToolExecutionOptions<ToolContext>) :
                     `${ctx.run.runId}:${name}:${stableHash(input)}`;
                 // parallel identical calls within a step share one application
                 let pending = inflight.get(key);

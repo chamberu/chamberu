@@ -17,6 +17,8 @@ import {
 import {
     InvalidAgentDefinitionError,
     RunEngine,
+    TRIGGER_KEY_MAX_LENGTH,
+    ValidationError,
     defineAgent,
 } from '@chamberu/core';
 import type { Run, RunEngineOptions, RunEvent } from '@chamberu/core';
@@ -139,6 +141,16 @@ describe('RunEngine.dispatch', () => {
         expect(new Set(results.map((r) => r.runId)).size).toBe(1);
         expect(results.filter((r) => !r.deduplicated)).toHaveLength(1);
         expect((await store.listRuns({})).total).toBe(1);
+    });
+
+    it.each(['idempotencyKey', 'concurrencyKey', 'thread'])('refuses a %s above TRIGGER_KEY_MAX_LENGTH or with a NUL before any store write', async (key) => {
+        const { engine, store } = make();
+        for (const value of ['k'.repeat(TRIGGER_KEY_MAX_LENGTH + 1), 'a\u0000b']) {
+            await expect(engine.dispatch(env({ [key]: value }))).rejects.toBeInstanceOf(ValidationError);
+        }
+        expect((await store.listRuns({})).total).toBe(0);
+        const { deduplicated } = await engine.dispatch(env({ [key]: 'k'.repeat(TRIGGER_KEY_MAX_LENGTH) }));
+        expect(deduplicated).toBe(false);
     });
 
     it('rejects two agents with the same name', () => {

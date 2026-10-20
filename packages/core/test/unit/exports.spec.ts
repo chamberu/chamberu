@@ -32,6 +32,7 @@ describe('public api', () => {
         'toolPermission',
         'requireToolPermission',
         'isArtifactMediaType',
+        'assertTriggerKey',
     ])('exports %s', (name) => {
         expect(core).toHaveProperty(name);
         expect(core[name as keyof typeof core]).toBeTypeOf('function');
@@ -43,6 +44,10 @@ describe('public api', () => {
 
     it('exports the tool context schema', () => {
         expect(core.toolContextSchema['~standard'].vendor).toBe('chamberu');
+    });
+
+    it('exports the trigger key bound', () => {
+        expect(core.TRIGGER_KEY_MAX_LENGTH).toBe(255);
     });
 
     it('exports the RunStatus enum', () => {
