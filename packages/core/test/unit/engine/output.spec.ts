@@ -5,7 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Output, tool } from 'ai';
+import type { LanguageModelV4StreamPart } from '@ai-sdk/provider';
+import { Output, simulateReadableStream, tool } from 'ai';
 import type { LanguageModel, ToolSet } from 'ai';
 import {
     afterEach,
@@ -13,6 +14,7 @@ import {
     expect,
     it,
 } from 'vitest';
+import { MockLanguageModelV4 } from 'ai/test';
 import { z } from 'zod';
 import { RunEngine, defineAgent } from '@chamberu/core';
 import { MemoryStore } from '../../../src/store/index.ts';
@@ -68,6 +70,43 @@ async function runOnce(model: LanguageModel, opts: Parameters<typeof make>[1] = 
 }
 
 const text = (t: string): MockResponse => ({ parts: [{ type: 'text', text: t }] });
+
+/** A model answering `t` once, finishing with reason 'length' (cut at its output token limit). */
+function cutModel(t: string) {
+    return new MockLanguageModelV4({
+        doStream: async () => ({
+            stream: simulateReadableStream<LanguageModelV4StreamPart>({
+                chunks: [
+                    { type: 'stream-start', warnings: [] },
+                    { type: 'text-start', id: 't' },
+                    {
+                        type: 'text-delta',
+                        id: 't',
+                        delta: t,
+                    },
+                    { type: 'text-end', id: 't' },
+                    {
+                        type: 'finish',
+                        finishReason: { unified: 'length', raw: 'max_tokens' },
+                        usage: {
+                            inputTokens: {
+                                total: 1,
+                                noCache: 1,
+                                cacheRead: undefined,
+                                cacheWrite: undefined,
+                            },
+                            outputTokens: {
+                                total: 1,
+                                text: 1,
+                                reasoning: undefined,
+                            },
+                        },
+                    },
+                ],
+            }),
+        }),
+    });
+}
 
 describe('structured output', () => {
     it('stores the parsed object as the run output', async () => {
@@ -145,5 +184,83 @@ describe('structured output', () => {
         if (status === 'completed') expect(run?.output).toEqual({ label: 'bug' });
         else expect(run?.error?.code).toBe('validation_error');
         expect(model.doStreamCalls).toHaveLength(0);
+    });
+
+    it('fails naming the tool when the loop ends on a call nothing executed', async () => {
+        const run = await runOnce(mockModel([{
+            parts: [{
+                type: 'tool-call',
+                toolName: 'handoff',
+                input: { to: 'human' },
+            }],
+        }]), {
+            // no execute: the AI SDK ends the loop on the call
+            tools: () => ({ handoff: tool({ inputSchema: z.object({ to: z.string() }) }) }),
+        });
+        expect(run?.status).toBe('failed');
+        expect(run?.error?.code).toBe('incomplete_response');
+        expect(run?.error?.message).toMatch(/"handoff"/);
+        expect(run?.error?.message).not.toMatch(/could not parse/);
+    });
+
+    it('keeps completing a plain agent whose loop ends on a call nothing executed', async () => {
+        const run = await runOnce(mockModel([{
+            parts: [{ type: 'text', text: 'handing off' }, {
+                type: 'tool-call',
+                toolName: 'handoff',
+                input: { to: 'human' },
+            }],
+        }]), {
+            tools: () => ({ handoff: tool({ inputSchema: z.object({ to: z.string() }) }) }),
+            output: undefined,
+        });
+        expect(run?.status).toBe('completed');
+        expect(run?.output).toBe('handing off');
+    });
+
+    it('fails saying the answer was cut off on finish reason length', async () => {
+        const run = await runOnce(cutModel('{"label":"bu'));
+        expect(run?.status).toBe('failed');
+        expect(run?.error?.code).toBe('incomplete_response');
+        expect(run?.error?.message).toMatch(/cut off/);
+        expect(run?.error?.message).toMatch(/length/);
+    });
+
+    it('keeps the cut text of a plain agent on finish reason length', async () => {
+        const run = await runOnce(cutModel('{"label":"bu'), { output: undefined });
+        expect(run?.status).toBe('completed');
+        expect(run?.output).toBe('{"label":"bu');
+    });
+
+    it('fails an earlier execution\'s cut answer at the step limit as incomplete', async () => {
+        const model = mockModel([]);
+        const { engine, store } = make(model, { maxSteps: 1 });
+        const { runId } = await engine.dispatch(env);
+        await store.saveCheckpoint({
+            runId,
+            stepIndex: 0,
+            messages: [
+                { role: 'user', content: 'q' },
+                { role: 'assistant', content: [{ type: 'text', text: '{"label":"bu' }] },
+            ],
+            finishReason: 'length',
+            createdAt: new Date(),
+        });
+        await engine.start();
+        await engine.idle();
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('failed');
+        expect(run?.error?.code).toBe('incomplete_response');
+        expect(model.doStreamCalls).toHaveLength(0);
+    });
+
+    it('bounds the answer quoted in a validation error', async () => {
+        const answer = 'x'.repeat(5000);
+        const run = await runOnce(mockModel([text(answer)]));
+        expect(run?.status).toBe('failed');
+        expect(run?.error?.code).toBe('validation_error');
+        expect(run?.error?.message).toMatch(/could not parse/);
+        expect(run?.error?.message).toMatch(/x…$/);
+        expect(run?.error?.message.length).toBeLessThan(600);
     });
 });

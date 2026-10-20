@@ -10,6 +10,7 @@ import type {
     LanguageModelResponseMetadata,
     LanguageModelUsage,
     ModelMessage,
+    StepResult,
     ToolApprovalStatus,
     ToolLoopAgentSettings,
     ToolSet,
@@ -19,11 +20,12 @@ import type { ApprovalPolicy } from '../../agent/types.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
-import { BudgetExceededError, ValidationError } from '../../errors/index.ts';
+import { BudgetExceededError, IncompleteResponseError, ValidationError } from '../../errors/index.ts';
 import type { Budget, Checkpoint, RunContext } from '../../run/types.ts';
 import { createAgentState } from '../../state/module.ts';
 import { createStateTools } from '../../state/tools.ts';
 import type { TriggerEnvelope } from '../../trigger/types.ts';
+import { MAX_ERROR_CAUSE_LENGTH } from './constants.ts';
 import type { ApprovalRequest, ExecuteContext } from './types.ts';
 
 export function renderTrigger(envelope: TriggerEnvelope): string {
@@ -211,12 +213,45 @@ export function budgetExceeded(budget: Budget, kind: 'steps' | 'tokens'): Budget
 
 /**
  * A structured output that failed to parse or validate, as a core ValidationError;
- * the cause (JSON parse or schema error) names the offending text or field.
+ * the cause (JSON parse or schema error) names the offending text or field, cut
+ * to MAX_ERROR_CAUSE_LENGTH characters (the whole answer stays in the llm step).
  */
 export function toValidationError(error: unknown): ValidationError {
     const message = error instanceof Error ? error.message : String(error);
-    const cause = isObject(error) && error.cause instanceof Error ? error.cause.message : undefined;
+    let cause = isObject(error) && error.cause instanceof Error ? error.cause.message : undefined;
+    if (cause && cause.length > MAX_ERROR_CAUSE_LENGTH) cause = `${cause.slice(0, MAX_ERROR_CAUSE_LENGTH)}…`;
     return new ValidationError(cause ? `${message} ${cause}` : message);
+}
+
+/** Names of the step's tool calls that got neither a result nor an error. */
+export function unansweredToolNames(step: StepResult<ToolSet> | undefined): string[] {
+    if (!step) return [];
+    const answered = new Set<string>();
+    for (const part of step.content) {
+        if (part.type === 'tool-result' || part.type === 'tool-error') answered.add(part.toolCallId);
+    }
+    return step.toolCalls.filter((call) => !answered.has(call.toolCallId)).map((call) => call.toolName);
+}
+
+/**
+ * Why a structured output has no complete answer to parse, for a loop that
+ * ended on `finishReason`: the answer was cut off ('length'), or the loop ended
+ * on tool calls nothing executed ('tool-calls' without a budget stop, e.g. a
+ * tool without `execute`). Undefined when the answer can be parsed.
+ */
+export function incompleteOutput(finishReason: string | undefined, toolNames: string[] = []): IncompleteResponseError | undefined {
+    if (finishReason === 'length') {
+        return new IncompleteResponseError(
+            'The model answer was cut off at its output token limit (finish reason length), so there is no complete output to parse.',
+        );
+    }
+    if (finishReason === 'tool-calls') {
+        const names = toolNames.length > 0 ? toolNames.map((name) => `"${name}"`).join(', ') : 'a tool';
+        return new IncompleteResponseError(
+            `The model ended on a call to ${names} that nothing executed (a tool without execute), so there is no final answer to parse.`,
+        );
+    }
+    return undefined;
 }
 
 /**

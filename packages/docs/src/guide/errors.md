@@ -12,7 +12,7 @@ Every error chamberu throws extends `ChamberuError`, which extends ebec's `BaseE
 | `BudgetExceededError` | `BUDGET_EXCEEDED` | `BudgetExceeded` | A run hit `maxSteps` or `maxTokens` while the model still wanted tools |
 | `TimeoutError` | `TIMEOUT` | `Timeout` | An execution exceeded `timeoutMs` |
 | `FatalToolError` | `FATAL_TOOL` | `FatalToolError` (or a custom code) | A tool decides the run must fail |
-| `IncompleteResponseError` | `INCOMPLETE_RESPONSE` | `incomplete_response` | The model gave no complete answer and the run fails: its stream ended without a finish part |
+| `IncompleteResponseError` | `INCOMPLETE_RESPONSE` | `incomplete_response` | The model gave no complete answer and the run fails: its stream ended without a finish part, or (with [structured `output`](/guide/agents#structured-output)) the answer was cut off at the output token limit or the loop ended on a tool call nothing executed |
 | `ToolNotAllowedError` | `TOOL_NOT_ALLOWED` | `tool_not_allowed` | A call to a tool the agent's `toolPolicy` refuses (only from an older history); it goes back to the model as a tool error, the run goes on |
 | `LeaseLostError` | `LEASE_LOST` | `lease_lost` | Reported to `onError` when an engine stops executing a run whose claim it lost; carries `runId` |
 | `ValidationError` | `VALIDATION` | `validation_error` | A state document fails its schema (carries `issues`); an invalid attachment at `dispatch()` or `artifacts.put()`; a final answer that does not parse as the agent's [structured `output`](/guide/agents#structured-output) (the run fails) |

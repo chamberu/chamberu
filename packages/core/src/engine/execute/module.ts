@@ -29,6 +29,7 @@ import {
     assembleTools,
     budgetExceeded,
     endsOnApprovalResponse,
+    incompleteOutput,
     initialMessage,
     lastAssistantText,
     outputContext,
@@ -36,6 +37,7 @@ import {
     toRunError,
     toToolApproval,
     toValidationError,
+    unansweredToolNames,
     untilAborted,
     withoutToolCalls,
 } from './helpers.ts';
@@ -79,6 +81,11 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
             const { output } = agent.definition;
             if (!output) {
                 await ctx.finish({ status: RunStatus.COMPLETED, output: text });
+                return;
+            }
+            const incomplete = incompleteOutput(checkpoint.finishReason);
+            if (incomplete) {
+                await ctx.finish({ status: RunStatus.FAILED, error: toRunError(incomplete) });
                 return;
             }
             try {
@@ -416,11 +423,21 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         return;
     }
 
+    // a plain agent keeps the text it got (cut, or before a call nothing executed)
     if (!agent.definition.output) {
         await ctx.finish({
             status: RunStatus.COMPLETED,
             usage,
             output: result.text,
+        });
+        return;
+    }
+    const incomplete = incompleteOutput(result.finishReason, unansweredToolNames(result.steps.at(-1)));
+    if (incomplete) {
+        await ctx.finish({
+            status: RunStatus.FAILED,
+            usage,
+            error: toRunError(incomplete),
         });
         return;
     }

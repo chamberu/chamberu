@@ -57,7 +57,7 @@ By default a completed run's `output` is the text of the model's last answer. Wi
 
 <<< @/snippets/agents.ts#output
 
-The model may call tools first; only the final answer is parsed. A final answer that is no valid JSON or fails the schema fails the run with `ValidationError` (`run.error.code` `validation_error`, the message from the AI SDK's cause). A run whose step budget an earlier execution used up parses the last answer in its checkpoint the same way.
+The model may call tools first; only the final answer is parsed. A final answer that is no valid JSON or fails the schema fails the run with `ValidationError` (`run.error.code` `validation_error`, the message from the AI SDK's cause, its quoted text cut to 500 characters; the whole answer stays in the `llm` step). Two loop ends have no answer to parse and fail the run with `IncompleteResponseError` (`incomplete_response`) instead: an answer cut off at the output token limit (finish reason `length`), and a loop that ended on a tool call nothing executed (a tool without `execute`, outside a budget stop). A run whose step budget an earlier execution used up parses the last answer in its checkpoint the same way. An agent without `output` keeps completing with the text it got in both cases.
 
 ## Files
 
