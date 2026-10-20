@@ -25,7 +25,7 @@ describe('toInvoker', () => {
         expect(invoker.permissions).not.toBe(permissions);
     });
 
-    it('takes the name from name, then preferred_username, then email', () => {
+    it('takes the name from name, then preferred_username, never email', () => {
         const base = {
             id: 'u1', 
             kind: 'authup', 
@@ -40,7 +40,7 @@ describe('toInvoker', () => {
             }, 
         }).name).toBe('Alice');
         expect(toInvoker({ ...base, claims: { preferred_username: 'alice', email: 'a@x' } }).name).toBe('alice');
-        expect(toInvoker({ ...base, claims: { email: 'a@x' } }).name).toBe('a@x');
+        expect(toInvoker({ ...base, claims: { email: 'a@x' } })).not.toHaveProperty('name');
         expect(toInvoker({
             ...base,
             claims: {
@@ -48,7 +48,7 @@ describe('toInvoker', () => {
                 preferred_username: 42, 
                 email: 'a@x', 
             }, 
-        }).name).toBe('a@x');
+        })).not.toHaveProperty('name');
         expect(toInvoker({ ...base, claims: {} })).not.toHaveProperty('name');
     });
 

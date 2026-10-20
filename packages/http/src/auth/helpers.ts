@@ -13,13 +13,16 @@ import type { HttpContext } from '../app/types.ts';
 import { PRINCIPAL } from './constants.ts';
 import type { Principal } from './types.ts';
 
-/** Claims read as the invoker's display name, first non-empty string wins. */
-const NAME_CLAIMS = ['name', 'preferred_username', 'email'] as const;
+/**
+ * Claims read as the invoker's display name, first non-empty string wins.
+ * Never `email`: the name reaches every reader of the run.
+ */
+const NAME_CLAIMS = ['name', 'preferred_username'] as const;
 
 /**
  * The run invoker (or approver) for a principal: a snapshot of `id`,
  * `kind` and `permissions`, plus a display `name` from the claims (`name`,
- * `preferred_username`, then `email`). Never carries the claims themselves.
+ * then `preferred_username`; never `email`). Never carries the claims themselves.
  */
 export function toInvoker(principal: Principal): Invoker {
     const name = NAME_CLAIMS

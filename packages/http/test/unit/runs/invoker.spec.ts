@@ -65,6 +65,24 @@ describe('run invoker over REST', () => {
         });
     });
 
+    it('never takes an email claim as the name, so readers never see it', async () => {
+        const bobAuth = async (request: Request): Promise<Principal | undefined> => {
+            if (request.headers.get('authorization') !== 'Bearer bob') return undefined;
+            return {
+                id: 'user-2',
+                kind: 'oidc',
+                permissions: ['agent:gate:run'],
+                claims: { email: 'bob@example.com' },
+            };
+        };
+        const { app, store } = createRunTestApp({ auth: [testAuth, bobAuth] });
+        const runId = await startRun(app, 'bob');
+        expect((await store.getRun(runId))?.trigger.invoker).not.toHaveProperty('name');
+        const response = await call(app, 'GET', `/runs/${runId}`, { token: READER_TOKEN });
+        expect(response.status).toBe(200);
+        expect(await response.text()).not.toContain('bob@example.com');
+    });
+
     it('never takes the invoker from the body', async () => {
         const { app, store } = setup();
         const response = await call(app, 'POST', '/agents/echo/runs', {

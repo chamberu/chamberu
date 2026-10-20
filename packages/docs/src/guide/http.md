@@ -86,7 +86,7 @@ A `*` segment matches exactly one segment (`agent:*:run`). A client that may sta
 
 ## Invoker
 
-`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name`, `preferred_username` or `email` claim (static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook runs have no invoker, and neither ever comes from a request body.
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name` or `preferred_username` claim (never `email`, since every reader of the run sees the name; static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook runs have no invoker, and neither ever comes from a request body.
 
 The invoker is a snapshot: a run keeps the grants it was started with, even when a grant is revoked while it waits on an approval. Responses (REST, SSE, MCP) carry the invoker and the approver without their `permissions`, so a `run:read` holder never learns another principal's grants.
 
