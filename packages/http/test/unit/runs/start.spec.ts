@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { defineAgent, http } from '@chamberu/core';
+import { staticTokens } from '@chamberu/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
@@ -46,6 +47,26 @@ describe('POST /agents/:name/runs', () => {
         const first = await (await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { idempotencyKey: 'k1' } })).json();
         const second = await (await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { idempotencyKey: 'k1' } })).json();
         expect(second).toEqual({ runId: first.runId, deduplicated: true });
+    });
+
+    it('scopes an idempotency key to the principal', async () => {
+        const low = 'low-runner-token-0123456789';
+        const high = 'high-runner-token-0123456789';
+        const { app, store } = createRunTestApp({
+            auth: [staticTokens({
+                tokens: {
+                    [low]: { id: 'u-low', permissions: ['agent:echo:run'] },
+                    [high]: { id: 'u-high', permissions: ['agent:echo:run', 'tool:echo:*'] },
+                },
+            })],
+        });
+        const start = async (token: string) => (await call(app, 'POST', '/agents/echo/runs', { token, body: { idempotencyKey: 'issue-42' } })).json();
+        const first = await start(low);
+        const second = await start(high);
+        expect(second.deduplicated).toBe(false);
+        expect(second.runId).not.toBe(first.runId);
+        expect((await store.getRun(second.runId))?.trigger.invoker?.id).toBe('u-high');
+        expect(await start(high)).toEqual({ runId: second.runId, deduplicated: true });
     });
 
     it('dedupes by the Idempotency-Key header', async () => {

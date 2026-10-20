@@ -21,7 +21,7 @@ describe('public api', () => {
         expect(pkg.STORE_ENTITIES).toBeInstanceOf(Array);
         expect(pkg.STORE_ENTITIES).toHaveLength(9);
         expect(pkg.STORE_MIGRATIONS).toBeInstanceOf(Array);
-        expect(pkg.STORE_MIGRATIONS).toHaveLength(2);
+        expect(pkg.STORE_MIGRATIONS).toHaveLength(3);
         expect(pkg.MIGRATION_LOCK_NAME).toBe('chamberu:migrations');
     });
 });

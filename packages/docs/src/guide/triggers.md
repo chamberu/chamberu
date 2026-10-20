@@ -48,6 +48,8 @@ Over HTTP, `POST /agents/:name/runs` takes the same list with `data` as base64 (
 
 With an `idempotencyKey`, `dispatch()` claims the key in the store under the scope `<agent>:<source>` (for example `triage:webhook`) for 7 days. The first dispatch creates the run. Every later dispatch with the same agent, source and key returns the existing run id with `deduplicated: true`, and no new run is created.
 
+A dispatch with an [invoker](#the-envelope) claims the key under `<agent>:<source>:<kind>:<id>` instead (`kind` and `id` URI-encoded). Keys are then per invoker: the same invoker's retry is deduplicated, while another invoker sending the same key gets a run of its own and never learns about the first.
+
 Use a key that is stable across redeliveries: a GitHub delivery id, a cron job plus its scheduled time, or a key your client sends.
 
 If the store claimed the key but the run was never created (for example `createRun` failed right after the claim), the next dispatch with that key creates the run under the reserved id. `createRun` is insert-if-absent, so concurrent dispatches create it once.

@@ -46,8 +46,9 @@ export type TriggerEnvelope<P = unknown> = {
     attachments?: Artifact[];
     /**
      * Who started the run; only ever set from an authenticator (never from a
-     * payload). Absent for cron and webhook runs. A deduplicated dispatch keeps
-     * the first run's invoker.
+     * payload). Absent for cron and webhook runs. With an invoker the
+     * idempotency key is scoped to it, so only the same invoker's dispatch
+     * is deduplicated (and gets its own first run).
      */
     invoker?: Invoker;
     receivedAt: Date;

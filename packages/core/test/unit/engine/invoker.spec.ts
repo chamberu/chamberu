@@ -155,17 +155,70 @@ describe('invoker', () => {
         expect((await store.getRun(runId))?.trigger.invoker).toEqual(alice);
     });
 
-    it('keeps the first invoker on a deduplicated dispatch', async () => {
+    it('dedupes a key per invoker: the same invoker gets the first run', async () => {
+        const { engine, store } = setup({ model: mockModel([]) });
+        const first = await engine.dispatch(env(alice, 'same'));
+        const second = await engine.dispatch(env({ ...alice, permissions: [] }, 'same'));
+        expect(second).toEqual({ runId: first.runId, deduplicated: true });
+        expect((await store.getRun(first.runId))?.trigger.invoker).toEqual(alice);
+    });
+
+    it('gives two invokers with the same key a run each', async () => {
         const { engine, store } = setup({ model: mockModel([]) });
         const first = await engine.dispatch(env(alice, 'same'));
         const bob: Invoker = {
-            id: 'u-bob', 
-            kind: 'user', 
-            permissions: ['*'], 
+            id: 'u-bob',
+            kind: 'user',
+            permissions: ['*'],
         };
         const second = await engine.dispatch(env(bob, 'same'));
-        expect(second).toEqual({ runId: first.runId, deduplicated: true });
+        expect(second.deduplicated).toBe(false);
+        expect(second.runId).not.toBe(first.runId);
         expect((await store.getRun(first.runId))?.trigger.invoker).toEqual(alice);
+        expect((await store.getRun(second.runId))?.trigger.invoker).toEqual(bob);
+    });
+
+    it('keeps an invoker id apart from another kind and from a run without an invoker', async () => {
+        const { engine } = setup({ model: mockModel([]) });
+        const ids = [
+            await engine.dispatch(env({
+                id: 'a:b', 
+                kind: 'user', 
+                permissions: [], 
+            }, 'same')),
+            await engine.dispatch(env({
+                id: 'b', 
+                kind: 'user:a', 
+                permissions: [], 
+            }, 'same')),
+            await engine.dispatch(env({
+                id: 'a:b', 
+                kind: 'client', 
+                permissions: [], 
+            }, 'same')),
+            await engine.dispatch(env(undefined, 'same')),
+        ];
+        expect(ids.map((r) => r.deduplicated)).toEqual([false, false, false, false]);
+        expect(new Set(ids.map((r) => r.runId)).size).toBe(4);
+        // without an invoker the key dedupes as before
+        expect(await engine.dispatch(env(undefined, 'same'))).toEqual({ runId: ids[3]!.runId, deduplicated: true });
+    });
+
+    it('claims the key under <agent>:<source>:<kind>:<id>, each part URI-encoded', async () => {
+        const { engine, store } = setup({ model: mockModel([]) });
+        const scopes: string[] = [];
+        const claimKey = store.claimKey.bind(store);
+        store.claimKey = (scope, ...rest) => {
+            scopes.push(scope);
+            return claimKey(scope, ...rest);
+        };
+        await engine.dispatch(env({
+            id: 'a:b c', 
+            kind: 'user', 
+            permissions: [], 
+        }, 'k'));
+        await engine.dispatch(env(undefined, 'k'));
+        expect(scopes).toEqual(['release:http:user:a%3Ab%20c', 'release:http']);
     });
 
     it('hands the invoker to the tool factory and approval policies', async () => {

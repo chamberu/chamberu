@@ -32,7 +32,7 @@ import type {
     WaitPoint,
 } from '../run/types.ts';
 import type { IStore } from '../store/types.ts';
-import { toInvoker } from '../trigger/helpers.ts';
+import { idempotencyScope, toInvoker } from '../trigger/helpers.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 import {
     APPROVAL_TIMED_OUT,
@@ -157,7 +157,7 @@ export class RunEngine {
 
         if (trigger.idempotencyKey !== undefined) {
             const claimed = await this.store.claimKey(
-                `${trigger.agent}:${trigger.source}`,
+                idempotencyScope(trigger),
                 trigger.idempotencyKey,
                 runId,
                 IDEMPOTENCY_TTL_MS,

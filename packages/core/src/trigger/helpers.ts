@@ -7,7 +7,7 @@
 
 import { isObject } from 'smob';
 import { ValidationError } from '../errors/index.ts';
-import type { Invoker } from './types.ts';
+import type { Invoker, TriggerEnvelope } from './types.ts';
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
@@ -35,4 +35,16 @@ export function toInvoker(value: unknown, label = 'invoker'): Invoker {
         ...(name !== undefined ? { name } : {}),
         permissions: [...permissions],
     };
+}
+
+/**
+ * The idempotency scope of an envelope: `<agent>:<source>`, plus
+ * `:<kind>:<id>` of the invoker when there is one (each part
+ * URI-encoded, so a `:` inside cannot make two invokers collide).
+ */
+export function idempotencyScope(envelope: Pick<TriggerEnvelope, 'agent' | 'source' | 'invoker'>): string {
+    const base = `${envelope.agent}:${envelope.source}`;
+    const { invoker } = envelope;
+    if (!invoker) return base;
+    return `${base}:${encodeURIComponent(invoker.kind)}:${encodeURIComponent(invoker.id)}`;
 }

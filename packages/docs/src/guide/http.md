@@ -98,7 +98,7 @@ The invoker is a snapshot: a run keeps the grants it was started with, even when
 - `get_run`, `list_runs`: the REST read rule applies.
 - `resume_run`: `{ token, approved, reason? }`, with the approve permission.
 
-An MCP start dedupes its `idempotencyKey` under `<agent>:mcp`, a REST start under `<agent>:http`. A client registers the endpoint like any HTTP MCP server:
+An MCP start dedupes its `idempotencyKey` under `<agent>:mcp:<kind>:<id>`, a REST start under `<agent>:http:<kind>:<id>` (the principal's `kind` and `id`, URI-encoded): one key used over both transports, or by two principals, creates two runs. A client registers the endpoint like any HTTP MCP server:
 
 <<< @/snippets/http.ts#mcp
 
