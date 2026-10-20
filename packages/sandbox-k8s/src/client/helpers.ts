@@ -50,8 +50,9 @@ export function exitCodeOf(status: V1Status): number {
     if (status.status === 'Success') return 0;
     if (status.reason === 'NonZeroExitCode') {
         const cause = status.details?.causes?.find((item) => item.reason === 'ExitCode');
-        const code = Number(cause?.message);
-        if (Number.isSafeInteger(code)) return code;
+        const text = cause?.message;
+        // Number('') is 0: only digits count as an exit code
+        if (typeof text === 'string' && /^\d{1,3}$/.test(text)) return Number(text);
     }
     throw new SandboxError(`exec failed: ${status.message ?? status.reason ?? 'unknown status'}`);
 }

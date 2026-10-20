@@ -292,6 +292,49 @@ describe('kubernetes sandbox', () => {
     });
 
     it.each([
+        'Agents',
+        'agents_1',
+        '-agents',
+        'agents-',
+        'a.b',
+        'a'.repeat(64),
+    ])('rejects the namespace %s', (namespace) => {
+        const client = createFakePodClient();
+        expect(() => createKubernetesSandbox({ namespace, client })).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('accepts valid pod labels', () => {
+        const client = createFakePodClient();
+        expect(() => createKubernetesSandbox({
+            namespace: 'a'.repeat(63),
+            client,
+            podLabels: {
+                team: 'x',
+                'example.com/tier': 'Back_end.1',
+                empty: '',
+                long: 'v'.repeat(63),
+            },
+        })).not.toThrow();
+    });
+
+    it.each([
+        ['a value over 63 characters', { team: 'v'.repeat(64) }],
+        ['a value with a space', { team: 'a b' }],
+        ['a value with a non-alphanumeric end', { team: 'x-' }],
+        ['an empty key', { '': 'x' }],
+        ['a key with an invalid prefix', { 'Example.com/tier': 'x' }],
+        ['a key with an empty name', { 'example.com/': 'x' }],
+        ['a key name over 63 characters', { ['k'.repeat(64)]: 'x' }],
+    ])('rejects podLabels with %s', (_name, podLabels) => {
+        const client = createFakePodClient();
+        expect(() => createKubernetesSandbox({
+            namespace: 'agents',
+            client,
+            podLabels,
+        })).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it.each([
         'chamberu.dev/run',
         'chamberu.dev/workspace',
         'app.kubernetes.io/managed-by',

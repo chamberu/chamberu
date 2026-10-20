@@ -37,8 +37,32 @@ const MANAGED_LABELS = [...Object.keys(SANDBOX_LABELS), RUN_LABEL, WORKSPACE_LAB
 
 const CLIENT_METHODS = ['create', 'read', 'delete', 'list', 'exec'];
 
+/** A DNS-1123 label (namespaces), at most 63 characters. */
+const DNS_LABEL = /^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/;
+
+/** A DNS-1123 subdomain (label key prefixes), at most 253 characters. */
+const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;
+
+/** A label name or value: alphanumeric ends, `-`, `_` and `.` inside, at most 63 characters. */
+const LABEL_NAME = /^[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$/;
+
 function isName(value: unknown): boolean {
     return typeof value === 'string' && value.length > 0 && !value.includes('\0');
+}
+
+/** True for a Kubernetes label key: `[prefix/]name`. */
+function isLabelKey(key: string): boolean {
+    const slash = key.lastIndexOf('/');
+    if (slash === -1) return LABEL_NAME.test(key);
+    const prefix = key.slice(0, slash);
+    return prefix.length <= 253 &&
+        DNS_SUBDOMAIN.test(prefix) &&
+        LABEL_NAME.test(key.slice(slash + 1));
+}
+
+/** True for a Kubernetes label value: empty or a label name. */
+function isLabelValue(value: unknown): boolean {
+    return typeof value === 'string' && (value === '' || LABEL_NAME.test(value));
 }
 
 function assertPositiveInteger(name: string, value: unknown): void {
@@ -52,8 +76,8 @@ export function assertKubernetesOptions(options: KubernetesSandboxOptions): void
     if (!isObject(options)) {
         throw new InvalidAgentDefinitionError('createKubernetesSandbox() options must be an object.');
     }
-    if (!isName(options.namespace)) {
-        throw new InvalidAgentDefinitionError('namespace must be a non-empty string.');
+    if (typeof options.namespace !== 'string' || !DNS_LABEL.test(options.namespace)) {
+        throw new InvalidAgentDefinitionError(`namespace must be a DNS-1123 label, got ${JSON.stringify(options.namespace)}.`);
     }
     const {
         client,
@@ -80,8 +104,11 @@ export function assertKubernetesOptions(options: KubernetesSandboxOptions): void
             if (MANAGED_LABELS.includes(key)) {
                 throw new InvalidAgentDefinitionError(`podLabels may not set the managed label ${key}.`);
             }
-            if (typeof value !== 'string') {
-                throw new InvalidAgentDefinitionError(`podLabels ${key} must be a string.`);
+            if (!isLabelKey(key)) {
+                throw new InvalidAgentDefinitionError(`podLabels key ${JSON.stringify(key)} is no valid label key.`);
+            }
+            if (!isLabelValue(value)) {
+                throw new InvalidAgentDefinitionError(`podLabels ${key} must be a label value (at most 63 characters, alphanumeric ends, - _ . inside).`);
             }
         }
     }

@@ -244,6 +244,21 @@ describe('pod client: exec', () => {
         await expect(client.exec('p', execInput().input)).resolves.toEqual({ exitCode: 3 });
     });
 
+    it.each([
+        ['an empty', [{ reason: 'ExitCode', message: '' }]],
+        ['a missing', [{ reason: 'ExitCode' }]],
+        ['a non-numeric', [{ reason: 'ExitCode', message: '1e2' }]],
+        ['no', []],
+    ])('turns a non-zero exit with %s exit code into SandboxError', async (_name, causes) => {
+        const { client } = setup(({ status }) => status({
+            status: 'Failure',
+            reason: 'NonZeroExitCode',
+            message: 'command terminated with non-zero exit code',
+            details: { causes },
+        }));
+        await expect(client.exec('p', execInput().input)).rejects.toBeInstanceOf(SandboxError);
+    });
+
     it('turns any other failure into SandboxError', async () => {
         const { client } = setup(({ status }) => status({ status: 'Failure', message: 'container not found' }));
         const error = await client.exec('p', execInput().input).catch((e: unknown) => e);
@@ -331,7 +346,8 @@ describe('createPodClient', () => {
         kubeConfig.loadFromOptions({
             clusters: [{
                 name: 'c',
-                server: 'https://127.0.0.1:1',
+                // an unparsable URL: the request fails before any socket opens
+                server: 'https://[invalid',
                 skipTLSVerify: true,
             }],
             users: [{ name: 'u', token: 't' }],
@@ -344,7 +360,6 @@ describe('createPodClient', () => {
         });
         const client = createPodClient({ kubeConfig, namespace: 'agents' });
         expect(Object.keys(client).sort()).toEqual(['create', 'delete', 'exec', 'list', 'read']);
-        // nothing listens on port 1: the request fails as a SandboxError
         await expect(client.read('p')).rejects.toBeInstanceOf(SandboxError);
     });
 });
