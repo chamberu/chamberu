@@ -20,7 +20,7 @@ Infrastructure failures fail the run as well: a store write that throws, or an u
 
 ## Cancellation inside tools
 
-Every tool factory gets `run.signal`. It aborts on cancel, drain, timeout and a lost lease. Pass it to `fetch`, child processes and other cancellable work so an aborted run stops quickly.
+Every tool factory gets `run.signal`. It aborts on cancel, drain, timeout and a lost lease, and once the execution has ended (so work a tool left running does not outlive it). Pass it to `fetch`, child processes and other cancellable work so an aborted run stops quickly.
 
 ## Tools with side effects
 

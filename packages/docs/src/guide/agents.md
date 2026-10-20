@@ -44,7 +44,7 @@ The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` ke
 | `run.runId` | `string` | Id of the run being executed |
 | `run.agent` | `string` | Agent name |
 | `run.trigger` | `TriggerEnvelope` | The envelope that started the run; `run.trigger.invoker` is who started it, if an authenticator knew |
-| `run.signal` | `AbortSignal` | Aborts on cancel, drain, a lost lease or the run timeout |
+| `run.signal` | `AbortSignal` | Aborts on cancel, drain, a lost lease or the run timeout, and once the execution has ended |
 | `artifacts` | `IRunArtifacts` | The run's files: `put()`, `get(id)`, `list()`. See [Files](#files) |
 
 A factory lets tools close over per-run data, such as the run id in an [effect key](/guide/effect-tools) or the repository named in the payload. Pass `run.signal` on to `fetch` and other cancellable work.

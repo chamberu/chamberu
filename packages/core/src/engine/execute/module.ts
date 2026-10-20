@@ -103,7 +103,9 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     }
 
     const timeout = budget.timeoutMs === undefined ? undefined : timeoutSignal(clock, budget.timeoutMs);
-    const signal = timeout ? AbortSignal.any([ctx.signal, timeout.signal]) : ctx.signal;
+    // aborted on every exit, so a stream left unread (e.g. a throw while consuming it) is cancelled
+    const local = new AbortController();
+    const signal = AbortSignal.any([ctx.signal, local.signal, ...(timeout ? [timeout.signal] : [])]);
     const runContext: RunContext = {
         runId: run.id,
         agent: run.agent,
@@ -355,6 +357,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         work.catch(() => {});
         result = await untilAborted(work, signal);
     } catch (error) {
+        // stop the model work right away; the cause is read from ctx.signal, timeout and fatal
+        local.abort();
         // the step-end writes in flight land completely before the run settles, never after
         let settled: Promise<void>;
         do {
@@ -379,6 +383,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         }
         return;
     } finally {
+        local.abort();
         timeout?.clear();
     }
 

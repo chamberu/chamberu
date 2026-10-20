@@ -30,6 +30,7 @@ export type RunContext = {
     runId: string;
     agent: string;
     trigger: TriggerEnvelope;
+    /** Aborts on cancel, drain, a lost lease or the run timeout, and once the execution has ended. */
     signal: AbortSignal;
 };
 

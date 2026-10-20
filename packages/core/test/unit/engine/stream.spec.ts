@@ -370,4 +370,60 @@ describe('streaming', () => {
         expect(run?.status).toBe('completed');
         expect(run?.output).toBe('answer');
     });
+
+    it('aborts the model stream when consuming it throws', async () => {
+        const calls: LanguageModelV4CallOptions[] = [];
+        let push: ((part: LanguageModelV4StreamPart) => void) | undefined;
+        const model = new MockLanguageModelV4({
+            doStream: async (options) => {
+                calls.push(options);
+                const stream = new ReadableStream<LanguageModelV4StreamPart>({
+                    start(controller) {
+                        controller.enqueue({ type: 'stream-start', warnings: [] });
+                        controller.enqueue({ type: 'text-start', id: 't' });
+                        push = (part) => {
+                            try {
+                                controller.enqueue(part);
+                            } catch {
+                                // closed
+                            }
+                        };
+                    },
+                });
+                return { stream };
+            },
+        });
+        const store = new MemoryStore();
+        const engine = new RunEngine({
+            store,
+            agents: [defineAgent({
+                name: 'triage',
+                instructions: 'You triage.',
+                model,
+            })],
+            resumeSecret: 's',
+            // a throwing error sink makes the listener failure escape emit
+            onError: () => {
+                throw new Error('sink failed');
+            },
+        });
+        engines.push(engine);
+        engine.on('run.delta', () => {
+            throw new Error('listener failed');
+        });
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await vi.waitFor(() => expect(push).toBeDefined());
+        push?.({
+            type: 'text-delta',
+            id: 't',
+            delta: 'x',
+        });
+        await engine.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('failed');
+        expect(run?.error).toEqual({ code: 'Error', message: 'sink failed' });
+        expect(calls[0]?.abortSignal?.aborted).toBe(true);
+    });
 });
