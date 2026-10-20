@@ -11,7 +11,7 @@ import type { IClock } from '../clock/index.ts';
 import type { INotifier } from '../notify/types.ts';
 import type { Run, Step } from '../run/types.ts';
 import type { IStore } from '../store/types.ts';
-import type { TriggerEnvelope } from '../trigger/types.ts';
+import type { Invoker, TriggerEnvelope } from '../trigger/types.ts';
 
 /**
  * A piece of model output while it streams; never stored. `step` is the
@@ -54,4 +54,6 @@ export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt' | 'atta
 export type ResumeDecision = {
     approved: boolean;
     reason?: string;
+    /** Who answered; recorded on the wait step (\`output.approver\`). */
+    approver?: Invoker;
 };

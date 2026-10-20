@@ -20,6 +20,19 @@ export type TriggerDefinition<P = unknown> = {
     idempotencyKey?(payload: P): string | undefined;
 };
 
+/**
+ * Who started a run (or answered an approval), as an authenticator resolved
+ * it: a snapshot of identity and grants taken at dispatch, never a token.
+ * Revoking a grant later does not reach a run that already holds it.
+ */
+export type Invoker = {
+    id: string;
+    /** E.g. 'user', 'robot', 'client', 'token'. */
+    kind: string;
+    name?: string;
+    permissions: readonly string[];
+};
+
 export type TriggerEnvelope<P = unknown> = {
     id: string;
     agent: string;
@@ -31,5 +44,11 @@ export type TriggerEnvelope<P = unknown> = {
     thread?: string;
     /** Files the run was started with, stored as artifacts of the run; the model gets them as file parts. */
     attachments?: Artifact[];
+    /**
+     * Who started the run; only ever set from an authenticator (never from a
+     * payload). Absent for cron and webhook runs. A deduplicated dispatch keeps
+     * the first run's invoker.
+     */
+    invoker?: Invoker;
     receivedAt: Date;
 };

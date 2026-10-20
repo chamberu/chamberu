@@ -23,12 +23,22 @@ export type ToolFactoryContext<S extends StateSchema = StateSchema> = {
 
 export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: RunContext }) => 'user' | 'allow' | 'deny');
 
+/**
+ * Decides per tool name whether a run may use a tool. A refused tool is not
+ * offered to the model; a call to it still arriving is answered with a
+ * ToolNotAllowedError tool result. Should depend only on the run snapshot
+ * (e.g. \`run.trigger.invoker\`), so the tool set is stable across executions.
+ */
+export type ToolPolicy = (toolName: string, ctx: { run: RunContext }) => boolean;
+
 export type AgentDefinition<S extends StateSchema = StateSchema> = {
     name: string;
     model: LanguageModel;
     instructions: string;
     triggers?: TriggerDefinition[];
     tools?: (ctx: ToolFactoryContext<S>) => ToolSet;
+    /** Filters the merged tool set (state tools included) per run, e.g. requireToolPermission(). */
+    toolPolicy?: ToolPolicy;
     /** Record<collection, StandardSchemaV1>. */
     state?: S;
     budget?: Partial<Budget>;

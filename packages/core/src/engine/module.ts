@@ -32,6 +32,7 @@ import type {
     WaitPoint,
 } from '../run/types.ts';
 import type { IStore } from '../store/types.ts';
+import { toInvoker } from '../trigger/helpers.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 import {
     APPROVAL_TIMED_OUT,
@@ -134,15 +135,21 @@ export class RunEngine {
         if (!this.agents.has(envelope.agent)) {
             throw new InvalidAgentDefinitionError(`unknown agent: ${envelope.agent}`);
         }
-        const { attachments, ...rest } = envelope;
+        const {
+            attachments, 
+            invoker, 
+            ...rest 
+        } = envelope;
         // before any store write: an invalid attachment stores nothing
         if (attachments !== undefined && !Array.isArray(attachments)) {
             throw new ValidationError('The attachments must be an array.');
         }
         attachments?.forEach((attachment, i) => assertArtifactInput(attachment, `attachment ${i}`));
+        const snapshot = invoker !== undefined ? toInvoker(invoker) : undefined;
         const now = this.nextCreatedAt();
         const trigger: TriggerEnvelope = {
             ...rest,
+            ...(snapshot ? { invoker: snapshot } : {}),
             id: envelope.id ?? randomUUID(),
             receivedAt: envelope.receivedAt ?? now,
         };
@@ -387,6 +394,9 @@ export class RunEngine {
      * Throws InvalidResumeTokenError for a forged, expired or superseded token.
      */
     async resume(token: string, decision: ResumeDecision): Promise<void> {
+        if (decision.approver !== undefined) {
+            decision = { ...decision, approver: toInvoker(decision.approver, 'approver') };
+        }
         const claims = verifyResumeToken(this.resumeSecret, token, this.clock.now());
         const run = await this.store.getRun(claims.runId);
         if (!run) throw new RunNotFoundError(claims.runId);
@@ -480,6 +490,7 @@ export class RunEngine {
                     approvalId: waiting.approvalId,
                     approved: decision.approved,
                     reason: decision.reason,
+                    ...(decision.approver ? { approver: decision.approver } : {}),
                 },
                 startedAt: run.updatedAt,
                 finishedAt: now,

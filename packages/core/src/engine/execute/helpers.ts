@@ -59,11 +59,16 @@ export function toRunError(error: unknown): { code: string; message: string } {
 
 /**
  * The tools handed to the agent: generated state tools (when the agent declares
- * `state`) merged with the user's tools, which win on a name clash. Seam for
- * effect memoization (wrapToolsForRun).
+ * `state`) merged with the user's tools, which win on a name clash, without
+ * those the agent's toolPolicy refuses. Seam for effect memoization and the
+ * execute-time policy re-check (wrapToolsForRun).
  */
 export function assembleTools(ctx: ExecuteContext, runContext: RunContext): ToolSet {
-    const { tools: factory, state: schema } = ctx.agent.definition;
+    const {
+        tools: factory, 
+        state: schema, 
+        toolPolicy, 
+    } = ctx.agent.definition;
     if (!factory && !schema) return {};
     const state = createAgentState(ctx.agent.name, schema, ctx.store);
     const tools: ToolSet = {
@@ -74,7 +79,11 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): Tool
             artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
         }),
     };
-    return wrapToolsForRun(tools, runContext, ctx.store);
+    if (!toolPolicy) return wrapToolsForRun(tools, runContext, ctx.store);
+    const allow = (name: string) => toolPolicy(name, { run: runContext });
+    const allowed: ToolSet = {};
+    for (const [name, def] of Object.entries(tools)) if (allow(name)) allowed[name] = def;
+    return wrapToolsForRun(allowed, runContext, ctx.store, allow);
 }
 
 export function toApprovalStatus(decision: 'user' | 'allow' | 'deny'): ToolApprovalStatus {

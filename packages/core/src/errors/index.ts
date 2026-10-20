@@ -16,4 +16,5 @@ export * from './resume-token.ts';
 export * from './run-not-found.ts';
 export * from './run-state.ts';
 export * from './timeout.ts';
+export * from './tool-not-allowed.ts';
 export * from './validation.ts';

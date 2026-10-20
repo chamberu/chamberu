@@ -5,20 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Permission } from './constants.ts';
+import { hasPermission as grantsPermission } from '@chamberu/core';
 import type { AgentAction, Principal } from './types.ts';
 
 /** `agent:<agent>:<action>`. */
 export function agentPermission(agent: string, action: AgentAction): string {
     return `agent:${agent}:${action}`;
-}
-
-function grants(granted: string, permission: string): boolean {
-    if (granted === Permission.ALL) return true;
-    const want = permission.split(':');
-    const have = granted.split(':');
-    if (want.length !== have.length) return false;
-    return have.every((segment, i) => segment === '*' || segment === want[i]);
 }
 
 /**
@@ -27,5 +19,5 @@ function grants(granted: string, permission: string): boolean {
  * exactly one segment; case-sensitive).
  */
 export function hasPermission(principal: Principal, permission: string): boolean {
-    return principal.permissions.some((granted) => grants(granted, permission));
+    return grantsPermission(principal.permissions, permission);
 }

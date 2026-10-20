@@ -24,6 +24,11 @@ describe('public api', () => {
         'InvalidResumeTokenError',
         'BudgetExceededError',
         'ArtifactNotFoundError',
+        'ToolNotAllowedError',
+        'hasPermission',
+        'matchesPermission',
+        'toolPermission',
+        'requireToolPermission',
     ])('exports %s', (name) => {
         expect(core).toHaveProperty(name);
         expect(core[name as keyof typeof core]).toBeTypeOf('function');

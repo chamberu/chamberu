@@ -15,6 +15,7 @@ export const ErrorCode = {
     LEASE_LOST: 'lease_lost',
     RUN_NOT_FOUND: 'run_not_found',
     TIMEOUT: 'Timeout',
+    TOOL_NOT_ALLOWED: 'tool_not_allowed',
     VALIDATION: 'validation_error',
 } as const;
 

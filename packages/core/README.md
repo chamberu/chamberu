@@ -203,6 +203,44 @@ await engine.resume(token, { approved: true });
 - A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
 - An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied, and the model sees the denial.
 
+### Invokers and tool access
+
+A run can carry its invoker: who started it, as an authenticator resolved it (`@chamberu/http` sets it from the request's principal). `toolPolicy` decides per tool whether the run may use it; a refused tool is not offered to the model.
+
+```typescript
+const ops = defineAgent({
+    name: 'ops',
+    model,
+    instructions: 'Operate the service.',
+    tools: () => ({ deploy, rollback }),
+    // offers a tool only when the invoker holds tool:ops:<tool>; cron and webhook runs get none
+    toolPolicy: requireToolPermission(),
+    approvals: {
+        // release managers deploy without asking
+        deploy: (_input, { runtimeContext }) => {
+            const invoker = runtimeContext.trigger.invoker;
+            return invoker && hasPermission(invoker.permissions, 'release:manage') ? 'allow' : 'user';
+        },
+    },
+});
+
+await engine.dispatch({
+    agent: 'ops',
+    trigger: 'http',
+    source: 'http',
+    payload: {},
+    invoker: { id: 'u-42', kind: 'user', permissions: ['tool:ops:deploy'] },
+});
+
+// the approver is recorded on the run's wait step
+await engine.resume(token, { approved: true, approver: { id: 'u-7', kind: 'user', permissions: [] } });
+```
+
+- The invoker (`{ id, kind, name?, permissions }`) is a snapshot taken at dispatch. A run keeps it across approvals and restarts; revoking a grant later does not reach a run that already holds it.
+- Tool code sees it as `run.trigger.invoker` in the tool factory and `ctx.trigger.invoker` in effect hooks; approval policies see it as `runtimeContext.trigger.invoker`.
+- The policy covers state tools too. A call to a refused tool that still arrives is answered with a `ToolNotAllowedError` tool result; the run goes on.
+- Permissions are `:`-separated: `*` alone grants everything, a `*` segment matches one segment, and segment counts must match. `requireToolPermission({ withoutInvoker: 'allow' })` lets runs without an invoker use every tool.
+
 ### Agent state
 
 ```typescript
@@ -261,6 +299,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()` |
 | `tools` | `(ctx) => ToolSet` | none | Tool factory, called for each execution |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections |
+| `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()` |
 | `budget` | `{ maxSteps, maxTokens?, timeoutMs? }` | `{ maxSteps: 20, timeoutMs: 900_000 }` | Per run; the timeout applies to each execution |
 | `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval: `'user'` or a function |
 | `approvalTimeoutMs` | `number` | `86_400_000` | After this, the approval is denied |
@@ -281,13 +320,15 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `wrapToolsForRun` | function | Applies effect recording to a `ToolSet` outside the engine |
 | `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API and generated state tools over a store |
+| `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
+| `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
 | `ChamberuError` | class | Base class of every error below |
-| `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
+| `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `ToolNotAllowedError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `TriggerDefinition`, `TriggerEnvelope`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `RunEngineOptions`, `IClock`.
+Types: `Agent`, `AgentDefinition`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `RunEngineOptions`, `IClock`.
 
 Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamberu/test-kit`](../test-kit).
 

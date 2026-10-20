@@ -15,7 +15,7 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { RunEngine, defineAgent } from '@chamberu/core';
+import { RunEngine, ToolNotAllowedError, defineAgent } from '@chamberu/core';
 import {
     EFFECT,
     defineEffectTool,
@@ -253,5 +253,21 @@ describe('effect tools', () => {
         });
         const tools = wrapToolsForRun({ post }, ctx, new MemoryStore());
         await expect(call(tools, 'post', { body: 'hi' })).rejects.toThrow('bad key');
+    });
+});
+
+describe('tool allow check', () => {
+    it('refuses a call the check rejects with ToolNotAllowedError, without executing', async () => {
+        let runs = 0;
+        const plain = tool({ inputSchema: schema, execute: async () => ++runs });
+        const post = defineEffectTool({ inputSchema: schema, execute: async () => ++runs });
+        const store = new MemoryStore();
+        const tools = wrapToolsForRun({ plain, post }, ctx, store, (name) => name === 'none');
+        await expect(call(tools, 'plain', { body: 'hi' })).rejects.toBeInstanceOf(ToolNotAllowedError);
+        await expect(call(tools, 'post', { body: 'hi' })).rejects.toMatchObject({ code: 'tool_not_allowed' });
+        expect(runs).toBe(0);
+
+        const allowed = wrapToolsForRun({ plain }, ctx, store, (name) => name === 'plain');
+        expect(await call(allowed, 'plain', { body: 'hi' })).toBe(1);
     });
 });
