@@ -28,7 +28,7 @@ Throws `InvalidAgentDefinitionError` when `workspaces` has no `get`. Returns `re
 | `bash` | `command`, `cwd?`, `timeoutMs?` (default 300 000, at most 1 800 000) | `ExecResult` from `@chamberu/sandbox` |
 | `git_diff` | `staged?`, `path?` | `GitDiffResult` |
 
-Every tool also takes `workspace?`, the id from `create_workspace`. A path is relative to the workspace root or starts with `/workspace/`. Input the model can correct (a bad path, a missing file, an `oldString` that is missing or ambiguous) is a `ValidationError` tool error; a sandbox failure a `SandboxError` tool error.
+Every tool also takes `workspace?`, the id from `create_workspace`. A path is relative to the workspace root or starts with `/workspace/`. Input the model can correct (a bad path, an `oldString` that is missing or ambiguous) is a `ValidationError` tool error; a missing or oversized file and any other sandbox failure a `SandboxError` tool error.
 
 <<< ../../../coding/src/tools/types.ts{ts}
 
