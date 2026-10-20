@@ -28,6 +28,8 @@ export type FakeProvider = ISandboxProvider & {
     /** Every workspace the provider handed out, by id. */
     workspaces: Map<string, ScriptedWorkspace>;
     failNextCreate(error: Error): void;
+    /** Creates wait for this promise (after recording their input) while it is set. */
+    gate?: Promise<void>;
     /** The next collectGarbage() rejects with `error`. */
     failNextGc(error: Error): void;
 };
@@ -57,6 +59,7 @@ export function createFakeProvider(options: { clock?: IClock } = {}): FakeProvid
             // a real provider never answers in the same tick
             await new Promise<void>((resolve) => { setImmediate(resolve); });
             provider.created.push(input);
+            if (provider.gate) await provider.gate;
             if (nextCreateError) {
                 const error = nextCreateError;
                 nextCreateError = undefined;

@@ -101,6 +101,8 @@ Every command runs as `timeout -k 5 <seconds> <argv>`; GNU `timeout` signals its
 
 An abort (`signal`) **detaches**: dockerode tears down the exec stream, and the command runs on until its `timeout` fires or the workspace is disposed. Every settled run disposes its workspaces (`manager.attach(engine)`), and a drain is followed by `manager.close()`, so nothing outlives the run for long. A dispose removes the container, which kills whatever still runs.
 
+dockerode sets no request timeout by default, so a hanging daemon stalls a create or a removal. `manager.close()` gives up after its `timeoutMs` (30 s) and reports what is left; to bound every request, pass a client with a timeout: `createDockerSandbox({ docker: new Docker({ timeout: 60_000 }) })` (in ms, longer than your slowest image pull).
+
 ## Garbage collection
 
 `collectGarbage()` lists the daemon's containers with the managed labels and removes every one past its `chamberu.dev/expires-at` (open workspaces of this process are disposed first), including those of crashed processes and other replicas sharing the daemon. The manager calls it from `acquire` at most every 10 minutes.

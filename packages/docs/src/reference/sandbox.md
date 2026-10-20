@@ -17,6 +17,7 @@ function createWorkspaceManager(options: WorkspaceManagerOptions): IWorkspaceMan
 
 const MAX_WORKSPACES_PER_RUN: 3;
 const GC_INTERVAL_MS: 600_000;
+const CLOSE_TIMEOUT_MS: 30_000;
 ```
 
 Throws `InvalidAgentDefinitionError` for a provider without `create` and `collectGarbage`, an empty `image`, invalid `env` or `limits`, an `allowRepo` or `onError` that is no function, a `maxWorkspacesPerRun` below 1 or a negative `gcIntervalMs`.

@@ -38,6 +38,11 @@ export type AcquireInput = {
     signal?: AbortSignal;
 };
 
+export type CloseOptions = {
+    /** How long close() waits for disposals and creates in flight. Default CLOSE_TIMEOUT_MS (30 s). */
+    timeoutMs?: number;
+};
+
 export type AcquireResult = {
     workspace: IWorkspace;
     /** True when the run already held (or was creating) the workspace of this repository. */
@@ -64,7 +69,8 @@ export interface IWorkspaceManager {
     get(runId: string, workspaceId?: string): IWorkspace;
     /**
      * Disposes one workspace (SandboxError /not found/ for an id the run does
-     * not hold, like get), or all of the run (never rejects for none).
+     * not hold, like get), or all of the run (never rejects for none); the
+     * latter aborts the run's creates in flight and waits for them.
      */
     release(runId: string, workspaceId?: string): Promise<void>;
     /**
@@ -77,10 +83,12 @@ export interface IWorkspaceManager {
     /** Disposes the manager's expired workspaces, then runs the provider's collection; returns how many went. */
     collectGarbage(): Promise<number>;
     /**
-     * Unsubscribes every attach and disposes every workspace (call after
-     * engine.drain()); afterwards acquire rejects and attach subscribes nothing.
+     * Unsubscribes every attach, aborts the creates in flight and disposes
+     * every workspace, waiting for both (call after engine.drain()); afterwards
+     * acquire rejects and attach subscribes nothing. Resolves after `timeoutMs`
+     * at the latest, reporting what is still being disposed to `onError`.
      */
-    close(): Promise<void>;
+    close(options?: CloseOptions): Promise<void>;
 }
 
 export type WorkspaceToolResult = {

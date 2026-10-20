@@ -68,7 +68,10 @@ describe('workspace tools', () => {
         const { provider, tools } = setup();
         const controller = new AbortController();
         await callTool(tools, 'create_workspace', {}, toolContext('r1', controller.signal));
-        expect(provider.created[0]!.signal).toBe(controller.signal);
+        const { signal } = provider.created[0]!;
+        expect(signal!.aborted).toBe(false);
+        controller.abort();
+        expect(signal!.aborted).toBe(true);
         expect(provider.created[0]!.runId).toBe('r1');
     });
 

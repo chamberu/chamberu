@@ -11,7 +11,11 @@ import {
     SandboxError,
     ValidationError,
 } from '@chamberu/core';
-import { GC_INTERVAL_MS, createWorkspaceManager } from '@chamberu/sandbox';
+import {
+    CLOSE_TIMEOUT_MS,
+    GC_INTERVAL_MS,
+    createWorkspaceManager,
+} from '@chamberu/sandbox';
 import type { WorkspaceManagerOptions } from '@chamberu/sandbox';
 import { ControllableClock } from '../../utils/clock.ts';
 import { createFakeProvider } from '../../utils/provider.ts';
@@ -89,8 +93,13 @@ describe('workspace manager: acquire', () => {
             image: 'node:24',
             env: { FOO: 'bar' },
             limits: { memory: '1Gi' },
-            signal: controller.signal,
+            signal: expect.any(AbortSignal),
         });
+        // the caller's signal reaches create
+        const { signal } = provider.created[0]!;
+        expect(signal!.aborted).toBe(false);
+        controller.abort();
+        expect(signal!.aborted).toBe(true);
     });
 
     it('refuses another ref for the same repo', async () => {
@@ -375,6 +384,99 @@ describe('workspace manager: acquire', () => {
         await expect(pending).rejects.toThrow(SandboxError);
         expect(provider.disposed).toHaveLength(1);
         expect(() => manager.get('r1')).toThrow(/create_workspace/);
+    });
+
+    it('close() waits for a create in flight, aborts it and disposes what it made', async () => {
+        const {
+            provider, 
+            manager, 
+            errors, 
+        } = setup();
+        const { promise: gate, resolve: open } = Promise.withResolvers<void>();
+        provider.gate = gate;
+        const pending = manager.acquire('r1', {});
+        const outcome = pending.catch((error: unknown) => error);
+        await flush();
+        expect(provider.created).toHaveLength(1);
+
+        let closed = false;
+        const closing = manager.close().then(() => { closed = true; });
+        await flush();
+        expect(provider.created[0]!.signal!.aborted).toBe(true);
+        expect(closed).toBe(false);
+
+        open();
+        await closing;
+        expect(await outcome).toBeInstanceOf(SandboxError);
+        expect(provider.disposed).toHaveLength(1);
+        expect(errors).toEqual([]);
+    });
+
+    it('release(runId) waits for the run\'s creates in flight', async () => {
+        const { provider, manager } = setup();
+        const { promise: gate, resolve: open } = Promise.withResolvers<void>();
+        provider.gate = gate;
+        const pending = manager.acquire('r1', {}).catch((error: unknown) => error);
+        await flush();
+
+        let released = false;
+        const releasing = manager.release('r1').then(() => { released = true; });
+        await flush();
+        expect(provider.created[0]!.signal!.aborted).toBe(true);
+        expect(released).toBe(false);
+        open();
+        await releasing;
+        expect(provider.disposed).toHaveLength(1);
+        expect(await pending).toBeInstanceOf(SandboxError);
+    });
+
+    it('close() gives up on a hanging dispose after timeoutMs and reports it', async () => {
+        const {
+            clock,
+            provider,
+            manager,
+            errors,
+        } = setup();
+        const { workspace } = await manager.acquire('r1', {});
+        provider.workspaces.get(workspace.id)!.dispose = () => new Promise<void>(() => {
+            // the daemon hangs
+        });
+
+        let closed = false;
+        const closing = manager.close({ timeoutMs: 5_000 }).then(() => { closed = true; });
+        await flush();
+        clock.advance(4_999);
+        await flush();
+        expect(closed).toBe(false);
+        clock.advance(1);
+        await closing;
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toBeInstanceOf(SandboxError);
+        expect((errors[0] as Error).message).toContain(workspace.id);
+        await expect(manager.acquire('r1', {})).rejects.toThrow(/closed/);
+    });
+
+    it('close() defaults to CLOSE_TIMEOUT_MS', async () => {
+        const {
+            clock,
+            provider,
+            manager,
+            errors,
+        } = setup();
+        const { workspace } = await manager.acquire('r1', {});
+        provider.workspaces.get(workspace.id)!.dispose = () => new Promise<void>(() => {
+            // the daemon hangs
+        });
+        const closing = manager.close();
+        await flush();
+        clock.advance(CLOSE_TIMEOUT_MS);
+        await closing;
+        expect(errors).toHaveLength(1);
+    });
+
+    it('close() rejects an invalid timeoutMs', async () => {
+        const { manager } = setup();
+        await expect(manager.close({ timeoutMs: -1 })).rejects.toThrow(InvalidAgentDefinitionError);
     });
 
     it('rejects invalid options', () => {

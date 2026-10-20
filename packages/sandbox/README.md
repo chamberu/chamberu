@@ -86,6 +86,8 @@ await engine.drain();
 await workspaces.close();
 ```
 
+`close()` aborts the creates still in flight and waits for them and for every disposal, at most `timeoutMs` (`CLOSE_TIMEOUT_MS`, 30 s): then it resolves and reports what is still being disposed to `onError`, so a hanging Docker daemon or Kubernetes API cannot stall the shutdown. `release(runId)` waits for the run's creates in flight the same way.
+
 ## Workspace tools
 
 `workspaces.tools()` is a plain AI SDK `ToolSet`, scoped to the calling run (`context.run.runId`):
@@ -208,10 +210,10 @@ Misconfiguration throws core `InvalidAgentDefinitionError`.
 | `createOutputCollector` | function | A capped output stream collector |
 | `WORKSPACE_ROOT`, `OUTPUT_MAX_BYTES`, `FILE_MAX_BYTES`, `EXEC_TIMEOUT_MS`, `EXEC_TIMEOUT_MAX_MS`, `SANDBOX_ENV` | constant | Workspace rules |
 | `DEFAULT_LIMITS`, `DEFAULT_SANDBOX_IMAGE`, `TMP_SIZE`, `SANDBOX_LABELS`, `RUN_LABEL`, `WORKSPACE_LABEL`, `EXPIRES_AT_KEY` | constant | Provider defaults and labels |
-| `MAX_WORKSPACES_PER_RUN`, `GC_INTERVAL_MS` | constant | Manager defaults |
+| `MAX_WORKSPACES_PER_RUN`, `GC_INTERVAL_MS`, `CLOSE_TIMEOUT_MS` | constant | Manager defaults |
 | `TIMEOUT_KILL_AFTER_SECONDS`, `EXEC_GRACE_MS`, `ALIVE_PROBE_TIMEOUT_MS` | constant | Remote timeout handling and the liveness probe bound |
 
-Types: `IWorkspace`, `WorkspaceInfo`, `ExecOptions`, `ExecResult`, `ISandboxProvider`, `WorkspaceCreateOptions`, `SandboxLimits`, `IExecTransport`, `TransportExecOptions`, `TransportExecResult`, `RemoteWorkspaceInput`, `IWorkspaceManager`, `WorkspaceManagerOptions`, `AcquireInput`, `AcquireResult`, `WorkspaceToolResult`, `DisposeWorkspaceResult`, `IOutputCollector`, `NormalizeRepoOptions`.
+Types: `IWorkspace`, `WorkspaceInfo`, `ExecOptions`, `ExecResult`, `ISandboxProvider`, `WorkspaceCreateOptions`, `SandboxLimits`, `IExecTransport`, `TransportExecOptions`, `TransportExecResult`, `RemoteWorkspaceInput`, `IWorkspaceManager`, `WorkspaceManagerOptions`, `AcquireInput`, `AcquireResult`, `CloseOptions`, `WorkspaceToolResult`, `DisposeWorkspaceResult`, `IOutputCollector`, `NormalizeRepoOptions`.
 
 ## License
 

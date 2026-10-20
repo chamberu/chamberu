@@ -6,6 +6,7 @@
  */
 
 import {
+    InvalidAgentDefinitionError,
     SandboxError,
     ValidationError,
     systemClock,
@@ -14,7 +15,7 @@ import type { ToolSet } from 'ai';
 import type { WorkspaceCreateOptions } from '../provider/types.ts';
 import { assertGitRef, normalizeRepo } from '../repo/module.ts';
 import type { IWorkspace } from '../workspace/types.ts';
-import { GC_INTERVAL_MS, MAX_WORKSPACES_PER_RUN } from './constants.ts';
+import { CLOSE_TIMEOUT_MS, GC_INTERVAL_MS, MAX_WORKSPACES_PER_RUN } from './constants.ts';
 import {
     assertManagerOptions,
     isExpired,
@@ -25,6 +26,7 @@ import { createWorkspaceTools } from './tools.ts';
 import type {
     AcquireInput,
     AcquireResult,
+    CloseOptions,
     IWorkspaceManager,
     WorkspaceManagerOptions,
 } from './types.ts';
@@ -36,6 +38,8 @@ type Entry = {
     workspace?: IWorkspace;
     /** Set while the provider creates the workspace; a pending entry counts toward the cap. */
     pending?: Promise<IWorkspace>;
+    /** Aborts the create in flight (combined with the caller's signal); release and close abort it. */
+    abort?: AbortController;
 };
 
 const NOT_FOUND = 'workspace not found in this run (disposed, expired or never created here); call create_workspace for a new one.';
@@ -128,17 +132,23 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         if (options.image !== undefined) createOptions.image = options.image;
         if (options.env !== undefined) createOptions.env = options.env;
         if (options.limits !== undefined) createOptions.limits = options.limits;
-        if (input.signal !== undefined) createOptions.signal = input.signal;
+        entry.abort = new AbortController();
+        createOptions.signal = input.signal === undefined ?
+            entry.abort.signal :
+            AbortSignal.any([input.signal, entry.abort.signal]);
 
         return (async () => {
             let workspace: IWorkspace;
             try {
                 workspace = await provider.create(createOptions);
             } catch (error) {
+                delete entry.pending;
+                delete entry.abort;
                 forget(runId, entry);
                 throw toSandboxError(error, 'workspace create failed');
             }
             delete entry.pending;
+            delete entry.abort;
             if (runs.get(runId) !== entries || entries.get(entry.key) !== entry) {
                 // released (run settled, dispose_workspace, close) while the provider created it
                 await disposeOrThrow(workspace).catch(onError);
@@ -238,9 +248,17 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         const entries = runs.get(runId);
         if (!entries) return;
         runs.delete(runId);
-        // pending creates see their run gone and dispose what they get
+        // pending creates are aborted, see their run gone and dispose what they
+        // get; waiting for them keeps a container from outliving the release
+        const pending = entries.values().toArray().flatMap((entry) => {
+            if (!entry.pending) return [];
+            entry.abort?.abort();
+            return [entry.pending];
+        });
         const held = entries.values().toArray().flatMap((entry) => (entry.workspace ? [entry.workspace] : []));
         const results = await Promise.allSettled(held.map((workspace) => disposeOrThrow(workspace)));
+        // their rejections belong to their acquire callers
+        await Promise.allSettled(pending);
         const failed = results.find((result) => result.status === 'rejected');
         if (failed) throw failed.reason;
     };
@@ -272,12 +290,35 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
             return tools;
         },
         collectGarbage,
-        async close() {
+        async close(closeOptions: CloseOptions = {}) {
+            const timeoutMs = closeOptions?.timeoutMs ?? CLOSE_TIMEOUT_MS;
+            if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0) {
+                throw new InvalidAgentDefinitionError(`close() timeoutMs must be an integer of at least 0, got ${JSON.stringify(timeoutMs)}.`);
+            }
             closed = true;
             for (const unsubscribe of [...subscriptions]) unsubscribe();
-            const results = await Promise.allSettled(runs.keys().toArray().map((runId) => release(runId)));
-            for (const result of results) {
-                if (result.status === 'rejected') onError(result.reason);
+
+            // what is still being disposed or created, for the timeout report
+            const left = new Set<string>();
+            const work = runs.entries().toArray().map(([runId, entries]) => {
+                const labels = entries.values().toArray()
+                    .map((entry) => entry.workspace?.id ?? `a workspace of run ${runId} still being created`);
+                for (const label of labels) left.add(label);
+                return release(runId).catch(onError).finally(() => {
+                    for (const label of labels) left.delete(label);
+                });
+            });
+
+            let timer: { clear(): void } | undefined;
+            const timedOut = await Promise.race([
+                Promise.all(work).then(() => false),
+                new Promise<boolean>((resolve) => {
+                    timer = clock.setTimeout(() => resolve(true), timeoutMs);
+                }),
+            ]);
+            timer?.clear();
+            if (timedOut && left.size > 0) {
+                onError(new SandboxError(`workspace manager close() gave up after ${timeoutMs} ms; still disposing: ${[...left].join(', ')}`));
             }
         },
     };
