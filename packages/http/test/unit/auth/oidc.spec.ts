@@ -158,6 +158,15 @@ describe('oidc', () => {
             kind: 'oidc', 
             permissions: [42], 
         }],
+        ['no kind', {
+            id: 'ci', 
+            permissions: [], 
+        }],
+        ['an empty kind', {
+            id: 'ci', 
+            kind: '', 
+            permissions: [], 
+        }],
     ])('treats a mapper result with %s as a server misconfiguration', async (_name, principal) => {
         const token = await signToken(key.privateKey, claims());
         const auth = make(() => principal as unknown as Principal);

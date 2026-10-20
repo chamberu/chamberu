@@ -156,7 +156,7 @@ A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:ru
 
 ## Authenticators
 
-`auth` takes one authenticator or a chain; the first principal wins. An authenticator resolves `undefined` for a request it does not recognize (the chain continues) and throws a 401 for credentials it rejects.
+`auth` takes one authenticator or a chain; the first principal wins. An authenticator resolves `undefined` for a request it does not recognize (the chain continues) and throws a 401 for credentials it rejects. A resolved principal needs a non-empty `id` and `kind` and a `permissions` array of strings; anything else is a server misconfiguration (500, reported to `onError`) and ends the chain.
 
 ```ts
 const ciToken = process.env.CI_TOKEN;

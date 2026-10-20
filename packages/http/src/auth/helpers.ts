@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { InvalidAgentDefinitionError } from '@chamberu/core';
 import type { Invoker } from '@chamberu/core';
 import { ForbiddenError, UnauthorizedError } from '@ebec/http';
 import type { IAppEvent } from 'routup';
@@ -45,15 +46,32 @@ export function readBearerToken(request: Request): string | undefined {
     return match[1];
 }
 
+/** True for a principal every route can rely on: a non-empty `id` and `kind`, `permissions` an array of strings. */
+export function isPrincipal(value: Principal): boolean {
+    return typeof value.id === 'string' &&
+        value.id.length > 0 &&
+        typeof value.kind === 'string' &&
+        value.kind.length > 0 &&
+        Array.isArray(value.permissions) &&
+        value.permissions.every((permission) => typeof permission === 'string');
+}
+
 async function resolvePrincipal(event: IAppEvent, ctx: HttpContext): Promise<Principal> {
     let rejection: unknown;
     for (const authenticator of ctx.authenticators) {
+        let principal: Principal | undefined;
         try {
-            const principal = await authenticator(event.request);
-            if (principal) return principal;
+            principal = await authenticator(event.request);
         } catch (error) {
             rejection ??= error;
+            continue;
         }
+        if (!principal) continue;
+        // a server misconfiguration (500 and onError), never a client error nor a reason to try the next authenticator
+        if (!isPrincipal(principal)) {
+            throw new InvalidAgentDefinitionError('An authenticator resolved a principal without a non-empty id and kind and a permissions array of strings.');
+        }
+        return principal;
     }
     throw rejection ?? new UnauthorizedError({ message: 'Authentication required.' });
 }

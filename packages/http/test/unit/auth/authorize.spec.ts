@@ -9,7 +9,7 @@ import { UnauthorizedError } from '@ebec/http';
 import { App, defineCoreHandler } from 'routup';
 import { describe, expect, it } from 'vitest';
 import { staticTokens } from '@chamberu/http';
-import type { Authenticator } from '@chamberu/http';
+import type { Authenticator, Principal } from '@chamberu/http';
 import { buildContext, createErrorHandler } from '../../../src/app/helpers.ts';
 import { authorize } from '../../../src/auth/helpers.ts';
 import { READER_TOKEN, createTestApp } from '../../utils/app.ts';
@@ -78,6 +78,40 @@ describe('authorize', () => {
         expect(response.status).toBe(401);
         expect(response.headers.get('www-authenticate')).toBe('Bearer');
         expect(await response.json()).toMatchObject({ message: 'rejected by the first authenticator' });
+    });
+
+    it.each([
+        ['an empty id', {
+            id: '', 
+            kind: 'custom', 
+            permissions: [], 
+        }],
+        ['no kind', { id: 'x', permissions: [] }],
+        ['an empty kind', {
+            id: 'x', 
+            kind: '', 
+            permissions: [], 
+        }],
+        ['permissions that are no array', {
+            id: 'x', 
+            kind: 'custom', 
+            permissions: 'run:read', 
+        }],
+        ['a non-string permission', {
+            id: 'x', 
+            kind: 'custom', 
+            permissions: [42], 
+        }],
+    ])('answers 500 for an authenticator resolving a principal with %s, without trying the next one', async (_name, principal) => {
+        let later = 0;
+        const malformed: Authenticator = async () => principal as unknown as Principal;
+        const next: Authenticator = async (request) => {
+            later++;
+            return reader(request);
+        };
+        const response = await probe(probeApp([malformed, next]), READER_TOKEN);
+        expect(response.status).toBe(500);
+        expect(later).toBe(0);
     });
 
     it('runs the chain once per request', async () => {

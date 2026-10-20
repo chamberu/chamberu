@@ -62,13 +62,13 @@ An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_
 
 ## Authentication and permissions
 
-`auth` takes one authenticator or a chain; the first principal wins.
+`auth` takes one authenticator or a chain; the first principal wins. A resolved principal needs a non-empty `id` and `kind` and a `permissions` array of strings; anything else is a server misconfiguration (500, reported to `onError`) and ends the chain.
 
 <<< @/snippets/http.ts#auth
 
 - `staticTokens()`: bearer tokens of at least 16 characters, each with a non-empty `id` (the principal and run invoker id). Put it before `authup()` and `oidc()`: `authup()` in remote mode introspects every bearer that is not a JWT, so a static token placed after it is sent to the authup server.
 - `authup()`: authup tokens through `@authup/server-adapter-web`. Only tokens with the `global` scope grant their permissions; others authenticate and get 403. Grants need remote verification (introspection); a cached result lives until the token's `exp`.
-- `oidc()`: any OIDC issuer through [vouchly](https://github.com/tada5hi/vouchly). Every issuer needs an `audience`, and `principal` is required: a public issuer such as GitHub Actions lets anyone mint a token for your audience, so the mapper decides which claims get which grants. A mapper result without a non-empty `id` or a `permissions` array of strings is a server error (500, reported to `onError`), not a client one.
+- `oidc()`: any OIDC issuer through [vouchly](https://github.com/tada5hi/vouchly). Every issuer needs an `audience`, and `principal` is required: a public issuer such as GitHub Actions lets anyone mint a token for your audience, so the mapper decides which claims get which grants. A mapper result without a non-empty `id` and `kind` and a `permissions` array of strings is a server error (500, reported to `onError`), not a client one.
 
 | Permission | Grants |
 |---|---|
