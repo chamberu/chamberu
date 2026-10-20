@@ -53,13 +53,21 @@ export function createDockerTransport(
                 abortSignal: signal,
             }) as Duplex;
 
+            // for the socket's whole life: stdin the command never read stays
+            // queued and fails (EPIPE) once the daemon closes the connection
+            stream.on('error', () => undefined);
             const ended = streamEnded(stream, signal);
             docker.modem.demuxStream(stream, sinkStream(options.stdout), sinkStream(options.stderr));
             if (stdin !== undefined) {
                 // after the demux listeners, so no output is lost; end() half-closes the socket (stdin EOF)
                 stream.end(stdin);
             }
-            await ended;
+            try {
+                await ended;
+            } finally {
+                // drops stdin still queued instead of flushing it into a closed connection
+                stream.destroy();
+            }
 
             let wait = INSPECT_POLL_INITIAL_MS;
             let info = await exec.inspect({ abortSignal: signal });

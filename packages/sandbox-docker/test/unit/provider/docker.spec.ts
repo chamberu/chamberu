@@ -89,6 +89,27 @@ describeDocker('docker sandbox', () => {
         await expect(docker.getVolume(volume).inspect()).rejects.toSatisfy((error) => statusCode(error) === 404);
     });
 
+    it('survives stdin the command never read when the container goes', async () => {
+        const errors: unknown[] = [];
+        const record = (error: unknown) => {
+            errors.push(error);
+        };
+        process.on('uncaughtException', record);
+        try {
+            const { workspace } = await create();
+            // more than the daemon absorbs: the rest stays queued on the socket
+            const result = await workspace.exec(['true'], { stdin: 'x'.repeat(4_000_000) });
+            expect(result.exitCode).toBe(0);
+            await workspace.dispose();
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            expect(errors).toEqual([]);
+        } finally {
+            process.off('uncaughtException', record);
+        }
+    });
+
     it.skipIf(offline)('clones a public repository', async () => {
         const { workspace } = await create({}, { repo: 'https://github.com/octocat/Hello-World.git', ref: 'master' });
         expect(await workspace.readFile('README')).toContain('Hello World');
