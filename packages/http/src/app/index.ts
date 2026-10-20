@@ -9,6 +9,11 @@ export { createHttpApp } from './module.ts';
 export type {
     CorsOptions,
     HttpAppOptions,
+    HttpRoute,
+    HttpRouteContext,
+    HttpRouteMethod,
+    HttpRouteRequest,
+    HttpRouteResult,
     McpOptions,
     PrometheusOptions,
     RateLimitOptions,

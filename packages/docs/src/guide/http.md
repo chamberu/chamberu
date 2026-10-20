@@ -104,6 +104,10 @@ An MCP start dedupes its `idempotencyKey` under `<agent>:mcp:<kind>:<id>`, a RES
 
 This is the "MCP in" half of the [OpenClaw](/deployment/openclaw) integration.
 
+## Extra routes
+
+`routes` adds routes that other packages provide, served under `basePath` beside the built-in ones. A route is a static path with a method and a fetch-style handler: it gets the request and a `readBody()` that returns the raw bytes (the app's `bodyLimit`, 413 and 415 apply), and answers `{ status, body? }`. Extra routes are not authenticated by `auth`: they check their own credentials, as a webhook checks its signature. Thrown errors render like those of every other route. `rateLimit: false` takes a route out of the rate limit, for senders that never retry a refused request.
+
 ## Operations
 
 - `/metrics` is unauthenticated: keep it off the public ingress (a NetworkPolicy, or an internal listener) or set `metrics: false`. Each app has its own `prom-client` registry, labelled by route template (`/runs/:id`, `/runs/:id/artifacts/:artifactId`; unknown paths share `/_unmatched`); SSE streams and rate-limited requests are not timed.

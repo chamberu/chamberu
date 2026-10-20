@@ -13,6 +13,7 @@ import { registerHookRoutes } from '../hooks/module.ts';
 import { registerMcpRoutes } from '../mcp/module.ts';
 import { installPlugins } from '../plugins/module.ts';
 import { assertNoNul } from '../request/helpers.ts';
+import { registerRoutes } from '../routes/module.ts';
 import { registerRunRoutes } from '../runs/module.ts';
 import { buildContext, createErrorHandler } from './helpers.ts';
 import type { HttpAppOptions } from './types.ts';
@@ -37,6 +38,7 @@ export function createHttpApp(options: HttpAppOptions): App {
     registerAgentRoutes(app, ctx);
     registerRunRoutes(app, ctx);
     registerHookRoutes(app, ctx);
+    registerRoutes(app, ctx);
     if (options.mcp !== false) registerMcpRoutes(app, ctx, options.mcp);
 
     app.use(defineCoreHandler(() => {

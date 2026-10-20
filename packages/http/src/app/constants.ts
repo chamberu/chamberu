@@ -34,3 +34,15 @@ export const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 
 /** Where Prometheus scrapes, relative to `basePath`. */
 export const DEFAULT_METRICS_PATH = '/metrics';
+
+/** First path segments of the built-in routes: an extra route may not start with one. */
+export const RESERVED_ROUTE_SEGMENTS: readonly string[] = [
+    'agents',
+    'healthz',
+    'hooks',
+    'mcp',
+    'readyz',
+    'resume',
+    'runs',
+    'schedules',
+];

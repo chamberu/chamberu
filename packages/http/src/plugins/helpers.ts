@@ -6,6 +6,7 @@
  */
 
 import type { IAppEvent } from 'routup';
+import type { HttpRoute } from '../app/types.ts';
 
 /** `event.path` without the `basePath` prefix. */
 function routePath(event: IAppEvent, basePath: string): string {
@@ -25,6 +26,12 @@ export function isStreamRequest(event: IAppEvent, basePath: string): boolean {
 export function isOperationalPath(event: IAppEvent, basePath: string, metricsPath: string): boolean {
     const path = routePath(event, basePath).replace(/\/+$/, '') || '/';
     return path === '/healthz' || path === '/readyz' || path === metricsPath;
+}
+
+/** A request to one of the extra routes declared `rateLimit: false` (method and path, under `basePath`). */
+export function isUnlimitedRoute(event: IAppEvent, basePath: string, routes: readonly HttpRoute[]): boolean {
+    const path = routePath(event, basePath).replace(/\/+$/, '') || '/';
+    return routes.some((route) => route.rateLimit === false && route.method === event.method && route.path === path);
 }
 
 /** The routes of the app as metric labels, matched against the path without `basePath`; keep in step with the route modules. */
@@ -48,9 +55,14 @@ const UNMATCHED_ROUTE_LABEL = '/_unmatched';
  * The `path` label of a request: its route template (`/runs/:id`), so ids,
  * keys and unknown paths cannot mint a series each.
  */
-export function routeLabel(event: IAppEvent, basePath: string, metricsPath: string): string {
+export function routeLabel(
+    event: IAppEvent,
+    basePath: string,
+    metricsPath: string,
+    extraPaths: readonly string[] = [],
+): string {
     const path = routePath(event, basePath).replace(/\/+$/, '') || '/';
-    if (path === metricsPath) return path;
+    if (path === metricsPath || extraPaths.includes(path)) return path;
     for (const [pattern, template] of ROUTE_TEMPLATES) {
         if (pattern.test(path)) return template || path;
     }

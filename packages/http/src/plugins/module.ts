@@ -18,7 +18,12 @@ import {
     DEFAULT_RATE_LIMIT_WINDOW_MS,
 } from '../app/constants.ts';
 import type { HttpAppOptions } from '../app/types.ts';
-import { isOperationalPath, isStreamRequest, routeLabel } from './helpers.ts';
+import {
+    isOperationalPath,
+    isStreamRequest,
+    isUnlimitedRoute,
+    routeLabel,
+} from './helpers.ts';
 
 /**
  * CORS (only when configured), a rate limit keyed by the client address
@@ -28,6 +33,8 @@ import { isOperationalPath, isStreamRequest, routeLabel } from './helpers.ts';
  */
 export function installPlugins(app: App, options: HttpAppOptions): void {
     const basePath = options.basePath ?? '';
+    const routes = options.routes ?? [];
+    const routePaths = routes.map((route) => route.path);
 
     if (options.cors) app.use(cors(options.cors));
 
@@ -42,7 +49,9 @@ export function installPlugins(app: App, options: HttpAppOptions): void {
             max: DEFAULT_RATE_LIMIT_MAX,
             // the library default trusts any X-Forwarded-For
             keyGenerator: (event) => getRequestIP(event) ?? 'unknown',
-            skip: (event) => event.method === 'OPTIONS' || isOperationalPath(event, basePath, metricsPath ?? ''),
+            skip: (event) => event.method === 'OPTIONS' ||
+                isOperationalPath(event, basePath, metricsPath ?? '') ||
+                isUnlimitedRoute(event, basePath, routes),
             handler: () => {
                 throw new TooManyRequestsError({ message: 'Too many requests, please try again later.' });
             },
@@ -56,7 +65,7 @@ export function installPlugins(app: App, options: HttpAppOptions): void {
             // the global default registry throws on a second app in one process
             registry: new Registry(),
             skip: (event) => isStreamRequest(event, basePath),
-            normalizePath: (_path, event) => routeLabel(event, basePath, metricsPath ?? DEFAULT_METRICS_PATH),
+            normalizePath: (_path, event) => routeLabel(event, basePath, metricsPath ?? DEFAULT_METRICS_PATH, routePaths),
             ...options.metrics,
         }));
     }

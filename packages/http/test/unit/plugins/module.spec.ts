@@ -6,7 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { App } from 'routup';
+import type { App, IAppEvent } from 'routup';
+import { routeLabel } from '../../../src/plugins/helpers.ts';
 import {
     ADMIN_TOKEN,
     call,
@@ -205,5 +206,18 @@ describe('rate limit', () => {
 
         expect(await spoof(createTestApp({ rateLimit: { max: 2 } }).app)).toEqual([200, 200, 429]);
         expect(await spoof(createTestApp({ rateLimit: { max: 2 }, trustProxy: true }).app)).toEqual([200, 200, 200]);
+    });
+});
+
+describe('route labels', () => {
+    it('labels an extra route by its path', () => {
+        const event = { method: 'POST', path: '/webhooks/github' } as IAppEvent;
+        expect(routeLabel(event, '', '/metrics', ['/webhooks/github'])).toBe('/webhooks/github');
+        expect(routeLabel(event, '', '/metrics', [])).toBe('/_unmatched');
+    });
+
+    it('labels an extra route under basePath', () => {
+        const event = { method: 'POST', path: '/api/webhooks/github' } as IAppEvent;
+        expect(routeLabel(event, '/api', '/metrics', ['/webhooks/github'])).toBe('/webhooks/github');
     });
 });

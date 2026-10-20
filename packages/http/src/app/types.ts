@@ -68,9 +68,54 @@ export type HttpAppOptions = {
     clock?: IClock;
     /** Receives 5xx causes and background failures. Default: `console.error`. */
     onError?: (error: unknown) => void;
+    /** Extra routes other packages contribute (e.g. a GitHub webhook), served under `basePath`. */
+    routes?: HttpRoute[];
 };
 
 // #endregion options
+
+// #region routes
+export type HttpRouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export type HttpRouteRequest = {
+    /** Headers, URL, signal. Read the body only through readBody(). */
+    request: Request;
+    /**
+     * The raw body, at most `bodyLimit` bytes: 413 above it (content-length
+     * refused unread, else drained like readJsonBody), 415 for a non-JSON
+     * media type with a non-empty body; an empty body is a 0-length array.
+     * Call once.
+     */
+    readBody(): Promise<Uint8Array>;
+};
+
+export type HttpRouteResult = {
+    status: number;
+    /** Sent as JSON; none for an empty body. */
+    body?: unknown;
+};
+
+export type HttpRouteContext = {
+    engine: RunEngine;
+    agents: readonly Agent[];
+    clock: IClock;
+    onError: (error: unknown) => void;
+};
+
+export type HttpRoute = {
+    method: HttpRouteMethod;
+    /** Static path under basePath (no ':' '*' '{'), e.g. '/webhooks/github'; also its metrics label. */
+    path: string;
+    /** false: skipped by the app's rate limiter (callers that never retry, e.g. webhook senders). Default: limited. */
+    rateLimit?: false;
+    /**
+     * Not authenticated by the app's authenticators: the route checks its own
+     * credentials. Thrown @ebec/http and core errors render like any route's.
+     */
+    handler: (request: HttpRouteRequest, ctx: HttpRouteContext) => Promise<HttpRouteResult>;
+};
+
+// #endregion routes
 
 /** Shared by every route module; internal. */
 export type HttpContext = {
@@ -92,5 +137,7 @@ export type HttpContext = {
     closers: Set<() => void | Promise<void>>;
     /** Set once the shutdown callback runs the closers: no new streams or MCP requests. */
     closed: boolean;
+    /** Extra routes, validated in `buildContext`. */
+    routes: HttpRoute[];
     onError: (error: unknown) => void;
 };
