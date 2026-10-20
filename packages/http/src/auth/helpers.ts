@@ -5,13 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError } from '@chamberu/core';
+import { InvalidAgentDefinitionError, hasPermission } from '@chamberu/core';
 import type { Invoker } from '@chamberu/core';
 import { ForbiddenError, UnauthorizedError } from '@ebec/http';
 import type { IAppEvent } from 'routup';
 import type { HttpContext } from '../app/types.ts';
 import { PRINCIPAL } from './constants.ts';
-import { hasPermission } from './module.ts';
 import type { Principal } from './types.ts';
 
 /** Claims read as the invoker's display name, first non-empty string wins. */
@@ -89,7 +88,7 @@ export function authenticate(event: IAppEvent, ctx: HttpContext): Promise<Princi
 /** `authenticate`, then 403 when `permission` is given and not granted. */
 export async function authorize(event: IAppEvent, ctx: HttpContext, permission?: string): Promise<Principal> {
     const principal = await authenticate(event, ctx);
-    if (permission !== undefined && !hasPermission(principal, permission)) {
+    if (permission !== undefined && !hasPermission(principal.permissions, permission)) {
         throw new ForbiddenError({ message: `Missing permission "${permission}".` });
     }
     return principal;

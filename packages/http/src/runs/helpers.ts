@@ -10,6 +10,7 @@ import {
     InvalidResumeTokenError,
     RunNotFoundError,
     RunStatus,
+    hasPermission,
 } from '@chamberu/core';
 import type {
     Agent,
@@ -27,7 +28,7 @@ import type { IFilter } from '@rapiq/core';
 import { parseFilterScalar } from '@rapiq/parser-simple';
 import { isObject } from 'smob';
 import { Container } from 'validup';
-import { agentPermission, hasPermission } from '../auth/module.ts';
+import { agentPermission } from '../auth/module.ts';
 import { Permission } from '../auth/constants.ts';
 import type { Principal } from '../auth/types.ts';
 import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
@@ -84,8 +85,8 @@ export function serializeStep(step: Step): Step {
 
 /** `run:read`, or `agent:<run.agent>:run`. */
 export function canReadRun(principal: Principal, run: Run): boolean {
-    return hasPermission(principal, Permission.RUN_READ) ||
-        hasPermission(principal, agentPermission(run.agent, 'run'));
+    return hasPermission(principal.permissions, Permission.RUN_READ) ||
+        hasPermission(principal.permissions, agentPermission(run.agent, 'run'));
 }
 
 /** The run, once the principal may read it: 404, then 403. */
@@ -103,8 +104,8 @@ export async function loadReadableRun(ctx: HttpContext, principal: Principal, id
  * agent it may run (one store query keeps `total` and paging exact).
  */
 export function assertCanListRuns(principal: Principal, agent: string | undefined): void {
-    if (hasPermission(principal, Permission.RUN_READ)) return;
-    if (agent !== undefined && hasPermission(principal, agentPermission(agent, 'run'))) return;
+    if (hasPermission(principal.permissions, Permission.RUN_READ)) return;
+    if (agent !== undefined && hasPermission(principal.permissions, agentPermission(agent, 'run'))) return;
     throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
 }
 
@@ -249,7 +250,7 @@ export async function resolveResumeTarget(ctx: HttpContext, principal: Principal
     if (!run) throw new InvalidResumeTokenError();
 
     const permission = agentPermission(run.agent, 'approve');
-    if (!hasPermission(principal, permission)) {
+    if (!hasPermission(principal.permissions, permission)) {
         throw new ForbiddenError({ message: `Missing permission "${permission}".` });
     }
     return run;

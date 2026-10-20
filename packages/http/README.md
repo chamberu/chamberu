@@ -150,7 +150,7 @@ Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`
 | `state:read`, `state:write` | Read and write agent state |
 | `*` | Everything |
 
-A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:run` but not `agent:triage:approve`, and `agent:*` grants neither. Matching is case-sensitive. `hasPermission(principal, permission)` and `agentPermission(agent, action)` are exported.
+A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:run` but not `agent:triage:approve`, and `agent:*` grants neither. Matching is case-sensitive. `agentPermission(agent, action)` is exported; to check a principal yourself, use `hasPermission(principal.permissions, permission)` from `@chamberu/core`, the matcher the routes use.
 
 `POST /resume` needs authentication **and** the approve permission: the resume token alone is not enough. The token's signature and expiry are checked before any store lookup (a forged or expired token answers 400 without touching the store).
 
@@ -268,7 +268,7 @@ process.once('SIGTERM', () => {
 | `createHttpApp` | function | Builds the routup App |
 | `createShutdown` | function | The graceful shutdown helper |
 | `staticTokens`, `authup`, `oidc` | function | Authenticators |
-| `hasPermission`, `agentPermission` | function | Permission matching |
+| `agentPermission` | function | `agent:<agent>:<action>` (matching is core's `hasPermission`) |
 | `Permission` | constant | `ALL`, `RUN_READ`, `RUN_CANCEL`, `STATE_READ`, `STATE_WRITE` |
 | `DEFAULT_SHUTDOWN_DRAIN_TIMEOUT_MS`, `DEFAULT_SHUTDOWN_CLOSE_TIMEOUT_MS` | constant | `30_000`, `5_000` |
 

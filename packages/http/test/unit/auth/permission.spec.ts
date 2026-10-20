@@ -6,29 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { agentPermission, hasPermission } from '@chamberu/http';
-import type { Principal } from '@chamberu/http';
-
-const principal = (permissions: string[]): Principal => ({
-    id: 'p',
-    kind: 'token',
-    permissions,
-});
-
-describe('hasPermission', () => {
-    it.each([
-        [['*'], 'agent:x:run', true],
-        [['agent:*:run'], 'agent:x:run', true],
-        [['agent:*:run'], 'agent:x:approve', false],
-        [['agent:*'], 'agent:x:run', false],
-        [['run:read'], 'run:read', true],
-        [['run:read'], 'run:cancel', false],
-        [['Run:read'], 'run:read', false],
-        [[], 'run:read', false],
-    ])('%j grants %s: %s', (granted, permission, expected) => {
-        expect(hasPermission(principal(granted), permission)).toBe(expected);
-    });
-});
+import { agentPermission } from '@chamberu/http';
 
 describe('agentPermission', () => {
     it('builds agent:<name>:<action>', () => {

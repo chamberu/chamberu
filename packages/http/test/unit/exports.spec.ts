@@ -14,12 +14,16 @@ describe('public api', () => {
         'authup',
         'createHttpApp',
         'createShutdown',
-        'hasPermission',
         'oidc',
         'staticTokens',
     ])('exports %s', (name) => {
         expect(http).toHaveProperty(name);
         expect(http[name as keyof typeof http]).toBeTypeOf('function');
+    });
+
+    it('leaves permission matching to core', () => {
+        // core's hasPermission(principal.permissions, wanted) is the one matcher
+        expect(http).not.toHaveProperty('hasPermission');
     });
 
     it('exports the shutdown defaults', () => {
