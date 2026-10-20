@@ -38,7 +38,7 @@
 |---|---|---|
 | **Restarts** | Everything is gone | Runs, steps, checkpoints, effects and state stay in Postgres; `recover()` picks interrupted runs up |
 | **Replicas** | One process only | Claims, idempotency keys and locks are single statements built with TypeORM's query builder, atomic across processes |
-| **Schema** | None | One migration, applied by `migrateStore()` under an advisory lock, so replicas booting at once migrate once |
+| **Schema** | None | Migrations (init plus the artifact table), applied by `migrateStore()` under an advisory lock, so replicas booting at once migrate once |
 | **Time** | From the injected `IClock` | From the injected `IClock` too, passed to every query as a parameter (never the database's `now()`) |
 | **Housekeeping** | Nothing to clean up | `purgeExpired()` deletes expired idempotency keys and locks |
 
@@ -132,7 +132,7 @@ purge.unref();
 |---|---|---|
 | `TypeormStore` | class | `IStore` on Postgres, plus `purgeExpired(now?)` |
 | `migrateStore` | function | Runs the migrations under the advisory lock `MIGRATION_LOCK_NAME` |
-| `STORE_ENTITIES` | array | The eight entity classes for the data source's `entities` |
+| `STORE_ENTITIES` | array | The nine entity classes for the data source's `entities` |
 | `STORE_MIGRATIONS` | array | The migrations for the data source's `migrations` |
 | `MIGRATION_LOCK_NAME` | constant | `'chamberu:migrations'` |
 
@@ -140,14 +140,15 @@ Types: `TypeormStoreOptions`, `PurgeResult`.
 
 ## Notes
 
-- **Tables are prefixed `chamberu_`:** `chamberu_runs`, `chamberu_steps`, `chamberu_checkpoints`, `chamberu_idempotency_keys`, `chamberu_locks`, `chamberu_effects`, `chamberu_kv`, `chamberu_docs`. They live in the data source's default schema.
-- **Identifiers have length limits** (`MemoryStore` has none): a run id 128 characters; `concurrencyKey`, `thread`, claim owners, step names, document collections and document ids 255; idempotency, lock, effect and state keys 512. A longer value makes the write fail with the driver's `value too long` error, so validate user-supplied keys before they reach `dispatch` (a rejected run with an `idempotencyKey` keeps its key reserved until the key expires).
+- **Tables are prefixed `chamberu_`:** `chamberu_runs`, `chamberu_steps`, `chamberu_checkpoints`, `chamberu_idempotency_keys`, `chamberu_locks`, `chamberu_effects`, `chamberu_kv`, `chamberu_docs`, `chamberu_artifacts`. They live in the data source's default schema.
+- **Identifiers have length limits** (`MemoryStore` has none): run and artifact ids 128 characters; `concurrencyKey`, `thread`, claim owners, step names, document collections and document ids 255; idempotency, lock, effect and state keys 512. A longer value makes the write fail with the driver's `value too long` error, so validate user-supplied keys before they reach `dispatch` (a rejected run with an `idempotencyKey` keeps its key reserved until the key expires).
+- **Artifact bytes are `bytea`** in `chamberu_artifacts` (indexed by `run_id`), read only by `readArtifact`; `getArtifact` and `listArtifacts` never load them. Postgres caps a `bytea` value at 1 GB, and the whole value travels in one query, so keep artifacts small enough for memory.
 - **Only the latest checkpoint is kept** per run; an equal `stepIndex` replaces it.
 - **Opaque values are JSON.** A run's `output`, a step's `input`/`output`/`error`, checkpoint messages, effect results and state values are stored as `jsonb`, so a `Date` inside them comes back as a string, `undefined` or `Map` values are lost and a typed array such as `Uint8Array` comes back as an object keyed by index. A `BigInt` or a circular structure makes the write throw a `TypeError` (`MemoryStore` accepts both). The run's own dates, `trigger.receivedAt`, `waiting.expiresAt` and `waiting.notifiedAt` come back as `Date`.
 - **NUL characters and lone surrogates become U+FFFD** in opaque values (keys and strings alike), because `jsonb` cannot hold them. A literal backslash sequence such as the text `\u0000` is kept.
 - **`null` in an optional property reads back as absent:** a run `output` of `null` and a step `input`, `output` or `error` of `null` are stored as SQL `NULL`. `putEffect(key, undefined)` reads back `{ result: null }` and `docUpsert(..., undefined)` reads back `doc: null`. `kvSet(agent, key, undefined)` deletes the key.
 - **`docList` `where` uses `jsonb` containment (`@>`).** For primitive values that is top-level equality; a nested object or array matches by containment (`MemoryStore` never matches those). A key whose value is `undefined` matches documents that lack the key. Documents are returned ordered by `id` (`MemoryStore`: insertion order).
-- **`listRuns` breaks `createdAt` ties by byte order of `id`** (`COLLATE "C"`, so `'B' < 'a'`); `MemoryStore` compares with `localeCompare`. Both agree for lowercase ids and UUIDs.
+- **`listRuns` and `listArtifacts` break `createdAt` ties by byte order of `id`** (`COLLATE "C"`, so `'B' < 'a'`); `MemoryStore` compares with `localeCompare`. Both agree for lowercase ids and UUIDs.
 - **The schema may still change before 1.0.** New versions ship new migrations; run `migrateStore()` on every boot.
 
 ## License

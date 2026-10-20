@@ -131,4 +131,120 @@ describe('POST /agents/:name/runs', () => {
         expect((await response.json()).issues[0].path).toEqual(['n']);
         expect((await store.listRuns({ agent: 'typed' })).total).toBe(0);
     });
+
+    describe('attachments', () => {
+        function b64(text: string): string {
+            return Buffer.from(text).toString('base64');
+        }
+
+        it('stores each attachment as an artifact of the run', async () => {
+            const { app, store } = createRunTestApp();
+            const response = await call(app, 'POST', '/agents/echo/runs', {
+                token: ADMIN_TOKEN,
+                body: {
+                    attachments: [
+                        {
+                            mediaType: 'text/plain',
+                            filename: 'a.txt',
+                            data: b64('alpha'),
+                            extra: 1,
+                        },
+                        { mediaType: 'image/png', data: b64('beta') },
+                    ],
+                },
+            });
+            expect(response.status).toBe(202);
+            const { runId } = await response.json() as { runId: string };
+
+            const run = await store.getRun(runId);
+            expect(run?.trigger.attachments).toHaveLength(2);
+            const [first, second] = run!.trigger.attachments!;
+            expect(first).toMatchObject({
+                runId,
+                agent: 'echo',
+                mediaType: 'text/plain',
+                filename: 'a.txt',
+                size: 5,
+            });
+            expect(second).not.toHaveProperty('filename');
+            expect(new TextDecoder().decode(await store.readArtifact(first!.id))).toBe('alpha');
+            expect(new TextDecoder().decode(await store.readArtifact(second!.id))).toBe('beta');
+            expect(await store.listArtifacts(runId)).toHaveLength(2);
+        });
+
+        it('takes an empty list as none', async () => {
+            const { app, store } = createRunTestApp();
+            const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { attachments: [] } });
+            expect(response.status).toBe(202);
+            const { runId } = await response.json() as { runId: string };
+            expect((await store.getRun(runId))?.trigger.attachments).toBeUndefined();
+        });
+
+        it('accepts at most 16 attachments', async () => {
+            const { app } = createRunTestApp();
+            const one = { mediaType: 'text/plain', data: b64('x') };
+            const fits = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { attachments: Array.from({ length: 16 }, () => one) } });
+            expect(fits.status).toBe(202);
+            const over = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { attachments: Array.from({ length: 17 }, () => one) } });
+            expect(over.status).toBe(400);
+            expect((await over.json()).issues[0].path).toEqual(['attachments']);
+        });
+
+        it.each([
+            ['bad base64', { mediaType: 'text/plain', data: 'aGk' }, ['attachments', 0, 'data']],
+            ['url-safe base64', { mediaType: 'text/plain', data: '-_8=' }, ['attachments', 0, 'data']],
+            ['a missing data', { mediaType: 'text/plain' }, ['attachments', 0, 'data']],
+            ['a bad mediaType', { mediaType: 'png', data: 'aGk=' }, ['attachments', 0, 'mediaType']],
+            ['a mediaType with parameters', { mediaType: 'text/plain; charset=utf-8', data: 'aGk=' }, ['attachments', 0, 'mediaType']],
+            ['an empty filename', {
+                mediaType: 'text/plain',
+                filename: '',
+                data: 'aGk=',
+            }, ['attachments', 0, 'filename']],
+        ])('rejects %s with 400 and stores nothing', async (_, attachment, path) => {
+            const { app, store } = createRunTestApp();
+            const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { attachments: [attachment] } });
+            expect(response.status).toBe(400);
+            const body = await response.json();
+            expect(body.code).toBe('validation_error');
+            expect(body.issues.map((i: { path: unknown }) => i.path)).toContainEqual(path);
+            expect((await store.listRuns({ agent: 'echo' })).total).toBe(0);
+        });
+
+        it.each([['str'], [{ 0: 1 }], [null], [[1]]])('rejects attachments %j', async (attachments) => {
+            const { app } = createRunTestApp();
+            const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { attachments } });
+            expect(response.status).toBe(400);
+        });
+
+        it.each([
+            ['an oversized list', Array.from({ length: 20000 }, () => ({}))],
+            ['an object with many keys', Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`k${i}`, {}]))],
+        ])('answers %s with one issue before checking any item', async (_, attachments) => {
+            const { app } = createRunTestApp({ bodyLimit: 1024 * 1024 });
+            const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { attachments } });
+            expect(response.status).toBe(400);
+            const body = await response.json();
+            expect(body.issues).toHaveLength(1);
+            expect(body.issues[0].path).toEqual(['attachments']);
+        });
+
+        it('stores nothing for a deduplicated dispatch', async () => {
+            const { app, store } = createRunTestApp();
+            const body = { idempotencyKey: 'k', attachments: [{ mediaType: 'text/plain', data: b64('x') }] };
+            const first = await (await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body })).json();
+            const second = await (await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body })).json();
+            expect(second).toEqual({ runId: first.runId, deduplicated: true });
+            expect(await store.listArtifacts(first.runId)).toHaveLength(1);
+        });
+
+        it('stays bounded by bodyLimit', async () => {
+            const { app } = createRunTestApp({ bodyLimit: 1024 });
+            const response = await call(app, 'POST', '/agents/echo/runs', {
+                token: ADMIN_TOKEN,
+                body: { attachments: [{ mediaType: 'text/plain', data: b64('x'.repeat(2048)) }] },
+            });
+            expect(response.status).toBe(413);
+        });
+    });
 });

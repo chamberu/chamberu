@@ -50,7 +50,7 @@ Steps are append-only and numbered per run (`index`). They are the run's audit l
 
 ## Watching runs
 
-`engine.on()` subscribes to `run.updated` (any status, usage or wait point change) and `step.appended`. It returns an unsubscribe function. A listener that throws is reported to `onError` and does not affect the run.
+`engine.on()` subscribes to `run.updated` (any status, usage or wait point change), `step.appended` and `run.delta` (model output while it streams, see [Streaming](/guide/execution#streaming)). It returns an unsubscribe function. A listener that throws is reported to `onError` and does not affect the run.
 
 <<< @/snippets/lifecycle.ts#events
 

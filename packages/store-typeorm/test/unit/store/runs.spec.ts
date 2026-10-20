@@ -109,6 +109,31 @@ describePostgres('TypeormStore runs', () => {
         }
     });
 
+    it('revives trigger.attachments[].createdAt as Date', async () => {
+        const createdAt = new Date('2026-03-08T07:15:00.456Z');
+        const base = makeRun('r1');
+        const run = makeRun('r1', {
+            trigger: {
+                ...base.trigger,
+                attachments: [{
+                    id: 'art-1',
+                    runId: 'r1',
+                    agent: 'a',
+                    mediaType: 'image/png',
+                    filename: 'a.png',
+                    size: 3,
+                    createdAt,
+                }],
+            },
+        });
+        await store.createRun(run);
+
+        const got = await store.getRun('r1');
+        expect(got).toEqual(run);
+        expect(got!.trigger.attachments![0]!.createdAt).toBeInstanceOf(Date);
+        expect(got!.trigger.attachments![0]!.createdAt.getTime()).toBe(createdAt.getTime());
+    });
+
     it('createRun keeps the stored run on a duplicate id', async () => {
         await expect(store.createRun(makeRun('r1', { thread: 'first' }))).resolves.toBe(true);
         await expect(store.createRun(makeRun('r1', { thread: 'second' }))).resolves.toBe(false);

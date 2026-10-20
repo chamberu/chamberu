@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import type { LanguageModel } from 'ai';
 import {
     MemoryStore,
@@ -51,6 +52,24 @@ export async function dispatchExamples(model: LanguageModel) {
     again.runId === first.runId; // true
     again.deduplicated; // true
     // #endregion dispatch
+
+    // #region attachments
+    const withFile = await engine.dispatch({
+        agent: 'triage',
+        trigger: 'http',
+        source: 'http',
+        payload: { repo: 'acme/app', issue: 43 },
+        // stored as artifacts of the run; the model gets them as file parts
+        attachments: [{
+            mediaType: 'image/png',
+            filename: 'crash.png',
+            data: new Uint8Array(await readFile('crash.png')),
+        }],
+    });
+
+    const run = await engine.getRun(withFile.runId);
+    run?.trigger.attachments; // [{ id, runId, agent, mediaType: 'image/png', filename: 'crash.png', size, createdAt }]
+    // #endregion attachments
 
     return { first, again };
 }

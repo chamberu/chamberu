@@ -6,6 +6,9 @@
  */
 
 import type {
+    FinishReason,
+    LanguageModelResponseMetadata,
+    LanguageModelUsage,
     ModelMessage,
     ToolApprovalStatus,
     ToolLoopAgentSettings,
@@ -13,9 +16,11 @@ import type {
 } from 'ai';
 import { isObject } from 'smob';
 import type { ApprovalPolicy } from '../../agent/types.ts';
+import { toFilePart } from '../../artifact/helpers.ts';
+import { createRunArtifacts } from '../../artifact/module.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
-import { BudgetExceededError } from '../../errors/index.ts';
-import type { Budget, RunContext } from '../../run/types.ts';
+import { BudgetExceededError, ValidationError } from '../../errors/index.ts';
+import type { Budget, Checkpoint, RunContext } from '../../run/types.ts';
 import { createAgentState } from '../../state/module.ts';
 import { createStateTools } from '../../state/tools.ts';
 import type { TriggerEnvelope } from '../../trigger/types.ts';
@@ -28,6 +33,19 @@ export function renderTrigger(envelope: TriggerEnvelope): string {
         payload: envelope.payload,
     }, null, 2);
     return `\`\`\`json\n${json}\n\`\`\``;
+}
+
+/**
+ * The run's first message: the rendered trigger, followed by a file part per
+ * attachment that holds the artifact marker (hydrated to bytes for the model).
+ */
+export function initialMessage(envelope: TriggerEnvelope): ModelMessage {
+    const text = renderTrigger(envelope);
+    if (!envelope.attachments?.length) return { role: 'user', content: text };
+    return {
+        role: 'user',
+        content: [{ type: 'text', text }, ...envelope.attachments.map(toFilePart)],
+    };
 }
 
 /** `{ code, message }` of anything thrown; code falls back to 'Error'. */
@@ -50,7 +68,11 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): Tool
     const state = createAgentState(ctx.agent.name, schema, ctx.store);
     const tools: ToolSet = {
         ...(schema ? createStateTools(state, schema) : {}),
-        ...factory?.({ state, run: runContext }),
+        ...factory?.({
+            state,
+            run: runContext,
+            artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
+        }),
     };
     return wrapToolsForRun(tools, runContext, ctx.store);
 }
@@ -170,4 +192,47 @@ export function budgetExceeded(budget: Budget, kind: 'steps' | 'tokens'): Budget
     return new BudgetExceededError(kind === 'steps' ?
         `The run reached its ${budget.maxSteps} step limit.` :
         `The run reached its ${budget.maxTokens} token limit.`);
+}
+
+/**
+ * A structured output that failed to parse or validate, as a core ValidationError;
+ * the cause (JSON parse or schema error) names the offending text or field.
+ */
+export function toValidationError(error: unknown): ValidationError {
+    const message = error instanceof Error ? error.message : String(error);
+    const cause = isObject(error) && error.cause instanceof Error ? error.cause.message : undefined;
+    return new ValidationError(cause ? `${message} ${cause}` : message);
+}
+
+/**
+ * The context `Output.parseCompleteOutput` gets for the final answer of an
+ * earlier execution: its finish reason, zero usage, minimal response metadata.
+ */
+export function outputContext(checkpoint: Checkpoint, now: Date): {
+    response: Omit<LanguageModelResponseMetadata, 'messages' | 'body'>;
+    usage: LanguageModelUsage;
+    finishReason: FinishReason;
+} {
+    return {
+        response: {
+            id: `checkpoint-${checkpoint.runId}-${checkpoint.stepIndex}`,
+            timestamp: now,
+            modelId: 'checkpoint',
+        },
+        usage: {
+            inputTokens: 0,
+            inputTokenDetails: {
+                noCacheTokens: 0,
+                cacheReadTokens: 0,
+                cacheWriteTokens: 0,
+            },
+            outputTokens: 0,
+            outputTokenDetails: {
+                textTokens: 0,
+                reasoningTokens: 0,
+            },
+            totalTokens: 0,
+        },
+        finishReason: (checkpoint.finishReason ?? 'other') as FinishReason,
+    };
 }

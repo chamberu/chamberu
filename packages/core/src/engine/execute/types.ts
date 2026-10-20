@@ -9,6 +9,7 @@ import type { Agent } from '../../agent/types.ts';
 import type { IClock } from '../../clock/index.ts';
 import type { Run, Step, Usage } from '../../run/types.ts';
 import type { IStore } from '../../store/types.ts';
+import type { RunDelta } from '../types.ts';
 
 export type ExecuteContext = {
     run: Run;
@@ -25,6 +26,8 @@ export type ExecuteContext = {
     /** Patches the still `running` run and emits `run.updated`. */
     update: (patch: Partial<Run>) => Promise<Run>;
     onStepAppended: (step: Step) => void;
+    /** A text or reasoning delta of the model output, while the execution was not abandoned. */
+    onDelta: (delta: RunDelta) => void;
     /**
      * Moves the still `running` run to `waiting` on `request` (releasing its
      * claim and slot) and notifies the owner.

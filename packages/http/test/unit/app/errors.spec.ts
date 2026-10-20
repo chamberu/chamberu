@@ -13,6 +13,7 @@ import {
 import { App, defineCoreHandler } from 'routup';
 import { describe, expect, it } from 'vitest';
 import {
+    ArtifactNotFoundError,
     InvalidAgentDefinitionError,
     InvalidRunStateError,
     RunNotFoundError,
@@ -47,6 +48,16 @@ describe('error handler', () => {
             status: 404,
             code: 'run_not_found',
             message: 'Run "r1" was not found.',
+        });
+    });
+
+    it('maps ArtifactNotFoundError to 404', async () => {
+        const response = await call(appThrowing(new ArtifactNotFoundError('a1')), 'GET', '/boom');
+        expect(response.status).toBe(404);
+        expect(await bodyOf(response)).toEqual({
+            status: 404,
+            code: 'artifact_not_found',
+            message: 'Artifact "a1" was not found.',
         });
     });
 

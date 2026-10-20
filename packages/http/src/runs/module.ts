@@ -22,13 +22,16 @@ import {
 } from '../request/helpers.ts';
 import {
     assertCanListRuns,
+    contentDisposition,
     createResumeContainer,
     createStartRunContainer,
     loadReadableRun,
+    loadRunArtifact,
     parseRunListQuery,
     requireHttpTrigger,
     resolveResumeTarget,
     serializeRun,
+    toBody,
 } from './helpers.ts';
 import { streamRun } from './stream/module.ts';
 
@@ -41,7 +44,10 @@ async function readableRun(event: IAppEvent, ctx: HttpContext, id: string): Prom
     return loadReadableRun(ctx, await authenticate(event, ctx), id);
 }
 
-/** `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `GET /runs/:id/stream`, `POST /runs/:id/cancel`, `POST /resume`. */
+/**
+ * `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `GET /runs/:id/stream`,
+ * `GET /runs/:id/artifacts`, `GET /runs/:id/artifacts/:artifactId`, `POST /runs/:id/cancel`, `POST /resume`.
+ */
 export function registerRunRoutes(app: App, ctx: HttpContext): void {
     const startContainer = createStartRunContainer();
     const resumeContainer = createResumeContainer();
@@ -62,6 +68,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
             payload,
             ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
             ...(body.thread !== undefined ? { thread: body.thread } : {}),
+            ...(body.attachments?.length ? { attachments: body.attachments } : {}),
         });
         event.response.status = 202;
         return result;
@@ -91,6 +98,25 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
     app.get('/runs/:id/stream', defineCoreHandler(async (event) => {
         const run = await readableRun(event, ctx, param(event, 'id'));
         return streamRun(event, ctx, run.id);
+    }));
+
+    app.get('/runs/:id/artifacts', defineCoreHandler(async (event) => {
+        const run = await readableRun(event, ctx, param(event, 'id'));
+        return { data: await ctx.store.listArtifacts(run.id) };
+    }));
+
+    app.get('/runs/:id/artifacts/:artifactId', defineCoreHandler(async (event) => {
+        const run = await readableRun(event, ctx, param(event, 'id'));
+        const { artifact, data } = await loadRunArtifact(ctx, run, param(event, 'artifactId'));
+        // from the response headers, so CORS and RateLimit-* survive
+        const headers = new Headers(event.response.headers);
+        headers.set('content-type', artifact.mediaType);
+        headers.set('content-length', String(data.byteLength));
+        headers.set('content-disposition', contentDisposition(artifact.filename));
+        // a stored text/html or image/svg+xml must never render as a page of this origin
+        headers.set('x-content-type-options', 'nosniff');
+        headers.set('cache-control', 'private, no-store');
+        return new Response(toBody(data), { status: 200, headers });
     }));
 
     app.post('/runs/:id/cancel', defineCoreHandler(async (event) => {

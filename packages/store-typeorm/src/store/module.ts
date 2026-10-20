@@ -11,6 +11,7 @@ import {
     systemClock,
 } from '@chamberu/core';
 import type {
+    Artifact,
     Checkpoint,
     IClock,
     IStore,
@@ -31,6 +32,7 @@ import type {
     Repository,
 } from 'typeorm';
 import {
+    ArtifactEntity,
     CheckpointEntity,
     DocEntity,
     EffectEntity,
@@ -42,6 +44,8 @@ import {
 } from '../entities/index.ts';
 import {
     asValues,
+    toArtifact,
+    toArtifactValues,
     toCheckpoint,
     toCheckpointValues,
     toEntity,
@@ -101,6 +105,10 @@ export class TypeormStore implements IStore {
 
     protected get docs(): Repository<DocEntity> {
         return this.dataSource.getRepository(DocEntity);
+    }
+
+    protected get artifacts(): Repository<ArtifactEntity> {
+        return this.dataSource.getRepository(ArtifactEntity);
     }
 
     // IRunStore
@@ -406,6 +414,42 @@ export class TypeormStore implements IStore {
             collection: coll,
             id,
         });
+    }
+
+    // IArtifactStore
+
+    async putArtifact(artifact: Artifact, data: Uint8Array): Promise<boolean> {
+        const result = await this.artifacts.createQueryBuilder()
+            .insert()
+            .values(toArtifactValues(artifact, data))
+            .orIgnore()
+            .returning(['id'])
+            .updateEntity(false)
+            .execute();
+        return result.raw.length === 1;
+    }
+
+    async getArtifact(id: string): Promise<Artifact | undefined> {
+        // the data column is select: false, so the bytes stay in the database
+        const entity = await this.artifacts.findOneBy({ id });
+        return entity ? toArtifact(entity) : undefined;
+    }
+
+    async readArtifact(id: string): Promise<Uint8Array | undefined> {
+        const entity = await this.artifacts.findOne({
+            select: { id: true, data: true },
+            where: { id },
+        });
+        // a copy into a plain Uint8Array: a Buffer would leak its toJSON
+        return entity ? new Uint8Array(entity.data) : undefined;
+    }
+
+    async listArtifacts(runId: string): Promise<Artifact[]> {
+        const entities = await this.artifacts.find({
+            where: { runId },
+            order: { createdAt: 'ASC', id: 'ASC' },
+        });
+        return entities.map((entity) => toArtifact(entity));
     }
 
     // Maintenance

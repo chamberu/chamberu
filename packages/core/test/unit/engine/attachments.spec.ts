@@ -1,0 +1,372 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+/* eslint-disable max-classes-per-file */
+import { tool } from 'ai';
+import type { ModelMessage, ToolSet } from 'ai';
+import { 
+    afterEach, 
+    describe, 
+    expect, 
+    it, 
+} from 'vitest';
+import { z } from 'zod';
+import {
+    ErrorCode,
+    RunEngine,
+    ValidationError,
+    defineAgent,
+} from '@chamberu/core';
+import type {
+    AgentDefinition,
+    INotifier,
+    IRunArtifacts,
+    Notification,
+} from '@chamberu/core';
+import { ControllableClock } from '../../utils/clock.ts';
+import { MemoryStore } from '../../../src/store/index.ts';
+import { mockModel } from '../../utils/mock-model.ts';
+import type { MockResponse } from '../../utils/mock-model.ts';
+
+const engines: RunEngine[] = [];
+
+afterEach(() => {
+    for (const e of engines) e.stop();
+    engines.length = 0;
+});
+
+const text = (t: string): MockResponse => ({ parts: [{ type: 'text', text: t }] });
+
+const PNG = new Uint8Array([137, 80, 78, 71]);
+
+class RecordingNotifier implements INotifier {
+    readonly name = 'owner';
+
+    calls: Notification[] = [];
+
+    async notify(n: Notification): Promise<void> {
+        this.calls.push(n);
+    }
+}
+
+function setup(
+    responses: MockResponse[],
+    opts: { store?: MemoryStore; definition?: Partial<AgentDefinition> } = {},
+) {
+    const clock = new ControllableClock(new Date(1_000_000));
+    const store = opts.store ?? new MemoryStore({ clock });
+    const model = mockModel(responses);
+    const notifier = new RecordingNotifier();
+    const agent = defineAgent({
+        name: 'vision',
+        instructions: 'You look at files.',
+        model,
+        notify: 'owner',
+        ...opts.definition,
+    });
+    const errors: unknown[] = [];
+    const engine = new RunEngine({
+        store,
+        agents: [agent],
+        notifiers: { owner: notifier },
+        resumeSecret: 's',
+        clock,
+        onError: (error) => {
+            errors.push(error);
+        },
+    });
+    engines.push(engine);
+    return {
+        clock,
+        store,
+        model,
+        engine,
+        notifier,
+        errors,
+    };
+}
+
+const env = (extra: Record<string, unknown> = {}) => ({
+    agent: 'vision',
+    trigger: 'http',
+    source: 'http' as const,
+    payload: { look: true },
+    ...extra,
+});
+
+type PromptPart = {
+    type: string; 
+    data?: unknown; 
+    mediaType?: string; 
+    filename?: string; 
+    text?: string 
+};
+
+/** The file parts of the user messages the model got on call `i`. */
+function filePartsOf(model: ReturnType<typeof mockModel>, i: number): PromptPart[] {
+    const prompt = model.doStreamCalls[i]!.prompt as Array<{ role: string; content: unknown }>;
+    return prompt
+        .filter((m) => m.role === 'user' && Array.isArray(m.content))
+        .flatMap((m) => m.content as PromptPart[])
+        .filter((p) => p.type === 'file');
+}
+
+/** Bytes of a provider file part, whether the data is bare or tagged. */
+function bytesOf(part: PromptPart): number[] {
+    const { data } = part;
+    if (data instanceof Uint8Array) return Array.from(data);
+    const tagged = data as { type: string; data: unknown };
+    expect(tagged.type).toBe('data');
+    expect(tagged.data).toBeInstanceOf(Uint8Array);
+    return Array.from(tagged.data as Uint8Array);
+}
+
+function userContentOf(messages: ModelMessage[]) {
+    const first = messages[0]!;
+    expect(first.role).toBe('user');
+    return first.content as Array<Record<string, unknown>>;
+}
+
+describe('attachments at dispatch', () => {
+    it('stores each attachment as an artifact of the run and puts the metadata on the envelope', async () => {
+        const ctx = setup([text('ok')]);
+        const { runId } = await ctx.engine.dispatch(env({
+            attachments: [
+                {
+                    mediaType: 'image/png', 
+                    filename: 'shot.png', 
+                    data: PNG, 
+                },
+                { mediaType: 'text/plain', data: new Uint8Array([104, 105]) },
+            ],
+        }));
+        const run = (await ctx.store.getRun(runId))!;
+        const listed = await ctx.store.listArtifacts(runId);
+        expect(listed).toHaveLength(2);
+        // equal createdAt: the listing breaks the tie by id
+        expect(listed).toEqual(expect.arrayContaining(run.trigger.attachments!));
+        expect(run.trigger.attachments?.[0]).toEqual({
+            id: expect.any(String),
+            runId,
+            agent: 'vision',
+            mediaType: 'image/png',
+            filename: 'shot.png',
+            size: 4,
+            createdAt: run.createdAt,
+        });
+        expect(run.trigger.attachments?.[1]?.filename).toBeUndefined();
+        expect(Array.from((await ctx.store.readArtifact(run.trigger.attachments![0]!.id))!)).toEqual(Array.from(PNG));
+        expect(run.trigger).not.toHaveProperty('attachments.0.data');
+    });
+
+    it('leaves the envelope without attachments when none are given', async () => {
+        const ctx = setup([text('ok')]);
+        const { runId } = await ctx.engine.dispatch(env({ attachments: [] }));
+        expect((await ctx.store.getRun(runId))?.trigger).not.toHaveProperty('attachments');
+        expect(await ctx.store.listArtifacts(runId)).toEqual([]);
+    });
+
+    it('stores nothing for a deduplicated dispatch', async () => {
+        const ctx = setup([text('ok')]);
+        const first = await ctx.engine.dispatch(env({
+            idempotencyKey: 'k',
+            attachments: [{ mediaType: 'image/png', data: PNG }],
+        }));
+        const second = await ctx.engine.dispatch(env({
+            idempotencyKey: 'k',
+            attachments: [{ mediaType: 'image/png', data: PNG }],
+        }));
+        expect(second).toEqual({ runId: first.runId, deduplicated: true });
+        expect(await ctx.store.listArtifacts(first.runId)).toHaveLength(1);
+    });
+
+    it.each([
+        ['a media type without subtype', { mediaType: 'image', data: PNG }],
+        ['an empty media type', { mediaType: '', data: PNG }],
+        ['a media type with spaces', { mediaType: 'image/ png', data: PNG }],
+        ['data that is no Uint8Array', { mediaType: 'image/png', data: 'iVBORw==' }],
+        ['a filename that is no string', {
+            mediaType: 'image/png', 
+            filename: 42, 
+            data: PNG, 
+        }],
+    ])('rejects %s with a ValidationError before any store write', async (_, attachment) => {
+        const ctx = setup([text('ok')]);
+        const writes: string[] = [];
+        for (const method of ['claimKey', 'createRun', 'putArtifact'] as const) {
+            const original = ctx.store[method].bind(ctx.store) as (...args: unknown[]) => Promise<unknown>;
+            (ctx.store as unknown as Record<string, unknown>)[method] = (...args: unknown[]) => {
+                writes.push(method);
+                return original(...args);
+            };
+        }
+        const promise = ctx.engine.dispatch(env({
+            idempotencyKey: 'k',
+            attachments: [{ mediaType: 'text/plain', data: new Uint8Array([1]) }, attachment],
+        }));
+        await expect(promise).rejects.toBeInstanceOf(ValidationError);
+        await expect(promise).rejects.toMatchObject({ code: ErrorCode.VALIDATION });
+        expect(writes).toEqual([]);
+        expect((await ctx.store.listRuns({})).total).toBe(0);
+    });
+});
+
+describe('attachments in the model prompt', () => {
+    it('hands the model the bytes as a file part while the checkpoint keeps the marker', async () => {
+        const ctx = setup([text('a png')]);
+        await ctx.engine.start();
+        const { runId } = await ctx.engine.dispatch(env({
+            attachments: [{
+                mediaType: 'image/png', 
+                filename: 'shot.png', 
+                data: PNG, 
+            }], 
+        }));
+        await ctx.engine.idle();
+
+        const run = (await ctx.store.getRun(runId))!;
+        expect(run.status).toBe('completed');
+        const [artifact] = run.trigger.attachments!;
+
+        const [part] = filePartsOf(ctx.model, 0);
+        expect(part).toMatchObject({ mediaType: 'image/png', filename: 'shot.png' });
+        expect(bytesOf(part!)).toEqual(Array.from(PNG));
+
+        const checkpoint = (await ctx.store.latestCheckpoint(runId))!;
+        const content = userContentOf(checkpoint.messages);
+        expect(content[0]).toMatchObject({ type: 'text' });
+        expect(content[0]!.text).toContain('"look": true');
+        expect(content[1]).toEqual({
+            type: 'file',
+            mediaType: 'image/png',
+            filename: 'shot.png',
+            data: `chamberu-artifact:${artifact!.id}`,
+        });
+    });
+
+    it('keeps the first message a plain string without attachments', async () => {
+        const ctx = setup([text('ok')]);
+        await ctx.engine.start();
+        const { runId } = await ctx.engine.dispatch(env());
+        await ctx.engine.idle();
+        const checkpoint = (await ctx.store.latestCheckpoint(runId))!;
+        expect(typeof checkpoint.messages[0]!.content).toBe('string');
+    });
+
+    it('hydrates the attachments again after an approval resume', async () => {
+        const deploy = tool({
+            inputSchema: z.object({ env: z.string() }),
+            execute: async () => 'deployed',
+        });
+        const ctx = setup([
+            {
+                parts: [{
+                    type: 'tool-call',
+                    toolName: 'deploy',
+                    input: { env: 'prod' },
+                }],
+            },
+            text('done'),
+        ], {
+            definition: {
+                tools: () => ({ deploy }),
+                approvals: { deploy: 'user' },
+            },
+        });
+        await ctx.engine.start();
+        const { runId } = await ctx.engine.dispatch(env({ attachments: [{ mediaType: 'image/png', data: PNG }] }));
+        await ctx.engine.idle();
+        expect((await ctx.store.getRun(runId))?.status).toBe('waiting');
+
+        await ctx.engine.resume(ctx.notifier.calls[0]!.resumeToken!, { approved: true });
+        await ctx.engine.idle();
+
+        expect((await ctx.store.getRun(runId))?.status).toBe('completed');
+        const [part] = filePartsOf(ctx.model, 1);
+        expect(bytesOf(part!)).toEqual(Array.from(PNG));
+        const checkpoint = (await ctx.store.latestCheckpoint(runId))!;
+        expect(userContentOf(checkpoint.messages)[1]!.data).toMatch(/^chamberu-artifact:/);
+    });
+
+    it('fails the run with ARTIFACT_NOT_FOUND when an attachment is gone', async () => {
+        class LossyStore extends MemoryStore {
+            override async readArtifact(): Promise<Uint8Array | undefined> {
+                return undefined;
+            }
+        }
+        const ctx = setup([text('never')], { store: new LossyStore() });
+        await ctx.engine.start();
+        const { runId } = await ctx.engine.dispatch(env({ attachments: [{ mediaType: 'image/png', data: PNG }] }));
+        await ctx.engine.idle();
+
+        const run = (await ctx.store.getRun(runId))!;
+        expect(run.status).toBe('failed');
+        expect(run.error?.code).toBe(ErrorCode.ARTIFACT_NOT_FOUND);
+        expect(run.error?.message).toContain(run.trigger.attachments![0]!.id);
+        expect(ctx.model.doStreamCalls).toHaveLength(0);
+    });
+});
+
+describe('tool artifacts', () => {
+    it('gives tools artifacts scoped to the run', async () => {
+        const scoped: IRunArtifacts[] = [];
+        const tools = ({ artifacts }: { artifacts: IRunArtifacts }): ToolSet => {
+            scoped.push(artifacts);
+            return {
+                save: tool({
+                    inputSchema: z.object({ body: z.string() }),
+                    execute: async ({ body }) => {
+                        const artifact = await artifacts.put({
+                            mediaType: 'text/markdown',
+                            filename: 'report.md',
+                            data: new TextEncoder().encode(body),
+                        });
+                        return artifact.id;
+                    },
+                }),
+            };
+        };
+        const ctx = setup([
+            {
+                parts: [{
+                    type: 'tool-call',
+                    toolName: 'save',
+                    input: { body: '# hi' },
+                }],
+            },
+            text('saved'),
+            text('other'),
+        ], { definition: { tools } });
+        await ctx.engine.start();
+        const a = await ctx.engine.dispatch(env({ attachments: [{ mediaType: 'image/png', data: PNG }] }));
+        await ctx.engine.idle();
+        const b = await ctx.engine.dispatch(env());
+        await ctx.engine.idle();
+        expect((await ctx.store.getRun(a.runId))?.status).toBe('completed');
+        expect((await ctx.store.getRun(b.runId))?.status).toBe('completed');
+
+        const [ofA, ofB] = scoped;
+        const listed = await ofA!.list();
+        expect(listed.map((x) => x.mediaType).sort()).toEqual(['image/png', 'text/markdown']);
+        const saved = listed.find((x) => x.mediaType === 'text/markdown')!;
+        expect(saved).toMatchObject({
+            runId: a.runId,
+            agent: 'vision',
+            filename: 'report.md',
+            size: 4,
+            createdAt: ctx.clock.now(),
+        });
+        const got = await ofA!.get(saved.id);
+        expect(got?.artifact).toEqual(saved);
+        expect(new TextDecoder().decode(got!.data)).toBe('# hi');
+
+        expect(await ofB!.list()).toEqual([]);
+        expect(await ofB!.get(saved.id)).toBeUndefined();
+        expect(await ofB!.get('missing')).toBeUndefined();
+        await expect(ofA!.put({ mediaType: 'nope', data: new Uint8Array() })).rejects.toBeInstanceOf(ValidationError);
+    });
+});

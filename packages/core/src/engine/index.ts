@@ -12,6 +12,7 @@ export type {
 export type {
     DispatchEnvelope,
     ResumeDecision,
+    RunDelta,
     RunEngineOptions,
     RunEvent,
 } from './types.ts';

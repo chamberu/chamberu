@@ -23,10 +23,12 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 
 | Method and path | Permission | Answer |
 |---|---|---|
-| `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, thread? }` (or an `Idempotency-Key` header) |
+| `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, thread?, attachments? }` (or an `Idempotency-Key` header) |
 | `GET /runs` | `run:read`, or `agent:<agent>:run` with `filter[agent]=<agent>` | `200 { data, meta: { total, limit, offset } }` |
 | `GET /runs/:id` | `run:read` or `agent:<run.agent>:run` | The run with its `steps` |
 | `GET /runs/:id/stream` | as `GET /runs/:id` | SSE |
+| `GET /runs/:id/artifacts` | as `GET /runs/:id` | `200 { data: Artifact[] }` |
+| `GET /runs/:id/artifacts/:artifactId` | as `GET /runs/:id` | The bytes, as a download |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
 | `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }` |
@@ -38,9 +40,19 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 
 `GET /runs` takes rapiq's URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]` (default 50, at most 100), `page[offset]`, `sort=createdAt`. Bodies are JSON of at most `bodyLimit` bytes (default 1 MiB). A protected route checks the bearer token before it reads the body. Runs leave the API without their internal `claim`.
 
+## Files
+
+`POST /agents/:name/runs` takes `attachments`: at most 16 objects `{ mediaType, filename?, data }`, `mediaType` of the form `type/subtype` (no parameters), `filename` 1 to 255 characters, `data` strict base64 (padded, standard alphabet, no whitespace). A bad entry answers 400 `validation_error` with the path of the field (`['attachments', 0, 'data']`) and dispatches nothing. Base64 travels in the JSON body, so `bodyLimit` (default 1 MiB) bounds the files too; raise it for larger ones. The files become [attachments](/guide/triggers#attachments) of the run.
+
+<<< @/snippets/http.ts#attachments
+
+`GET /runs/:id/artifacts` lists the run's artifacts (attachments and files its tools stored, see [Files](/guide/agents#files)) as metadata. `GET /runs/:id/artifacts/:artifactId` answers the bytes with the stored media type as `content-type`, `content-length`, `content-disposition: attachment` (with `filename` and an RFC 5987 `filename*` when the artifact has a filename), `x-content-type-options: nosniff` and `cache-control: private, no-store`, so a stored HTML or SVG file is downloaded, never rendered in the API's origin. Both follow the run read rule (404 for an unknown run before 403); an unknown artifact, or one of another run, is 404 `artifact_not_found`.
+
 ## Following a run
 
 `GET /runs/:id/stream` sends `run.updated` with the current run, then each step as `step.appended` (`id` is the step index, so `Last-Event-ID` resumes), then live events; it ends once the run is `completed`, `failed` or `cancelled`. The engine's events only cover runs executing in this process, so the stream also polls the store every `stream.pollMs` (2 s) and sees a run that [another replica](/guide/concurrency) executes; an idle poll sends `ping`. A client that disconnects unsubscribes at once, and the app ends open streams on shutdown.
+
+While the model writes, the stream also sends `delta` events, `data: { step, kind, text }` with `kind` `text` or `reasoning` (the engine's [`run.delta`](/guide/execution#streaming)). `step` is the checkpoint step index of the `llm` step being generated (one per model call), not the `step.appended` `id`, which also counts `tool` and `wait` rows. They carry no `id`, so `Last-Event-ID` stays a step index, and they are live only: a reconnect or a late subscriber gets the stored `llm` step instead, never the deltas it missed. Only the replica executing the run has them; a stream served by another replica sees the steps through its store poll and no deltas.
 
 To resume, send `Last-Event-ID` with the last step id you saw, or the query `?after=<step index>` (a non-negative integer, else 400). If both are present, a valid `Last-Event-ID` wins: it is the client's progress on a reconnect, while the URL stays the one of the first connect.
 
@@ -87,7 +99,7 @@ This is the "MCP in" half of the [OpenClaw](/deployment/openclaw) integration.
 
 ## Operations
 
-- `/metrics` is unauthenticated: keep it off the public ingress (a NetworkPolicy, or an internal listener) or set `metrics: false`. Each app has its own `prom-client` registry, labelled by route template (`/runs/:id`; unknown paths share `/_unmatched`); SSE streams and rate-limited requests are not timed.
+- `/metrics` is unauthenticated: keep it off the public ingress (a NetworkPolicy, or an internal listener) or set `metrics: false`. Each app has its own `prom-client` registry, labelled by route template (`/runs/:id`, `/runs/:id/artifacts/:artifactId`; unknown paths share `/_unmatched`); SSE streams and rate-limited requests are not timed.
 - The rate limit (300 requests per minute per client, health, metrics and CORS preflights excluded) keys on the socket address. Behind a reverse proxy set `trustProxy`, or every client shares the proxy's bucket; `X-Forwarded-For` is never trusted otherwise.
 - CORS is off unless `cors` is given.
 - `/readyz` fails while shutting down, while the engine drains and when the store does not answer within `readyTimeoutMs` (2 s).

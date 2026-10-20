@@ -27,7 +27,7 @@ It passes the same contract suite every other store must pass.
 - A single process where losing queued and waiting runs on restart is acceptable.
 
 ::: warning Not durable
-Everything is gone with the process: queued runs, waiting approvals, checkpoints, recorded effects and agent state. It also cannot be shared between replicas. Use a durable store to survive restarts or to run more than one replica.
+Everything is gone with the process: queued runs, waiting approvals, checkpoints, recorded effects, agent state and artifacts. It also cannot be shared between replicas. Use a durable store to survive restarts or to run more than one replica.
 :::
 
 ## In tests

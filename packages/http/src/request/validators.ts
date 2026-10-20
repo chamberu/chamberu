@@ -5,9 +5,15 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { IssueCode } from '@ebec/core';
-import { createValidupError, defineValidator } from 'validup';
-import type { ValidatorDescriptor } from 'validup';
+import { IssueCode, prefixIssuePath } from '@ebec/core';
+import type { Issue } from '@ebec/core';
+import {
+    ValidupError,
+    createValidupError,
+    defineValidator,
+    isValidupError,
+} from 'validup';
+import type { Container, ValidatorDescriptor } from 'validup';
 
 /** A string of `min` to `max` characters without U+0000 (which Postgres text columns refuse). */
 export function isString({ min = 0, max }: { min?: number; max: number }): ValidatorDescriptor {
@@ -39,6 +45,68 @@ export function isDefined(): ValidatorDescriptor {
         run: ({ value }) => {
             if (value === undefined) throw createValidupError(value, IssueCode.REQUIRED, 'is required');
             return value;
+        },
+    });
+}
+
+/**
+ * An array of at most `max` items, each run through `item`. The length is
+ * checked before any item, so an oversized list costs one issue; item
+ * issues carry the item's index in their path. Returns the cleaned items.
+ */
+export function isArrayOf<T extends Record<string, any>>(item: Container<T>, { max }: { max: number }): ValidatorDescriptor {
+    return defineValidator({
+        run: async ({ value }) => {
+            if (!Array.isArray(value) || value.length > max) {
+                throw createValidupError(value, IssueCode.VALUE_INVALID, `must be an array of at most ${max} items`);
+            }
+            const items: T[] = [];
+            const issues: Issue[] = [];
+            for (const [index, entry] of value.entries()) {
+                try {
+                    items.push(await item.run(entry));
+                } catch (error) {
+                    if (!isValidupError(error)) throw error;
+                    issues.push(...error.issues.map((issue) => prefixIssuePath(issue, [index])));
+                }
+            }
+            if (issues.length > 0) throw new ValidupError(issues);
+            return items;
+        },
+    });
+}
+
+// RFC 6838 restricted names, no parameters (the rule core applies to artifacts)
+const MEDIA_TYPE = /^[a-z0-9][\w!#$&^.+-]{0,126}\/[a-z0-9][\w!#$&^.+-]{0,126}$/i;
+
+/** A media type `type/subtype` without parameters. */
+export function isMediaType(): ValidatorDescriptor {
+    return defineValidator({
+        run: ({ value }) => {
+            if (typeof value !== 'string' || !MEDIA_TYPE.test(value)) {
+                throw createValidupError(value, IssueCode.VALUE_INVALID, 'must be a media type of the form type/subtype');
+            }
+            return value;
+        },
+    });
+}
+
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+/**
+ * Strict base64 (RFC 4648 section 4: padded, no whitespace, no url-safe
+ * alphabet, zero pad bits), decoded to a plain `Uint8Array`.
+ */
+export function isBase64(): ValidatorDescriptor {
+    return defineValidator({
+        run: ({ value }) => {
+            if (typeof value === 'string' && BASE64.test(value)) {
+                const buffer = Buffer.from(value, 'base64');
+                // non-zero pad bits decode too: only the canonical form re-encodes to the input
+                if (buffer.toString('base64') === value) return new Uint8Array(buffer);
+            }
+            // never echo the (up to bodyLimit) input back in the issue
+            throw createValidupError(undefined, IssueCode.VALUE_INVALID, 'must be strict base64');
         },
     });
 }

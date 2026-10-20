@@ -6,7 +6,7 @@
  */
 
 import { RunStatus } from '@chamberu/core';
-import type { Run } from '@chamberu/core';
+import type { Artifact, Run } from '@chamberu/core';
 
 export function makeRun(id: string, overrides: Partial<Run> = {}): Run {
     const createdAt = new Date(1_000);
@@ -25,6 +25,19 @@ export function makeRun(id: string, overrides: Partial<Run> = {}): Run {
         usage: { inputTokens: 0, outputTokens: 0 },
         createdAt,
         updatedAt: createdAt,
+        ...overrides,
+    };
+}
+
+export function makeArtifact(id: string, overrides: Partial<Artifact> = {}): Artifact {
+    return {
+        id,
+        runId: 'r1',
+        agent: 'a',
+        mediaType: 'text/plain',
+        filename: `${id}.txt`,
+        size: 3,
+        createdAt: new Date(1_000),
         ...overrides,
     };
 }

@@ -112,6 +112,38 @@ describe('GET /runs/:id/stream', () => {
         expect(reader.done).toBe(true);
     });
 
+    it('forwards the model output of the run live as delta events without an id', async () => {
+        const { app, engine } = createRunTestApp();
+        const runId = await start(app);
+        // another run streams its own deltas: never forwarded here
+        await start(app);
+        const reader = new SseReader(await call(app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN }));
+        await reader.next(1);
+
+        await engine.start();
+        await engine.idle();
+        const events = await reader.rest();
+        const deltas = events.filter((e) => e.event === 'delta');
+        expect(deltas).toEqual([{
+            event: 'delta',
+            data: JSON.stringify({
+                step: 0,
+                kind: 'text',
+                text: 'done',
+            }),
+        }]);
+        expect(deltas[0]).not.toHaveProperty('id');
+        // a delta comes before the step it belongs to is appended
+        expect(events.findIndex((e) => e.event === 'delta')).toBeLessThan(events.findIndex((e) => e.event === 'step.appended'));
+        expect(events.map(statusOf).filter(Boolean).at(-1)).toBe('completed');
+    });
+
+    it('sends no delta for a settled run', async () => {
+        const { app, runId } = await completedRun();
+        const events = await readEvents(await call(app, 'GET', `/runs/${runId}/stream`, { token: READER_TOKEN }));
+        expect(events.some((e) => e.event === 'delta')).toBe(false);
+    });
+
     it('skips the steps up to Last-Event-ID', async () => {
         const {
             app,
@@ -234,9 +266,9 @@ describe('GET /runs/:id/stream', () => {
 
     it('reads the steps again only when the polled run changed', async () => {
         const {
-            app, 
-            clock, 
-            store, 
+            app,
+            clock,
+            store,
         } = createRunTestApp();
         const runId = await start(app);
         const listSteps = vi.spyOn(store, 'listSteps');
@@ -267,7 +299,7 @@ describe('GET /runs/:id/stream', () => {
         const getRun = vi.spyOn(ctx.store, 'getRun');
         ctx.clock.advance(2_000);
         await flush();
-        expect(unsubscribes).toHaveLength(2);
+        expect(unsubscribes).toHaveLength(3);
         for (const unsubscribe of unsubscribes) expect(unsubscribe).toHaveBeenCalledTimes(1);
 
         const calls = getRun.mock.calls.length;
@@ -285,7 +317,7 @@ describe('GET /runs/:id/stream', () => {
         await reader.next(1);
 
         controller.abort();
-        expect(unsubscribes).toHaveLength(2);
+        expect(unsubscribes).toHaveLength(3);
         for (const unsubscribe of unsubscribes) expect(unsubscribe).toHaveBeenCalledTimes(1);
 
         const getRun = vi.spyOn(ctx.store, 'getRun');

@@ -17,6 +17,7 @@ export const TableName = {
     EFFECTS: 'chamberu_effects',
     KV: 'chamberu_kv',
     DOCS: 'chamberu_docs',
+    ARTIFACTS: 'chamberu_artifacts',
 } as const;
 
 /**

@@ -107,3 +107,36 @@ export const mcpServers = {
     },
 };
 // #endregion mcp
+
+/** A client of the app above (`basePath: '/api'`): start a run with a file, then download what it stored. */
+export async function startWithAttachment(token: string, png: Uint8Array) {
+    // #region attachments
+    const base = 'https://chamberu.example.com/api';
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+
+    const started = await fetch(`${base}/agents/triage/runs`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            payload: { issue: 43 },
+            // at most 16, data as strict base64; the whole body stays within bodyLimit
+            attachments: [{
+                mediaType: 'image/png',
+                filename: 'crash.png',
+                data: Buffer.from(png).toString('base64'),
+            }],
+        }),
+    });
+    const { runId } = await started.json() as { runId: string };
+
+    // metadata of the attachments and of every file a tool stored
+    const listed = await fetch(`${base}/runs/${runId}/artifacts`, { headers });
+    const { data } = await listed.json() as { data: Array<{ id: string; mediaType: string }> };
+
+    // the bytes, served as a download with the stored media type
+    const [first] = data;
+    const file = first ? await fetch(`${base}/runs/${runId}/artifacts/${first.id}`, { headers }) : undefined;
+    // #endregion attachments
+
+    return file;
+}

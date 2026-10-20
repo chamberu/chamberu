@@ -15,7 +15,8 @@ import type {
     ToolExecutionEndEvent,
     ToolSet,
 } from 'ai';
-import { FatalToolError } from '../../errors/index.ts';
+import { hydrateMessages } from '../../artifact/helpers.ts';
+import { ArtifactNotFoundError, FatalToolError } from '../../errors/index.ts';
 import { RunStatus } from '../../run/constants.ts';
 import type { RunContext, Step, Usage } from '../../run/types.ts';
 import {
@@ -28,19 +29,22 @@ import {
     assembleTools,
     budgetExceeded,
     endsOnApprovalResponse,
+    initialMessage,
     lastAssistantText,
+    outputContext,
     pendingApproval,
-    renderTrigger,
     toRunError,
     toToolApproval,
+    toValidationError,
     untilAborted,
     withoutToolCalls,
 } from './helpers.ts';
 import type { ApprovalRequest, ExecuteContext } from './types.ts';
 
 /**
- * One execution of a claimed, `running` run: drives a ToolLoopAgent from the
- * latest checkpoint, checkpoints every step and settles the run.
+ * One execution of a claimed, `running` run: streams a ToolLoopAgent from the
+ * latest checkpoint (emitting text and reasoning deltas), checkpoints every
+ * step and settles the run.
  */
 export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const {
@@ -51,7 +55,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     } = ctx;
     const budget = resolveBudget(agent);
     const checkpoint = await store.latestCheckpoint(run.id);
-    const initial: ModelMessage[] = checkpoint?.messages ?? [{ role: 'user', content: renderTrigger(run.trigger) }];
+    // stored form: file parts hold artifact markers; the model gets a hydrated copy
+    const initial: ModelMessage[] = checkpoint?.messages ?? [initialMessage(run.trigger)];
     const usage: Usage = { ...run.usage };
     let stepIndex = checkpoint ? checkpoint.stepIndex + 1 : 0;
     let stepSeq = (await store.listSteps(run.id)).length;
@@ -70,10 +75,30 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     if (remainingSteps <= 0) {
         // the step limit was reached by an earlier execution that did not settle the run
         if (checkpoint && checkpoint.finishReason !== 'tool-calls') {
-            await ctx.finish({ status: RunStatus.COMPLETED, output: lastAssistantText(checkpoint.messages) });
+            const text = lastAssistantText(checkpoint.messages);
+            const { output } = agent.definition;
+            if (!output) {
+                await ctx.finish({ status: RunStatus.COMPLETED, output: text });
+                return;
+            }
+            try {
+                const parsed: unknown = await output.parseCompleteOutput({ text }, outputContext(checkpoint, clock.now()));
+                await ctx.finish({ status: RunStatus.COMPLETED, output: parsed });
+            } catch (error) {
+                await ctx.finish({ status: RunStatus.FAILED, error: toRunError(toValidationError(error)) });
+            }
         } else {
             await ctx.finish({ status: RunStatus.FAILED, error: toRunError(budgetExceeded(budget, 'steps')) });
         }
+        return;
+    }
+
+    let prompt: ModelMessage[];
+    try {
+        prompt = await hydrateMessages(initial, store);
+    } catch (error) {
+        if (!(error instanceof ArtifactNotFoundError)) throw error;
+        await ctx.finish({ status: RunStatus.FAILED, error: toRunError(error) });
         return;
     }
 
@@ -89,7 +114,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const responseMessages: ModelMessage[] = [];
     // AI SDK swallows onStepEnd errors; a fatal one is kept here and stops the loop
     let fatal: { error: unknown } | undefined;
-    // set once the run settles on abort; a still running generate must not write anymore
+    // set once the run settles on abort; a still running stream must not write anymore
     let abandoned = false;
     let pendingStepEnd: Promise<void> = Promise.resolve();
     let stepStartedAt = clock.now();
@@ -265,15 +290,53 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         stopWhen,
         prepareStep,
         onStepEnd,
+        output: agent.definition.output,
     });
 
-    let result: Awaited<ReturnType<typeof loop.generate>>;
-    try {
-        const work = loop.generate({
-            messages: initial,
+    // stream steps seen so far; a step's deltas belong to the checkpoint index it is saved under
+    const firstStepIndex = stepIndex;
+    let streamStep = -1;
+    const consume = async () => {
+        // onError is no typed agent stream parameter but reaches streamText; the
+        // error is the run's, so the AI SDK's default console logging is muted
+        const options = {
+            messages: prompt,
             abortSignal: signal,
             onToolExecutionEnd,
-        });
+            onError: () => {},
+        };
+        const stream = await loop.stream(options);
+        // the first stream error fails the run, as a rejected generate did
+        let streamError: { error: unknown } | undefined;
+        for await (const part of stream.fullStream) {
+            if (part.type === 'start-step') {
+                streamStep++;
+            } else if (part.type === 'text-delta' || part.type === 'reasoning-delta') {
+                if (!abandoned) {
+                    ctx.onDelta({
+                        runId: run.id,
+                        step: firstStepIndex + Math.max(streamStep, 0),
+                        kind: part.type === 'text-delta' ? 'text' : 'reasoning',
+                        text: part.text,
+                    });
+                }
+            } else if (part.type === 'error') {
+                streamError ??= { error: part.error };
+            }
+        }
+        if (streamError) throw streamError.error;
+        const [steps, finishReason, text] = await Promise.all([stream.steps, stream.finishReason, stream.text]);
+        return {
+            stream,
+            steps,
+            finishReason,
+            text,
+        };
+    };
+
+    let result: Awaited<ReturnType<typeof consume>>;
+    try {
+        const work = consume();
         // the agent may keep running after an abort; never leak its rejection
         work.catch(() => {});
         result = await untilAborted(work, signal);
@@ -334,9 +397,28 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         return;
     }
 
+    if (!agent.definition.output) {
+        await ctx.finish({
+            status: RunStatus.COMPLETED,
+            usage,
+            output: result.text,
+        });
+        return;
+    }
+    let output: unknown;
+    try {
+        output = await result.stream.output;
+    } catch (error) {
+        await ctx.finish({
+            status: RunStatus.FAILED,
+            usage,
+            error: toRunError(toValidationError(error)),
+        });
+        return;
+    }
     await ctx.finish({
         status: RunStatus.COMPLETED,
         usage,
-        output: result.text,
+        output,
     });
 }

@@ -23,9 +23,14 @@ describe('public api', () => {
         'ChamberuError',
         'InvalidResumeTokenError',
         'BudgetExceededError',
+        'ArtifactNotFoundError',
     ])('exports %s', (name) => {
         expect(core).toHaveProperty(name);
         expect(core[name as keyof typeof core]).toBeTypeOf('function');
+    });
+
+    it('keeps the artifact uri prefix internal', () => {
+        expect(core).not.toHaveProperty('ARTIFACT_URI_PREFIX');
     });
 
     it('exports the RunStatus enum', () => {

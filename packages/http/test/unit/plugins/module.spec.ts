@@ -80,6 +80,8 @@ describe('metrics', () => {
             await send(app, `/api/nope/${crypto.randomUUID()}`);
             await send(app, `/api/agents/echo/state/kv/k${i}`, { token: ADMIN_TOKEN });
             await send(app, `/api/hooks/hooked/x${i}/y`, { method: 'POST' });
+            await send(app, `/api/runs/${crypto.randomUUID()}/artifacts`, { token: ADMIN_TOKEN });
+            await send(app, `/api/runs/${crypto.randomUUID()}/artifacts/${crypto.randomUUID()}`, { token: ADMIN_TOKEN });
         }
         const labels = pathLabels(await (await send(app, '/api/metrics')).text());
         expect([...labels].sort()).toEqual([
@@ -87,6 +89,8 @@ describe('metrics', () => {
             '/agents/:name/state/kv/:key',
             '/hooks/:agent/*',
             '/runs/:id',
+            '/runs/:id/artifacts',
+            '/runs/:id/artifacts/:artifactId',
             '/runs/:id/cancel',
         ]);
     });

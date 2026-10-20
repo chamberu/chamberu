@@ -6,13 +6,27 @@
  */
 
 import type { Agent } from '../agent/types.ts';
+import type { ArtifactInput } from '../artifact/types.ts';
 import type { IClock } from '../clock/index.ts';
 import type { INotifier } from '../notify/types.ts';
 import type { Run, Step } from '../run/types.ts';
 import type { IStore } from '../store/types.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 
-export type RunEvent = { type: 'run.updated'; run: Run } | { type: 'step.appended'; step: Step };
+/**
+ * A piece of model output while it streams; never stored. `step` is the
+ * checkpoint step index the step it belongs to is saved under.
+ */
+export type RunDelta = {
+    runId: string;
+    step: number;
+    kind: 'text' | 'reasoning';
+    text: string;
+};
+
+export type RunEvent = { type: 'run.updated'; run: Run } |
+    { type: 'step.appended'; step: Step } |
+    { type: 'run.delta'; delta: RunDelta };
 
 export type RunEngineOptions = {
     store: IStore;
@@ -31,7 +45,11 @@ export type RunEngineOptions = {
     onError?: (error: unknown, run?: Run) => void;
 };
 
-export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt'> & Partial<Pick<TriggerEnvelope, 'id' | 'receivedAt'>>;
+export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt' | 'attachments'> &
+    Partial<Pick<TriggerEnvelope, 'id' | 'receivedAt'>> & {
+        /** Files to start the run with; stored as artifacts of the run before it is created. */
+        attachments?: ArtifactInput[];
+    };
 
 export type ResumeDecision = {
     approved: boolean;

@@ -52,7 +52,7 @@ type Turn = MockResponse | 'hang' | { before: () => Promise<void>; response: Moc
 function scripted(script: Turn[]) {
     const calls: LanguageModelV4CallOptions[] = [];
     const model = new MockLanguageModelV4({
-        doGenerate: async (options) => {
+        doStream: async (options) => {
             const turn = script[calls.length];
             calls.push(options);
             if (!turn) throw new Error('mock script exhausted');
@@ -63,9 +63,9 @@ function scripted(script: Turn[]) {
             }
             if ('before' in turn) {
                 await turn.before();
-                return mockModel([turn.response]).doGenerate(options);
+                return mockModel([turn.response]).doStream(options);
             }
-            return mockModel([turn]).doGenerate(options);
+            return mockModel([turn]).doStream(options);
         },
     });
     return { model, calls };
@@ -304,10 +304,10 @@ describe('graceful drain', () => {
     it('a drain landing during the step-end writes keeps the completed step, so recovery does not redo it', async () => {
         const calls: LanguageModelV4CallOptions[] = [];
         const model = new MockLanguageModelV4({
-            doGenerate: async (options) => {
+            doStream: async (options) => {
                 if (options.abortSignal?.aborted) throw options.abortSignal.reason;
                 calls.push(options);
-                return mockModel([calls.length === 1 ? toolTurn : text('done')]).doGenerate(options);
+                return mockModel([calls.length === 1 ? toolTurn : text('done')]).doStream(options);
             },
         });
         const lookup = vi.fn(async () => 'found');
