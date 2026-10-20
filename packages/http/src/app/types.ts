@@ -37,6 +37,11 @@ export type McpOptions = {
 export type HttpAppOptions = {
     /** Its `store`, agents and `clock` serve every route. */
     engine: Engine;
+    /**
+     * Names of the engine's agents to serve (routes, MCP tools, hooks, extra
+     * routes); the others are unknown to this app. Default: every agent.
+     */
+    agents?: string[];
     /** One authenticator or a chain; the first principal wins. */
     auth: Authenticator | Authenticator[];
     /** Prefix of every route, e.g. `/api`. Default: none. */

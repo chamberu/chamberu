@@ -15,6 +15,11 @@ export type SchedulerErrorContext = {
 export type SchedulerOptions = {
     /** Its agents' cron triggers are scheduled; its store holds the tick locks. */
     engine: Engine;
+    /**
+     * Names of the engine's agents to schedule, e.g. to split cron triggers
+     * across deployments. Default: every agent of the engine.
+     */
+    agents?: string[];
     /** Lock owner. Default `${hostname()}-${pid}`. */
     owner?: string;
     /**

@@ -242,6 +242,7 @@ process.once('SIGTERM', () => {
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `engine` | `Engine` | required | Dispatches, cancels and resumes runs; its `store`, agents and `clock` serve every route (runs, steps and state are read from `engine.store`, polls, waits and timeouts run on `engine.clock`) |
+| `agents` | `string[]` | every agent | Names of the engine's agents this app serves (routes, MCP tools, hooks, extra routes); the others are unknown to it. A name the engine lacks or given twice throws `InvalidAgentDefinitionError` |
 | `auth` | `Authenticator \| Authenticator[]` | required | The authenticator chain |
 | `basePath` | `string` | none | Prefix of every route, e.g. `/api` |
 | `trustProxy` | routup trust-proxy input | none | Which proxies the client address (and the rate-limit key) trusts |

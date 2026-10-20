@@ -14,7 +14,7 @@ npm install @chamberu/http @chamberu/core --save
 function createHttpApp(options: HttpAppOptions): App; // routup App
 ```
 
-The store, the agents and the clock come from `engine` (`engine.store`, `engine.listAgents()`, `engine.clock`). Throws `InvalidAgentDefinitionError` for an empty `auth` array and an invalid `routes` entry (a path that is not static, a duplicate method and path, a first segment of a built-in route such as `agents`, `runs` or `hooks`, or the metrics path, all compared case-insensitively).
+The store, the agents and the clock come from `engine` (`engine.store`, `engine.listAgents()`, `engine.clock`); `agents` narrows the served agents to the named ones, the others get no routes, MCP tools or hooks in this app. Throws `InvalidAgentDefinitionError` for a name in `agents` the engine lacks or that is given twice, an empty `auth` array and an invalid `routes` entry (a path that is not static, a duplicate method and path, a first segment of a built-in route such as `agents`, `runs` or `hooks`, or the metrics path, all compared case-insensitively).
 
 <<< ../../../http/src/app/types.ts#options{ts}
 

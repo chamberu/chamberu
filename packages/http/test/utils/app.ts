@@ -46,7 +46,7 @@ export const testAuth = staticTokens({
     ],
 });
 
-export type TestAppOverrides = Partial<HttpAppOptions> & {
+export type TestAppOverrides = Partial<Omit<HttpAppOptions, 'agents'>> & {
     /** Engine construction, ignored when `engine` is given. */
     agents?: Agent[];
     store?: IStore;

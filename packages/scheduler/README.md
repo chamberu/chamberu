@@ -152,6 +152,7 @@ A run that pauses for an approval does not hold the pod: the job returns, the ap
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `engine` | `Engine` | required | Dispatches the runs; its agents' cron triggers are scheduled, its store holds the tick locks and the runs the overlap check reads |
+| `agents` | `string[]` | every agent | Names of the engine's agents whose cron triggers are scheduled, e.g. to split them across deployments. A name the engine lacks or given twice throws `InvalidAgentDefinitionError` |
 | `owner` | `string` | `` `${hostname}-${pid}` `` | Lock owner |
 | `lockTtlMs` | `number` | `600_000` | How long a tick's lock key is held; a tick firing this late or later is skipped |
 | `onError` | `(error, { agent, trigger }) => void` | `console.error` | Failing ticks |

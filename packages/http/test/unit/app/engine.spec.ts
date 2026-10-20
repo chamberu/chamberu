@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     Engine,
+    InvalidAgentDefinitionError,
     MemoryStore,
     defineAgent,
     http,
@@ -108,5 +109,35 @@ describe('createHttpApp over the engine', () => {
             .map((event) => (JSON.parse(event.data) as { status: string }).status);
         expect(statuses).toContain('completed');
         await other.drain();
+    });
+
+    it('serves only the named agents', async () => {
+        const { engine } = setup();
+        const app = createHttpApp({
+            engine,
+            agents: ['echo'],
+            auth: testAuth,
+            metrics: false,
+            rateLimit: false,
+        });
+        const response = await call(app, 'GET', '/agents', { token: ADMIN_TOKEN });
+        const { data } = await response.json() as { data: { name: string }[] };
+        expect(data.map((agent) => agent.name)).toEqual(['echo']);
+        expect((await call(app, 'POST', '/agents/other/runs', { token: ADMIN_TOKEN })).status).toBe(404);
+        expect((await call(app, 'GET', '/agents/other/state/kv/k', { token: ADMIN_TOKEN })).status).toBe(404);
+        expect((await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN })).status).toBe(202);
+    });
+
+    it('rejects an agent name the engine lacks or a name given twice', () => {
+        const { engine } = setup();
+        const make = (agents: string[]) => createHttpApp({
+            engine,
+            agents,
+            auth: testAuth,
+            metrics: false,
+            rateLimit: false,
+        });
+        expect(() => make(['missing'])).toThrow(InvalidAgentDefinitionError);
+        expect(() => make(['echo', 'echo'])).toThrow(InvalidAgentDefinitionError);
     });
 });

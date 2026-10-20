@@ -5,7 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Agent, TriggerDefinition } from '@chamberu/core';
+import { InvalidAgentDefinitionError } from '@chamberu/core';
+import type { Agent, Engine, TriggerDefinition } from '@chamberu/core';
 import type { IScheduleLock, ScheduledComponentOptions } from 'hubwire';
 import { fireCronTrigger, readCronOptions } from '../tick/index.ts';
 import type { SchedulerOptions } from './types.ts';
@@ -38,4 +39,24 @@ export function buildComponentOptions(
         },
         hooks: { onError: (error) => ctx.onError(error, { agent: agent.name, trigger: trigger.id }) },
     };
+}
+
+/**
+ * The engine's agents, or only the named ones (in the given order); a name the
+ * engine lacks or a name given twice throws InvalidAgentDefinitionError.
+ */
+export function selectAgents(engine: Engine, names?: readonly string[]): Agent[] {
+    if (names === undefined) return engine.listAgents();
+    const seen = new Set<string>();
+    return names.map((name) => {
+        if (seen.has(name)) {
+            throw new InvalidAgentDefinitionError(`Agent "${name}" is named more than once.`);
+        }
+        seen.add(name);
+        const agent = engine.getAgent(name);
+        if (!agent) {
+            throw new InvalidAgentDefinitionError(`The engine has no agent "${name}".`);
+        }
+        return agent;
+    });
 }

@@ -12,17 +12,19 @@ import type { IScheduledComponent } from 'hubwire';
 import { defineScheduledComponent } from 'hubwire';
 import { createStoreScheduleLock } from '../lock/index.ts';
 import { SCHEDULE_LOCK_TTL_MS } from './constants.ts';
-import { buildComponentOptions } from './helpers.ts';
+import { buildComponentOptions, selectAgents } from './helpers.ts';
 import type { IScheduler, SchedulerOptions } from './types.ts';
 
 /**
- * Schedules every cron trigger of the engine's agents as one hubwire component,
+ * Schedules every cron trigger of the engine's agents (or of `agents`) as one hubwire component,
  * guarded by a per-tick lock in the engine's store, so replicas sharing the
  * store dispatch each tick once. Validates every trigger up front: throws
- * InvalidAgentDefinitionError for a trigger hubwire cannot schedule.
+ * InvalidAgentDefinitionError for a trigger hubwire cannot schedule or a name
+ * in `agents` the engine lacks.
  * Shutdown order: `await scheduler.stop()`, then `await engine.drain()`.
  */
 export function createScheduler(opts: SchedulerOptions): IScheduler {
+    const agents = selectAgents(opts.engine, opts.agents);
     const ctx = {
         engine: opts.engine,
         lock: createStoreScheduleLock(opts.engine.store, opts.owner ?? `${hostname()}-${pid}`),
@@ -32,7 +34,7 @@ export function createScheduler(opts: SchedulerOptions): IScheduler {
     } satisfies Parameters<typeof buildComponentOptions>[0];
 
     const components: IScheduledComponent[] = [];
-    for (const agent of opts.engine.listAgents()) {
+    for (const agent of agents) {
         for (const trigger of agent.definition.triggers ?? []) {
             if (trigger.source !== 'cron') continue;
             try {
