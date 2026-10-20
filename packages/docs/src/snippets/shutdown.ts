@@ -1,9 +1,9 @@
 import type { Agent, IStore } from '@chamberu/core';
-import { RunEngine } from '@chamberu/core';
+import { Engine } from '@chamberu/core';
 
 export async function serve(store: IStore, agents: Agent[], resumeSecret: string) {
     // #region shutdown
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents,
         resumeSecret,
@@ -22,7 +22,7 @@ export async function serve(store: IStore, agents: Agent[], resumeSecret: string
     return engine;
 }
 
-export async function cancelRun(engine: RunEngine, runId: string) {
+export async function cancelRun(engine: Engine, runId: string) {
     // #region cancel
     await engine.cancel(runId);
     const run = await engine.getRun(runId);

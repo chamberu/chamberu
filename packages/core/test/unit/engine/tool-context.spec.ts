@@ -19,8 +19,8 @@ import {
 } from 'vitest';
 import { z } from 'zod';
 import {
+    Engine,
     InvalidAgentDefinitionError,
-    RunEngine,
     defineAgent,
     defineEffectTool,
     defineTool,
@@ -39,7 +39,7 @@ import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 afterEach(() => {
     for (const e of engines) e.stop();
@@ -119,7 +119,7 @@ function setup(s: Setup) {
         toolsContext: s.toolsContext,
         notify: 'owner',
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         notifiers: { owner: notifier },

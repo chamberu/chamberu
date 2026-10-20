@@ -15,13 +15,13 @@ import {
     vi,
 } from 'vitest';
 import {
+    Engine,
     InvalidAgentDefinitionError,
-    RunEngine,
     TRIGGER_KEY_MAX_LENGTH,
     ValidationError,
     defineAgent,
 } from '@chamberu/core';
-import type { Run, RunEngineOptions, RunEvent } from '@chamberu/core';
+import type { EngineOptions, Run, RunEvent } from '@chamberu/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 
@@ -36,7 +36,7 @@ const agent = defineAgent({
 const flush = () => new Promise<void>((resolve) => { setImmediate(resolve); });
 
 /** Engine whose executions block until released, to observe scheduling. */
-class GatedEngine extends RunEngine {
+class GatedEngine extends Engine {
     gates = new Map<string, () => void>();
 
     executed: string[] = [];
@@ -82,14 +82,14 @@ class SlowStartStore extends MemoryStore {
     }
 }
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 afterEach(() => {
     for (const e of engines) e.stop();
     engines.length = 0;
 });
 
-function make(opts: Partial<RunEngineOptions> & { store?: MemoryStore } = {}) {
+function make(opts: Partial<EngineOptions> & { store?: MemoryStore } = {}) {
     const store = opts.store ?? new MemoryStore();
     const engine = new GatedEngine({
         store,
@@ -110,9 +110,9 @@ const env = (extra: Record<string, unknown> = {}) => ({
     ...extra,
 });
 
-const statusOf = async (engine: RunEngine, id: string) => (await engine.getRun(id))?.status;
+const statusOf = async (engine: Engine, id: string) => (await engine.getRun(id))?.status;
 
-describe('RunEngine.dispatch', () => {
+describe('Engine.dispatch', () => {
     it('dispatch creates queued run', async () => {
         const { engine } = make();
         const { runId, deduplicated } = await engine.dispatch(env());
@@ -159,7 +159,7 @@ describe('RunEngine.dispatch', () => {
             model,
             instructions: 'y',
         });
-        expect(() => new RunEngine({
+        expect(() => new Engine({
             store: new MemoryStore(),
             agents: [agent, other],
             resumeSecret: 's',
@@ -167,7 +167,7 @@ describe('RunEngine.dispatch', () => {
     });
 
     it('rejects an empty resumeSecret', () => {
-        expect(() => new RunEngine({
+        expect(() => new Engine({
             store: new MemoryStore(),
             agents: [agent],
             resumeSecret: '',
@@ -406,7 +406,7 @@ describe('RunEngine.dispatch', () => {
     });
 });
 
-describe('RunEngine.on', () => {
+describe('Engine.on', () => {
     it('narrows the listener to the event type', async () => {
         const { engine } = make();
         const statuses: string[] = [];

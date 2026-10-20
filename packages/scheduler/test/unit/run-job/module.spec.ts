@@ -16,9 +16,9 @@ import {
 import { z } from 'zod';
 import type { AgentDefinition, TriggerDefinition } from '@chamberu/core';
 import {
+    Engine,
     InvalidAgentDefinitionError,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
     http,
@@ -43,7 +43,7 @@ function setup(
         triggers,
         ...extra,
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret: 's',
@@ -168,7 +168,7 @@ describe('runJob', () => {
         await store.updateRun(runId, { status: 'running' });
         clock.advance(15 * 60_000);
 
-        const pod2 = new RunEngine({
+        const pod2 = new Engine({
             store,
             agents: [agent],
             resumeSecret: 's',
@@ -201,7 +201,7 @@ describe('runJob', () => {
         expect(first.status).toBe('waiting');
         clock.advance(25 * 60 * 60_000);
 
-        const pod2 = new RunEngine({
+        const pod2 = new Engine({
             store,
             agents: [agent],
             resumeSecret: 's',
@@ -233,7 +233,7 @@ describe('runJob', () => {
         expect(first.status).toBe('waiting');
         clock.advance(300_000);
 
-        const pod2 = new RunEngine({
+        const pod2 = new Engine({
             store,
             agents: [agent],
             resumeSecret: 's',
@@ -258,7 +258,7 @@ describe('runJob', () => {
             store,
             agent,
         } = setup(textModel());
-        const a = new RunEngine({
+        const a = new Engine({
             store,
             agents: [agent],
             resumeSecret: 's',
@@ -266,7 +266,7 @@ describe('runJob', () => {
             owner: 'a',
             maxConcurrentRuns: 0,
         });
-        const b = new RunEngine({
+        const b = new Engine({
             store,
             agents: [agent],
             resumeSecret: 's',

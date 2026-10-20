@@ -15,7 +15,7 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { RunEngine, ToolNotAllowedError, defineAgent } from '@chamberu/core';
+import { Engine, ToolNotAllowedError, defineAgent } from '@chamberu/core';
 import {
     EFFECT,
     defineEffectTool,
@@ -56,7 +56,7 @@ const ctx = toolContext('r1');
 const callOpts = { toolCallId: 'c', messages: [] };
 const schema = z.object({ body: z.string(), n: z.number().optional() });
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 afterEach(() => {
     for (const e of engines) e.stop();
     engines.length = 0;
@@ -171,7 +171,7 @@ describe('effect tools', () => {
         };
         const done = { parts: [{ type: 'text' as const, text: 'done' }] };
         const make = (model: ReturnType<typeof mockModel>) => {
-            const engine = new RunEngine({
+            const engine = new Engine({
                 store,
                 agents: [defineAgent({
                     name: 'triage',

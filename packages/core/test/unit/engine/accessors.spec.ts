@@ -7,7 +7,7 @@
 
 import type { LanguageModel } from 'ai';
 import { describe, expect, it } from 'vitest';
-import { RunEngine, defineAgent, systemClock } from '@chamberu/core';
+import { Engine, defineAgent, systemClock } from '@chamberu/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 
@@ -27,7 +27,7 @@ describe('engine accessors', () => {
     it('exposes the store and clock it was built with', () => {
         const clock = new ControllableClock();
         const store = new MemoryStore({ clock });
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents: [triage],
             resumeSecret: 's',
@@ -38,7 +38,7 @@ describe('engine accessors', () => {
     });
 
     it('defaults the clock to systemClock', () => {
-        const engine = new RunEngine({
+        const engine = new Engine({
             store: new MemoryStore(), 
             agents: [], 
             resumeSecret: 's', 
@@ -47,7 +47,7 @@ describe('engine accessors', () => {
     });
 
     it('lists its agents in registration order', () => {
-        const engine = new RunEngine({
+        const engine = new Engine({
             store: new MemoryStore(), 
             agents: [triage, digest], 
             resumeSecret: 's', 
@@ -57,7 +57,7 @@ describe('engine accessors', () => {
     });
 
     it('returns a fresh array from listAgents', () => {
-        const engine = new RunEngine({
+        const engine = new Engine({
             store: new MemoryStore(), 
             agents: [triage], 
             resumeSecret: 's', 
@@ -69,7 +69,7 @@ describe('engine accessors', () => {
     });
 
     it('looks an agent up by name', () => {
-        const engine = new RunEngine({
+        const engine = new Engine({
             store: new MemoryStore(), 
             agents: [triage, digest], 
             resumeSecret: 's', 

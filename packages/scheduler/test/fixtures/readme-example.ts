@@ -1,7 +1,7 @@
 import type { LanguageModel } from 'ai';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
 } from '@chamberu/core';
@@ -18,7 +18,7 @@ export async function startScheduling(model: LanguageModel) {
 
     // MemoryStore is per process; with several replicas, pass one shared store
     // (e.g. TypeormStore) so its lock fires each tick once across them
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [sweep],
         resumeSecret: 'change-me',

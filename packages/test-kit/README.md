@@ -42,12 +42,12 @@ describeStoreContract((clock) => new MemoryStore({ clock }));
 `ControllableClock` implements `IClock` and only moves when told to, so engine timeouts, claim leases and approval expiry are tested without real timers:
 
 ```typescript
-import { MemoryStore, RunEngine } from '@chamberu/core';
+import { MemoryStore, Engine } from '@chamberu/core';
 import { ControllableClock } from '@chamberu/test-kit';
 
 const clock = new ControllableClock();
 const store = new MemoryStore({ clock });
-const engine = new RunEngine({ store, agents: [], resumeSecret: 'secret', clock });
+const engine = new Engine({ store, agents: [], resumeSecret: 'secret', clock });
 
 clock.advance(60_000); // fires every timer due within the next minute, in order
 ```

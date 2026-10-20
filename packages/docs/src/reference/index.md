@@ -3,7 +3,7 @@
 The public API of `@chamberu/core`, taken from `packages/core/src/index.ts`. Contract interfaces carry an `I` prefix (`IStore`, `IClock`, `INotifier`, `IAgentState`); data shapes are unprefixed types.
 
 ```ts
-import { RunEngine, defineAgent } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamberu/core';
 ```
 
 Test helpers live in [`@chamberu/test-kit`](/reference/test-kit).
@@ -56,11 +56,11 @@ function webhook(opts: WebhookTriggerOptions): TriggerDefinition;
 
 See [Triggers & the Envelope](/guide/triggers).
 
-## RunEngine
+## Engine
 
 ```ts
-class RunEngine {
-    constructor(opts: RunEngineOptions);
+class Engine {
+    constructor(opts: EngineOptions);
 
     readonly store: IStore;
     readonly clock: IClock;

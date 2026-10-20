@@ -20,8 +20,8 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { RunEngine, defineAgent } from '@chamberu/core';
-import type { RunEngineOptions } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamberu/core';
+import type { EngineOptions } from '@chamberu/core';
 import { TypeormStore } from '@chamberu/store-typeorm';
 import { createTestDataSource, describePostgres, truncateStore } from '../../utils/database.ts';
 import { mockModel } from '../../utils/mock-model.ts';
@@ -76,11 +76,11 @@ const env = {
 
 describePostgres('two engines on one TypeORM store', () => {
     let dataSource: DataSource;
-    const engines: RunEngine[] = [];
+    const engines: Engine[] = [];
 
     function make(
         model: LanguageModel,
-        opts: Partial<RunEngineOptions> & { tools?: () => ToolSet } = {},
+        opts: Partial<EngineOptions> & { tools?: () => ToolSet } = {},
     ) {
         const store = new TypeormStore({ dataSource });
         const errors: unknown[] = [];
@@ -90,7 +90,7 @@ describePostgres('two engines on one TypeORM store', () => {
             model,
             tools: opts.tools,
         });
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents: [agent],
             resumeSecret: 's',

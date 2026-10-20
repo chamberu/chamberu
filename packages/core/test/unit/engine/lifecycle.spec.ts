@@ -19,12 +19,12 @@ import {
 } from 'vitest';
 import { z } from 'zod';
 import {
+    Engine,
     InvalidRunStateError,
     LeaseLostError,
-    RunEngine,
     defineAgent,
 } from '@chamberu/core';
-import type { Run, RunEngineOptions, RunEvent } from '@chamberu/core';
+import type { EngineOptions, Run, RunEvent } from '@chamberu/core';
 import type { IClock } from '../../../src/clock/index.ts';
 import { systemClock } from '../../../src/clock/index.ts';
 import { ControllableClock } from '../../utils/clock.ts';
@@ -32,7 +32,7 @@ import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 /** Lets already-queued microtasks settle; not a sleep. */
 const flush = () => new Promise<void>((resolve) => { setImmediate(resolve); });
@@ -83,7 +83,7 @@ const toolTurn: MockResponse = {
 
 function make(
     model: LanguageModel,
-    opts: Partial<RunEngineOptions> & { store?: MemoryStore; tools?: () => ToolSet } = {},
+    opts: Partial<EngineOptions> & { store?: MemoryStore; tools?: () => ToolSet } = {},
 ) {
     const store = opts.store ?? new MemoryStore({ clock: opts.clock });
     const errors: unknown[] = [];
@@ -94,7 +94,7 @@ function make(
         model,
         tools: opts.tools,
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret: 's',

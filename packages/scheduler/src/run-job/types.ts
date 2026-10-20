@@ -7,7 +7,7 @@
 
 import type {
     Agent,
-    RunEngine,
+    Engine,
     RunStatusLiteral,
 } from '@chamberu/core';
 
@@ -17,7 +17,7 @@ export type RunJobOptions = {
      * skipped. Its store is polled and its clock gives scheduledAt and drives
      * the poll.
      */
-    engine: RunEngine;
+    engine: Engine;
     agent: Agent;
     /** Cron trigger id; optional when the agent has exactly one cron trigger. */
     trigger?: string;

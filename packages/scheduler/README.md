@@ -45,8 +45,8 @@ ESM only, Node.js `>=22`. `@chamberu/core` is a peer dependency; [`hubwire`](htt
 ```typescript
 import type { LanguageModel } from 'ai';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
 } from '@chamberu/core';
@@ -63,7 +63,7 @@ export async function startScheduling(model: LanguageModel) {
 
     // MemoryStore is per process; with several replicas, pass one shared store
     // (e.g. TypeormStore) so its lock fires each tick once across them
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [sweep],
         resumeSecret: 'change-me',
@@ -151,7 +151,7 @@ A run that pauses for an approval does not hold the pod: the job returns, the ap
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Dispatches the runs; its agents' cron triggers are scheduled, its store holds the tick locks and the runs the overlap check reads |
+| `engine` | `Engine` | required | Dispatches the runs; its agents' cron triggers are scheduled, its store holds the tick locks and the runs the overlap check reads |
 | `owner` | `string` | `` `${hostname}-${pid}` `` | Lock owner |
 | `lockTtlMs` | `number` | `600_000` | How long a tick's lock key is held; a tick firing this late or later is skipped |
 | `onError` | `(error, { agent, trigger }) => void` | `console.error` | Failing ticks |
@@ -160,7 +160,7 @@ A run that pauses for an approval does not hold the pod: the job returns, the ap
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Not started yet; started and drained by the job, also when the tick is skipped. Its clock gives `scheduledAt` and drives the poll |
+| `engine` | `Engine` | required | Not started yet; started and drained by the job, also when the tick is skipped. Its clock gives `scheduledAt` and drives the poll |
 | `agent` | `Agent` | required | The agent to fire |
 | `trigger` | `string` | the only cron trigger | Cron trigger id; required when the agent has several |
 | `pollMs` | `number` | `1_000` | Poll of `engine.getRun`, which also sees a run finished by another replica |

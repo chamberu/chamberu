@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import type { LanguageModel } from 'ai';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
     http,
@@ -23,7 +23,7 @@ export async function dispatchExamples(model: LanguageModel) {
     });
     // #endregion definitions
 
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage],
         resumeSecret: 'change-me',

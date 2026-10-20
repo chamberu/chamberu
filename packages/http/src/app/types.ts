@@ -7,9 +7,9 @@
 
 import type {
     Agent,
+    Engine,
     IClock,
     IStore,
-    RunEngine,
 } from '@chamberu/core';
 import type { Options as CorsPluginOptions } from '@routup/cors';
 import type { Options as PrometheusPluginOptions } from '@routup/prometheus';
@@ -36,7 +36,7 @@ export type McpOptions = {
 
 export type HttpAppOptions = {
     /** Its `store`, agents and `clock` serve every route. */
-    engine: RunEngine;
+    engine: Engine;
     /** One authenticator or a chain; the first principal wins. */
     auth: Authenticator | Authenticator[];
     /** Prefix of every route, e.g. `/api`. Default: none. */
@@ -97,7 +97,7 @@ export type HttpRouteResult = {
 };
 
 export type HttpRouteContext = {
-    engine: RunEngine;
+    engine: Engine;
     agents: readonly Agent[];
     clock: IClock;
     onError: (error: unknown) => void;
@@ -120,7 +120,7 @@ export type HttpRoute = {
 
 /** Shared by every route module; internal. */
 export type HttpContext = {
-    engine: RunEngine;
+    engine: Engine;
     store: IStore;
     agents: Map<string, Agent>;
     authenticators: Authenticator[];

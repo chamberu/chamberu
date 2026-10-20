@@ -8,8 +8,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
     http,
@@ -67,7 +67,7 @@ export function createTestApp(overrides: TestAppOverrides = {}) {
     const clock = (engineOverride?.clock as ControllableClock | undefined) ??
         clockOverride ??
         new ControllableClock(new Date(1_000_000));
-    const engine = engineOverride ?? new RunEngine({
+    const engine = engineOverride ?? new Engine({
         store: storeOverride ?? new MemoryStore({ clock }),
         agents: agentsOverride ?? [
             defineAgent({

@@ -1,7 +1,7 @@
 import type { LanguageModel } from 'ai';
 import type { IStore } from '@chamberu/core';
 import {
-    RunEngine,
+    Engine,
     cron,
     defineAgent,
     requireToolPermission,
@@ -46,7 +46,7 @@ export function createTriage(model: LanguageModel, store: IStore) {
     // #endregion agent
 
     // #region http
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [triage],
         resumeSecret: process.env.RESUME_SECRET ?? '',

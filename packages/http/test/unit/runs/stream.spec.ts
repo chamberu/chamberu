@@ -12,7 +12,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import { MemoryStore, RunEngine } from '@chamberu/core';
+import { Engine, MemoryStore } from '@chamberu/core';
 import { ControllableClock } from '@chamberu/test-kit';
 import { createShutdown } from '@chamberu/http';
 import {
@@ -58,10 +58,10 @@ async function completedRun() {
 }
 
 /** Spies on engine.on so every unsubscribe it hands out is a spy. */
-function spyOnSubscriptions(engine: RunEngine) {
+function spyOnSubscriptions(engine: Engine) {
     const unsubscribes: Array<ReturnType<typeof vi.fn>> = [];
     const original = engine.on.bind(engine);
-    const on: RunEngine['on'] = (type, listener) => {
+    const on: Engine['on'] = (type, listener) => {
         const unsubscribe = vi.fn(original(type, listener));
         unsubscribes.push(unsubscribe);
         return unsubscribe;
@@ -230,7 +230,7 @@ describe('GET /runs/:id/stream', () => {
             store,
             agents,
         });
-        const other = new RunEngine({
+        const other = new Engine({
             store,
             agents,
             resumeSecret: 'test-secret',
@@ -394,7 +394,7 @@ describe('GET /runs/:id/stream', () => {
         const clock = new ControllableClock(new Date(1_000_000));
         const store = new MemoryStore({ clock });
         const agents = createRunAgents();
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents,
             resumeSecret: 'test-secret',

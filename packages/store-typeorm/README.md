@@ -58,7 +58,7 @@ Create the data source with the store's entities and migrations, run the migrati
 
 ```typescript
 import type { LanguageModel } from 'ai';
-import { RunEngine, defineAgent } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamberu/core';
 import {
     STORE_ENTITIES,
     STORE_MIGRATIONS,
@@ -84,7 +84,7 @@ export async function startEngine(model: LanguageModel) {
     await migrateStore(dataSource);
 
     const store = new TypeormStore({ dataSource });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [triage],
         resumeSecret: process.env.RESUME_SECRET!,

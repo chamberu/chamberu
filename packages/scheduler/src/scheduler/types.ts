@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { RunEngine } from '@chamberu/core';
+import type { Engine } from '@chamberu/core';
 
 export type SchedulerErrorContext = {
     agent: string;
@@ -14,7 +14,7 @@ export type SchedulerErrorContext = {
 
 export type SchedulerOptions = {
     /** Its agents' cron triggers are scheduled; its store holds the tick locks. */
-    engine: RunEngine;
+    engine: Engine;
     /** Lock owner. Default `${hostname()}-${pid}`. */
     owner?: string;
     /**

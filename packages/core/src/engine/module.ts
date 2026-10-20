@@ -47,12 +47,12 @@ import type { ApprovalRequest } from './execute/types.ts';
 import { RunQueue } from './queue/module.ts';
 import type {
     DispatchEnvelope,
+    EngineOptions,
     ResumeDecision,
-    RunEngineOptions,
     RunEvent,
 } from './types.ts';
 
-export class RunEngine {
+export class Engine {
     /** The store runs, steps and state live in; packages built on the engine read through it. */
     readonly store: IStore;
 
@@ -92,7 +92,7 @@ export class RunEngine {
 
     protected lastCreatedAt = 0;
 
-    constructor(opts: RunEngineOptions) {
+    constructor(opts: EngineOptions) {
         this.store = opts.store;
         this.agents = new Map(opts.agents.map((a) => [a.name, a]));
         this.notifiers = opts.notifiers ?? {};

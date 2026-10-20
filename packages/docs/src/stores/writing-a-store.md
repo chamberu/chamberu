@@ -1,6 +1,6 @@
 # Writing a Store
 
-A store is any object that implements `IStore` from `@chamberu/core`. Pass it to `new RunEngine({ store })`; the engine needs nothing else.
+A store is any object that implements `IStore` from `@chamberu/core`. Pass it to `new Engine({ store })`; the engine needs nothing else.
 
 ## Prove it with the contract suite
 

@@ -15,9 +15,9 @@ import {
 } from 'vitest';
 import type { Agent, TriggerDefinition } from '@chamberu/core';
 import {
+    Engine,
     InvalidAgentDefinitionError,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
     http,
@@ -42,7 +42,7 @@ describe('createScheduler', () => {
         agents: Agent[],
         opts: Partial<SchedulerOptions> = {},
     ) => {
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents,
             resumeSecret: 's',

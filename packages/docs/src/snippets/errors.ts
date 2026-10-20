@@ -1,7 +1,7 @@
 import {
+    Engine,
     ErrorCode,
     LeaseLostError,
-    RunEngine,
     RunStatus,
 } from '@chamberu/core';
 import type { Agent, IStore } from '@chamberu/core';
@@ -10,7 +10,7 @@ declare const logger: { error(fields: object, message: string): void };
 
 export function createEngine(store: IStore, agents: Agent[], resumeSecret: string) {
     // #region on-error
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents,
         resumeSecret,
@@ -27,7 +27,7 @@ export function createEngine(store: IStore, agents: Agent[], resumeSecret: strin
     return engine;
 }
 
-export async function explainFailure(engine: RunEngine, runId: string) {
+export async function explainFailure(engine: Engine, runId: string) {
     // #region run-error
     const run = await engine.getRun(runId);
     if (run?.status === RunStatus.FAILED) {

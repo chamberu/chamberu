@@ -1,8 +1,8 @@
 import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     defineAgent,
     defineEffectTool,
     http,
@@ -30,7 +30,7 @@ export async function triageIssue(model: LanguageModel) {
         },
     });
 
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage],
         resumeSecret: 'change-me',

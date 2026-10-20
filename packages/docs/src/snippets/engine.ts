@@ -1,7 +1,7 @@
 import type { LanguageModel } from 'ai';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     defineAgent,
 } from '@chamberu/core';
 import { ConsoleNotifier } from './notifiers.ts';
@@ -20,7 +20,7 @@ export function createEngine(model: LanguageModel) {
         notify: 'console',
     });
 
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage, digest],
         notifiers: { console: new ConsoleNotifier() },

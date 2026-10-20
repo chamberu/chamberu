@@ -6,7 +6,7 @@
  */
 
 import { createHmac } from 'node:crypto';
-import { MemoryStore, RunEngine } from '@chamberu/core';
+import { Engine, MemoryStore } from '@chamberu/core';
 import type { Agent, INotifier } from '@chamberu/core';
 import { createGithubApp } from '@chamberu/github';
 import type { GithubAppOptions, GithubWebhookRouteOptions, IGithubApp } from '@chamberu/github';
@@ -37,7 +37,7 @@ export type GithubTestAppInput = {
 
 export type GithubTestApp = {
     app: App;
-    engine: RunEngine;
+    engine: Engine;
     store: MemoryStore;
     clock: ControllableClock;
     fake: FakeGithub;
@@ -81,7 +81,7 @@ export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
         input.onError?.(error);
     };
     const store = new MemoryStore({ clock });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents,
         resumeSecret: 'test-secret',

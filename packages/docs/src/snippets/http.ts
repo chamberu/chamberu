@@ -1,6 +1,6 @@
 import type { ITokenVerifier } from '@authup/server-adapter-kit';
 import type { Agent, IStore } from '@chamberu/core';
-import { RunEngine } from '@chamberu/core';
+import { Engine } from '@chamberu/core';
 import {
     authup,
     createHttpApp,
@@ -51,7 +51,7 @@ export function authenticators(verifier: ITokenVerifier): Authenticator[] {
 
 export async function start(store: IStore, agents: Agent[], resumeSecret: string, verifier: ITokenVerifier) {
     // #region app
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents,
         resumeSecret,

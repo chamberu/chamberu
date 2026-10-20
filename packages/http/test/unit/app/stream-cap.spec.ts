@@ -12,7 +12,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import { InvalidAgentDefinitionError, MemoryStore, RunEngine } from '@chamberu/core';
+import { Engine, InvalidAgentDefinitionError, MemoryStore } from '@chamberu/core';
 import { ControllableClock } from '@chamberu/test-kit';
 import { createShutdown } from '@chamberu/http';
 import {
@@ -174,7 +174,7 @@ describe('stream.maxOpen', () => {
         const clock = new ControllableClock(new Date(1_000_000));
         const store = new MemoryStore({ clock });
         const agents = createRunAgents();
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents,
             resumeSecret: 'test-secret',

@@ -37,4 +37,4 @@ Time moves only through `advance(ms)`, which fires every timer due within the wi
 
 <<< @/snippets/testing.ts#clock
 
-Pass the same clock to the store and to the engine (`new RunEngine({ ..., clock })`) to test claim leases, run timeouts and approval expiry without real timers.
+Pass the same clock to the store and to the engine (`new Engine({ ..., clock })`) to test claim leases, run timeouts and approval expiry without real timers.

@@ -9,7 +9,7 @@ Pass any AI SDK `LanguageModel`, for example `anthropic(...)` from `@ai-sdk/anth
 ## What happened
 
 1. **`defineAgent()`** checked the name and filled in the default budget. The `tools` factory runs once per execution and returns an AI SDK `ToolSet`.
-2. **`new RunEngine()`** validated the setup: a non-empty `resumeSecret`, unique agent names, known notifiers.
+2. **`new Engine()`** validated the setup: a non-empty `resumeSecret`, unique agent names, known notifiers.
 3. **`engine.start()`** recovered abandoned runs (there were none) and started polling.
 4. **`engine.dispatch()`** stored a `queued` run. The trigger envelope (source, trigger id and payload) became the run's first user message.
 5. The engine claimed the run, set it `running` and drove an AI SDK `ToolLoopAgent`. After every step it appended the steps and saved a checkpoint to the store.

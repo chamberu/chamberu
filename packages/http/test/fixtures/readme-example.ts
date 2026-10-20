@@ -1,7 +1,7 @@
 import type { LanguageModel } from 'ai';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     defineAgent,
     http,
 } from '@chamberu/core';
@@ -16,7 +16,7 @@ export async function createAgentServer(model: LanguageModel) {
         triggers: [http()],
     });
 
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [echo],
         resumeSecret: 'change-me',

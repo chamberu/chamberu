@@ -7,8 +7,8 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     defineAgent,
     http,
 } from '@chamberu/core';
@@ -46,7 +46,7 @@ function setup() {
         clock,
         onError: () => {},
     };
-    const engine = new RunEngine(options);
+    const engine = new Engine(options);
     // only the engine knows the store, the agents and the clock
     const app = createHttpApp({
         engine,
@@ -98,7 +98,7 @@ describe('createHttpApp over the engine', () => {
         await reader.next(1);
 
         // another replica runs it: only the store poll sees the change
-        const other = new RunEngine({ ...options, owner: 'replica-b' });
+        const other = new Engine({ ...options, owner: 'replica-b' });
         await other.start();
         await other.idle();
         clock.advance(2_000);

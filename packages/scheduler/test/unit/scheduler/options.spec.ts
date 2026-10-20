@@ -13,8 +13,8 @@ import {
     vi,
 } from 'vitest';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
 } from '@chamberu/core';
@@ -34,7 +34,7 @@ function setup() {
         instructions: 'x',
         triggers: [trigger],
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret: 's',

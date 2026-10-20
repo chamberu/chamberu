@@ -47,8 +47,8 @@ ESM only, Node.js `>=22`. `@chamberu/core` is a peer dependency; [routup](https:
 ```typescript
 import type { LanguageModel } from 'ai';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     defineAgent,
     http,
 } from '@chamberu/core';
@@ -63,7 +63,7 @@ export async function createAgentServer(model: LanguageModel) {
         triggers: [http()],
     });
 
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [echo],
         resumeSecret: 'change-me',
@@ -241,7 +241,7 @@ process.once('SIGTERM', () => {
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Dispatches, cancels and resumes runs; its `store`, agents and `clock` serve every route (runs, steps and state are read from `engine.store`, polls, waits and timeouts run on `engine.clock`) |
+| `engine` | `Engine` | required | Dispatches, cancels and resumes runs; its `store`, agents and `clock` serve every route (runs, steps and state are read from `engine.store`, polls, waits and timeouts run on `engine.clock`) |
 | `auth` | `Authenticator \| Authenticator[]` | required | The authenticator chain |
 | `basePath` | `string` | none | Prefix of every route, e.g. `/api` |
 | `trustProxy` | routup trust-proxy input | none | Which proxies the client address (and the rate-limit key) trusts |
@@ -261,7 +261,7 @@ process.once('SIGTERM', () => {
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Drained during the shutdown; its `clock` drives the delays |
+| `engine` | `Engine` | required | Drained during the shutdown; its `clock` drives the delays |
 | `scheduler` | `{ stop(): Promise<void> }` | none | Stopped first, e.g. `createScheduler()` from `@chamberu/scheduler` |
 | `server` | `{ close(force?): Promise<void> }` | none | The srvx server |
 | `readinessDelayMs` | `number` | `0` | Time for load balancers to see the failing readiness |

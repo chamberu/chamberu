@@ -1,5 +1,5 @@
 import type { LanguageModel } from 'ai';
-import { RunEngine, defineAgent } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamberu/core';
 import {
     STORE_ENTITIES,
     STORE_MIGRATIONS,
@@ -26,7 +26,7 @@ export async function createEngine(model: LanguageModel) {
     await migrateStore(dataSource);
 
     const store = new TypeormStore({ dataSource });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [triage],
         resumeSecret: process.env.RESUME_SECRET!,

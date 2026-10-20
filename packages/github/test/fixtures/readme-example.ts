@@ -1,5 +1,5 @@
 import type { LanguageModel } from 'ai';
-import { MemoryStore, RunEngine, defineAgent } from '@chamberu/core';
+import { Engine, MemoryStore, defineAgent } from '@chamberu/core';
 import { createGithubApp, githubWebhook } from '@chamberu/github';
 import type { GithubAppOptions } from '@chamberu/github';
 import { createHttpApp, createShutdown, staticTokens } from '@chamberu/http';
@@ -36,7 +36,7 @@ export async function createTriageServer(
         approvals: { github_close_issue: 'user' },
     });
 
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage],
         resumeSecret: RESUME_SECRET,

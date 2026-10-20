@@ -7,9 +7,9 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+    Engine,
     FatalToolError,
     MemoryStore,
-    RunEngine,
     ValidationError,
     defineAgent,
     wrapToolsForRun,
@@ -305,7 +305,7 @@ describe('read tools', () => {
             triggers: [githubWebhook({ events: ['issues.opened'] })],
             tools: () => gh.readTools(),
         });
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents: [agent],
             resumeSecret: 'test-secret',
