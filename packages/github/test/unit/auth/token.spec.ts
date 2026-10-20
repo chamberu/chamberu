@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { createGithubApp } from '@chamberu/github';
 import type { GithubAppOptions } from '@chamberu/github';
 import { ControllableClock } from '@chamberu/test-kit';
+import { APP_REQUEST_TIMEOUT_MS } from '../../../src/auth/constants.ts';
 import { createFakeGithub } from '../../utils/github.ts';
 
 const START = new Date('2026-10-20T10:00:00Z');
@@ -147,5 +148,60 @@ describe('botLogin', () => {
         const { fake, gh } = setup({ slug: 'x' });
         expect(await gh.botLogin()).toBe('x[bot]');
         expect(fake.requests).toHaveLength(0);
+    });
+});
+
+/** A fetch whose first `stalls` App requests never answer (until aborted); the rest go to `fake`. */
+function stallingFetch(fake: ReturnType<typeof createFakeGithub>, stalls = 1) {
+    const state = { stalled: 0 };
+    const fetch: typeof globalThis.fetch = (input, init) => {
+        if (state.stalled < stalls) {
+            state.stalled++;
+            return new Promise<Response>((_resolve, reject) => {
+                init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+            });
+        }
+        return fake.fetch(input, init);
+    };
+    return { fetch, state };
+}
+
+const flush = () => new Promise<void>((resolve) => { setImmediate(resolve); });
+
+describe('app-authenticated requests', () => {
+    it('time out a stalled token exchange for every waiter, and the next caller retries', async () => {
+        const clock = new ControllableClock(START);
+        const fake = createFakeGithub({ appId: '123', clock });
+        const { fetch, state } = stallingFetch(fake);
+        const { gh } = setup({
+            clock, 
+            fetch, 
+            privateKey: fake.privateKey, 
+        });
+        const first = gh.octokit(42);
+        const second = gh.octokit(42);
+        await flush();
+        expect(state.stalled).toBe(1);
+        clock.advance(APP_REQUEST_TIMEOUT_MS);
+        await expect(first).rejects.toThrow(/did not answer/);
+        await expect(second).rejects.toThrow(/did not answer/);
+        await (await gh.octokit(42)).request('GET /rate_limit');
+        expect(fake.tokensIssued).toBe(1);
+    });
+
+    it('time out a stalled GET /app, and the next botLogin retries', async () => {
+        const clock = new ControllableClock(START);
+        const fake = createFakeGithub({ appId: '123', clock });
+        const { fetch } = stallingFetch(fake);
+        const { gh } = setup({
+            clock, 
+            fetch, 
+            privateKey: fake.privateKey, 
+        });
+        const login = gh.botLogin();
+        await flush();
+        clock.advance(APP_REQUEST_TIMEOUT_MS);
+        await expect(login).rejects.toThrow(/did not answer/);
+        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
     });
 });

@@ -159,7 +159,7 @@ The run payload is a `GithubEvent { name, action?, delivery, installationId?, pa
 
 ## Tools
 
-Every tool acts as an installation: the delivery's for a run started by a GitHub delivery, else `installationId` from `createGithubApp()` (cron, REST and MCP runs). Without either, a tool fails the run (`FatalToolError`). Inputs name the repository as `owner/name` (GitHub's name characters; `.` and `..` are refused). Every request carries the run's signal, so cancel, drain and the run timeout abort a stalled GitHub call. A failed GitHub call reaches the model as `GitHub <status>: <message>`, never with the request or its token.
+Every tool acts as an installation: the delivery's for a run started by a GitHub delivery, else `installationId` from `createGithubApp()` (cron, REST and MCP runs). Without either, a tool fails the run (`FatalToolError`). Inputs name the repository as `owner/name` (GitHub's name characters; `.` and `..` are refused). Every installation request carries the run's signal, so cancel, drain and the run timeout abort a stalled GitHub call. The App-authenticated requests (the token exchange and `GET /app` for the bot login) are shared by every waiting run and delivery, so they carry no run's signal; each is aborted after 30 s on the app's clock instead, and the next caller retries. A failed GitHub call reaches the model as `GitHub <status>: <message>`, never with the request or its token.
 
 | Tool | Kind | Input | Result |
 |---|---|---|---|

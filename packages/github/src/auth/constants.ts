@@ -16,3 +16,11 @@ export const TOKEN_REFRESH_MARGIN_MS = 5 * 60_000;
 
 /** The User-Agent of every GitHub request. */
 export const GITHUB_USER_AGENT = 'chamberu';
+
+/**
+ * A request authenticated as the App (the token exchange, `GET /app`) is
+ * aborted after this long on the `IClock`. These requests are shared by
+ * every caller and carry no run's signal, so a stalled connection must not
+ * hold them for good.
+ */
+export const APP_REQUEST_TIMEOUT_MS = 30_000;

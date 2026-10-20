@@ -6,10 +6,12 @@
  */
 
 import type { KeyObject } from 'node:crypto';
+import { ChamberuError } from '@chamberu/core';
 import type { IClock } from '@chamberu/core';
 import { PaginatedOctokit } from '../app/helpers.ts';
 import type { GithubOctokit } from '../app/types.ts';
-import { GITHUB_USER_AGENT, TOKEN_REFRESH_MARGIN_MS } from './constants.ts';
+import { GITHUB_REQUEST_ERROR_CODE } from '../tools/constants.ts';
+import { APP_REQUEST_TIMEOUT_MS, GITHUB_USER_AGENT, TOKEN_REFRESH_MARGIN_MS } from './constants.ts';
 import { createAppJwt } from './helpers.ts';
 
 type CachedToken = { token: string; expiresAt: number };
@@ -35,14 +37,35 @@ export function createInstallationTokens(input: InstallationTokensInput): {
     const pending = new Map<number, Promise<string>>();
     const request = input.fetch ? { fetch: input.fetch } : {};
 
-    /** An Octokit authenticated as the App (a fresh JWT). */
+    /**
+     * An Octokit authenticated as the App (a fresh JWT). Each request is
+     * aborted after APP_REQUEST_TIMEOUT_MS on the clock (beside any signal
+     * of its own): the exchange and `GET /app` are shared by every caller.
+     */
     async function app(): Promise<GithubOctokit> {
-        return new PaginatedOctokit({
+        const octokit = new PaginatedOctokit({
             auth: createAppJwt(input.appId, input.key, input.clock.now()),
             baseUrl: input.baseUrl,
             userAgent: GITHUB_USER_AGENT,
             request,
         });
+        octokit.hook.wrap('request', async (send, options) => {
+            const controller = new AbortController();
+            const timer = input.clock.setTimeout(() => controller.abort(new ChamberuError({
+                message: `The GitHub App request did not answer within ${APP_REQUEST_TIMEOUT_MS}ms.`,
+                code: GITHUB_REQUEST_ERROR_CODE,
+            })), APP_REQUEST_TIMEOUT_MS);
+            const own = options.request?.signal;
+            const signal = own ? AbortSignal.any([own, controller.signal]) : controller.signal;
+            // in place: before-after-hook hands every hook the same options object
+            options.request = { ...options.request, signal };
+            try {
+                return await send(options);
+            } finally {
+                timer.clear();
+            }
+        });
+        return octokit;
     }
 
     async function exchange(installationId: number): Promise<string> {

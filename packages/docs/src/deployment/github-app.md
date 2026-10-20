@@ -49,7 +49,7 @@ Large `push` or `pull_request` deliveries can exceed the default `bodyLimit` of 
 
 ## Tools
 
-Every tool acts as an installation: the delivery's for a run started by a delivery, else `installationId` from `createGithubApp()` (cron, REST and MCP runs); without either the run fails with `FatalToolError`. Installation tokens are cached per installation on the engine's clock, replaced five minutes before they expire (so a run resumed hours after an approval gets a fresh one) and never logged or stored. A failed GitHub call reaches the model as `GitHub <status>: <message>`, never with the request or its token. Every request carries the run's signal: cancel, drain and the run timeout abort a stalled call.
+Every tool acts as an installation: the delivery's for a run started by a delivery, else `installationId` from `createGithubApp()` (cron, REST and MCP runs); without either the run fails with `FatalToolError`. Installation tokens are cached per installation on the engine's clock, replaced five minutes before they expire (so a run resumed hours after an approval gets a fresh one) and never logged or stored. A failed GitHub call reaches the model as `GitHub <status>: <message>`, never with the request or its token. Every installation request carries the run's signal: cancel, drain and the run timeout abort a stalled call. The token exchange and `GET /app` are shared by every waiting run and delivery, so they are bounded by their own 30 s timeout on the app's clock instead; a timed-out one is not cached and the next caller retries.
 
 | Tool | Kind | Purpose |
 |---|---|---|
