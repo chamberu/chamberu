@@ -26,7 +26,7 @@ import type { IAppEvent } from 'routup';
 import { isObject } from 'smob';
 import type { Container } from 'validup';
 import { MAX_PAGE_LIMIT } from '../app/constants.ts';
-import { KEY_MAX_LENGTH } from './constants.ts';
+import { KEY_MAX_LENGTH, RECEIVED_MAX_LENGTH } from './constants.ts';
 import type { DecodedQuery } from './types.ts';
 
 function isJsonMediaType(contentType: string | null): boolean {
@@ -63,6 +63,33 @@ async function drain(reader: ReadableStreamDefaultReader<Uint8Array>, max: numbe
     } catch {
         return false;
     }
+}
+
+/**
+ * `value` when its JSON has at most `RECEIVED_MAX_LENGTH` characters, else
+ * `undefined`: what a validation issue may carry as `received`.
+ */
+export function boundReceived(value: unknown): unknown {
+    if (value === undefined) return undefined;
+    try {
+        const json = JSON.stringify(value);
+        return json !== undefined && json.length <= RECEIVED_MAX_LENGTH ? value : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** `issues` (groups walked) without a `received` value over `RECEIVED_MAX_LENGTH`. */
+export function boundIssues(issues: readonly Issue[]): Issue[] {
+    return issues.map((issue) => {
+        if (issue.type === 'group') {
+            return { ...issue, issues: boundIssues(issue.issues) };
+        }
+        if (!('received' in issue) || boundReceived(issue.received) !== undefined) return issue;
+        const bounded = { ...issue };
+        delete bounded.received;
+        return bounded;
+    });
 }
 
 /**

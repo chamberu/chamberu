@@ -15,16 +15,22 @@ import {
     isValidupError,
 } from 'validup';
 import type { Container, ValidatorDescriptor } from 'validup';
+import { boundReceived } from './helpers.ts';
+
+/*
+ * Every validator that fails on a value passes `boundReceived(value)` as the issue's received
+ * value: a 400 never echoes a large input (up to `bodyLimit`) back.
+ */
 
 /** A string of `min` to `max` characters without U+0000 (which Postgres text columns refuse). */
 export function isString({ min = 0, max }: { min?: number; max: number }): ValidatorDescriptor {
     return defineValidator({
         run: ({ value }) => {
             if (typeof value !== 'string' || value.length < min || value.length > max) {
-                throw createValidupError(value, IssueCode.VALUE_INVALID, `must be a string of ${min} to ${max} characters`);
+                throw createValidupError(boundReceived(value), IssueCode.VALUE_INVALID, `must be a string of ${min} to ${max} characters`);
             }
             if (value.includes('\u0000')) {
-                throw createValidupError(value, IssueCode.VALUE_INVALID, 'must not contain a NUL character');
+                throw createValidupError(boundReceived(value), IssueCode.VALUE_INVALID, 'must not contain a NUL character');
             }
             return value;
         },
@@ -34,7 +40,7 @@ export function isString({ min = 0, max }: { min?: number; max: number }): Valid
 export function isBoolean(): ValidatorDescriptor {
     return defineValidator({
         run: ({ value }) => {
-            if (typeof value !== 'boolean') throw createValidupError(value, IssueCode.VALUE_INVALID, 'must be a boolean');
+            if (typeof value !== 'boolean') throw createValidupError(boundReceived(value), IssueCode.VALUE_INVALID, 'must be a boolean');
             return value;
         },
     });
@@ -59,7 +65,7 @@ export function isArrayOf<T extends Record<string, any>>(item: Container<T>, { m
     return defineValidator({
         run: async ({ value }) => {
             if (!Array.isArray(value) || value.length > max) {
-                throw createValidupError(value, IssueCode.VALUE_INVALID, `must be an array of at most ${max} items`);
+                throw createValidupError(boundReceived(value), IssueCode.VALUE_INVALID, `must be an array of at most ${max} items`);
             }
             const items: T[] = [];
             const issues: Issue[] = [];
@@ -82,7 +88,7 @@ export function isMediaType(): ValidatorDescriptor {
     return defineValidator({
         run: ({ value }) => {
             if (!isArtifactMediaType(value)) {
-                throw createValidupError(value, IssueCode.VALUE_INVALID, 'must be a media type of the form type/subtype');
+                throw createValidupError(boundReceived(value), IssueCode.VALUE_INVALID, 'must be a media type of the form type/subtype');
             }
             return value;
         },

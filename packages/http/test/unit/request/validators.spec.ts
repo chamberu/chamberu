@@ -106,4 +106,21 @@ describe('validators', () => {
         await rejects(isBase64(), { k: 1 });
         await rejects(isBase64(), { k: null });
     });
+
+    it.each([
+        ['isString', isString({ max: 3 }), 'x'.repeat(100_000)],
+        ['isString (NUL)', isString({ max: 200_000 }), `${'x'.repeat(100_000)}\u0000`],
+        ['isMediaType', isMediaType(), 'x'.repeat(100_000)],
+        ['isArrayOf', isArrayOf(new Container(), { max: 1 }), Array.from({ length: 3 }, () => 'x'.repeat(50_000))],
+        ['isArrayOf (no array)', isArrayOf(new Container(), { max: 1 }), 'x'.repeat(100_000)],
+    ])('%s never echoes a large received value', async (_, validator, value) => {
+        const error = await run(validator, { k: value }).catch((e: unknown) => e) as ValidupError;
+        expect(error).toBeInstanceOf(ValidupError);
+        expect(JSON.stringify(error.issues).length).toBeLessThan(1024);
+    });
+
+    it('keeps a short received value', async () => {
+        const error = await run(isMediaType(), { k: 'png' }).catch((e: unknown) => e) as ValidupError;
+        expect(error.issues[0]).toMatchObject({ received: 'png' });
+    });
 });

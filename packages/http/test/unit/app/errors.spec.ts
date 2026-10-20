@@ -81,6 +81,42 @@ describe('error handler', () => {
         expect(body.issues).toHaveLength(1);
     });
 
+    it('never renders a large received value', async () => {
+        const big = {
+            type: 'item' as const,
+            code: 'value_invalid',
+            path: ['a'],
+            message: 'bad',
+            received: 'x'.repeat(100_000),
+        };
+        const small = {
+            type: 'item' as const,
+            code: 'value_invalid',
+            path: ['b'],
+            message: 'bad',
+            received: 'png',
+        };
+        const group = {
+            type: 'group' as const,
+            path: ['c'],
+            message: 'bad',
+            issues: [{ ...big, path: ['c', 0] }],
+        };
+        const response = await call(appThrowing(new ValidationError('bad', [big, small, group])), 'GET', '/boom');
+        expect(response.status).toBe(400);
+        const text = await response.text();
+        expect(text.length).toBeLessThan(1024);
+        const body = JSON.parse(text);
+        expect(body.issues[0]).toEqual({
+            type: 'item',
+            code: 'value_invalid',
+            path: ['a'],
+            message: 'bad',
+        });
+        expect(body.issues[1]).toEqual(small);
+        expect(body.issues[2].issues[0]).not.toHaveProperty('received');
+    });
+
     it('maps an ebec HTTP error to its status and a lower-case code', async () => {
         const response = await call(appThrowing(new BadRequestError({ message: 'x' })), 'GET', '/boom');
         expect(response.status).toBe(400);

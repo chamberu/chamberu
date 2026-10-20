@@ -250,6 +250,20 @@ describe('POST /agents/:name/runs', () => {
             expect(body.issues[0].path).toEqual(['attachments']);
         });
 
+        it.each([
+            ['an oversized list of large attachments', { attachments: Array.from({ length: 17 }, () => ({ mediaType: 'text/plain', data: b64('x'.repeat(45_000)) })) }, ['attachments']],
+            ['a long string as attachments', { attachments: 'A'.repeat(100_000) }, ['attachments']],
+            ['a long mediaType', { attachments: [{ mediaType: 'x'.repeat(100_000), data: 'aGk=' }] }, ['attachments', 0, 'mediaType']],
+            ['a long thread', { thread: 'x'.repeat(500_000) }, ['thread']],
+        ])('answers %s with a small 400 body', async (_, body, path) => {
+            const { app } = createRunTestApp({ bodyLimit: 4 * 1024 * 1024 });
+            const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body });
+            expect(response.status).toBe(400);
+            const text = await response.text();
+            expect(text.length).toBeLessThan(2048);
+            expect(JSON.parse(text).issues.map((i: { path: unknown }) => i.path)).toContainEqual(path);
+        });
+
         it('stores nothing for a deduplicated dispatch', async () => {
             const { app, store } = createRunTestApp();
             const body = { idempotencyKey: 'k', attachments: [{ mediaType: 'text/plain', data: b64('x') }] };
