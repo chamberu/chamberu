@@ -8,7 +8,7 @@ npm install @chamberu/http @chamberu/core --save
 
 <<< @/snippets/http.ts#app
 
-Every HTTP or MCP start ends in `engine.dispatch()`; nothing runs synchronously in a request. Errors are always JSON `{ status, code, message, issues? }`, unmatched routes included; a 5xx body says `Internal Server Error` and the cause goes to `onError`.
+Every HTTP or MCP start ends in `engine.dispatch()`; nothing runs synchronously in a request. Errors are always JSON `{ status, code, message, issues? }`, unmatched routes included; a 5xx body says `Internal Server Error` and the cause goes to `onError`. An issue carries the `received` value only when it is small (at most 256 characters as JSON), so a 400 for an oversized list, a long string or a large file never echoes the body back.
 
 ## Triggers decide what is reachable
 

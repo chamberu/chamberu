@@ -96,7 +96,7 @@ export async function createAgentServer(model: LanguageModel) {
 }
 ```
 
-Every route answers JSON. Errors are always `{ status, code, message, issues? }` (for unmatched routes too); a 5xx body says `Internal Server Error` and the cause goes to `onError`. Every 401 carries `WWW-Authenticate: Bearer`.
+Every route answers JSON. Errors are always `{ status, code, message, issues? }` (for unmatched routes too); a 5xx body says `Internal Server Error` and the cause goes to `onError`. An issue keeps its `received` value only when that is at most 256 characters as JSON, so a 400 never echoes a large body (an oversized `attachments` list, a long `thread` or media type) back. Every 401 carries `WWW-Authenticate: Bearer`.
 
 ## Endpoints
 

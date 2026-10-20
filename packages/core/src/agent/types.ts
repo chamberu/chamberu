@@ -25,10 +25,17 @@ export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: R
 
 /**
  * Decides per tool name whether a run may use a tool. A refused tool is not
- * offered to the model; a call to it still arriving is a tool error recorded
- * as ToolNotAllowedError (a model's call gets the AI SDK's unavailable-tool
- * answer, an approved call from an older history the ToolNotAllowedError). Should depend only on the run snapshot
- * (e.g. \`run.trigger.invoker\`), so the tool set is stable across executions.
+ * offered to the model (it is left out of `activeTools`). A call to it that
+ * still arrives is a tool error, never a run failure, and its tool step
+ * records `tool_not_allowed` (ToolNotAllowedError) on both paths:
+ * - the model calls it anyway: the AI SDK answers the model with its
+ *   unavailable-tool error (NoSuchToolError), the engine records the step
+ *   as ToolNotAllowedError;
+ * - an approved call from an older history (the policy changed before the
+ *   resume) reaches the engine's per-call re-check, which answers the model
+ *   with ToolNotAllowedError.
+ * Should depend only on the run snapshot (e.g. `run.trigger.invoker`), so
+ * the tool set is stable across executions.
  */
 export type ToolPolicy = (toolName: string, ctx: { run: RunContext }) => boolean;
 

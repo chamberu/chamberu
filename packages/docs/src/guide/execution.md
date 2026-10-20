@@ -9,7 +9,7 @@ One execution is one call of an AI SDK `ToolLoopAgent` for one claimed, `running
 3. **Check the step budget.** If an earlier execution already used every step, the run settles right away (see [Budgets](/guide/budgets)).
 4. **Assemble the tools.** Generated [state tools](/guide/state) plus the result of your `tools` factory, with every [effect tool](/guide/effect-tools) wrapped.
 5. **Run the loop.** `ToolLoopAgent.stream()` with your model and instructions, the agent's `output`, the `toolApproval` derived from `approvals`, and stop conditions for the step and token budgets. Text and reasoning are emitted as `run.delta` events while they stream (see [Streaming](#streaming)).
-6. **After every step:** append the `llm` step and one `tool` step per tool result or error, save a checkpoint, and update the run's token usage.
+6. **After every step:** append the `llm` step and one `tool` step per tool result or error, save a checkpoint, and update the run's token usage. A model call that fails (an `error` part in its stream) still ends its step: the `llm` step (with the text so far and finish reason `error`) and its checkpoint are written, then the run fails with that error. A stream that ends without a finish part fails the run with `IncompleteResponseError` (`incomplete_response`), since the AI SDK would otherwise skip the step's tool calls.
 7. **Settle.** `completed` (with the final text, or the parsed [structured output](/guide/agents#structured-output), as `output`), `failed`, `cancelled`, `waiting` (approval) or, during a drain, `interrupted`.
 
 ## Checkpoints
@@ -34,7 +34,7 @@ The engine always streams (every AI SDK provider does). Each text and reasoning 
 
 <<< @/snippets/lifecycle.ts#deltas
 
-`delta` is `{ runId, step, kind: 'text' | 'reasoning', text }`; `step` is the checkpoint `stepIndex` the step is saved under. Deltas arrive in order, and their concatenated text equals the text of the stored `llm` step. They are never stored and only reach listeners in the process that executes the run; after a cancel, drain or lost lease settled the run, no more arrive. A model error during the stream fails the run as before. So does a stream that closes without the provider's finish part (a cut connection): the run fails with `incomplete_response` instead of completing with a partial answer, and a tool call of that step never runs. `@chamberu/http` forwards them on the run's SSE stream as `delta` events.
+`delta` is `{ runId, step, kind: 'text' | 'reasoning', text }`; `step` is the checkpoint `stepIndex` the step is saved under. Deltas arrive in order, and their concatenated text equals the text of the stored `llm` step. They are never stored and only reach listeners in the process that executes the run; after a cancel, drain or lost lease settled the run, no more arrive. A model error during the stream fails the run, after the errored step's `llm` row (finish reason `error`) and checkpoint are written. So does a stream that closes without the provider's finish part (a cut connection): the run fails with `incomplete_response` instead of completing with a partial answer, and a tool call of that step never runs. `@chamberu/http` forwards them on the run's SSE stream as `delta` events.
 
 ## Ownership
 

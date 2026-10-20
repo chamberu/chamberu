@@ -9,9 +9,11 @@ import { ChamberuError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /**
- * A tool call the agent's toolPolicy refuses for the run: the tool step's
- * error for a model's call to it, and the tool error an approved call from an
- * older history gets. It does not fail the run.
+ * A tool call the agent's toolPolicy refuses for the run. It is recorded as
+ * the tool step's error on both paths: a model's call to a tool it was never
+ * offered (the model itself sees the AI SDK's unavailable-tool error), and an
+ * approved call from an older history that the engine's per-call re-check
+ * refuses (the model sees this error). It never fails the run.
  */
 export class ToolNotAllowedError extends ChamberuError {
     constructor(toolName: string) {

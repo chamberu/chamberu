@@ -131,7 +131,7 @@ export async function triageIssue(model: LanguageModel) {
 }
 ```
 
-The run settles `completed`, and its `output` is the text of the model's last answer. This is the code of [`test/fixtures/readme-example.ts`](./test/fixtures/readme-example.ts), which the test suite runs against a scripted model.
+The run settles `completed`, and its `output` is the text of the model's last answer (with structured `output`, the parsed value). This is the code of [`test/fixtures/readme-example.ts`](./test/fixtures/readme-example.ts), which the test suite runs against a scripted model.
 
 ### Agents and triggers
 
@@ -141,8 +141,9 @@ The run settles `completed`, and its `output` is the text of the model's last an
 - The trigger envelope (source, trigger id, payload) becomes the run's first user message, as a JSON block.
 - `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments` (ids `<runId>.0000`, `<runId>.0001`, ..., so a listing keeps the input order), and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
 - The tool factory also gets `artifacts`, scoped to the run: `put({ mediaType, filename?, data })`, `get(id)` and `list()`. `put()` is no effect by itself; call it inside a `defineEffectTool` to store a file exactly once.
-- `output` takes an AI SDK `Output` (e.g. `Output.object({ schema })`): a completed run's `output` is then the parsed value instead of the text, and a final answer that does not parse fails the run with `validation_error`. An answer cut off at the output token limit, or a loop that ended on a tool call nothing executed, fails it with `incomplete_response`.
+- `output` takes an AI SDK `Output` (e.g. `Output.object({ schema })`): a completed run's `output` is then the parsed value instead of the text, and a final answer that does not parse fails the run with `validation_error` (the quoted cause cut to 500 characters; the whole answer stays in the `llm` step). An answer cut off at the output token limit, or a loop that ended on a tool call nothing executed, fails it with `incomplete_response`.
 - The engine streams every model call: `engine.on('run.delta', ({ delta }) => ...)` gets `{ runId, step, kind: 'text' | 'reasoning', text }` while the model writes. Deltas are never stored and reach only listeners in the process executing the run.
+- A model call that fails mid-stream still ends its step: the `llm` step (text so far, finish reason `error`) and a checkpoint are written, then the run fails with the model's error. A stream that closes without the provider's finish part fails the run with `incomplete_response` and never runs that step's tool calls.
 
 ### Effect tools
 

@@ -27,7 +27,11 @@ export type TriggerDefinition<P = unknown> = {
  */
 export type Invoker = {
     id: string;
-    /** E.g. 'user', 'robot', 'client', 'token'. */
+    /**
+     * The authenticator's label: `@chamberu/http`'s built-ins produce 'token'
+     * (staticTokens), 'authup' and 'oidc'; a custom authenticator or a direct
+     * dispatch may use its own (e.g. 'user').
+     */
     kind: string;
     name?: string;
     permissions: readonly string[];
