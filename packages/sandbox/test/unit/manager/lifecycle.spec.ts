@@ -253,6 +253,71 @@ describe('workspace manager: run lifecycle', () => {
         expect(errors).toEqual([]);
     });
 
+    it('close() waits for a create in flight whose run settled', async () => {
+        const clock = new ControllableClock(new Date(1_000_000));
+        const provider = createFakeProvider({ clock });
+        const errors: unknown[] = [];
+        const manager = createWorkspaceManager({
+            provider,
+            clock,
+            gcIntervalMs: 0,
+            onError: (error) => { errors.push(error); },
+        });
+        const engine = fakeEngine();
+        manager.attach(engine);
+
+        // the fake provider ignores the abort while gated, like a cleanup in flight
+        const gate = Promise.withResolvers<void>();
+        provider.gate = gate.promise;
+        const acquiring = manager.acquire('r1', {}).catch((error: unknown) => error);
+        await flush();
+        expect(provider.created).toHaveLength(1);
+        engine.emit({ id: 'r1', status: RunStatus.CANCELLED });
+
+        let closed = false;
+        const closing = manager.close().then(() => { closed = true; });
+        await flush();
+        expect(closed).toBe(false);
+
+        gate.resolve();
+        await closing;
+        expect(await acquiring).toBeInstanceOf(SandboxError);
+        const [id] = provider.workspaces.keys();
+        expect(provider.disposed).toEqual([id]);
+        expect(errors).toEqual([]);
+    });
+
+    it('close() gives up on a create in flight of a settled run after timeoutMs', async () => {
+        const clock = new ControllableClock(new Date(1_000_000));
+        const provider = createFakeProvider({ clock });
+        const errors: unknown[] = [];
+        const manager = createWorkspaceManager({
+            provider,
+            clock,
+            gcIntervalMs: 0,
+            onError: (error) => { errors.push(error); },
+        });
+        const engine = fakeEngine();
+        manager.attach(engine);
+
+        provider.gate = new Promise<void>(() => {});
+        void manager.acquire('r1', {}).catch(() => undefined);
+        await flush();
+        engine.emit({ id: 'r1', status: RunStatus.COMPLETED });
+
+        let closed = false;
+        const closing = manager.close({ timeoutMs: 1000 }).then(() => { closed = true; });
+        await flush();
+        clock.advance(999);
+        await flush();
+        expect(closed).toBe(false);
+        clock.advance(1);
+        await closing;
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toBeInstanceOf(SandboxError);
+        expect((errors[0] as Error).message).toMatch(/a workspace of run r1 still being created/);
+    });
+
     it('subscribes nothing when attached after close()', async () => {
         const { manager } = await run({ script: [text('done')] });
         await manager.close();

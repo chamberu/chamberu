@@ -84,7 +84,8 @@ export interface IWorkspaceManager {
     collectGarbage(): Promise<number>;
     /**
      * Unsubscribes every attach, aborts the creates in flight and disposes
-     * every workspace, waiting for both (call after engine.drain()); afterwards
+     * every workspace, waiting for both, for disposals started earlier and for
+     * the creates in flight of runs released before (call after engine.drain()); afterwards
      * acquire rejects and attach subscribes nothing. Resolves after `timeoutMs`
      * at the latest, reporting what is still being disposed to `onError`.
      */

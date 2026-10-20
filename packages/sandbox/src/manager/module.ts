@@ -86,6 +86,20 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         return disposal;
     };
 
+    /**
+     * Every create in flight a release aborted, with its label: close() waits
+     * for them, since a run released by attach is no longer in `runs` while
+     * the provider's abort cleanup, or the dispose of a workspace created
+     * anyway, still runs.
+     */
+    const releasedCreates = new Map<Promise<unknown>, string>();
+
+    const trackReleasedCreate = (runId: string, pending: Promise<IWorkspace>): void => {
+        const tracked = pending.then(() => undefined, () => undefined);
+        releasedCreates.set(tracked, `a workspace of run ${runId} still being created`);
+        tracked.then(() => { releasedCreates.delete(tracked); });
+    };
+
     const disposeInBackground = (workspace: IWorkspace): void => {
         disposeOrThrow(workspace).catch(onError);
     };
@@ -264,6 +278,7 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         const pending = entries.values().toArray().flatMap((entry) => {
             if (!entry.pending) return [];
             entry.abort?.abort();
+            trackReleasedCreate(runId, entry.pending);
             return [entry.pending];
         });
         const held = entries.values().toArray().flatMap((entry) => (entry.workspace ? [entry.workspace] : []));
@@ -318,6 +333,12 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
                 left.add(id);
                 return disposal.catch(() => undefined).finally(() => left.delete(id));
             });
+            // creates in flight of runs released before (attach): their
+            // abort cleanup or the dispose of what they got anyway
+            const creating = releasedCreates.entries().toArray().map(([pending, label]) => {
+                left.add(label);
+                return pending.finally(() => left.delete(label));
+            });
             const work = runs.entries().toArray().map(([runId, entries]) => {
                 const labels = entries.values().toArray()
                     .map((entry) => entry.workspace?.id ?? `a workspace of run ${runId} still being created`);
@@ -329,7 +350,7 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
 
             let timer: { clear(): void } | undefined;
             const timedOut = await Promise.race([
-                Promise.all([...started, ...work]).then(() => false),
+                Promise.all([...started, ...creating, ...work]).then(() => false),
                 new Promise<boolean>((resolve) => {
                     timer = clock.setTimeout(() => resolve(true), timeoutMs);
                 }),
