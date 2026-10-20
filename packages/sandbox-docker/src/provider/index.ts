@@ -6,4 +6,5 @@
  */
 
 export * from './constants.ts';
+export * from './module.ts';
 export type { DockerSandboxOptions } from './types.ts';

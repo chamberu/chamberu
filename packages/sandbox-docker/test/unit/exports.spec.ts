@@ -9,18 +9,21 @@ import { describe, expect, it } from 'vitest';
 import * as docker from '@chamberu/sandbox-docker';
 
 describe('public api', () => {
-    it('exports the constants', () => {
+    it('exports the provider and the constants', () => {
         expect(Object.keys(docker).sort()).toEqual([
             'CONTAINER_NAME_PREFIX',
             'DEFAULT_NETWORK',
             'SANDBOX_USER',
+            'createDockerSandbox',
         ]);
         expect(docker.DEFAULT_NETWORK).toBe('bridge');
         expect(docker.CONTAINER_NAME_PREFIX).toBe('chamberu-ws-');
         expect(docker.SANDBOX_USER).toBe('1000:1000');
+        expect(typeof docker.createDockerSandbox).toBe('function');
     });
 
-    it('keeps the container builder internal', () => {
+    it('keeps the container builder and the transport internal', () => {
         expect(docker).not.toHaveProperty('buildContainerOptions');
+        expect(docker).not.toHaveProperty('createDockerTransport');
     });
 });

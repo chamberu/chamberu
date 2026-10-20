@@ -1,0 +1,78 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import type { Duplex } from 'node:stream';
+import { Writable } from 'node:stream';
+import type { IClock } from '@chamberu/core';
+import type { IOutputCollector } from '@chamberu/sandbox';
+
+/** An error naming the abort, for the remote workspace to map by its precedence. */
+export function abortError(signal: AbortSignal): Error {
+    return signal.reason instanceof Error ? signal.reason : new Error('exec aborted');
+}
+
+/** A sink that hands every chunk to the collector and never applies backpressure. */
+export function collectorSink(collector: IOutputCollector): Writable {
+    return new Writable({
+        write(chunk: Uint8Array, _encoding, callback) {
+            collector.write(chunk);
+            callback();
+        },
+    });
+}
+
+/** Resolves when the hijacked stream ends or closes; rejects on its error or the signal. */
+export function streamEnded(stream: Duplex, signal: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+            signal.removeEventListener('abort', onAbort);
+            stream.off('end', onEnd);
+            stream.off('close', onEnd);
+            stream.off('error', onError);
+        };
+        function onEnd() {
+            cleanup();
+            resolve();
+        }
+        function onError(error: Error) {
+            cleanup();
+            reject(error);
+        }
+        function onAbort() {
+            cleanup();
+            stream.destroy();
+            reject(abortError(signal));
+        }
+        if (signal.aborted) {
+            onAbort();
+            return;
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
+        stream.on('end', onEnd);
+        stream.on('close', onEnd);
+        stream.on('error', onError);
+    });
+}
+
+/** Waits `ms` on the clock; rejects when the signal fires first. */
+export function delay(clock: IClock, ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        if (signal.aborted) {
+            reject(abortError(signal));
+            return;
+        }
+        const timer = clock.setTimeout(() => {
+            signal.removeEventListener('abort', onAbort);
+            resolve();
+        }, ms);
+        function onAbort() {
+            timer.clear();
+            reject(abortError(signal));
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
+    });
+}
