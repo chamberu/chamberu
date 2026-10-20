@@ -8,8 +8,5 @@
 /** `X-GitHub-Event`: GitHub's event names are lower case, digits (`projects_v2_item`) and underscores. */
 export const EVENT_HEADER_PATTERN = /^[a-z0-9_]+$/;
 
-/** Longest delivery id and derived key; the store's key columns are varchar(255). */
-export const KEY_MAX_LENGTH = 255;
-
 /** `X-Hub-Signature-256`: `sha256=` and 64 lower-case hex digits. */
 export const SIGNATURE_PATTERN = /^sha256=([0-9a-f]{64})$/;

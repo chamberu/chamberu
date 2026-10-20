@@ -294,15 +294,31 @@ describe('webhook route', () => {
         expect(run?.trigger.concurrencyKey).toBe('one-lane');
     });
 
-    it('refuses a derived key above 255 characters', async () => {
-        const { app, store } = createGithubTestApp({ agents: [agent('keyed', { events: ['issues.opened'], idempotencyKey: () => 'k'.repeat(256) })] });
+    it.each([
+        ['a throwing filter', { filter: () => { throw new Error('unexpected payload'); } }],
+        ['a throwing idempotencyKey', { idempotencyKey: () => { throw new Error('unexpected payload'); } }],
+        ['a derived key above 255 characters', { idempotencyKey: () => 'k'.repeat(256) }],
+        ['a derived concurrency key with NUL', { concurrencyKey: () => 'a\u0000b' }],
+    ] as Array<[string, Partial<GithubWebhookTriggerOptions>]>)('dispatches the other agents past %s, reports it, then 500s', async (_name, broken) => {
+        const {
+            app,
+            store,
+            errors,
+        } = createGithubTestApp({
+            agents: [
+                agent('broken', { events: ['issues'], ...broken }),
+                agent('ok', { events: ['issues'] }),
+            ],
+        });
         const response = await deliver(app, {
             event: 'issues',
             delivery: 'd-1',
             body: ISSUES_OPENED,
         });
-        expect(response.status).toBe(400);
-        expect((await store.listRuns({})).total).toBe(0);
+        expect(response.status).toBe(500);
+        expect(errors).toHaveLength(1);
+        const { data } = await store.listRuns({});
+        expect(data.map((r) => r.agent)).toEqual(['ok']);
     });
 
     it('serves a custom path', async () => {

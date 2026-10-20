@@ -13,11 +13,7 @@ import { isSameLogin } from '../app/helpers.ts';
 import type { IGithubApp } from '../app/types.ts';
 import { matchesGithubTrigger } from '../trigger/helpers.ts';
 import type { GithubEvent } from '../trigger/types.ts';
-import {
-    assertDerivedKey,
-    readHeaders,
-    toGithubEvent,
-} from './helpers.ts';
+import { readHeaders, toGithubEvent } from './helpers.ts';
 import type { GithubWebhookResult, GithubWebhookRouteOptions } from './types.ts';
 
 /** The 500 body of a delivery some agent could not be dispatched for (shaped like the http app's errors). */
@@ -41,9 +37,10 @@ async function isSelfSent(app: IGithubApp, event: GithubEvent): Promise<boolean>
  * `POST <path>` for GitHub App deliveries: checks the signature over the
  * raw body, then dispatches one run per agent with a matching
  * `githubWebhook()` trigger (its first one), deduplicated by the delivery
- * id. Answers `202` (also for ping, unmatched and self-sent events); a
- * failing agent goes to `onError`, the others are still dispatched, and
- * the answer is then a 500.
+ * id (keys are checked by `dispatch`). Answers `202` (also for ping,
+ * unmatched and self-sent events); a failing agent (filter, key function,
+ * dispatch) goes to `onError`, the others are still dispatched, and the
+ * answer is then a 500.
  */
 export function createWebhookRoute(app: IGithubApp, options: GithubWebhookRouteOptions = {}): HttpRoute {
     return {
@@ -62,42 +59,46 @@ export function createWebhookRoute(app: IGithubApp, options: GithubWebhookRouteO
             }
             const event = toGithubEvent(body, name, delivery);
 
+            // a failing agent (a throwing filter or key function, a key dispatch
+            // refuses) goes to onError and does not stop the others
+            let failed = false;
+            const fail = (error: unknown) => {
+                failed = true;
+                ctx.onError(error);
+            };
             const envelopes: DispatchEnvelope[] = [];
             for (const agent of ctx.agents) {
-                const trigger = (agent.definition.triggers ?? [])
-                    .find((t: TriggerDefinition) => matchesGithubTrigger(t, event));
-                if (!trigger) continue;
-                const idempotencyKey = trigger.idempotencyKey?.(event) ?? delivery;
-                const concurrencyKey = trigger.concurrencyKey?.(event);
-                assertDerivedKey('idempotency key', idempotencyKey);
-                assertDerivedKey('concurrency key', concurrencyKey);
-                envelopes.push({
-                    agent: agent.name,
-                    trigger: trigger.id,
-                    source: 'github',
-                    payload: event,
-                    idempotencyKey,
-                    ...(concurrencyKey !== undefined ? { concurrencyKey } : {}),
-                });
+                try {
+                    const trigger = (agent.definition.triggers ?? [])
+                        .find((t: TriggerDefinition) => matchesGithubTrigger(t, event));
+                    if (!trigger) continue;
+                    const concurrencyKey = trigger.concurrencyKey?.(event);
+                    envelopes.push({
+                        agent: agent.name,
+                        trigger: trigger.id,
+                        source: 'github',
+                        payload: event,
+                        idempotencyKey: trigger.idempotencyKey?.(event) ?? delivery,
+                        ...(concurrencyKey !== undefined ? { concurrencyKey } : {}),
+                    });
+                } catch (error) {
+                    fail(error);
+                }
             }
 
             const result: GithubWebhookResult = { delivery, runs: [] };
-            if (envelopes.length === 0 || await isSelfSent(app, event)) {
-                return { status: 202, body: result };
-            }
-
-            let failed = false;
-            for (const envelope of envelopes) {
-                try {
-                    const { runId, deduplicated } = await ctx.engine.dispatch(envelope);
-                    result.runs.push({
-                        agent: envelope.agent,
-                        runId,
-                        deduplicated,
-                    });
-                } catch (error) {
-                    failed = true;
-                    ctx.onError(error);
+            if (envelopes.length > 0 && !await isSelfSent(app, event)) {
+                for (const envelope of envelopes) {
+                    try {
+                        const { runId, deduplicated } = await ctx.engine.dispatch(envelope);
+                        result.runs.push({
+                            agent: envelope.agent,
+                            runId,
+                            deduplicated,
+                        });
+                    } catch (error) {
+                        fail(error);
+                    }
                 }
             }
             return failed ? DISPATCH_FAILED : { status: 202, body: result };

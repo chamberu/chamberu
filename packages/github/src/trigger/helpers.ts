@@ -17,7 +17,8 @@ function matchesEvent(spec: string, event: GithubEvent): boolean {
 /**
  * True when `trigger` is a `githubWebhook()` trigger whose events name the
  * delivery's event (and action) and whose `filter`, if any, accepts it. A
- * throwing filter propagates.
+ * throwing filter propagates (the webhook route reports it as that agent's
+ * failure).
  */
 export function matchesGithubTrigger(trigger: TriggerDefinition, event: GithubEvent): boolean {
     if (trigger.source !== 'github') return false;

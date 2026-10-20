@@ -6,10 +6,11 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { TRIGGER_KEY_MAX_LENGTH } from '@chamberu/core';
 import { BadRequestError } from '@ebec/http';
 import { isObject } from 'smob';
 import type { GithubEvent, GithubPayload } from '../trigger/types.ts';
-import { EVENT_HEADER_PATTERN, KEY_MAX_LENGTH, SIGNATURE_PATTERN } from './constants.ts';
+import { EVENT_HEADER_PATTERN, SIGNATURE_PATTERN } from './constants.ts';
 
 /**
  * True when `signature` is `sha256=<hex>` of the HMAC-SHA256 of the exact
@@ -35,8 +36,8 @@ export function readHeaders(request: Request): { name: string; delivery: string 
         throw new BadRequestError({ message: 'The X-GitHub-Event header is missing or malformed.' });
     }
     const delivery = request.headers.get('x-github-delivery');
-    if (delivery === null || delivery.length === 0 || delivery.length > KEY_MAX_LENGTH || delivery.includes('\u0000')) {
-        throw new BadRequestError({ message: `The X-GitHub-Delivery header must have 1 to ${KEY_MAX_LENGTH} characters.` });
+    if (delivery === null || delivery.length === 0 || delivery.length > TRIGGER_KEY_MAX_LENGTH || delivery.includes('\u0000')) {
+        throw new BadRequestError({ message: `The X-GitHub-Delivery header must have 1 to ${TRIGGER_KEY_MAX_LENGTH} characters.` });
     }
     return { name, delivery };
 }
@@ -61,12 +62,4 @@ export function toGithubEvent(body: Uint8Array, name: string, delivery: string):
     const { installation } = payload;
     if (isObject(installation) && typeof installation.id === 'number') event.installationId = installation.id;
     return event;
-}
-
-/** A key a trigger derived from the event: at most KEY_MAX_LENGTH characters and no NUL, else 400. */
-export function assertDerivedKey(name: string, value: string | undefined): void {
-    if (value === undefined) return;
-    if (value.length > KEY_MAX_LENGTH || value.includes('\u0000')) {
-        throw new BadRequestError({ message: `The ${name} derived from the delivery must have at most ${KEY_MAX_LENGTH} characters and no NUL.` });
-    }
 }

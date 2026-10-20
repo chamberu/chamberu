@@ -133,7 +133,7 @@ export async function createTriageServer(
 A verified delivery is dispatched to every agent with a matching `githubWebhook()` trigger, **at most one run per agent** (its first matching trigger), with `source: 'github'` and the `GithubEvent` as payload. The answer is `202 { delivery, runs: [{ agent, runId, deduplicated }] }`, also for `ping`, for events no trigger matches and for events the App sent itself (`runs: []`).
 
 - **Dedupe**: the idempotency key is the delivery id (or the trigger's `idempotencyKey(event)`), so a redelivery returns the existing runs with `deduplicated: true`. The signature covers the body, not the `X-GitHub-Delivery` header: whoever holds one signed delivery (a proxy log, a support dump) can replay it under new delivery ids and start a new run each time. On an exposed endpoint, derive the key from the content, e.g. `` idempotencyKey: (e) => `${e.name}.${e.action}:${e.payload.repository?.full_name}#${e.payload.issue?.number}@${e.payload.issue?.updated_at}` ``.
-- **Failures**: agents are dispatched in order and a failing one does not stop the others; each failure goes to the http app's `onError`, and the answer is then `500`. **GitHub does not redeliver failed deliveries automatically**: redeliver a `4xx`/`5xx` delivery by hand (the App's *Advanced* tab) or through the redelivery API. A redelivery keeps the delivery id, so the agents that already got their run are deduplicated.
+- **Failures**: agents are matched and dispatched in order and a failing one (a throwing `filter` or key function, a key `dispatch` refuses, a failed dispatch) does not stop the others; each failure goes to the http app's `onError`, and the answer is then `500`. **GitHub does not redeliver failed deliveries automatically**: redeliver a `4xx`/`5xx` delivery by hand (the App's *Advanced* tab) or through the redelivery API. A redelivery keeps the delivery id, so the agents that already got their run are deduplicated.
 - **Self guard**: a delivery whose `sender` is the App's own bot (`<slug>[bot]`, `type: 'Bot'`) starts no run, so an agent is not woken by its own comment. Other bots (`dependabot[bot]`, a second chamberu App on the same repository) are ordinary senders; use a trigger `filter` to break loops between two Apps.
 - **Body size**: the route inherits the app's `bodyLimit` (1 MiB by default). Issue and comment deliveries are far below it; raise `bodyLimit` on `createHttpApp` for large `push` or `pull_request` deliveries (GitHub sends up to 25 MB), which are otherwise answered `413`.
 - The route is not rate limited and not authenticated by the app's authenticators: the signature is its credential.
@@ -155,7 +155,7 @@ githubWebhook({
 | `idempotencyKey` | the delivery id | `(event) => string \| undefined` |
 | `concurrencyKey` | `<owner>/<repo>#<issue or pull request number>`, else `<owner>/<repo>` | `(event) => string \| undefined`; runs on one issue wait for each other |
 
-The run payload is a `GithubEvent { name, action?, delivery, installationId?, payload }`, where `payload` is the full GitHub body. Derived keys above 255 characters are a `400`.
+The run payload is a `GithubEvent { name, action?, delivery, installationId?, payload }`, where `payload` is the full GitHub body. A derived key above 255 characters or with a NUL fails that agent like a throwing `filter` (see *Failures*).
 
 ## Tools
 

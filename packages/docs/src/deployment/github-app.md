@@ -42,7 +42,7 @@ The route is not rate limited and not behind the app's authenticators: the signa
 :::
 
 ::: warning GitHub does not redeliver failed deliveries
-A failing agent does not stop the others; each failure goes to `onError` and the answer is `500`. GitHub never retries a `4xx` or `5xx` delivery by itself: redeliver it by hand (the App's *Advanced* tab) or through the redelivery API. A redelivery keeps the delivery id, so the agents that already got their run are deduplicated.
+A failing agent (a throwing `filter` or key function, a key above 255 characters, a failed dispatch) does not stop the others; each failure goes to `onError` and the answer is `500`. GitHub never retries a `4xx` or `5xx` delivery by itself: redeliver it by hand (the App's *Advanced* tab) or through the redelivery API. A redelivery keeps the delivery id, so the agents that already got their run are deduplicated.
 :::
 
 Large `push` or `pull_request` deliveries can exceed the default `bodyLimit` of 1 MiB (GitHub sends up to 25 MB); raise `bodyLimit` on `createHttpApp` when an agent needs them. Two chamberu Apps on one repository see each other as ordinary bots: use a `filter` to break such loops.
