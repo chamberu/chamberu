@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { defineAgent } from '@chamberu/core';
+import type { INotifier, Notification } from '@chamberu/core';
 import type { IGithubApp } from '@chamberu/github';
 import { githubWebhook } from '@chamberu/github';
 import { createGithubTestApp, deliver } from '../../utils/app.ts';
@@ -126,6 +127,67 @@ describe('webhook to comment', () => {
         expect(run?.status).toBe('waiting');
         expect(run?.waiting?.toolName).toBe('github_close_issue');
         expect(fake.requests.filter((r) => r.method === 'PATCH')).toHaveLength(0);
+        await engine.drain();
+    });
+
+    it('keeps one comment per step across an approval resume', async () => {
+        const notifications: Notification[] = [];
+        const notifier: INotifier = {
+            name: 'owner',
+            notify: async (n) => { notifications.push(n); },
+        };
+        const comment = (body: string) => ({
+            parts: [{
+                type: 'tool-call' as const,
+                toolName: 'github_create_comment',
+                input: { ...ISSUE, body },
+            }],
+        });
+        const setup = createGithubTestApp({
+            notifiers: { owner: notifier },
+            agents: (gh) => [defineAgent({
+                name: 'triage',
+                model: mockModel([comment('zero'), comment('first'), comment('second'), { parts: [{ type: 'text', text: 'Done.' }] }]),
+                instructions: 'Triage new issues.',
+                triggers: [githubWebhook({ events: ['issues.opened'] })],
+                tools: () => gh.writeTools(),
+                approvals: { github_create_comment: (input) => ((input as { body?: string }).body === 'first' ? 'user' : 'allow') },
+                notify: 'owner',
+            })],
+        });
+        const {
+            app,
+            engine,
+            store,
+            fake,
+            errors,
+        } = setup;
+        const { issue } = (JSON.parse(ISSUES_OPENED) as { issue: Record<string, unknown> });
+        fake.issues.set('octo/demo#5', { ...issue });
+        const response = await deliver(app, {
+            event: 'issues',
+            delivery: 'd-1',
+            body: ISSUES_OPENED,
+        });
+        const { runs } = await response.json() as { runs: Array<{ runId: string }> };
+        const runId = runs[0]!.runId;
+        await engine.start();
+        await engine.idle();
+
+        const paused = await store.getRun(runId);
+        expect(paused?.status).toBe('waiting');
+        expect(paused?.waiting?.toolName).toBe('github_create_comment');
+        expect(fake.comments.get('octo/demo#5')).toHaveLength(1);
+
+        await engine.resume(notifications[0]!.resumeToken!, { approved: true });
+        await engine.idle();
+        expect((await store.getRun(runId))?.status).toBe('completed');
+        expect(errors).toEqual([]);
+        const bodies = (fake.comments.get('octo/demo#5') ?? []).map((c) => String(c.body));
+        expect(bodies).toHaveLength(3);
+        for (const [step, body] of bodies.entries()) {
+            expect(body).toContain(`<!-- chamberu:effect=${runId}:github_create_comment:octo/demo#5:${step} -->`);
+        }
         await engine.drain();
     });
 });
