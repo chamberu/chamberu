@@ -179,6 +179,7 @@ export default defineConfig({
                     text: 'Reference',
                     items: [
                         { text: '@chamberu/core', link: '/reference/' },
+                        { text: '@chamberu/github', link: '/reference/github' },
                         { text: '@chamberu/http', link: '/reference/http' },
                         { text: '@chamberu/scheduler', link: '/reference/scheduler' },
                         { text: '@chamberu/test-kit', link: '/reference/test-kit' },

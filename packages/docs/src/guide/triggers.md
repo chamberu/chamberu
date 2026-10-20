@@ -11,13 +11,14 @@ A trigger describes how a run of an agent can start. At intake every trigger bec
 | `http(opts?)` | `http` | `http` | `schema?`: a Standard Schema for the payload. At most one per agent; REST, the UI and MCP start runs through it |
 | `webhook(opts)` | `webhook` | `webhook:<path>` | `path` (starts with `/`), `schema?`, `idempotencyKey?`, `concurrencyKey?`. Many per agent |
 | `cron(expression, opts?)` | `cron` | `cron:<expression>` | `timezone?`, `overlap?` (`skip` by default, `queue-one`, `allow`), `payload?` |
+| `githubWebhook(opts)` from `@chamberu/github` | `github` | `github:<events>` | `events` (`'issues'` or `'issues.opened'`), `id?`, `filter?`, `idempotencyKey?` (default the delivery id), `concurrencyKey?` (default `<owner>/<repo>#<number>`). See [GitHub App](/deployment/github-app) |
 
 `cron()` validates the expression (and timezone) with cron-parser and throws `InvalidAgentDefinitionError` for an invalid one; `webhook()` throws it for a path that does not start with `/`. Trigger ids must be unique per agent, so an agent declares `http()` at most once.
 
 A `TriggerDefinition` may also carry `concurrencyKey(payload)` and `idempotencyKey(payload)` functions (`webhook()` copies them from its options). They are meant for the intake packages, which compute the envelope keys from a payload.
 
 ::: warning Firing triggers is not in core
-In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigger definitions describe intent; nothing in core fires a cron expression or listens on an HTTP path. [`@chamberu/scheduler`](/guide/scheduler) fires `cron()` triggers (with per-tick locks and the overlap policy); [`@chamberu/http`](/guide/http) serves `http()` triggers over REST and MCP and `webhook()` triggers at `/hooks/:agent<path>`.
+In `@chamberu/core`, `engine.dispatch()` is the only way a run starts. The trigger definitions describe intent; nothing in core fires a cron expression or listens on an HTTP path. [`@chamberu/scheduler`](/guide/scheduler) fires `cron()` triggers (with per-tick locks and the overlap policy); [`@chamberu/http`](/guide/http) serves `http()` triggers over REST and MCP and `webhook()` triggers at `/hooks/:agent<path>`; [`@chamberu/github`](/deployment/github-app) serves `githubWebhook()` triggers at `/webhooks/github`.
 :::
 
 ## The envelope
