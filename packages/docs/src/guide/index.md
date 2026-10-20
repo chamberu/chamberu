@@ -15,8 +15,9 @@ This guide describes `@chamberu/core` as it is built today. Every sample on thes
 | **State** | `AgentState` | Per-agent key-value data and typed collections that outlive runs |
 | **Notifier** | `Notifier` | Delivers approval requests and other messages to the owner |
 | **Store** | `Store` | Runs, steps, checkpoints, keys, locks, effects and state. Pluggable |
+| **Workspace** | `@chamberu/sandbox` | A disposable directory or container a run executes commands in, optionally a checkout of a repository. See [Workspaces & Coding](/guide/workspaces) |
 
-The **App** and **Workspace** concepts (an app with HTTP, scheduler and UI, and sandboxed workspaces for coding) belong to [planned packages](/roadmap).
+The **App** concept (one app with HTTP, scheduler and UI) belongs to [planned packages](/roadmap).
 
 ## The engine in one picture
 
@@ -44,4 +45,5 @@ See [Run Lifecycle](/guide/run-lifecycle) for every transition.
 1. [Agents](/guide/agents) and [Triggers & the Envelope](/guide/triggers)
 2. [Run Lifecycle](/guide/run-lifecycle) and [Execution & Checkpoints](/guide/execution)
 3. [Budgets](/guide/budgets), [Tools](/guide/tools), [Effect Tools](/guide/effect-tools), [Approvals](/guide/approvals), [State](/guide/state)
-4. [Concurrency](/guide/concurrency), [Cancel, Drain & Recovery](/guide/recovery), [Notifiers](/guide/notifiers), [Errors](/guide/errors)
+4. [Workspaces & Coding](/guide/workspaces) for agents that run commands and edit code
+5. [Concurrency](/guide/concurrency), [Cancel, Drain & Recovery](/guide/recovery), [Notifiers](/guide/notifiers), [Errors](/guide/errors)

@@ -69,4 +69,4 @@ Write tools are [effect tools](/guide/effect-tools). A comment embeds an [`effec
 
 - The tools reach every repository the installation reaches. Issue text is untrusted input: a model steered by it can act on any of them. Install the App only where the agent may act and put destructive tools behind approvals.
 - [`requireToolPermission()`](/guide/tools#restricting-tools-per-invoker) denies every tool to runs without an invoker, which includes every delivery run. GitHub agents use `requireToolPermission({ withoutInvoker: 'allow' })` or wrap it.
-- Sandboxes never get the App's credentials. A short-lived token scoped to one repository, for a sandbox that must push, is planned with the sandbox packages.
+- Sandboxes never get the App's credentials. A short-lived token scoped to one repository, for a sandbox that must push, is planned; the [workspaces](/guide/workspaces) shipped without it.

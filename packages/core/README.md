@@ -347,6 +347,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `IncompleteResponseError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
 | `ToolNotAllowedError` | class | The tool error recorded for a call to a tool the `toolPolicy` refuses |
+| `SandboxError` | class | A sandbox workspace or provider failed (`@chamberu/sandbox` and its providers); a tool error, never a failed run |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 

@@ -136,6 +136,7 @@ export default defineConfig({
                         { text: 'Effect Tools & Reconciliation', link: '/guide/effect-tools' },
                         { text: 'Approvals & Resume Tokens', link: '/guide/approvals' },
                         { text: 'Agent State', link: '/guide/state' },
+                        { text: 'Workspaces & Coding', link: '/guide/workspaces' },
                     ],
                 },
                 {
@@ -179,8 +180,10 @@ export default defineConfig({
                     text: 'Reference',
                     items: [
                         { text: '@chamberu/core', link: '/reference/' },
+                        { text: '@chamberu/coding', link: '/reference/coding' },
                         { text: '@chamberu/github', link: '/reference/github' },
                         { text: '@chamberu/http', link: '/reference/http' },
+                        { text: '@chamberu/sandbox', link: '/reference/sandbox' },
                         { text: '@chamberu/scheduler', link: '/reference/scheduler' },
                         { text: '@chamberu/test-kit', link: '/reference/test-kit' },
                     ],
