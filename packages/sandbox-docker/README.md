@@ -97,7 +97,7 @@ The default image is `ghcr.io/chamberu/sandbox-node:24` (`DEFAULT_SANDBOX_IMAGE`
 
 ## Timeouts and abort
 
-Every command runs as `timeout -k 5 <seconds> <argv>`; GNU `timeout` signals its whole process group, so backgrounded grandchildren go too. A client-side guard stops waiting 15 s (`EXEC_GRACE_MS`) after the timeout and reports exit 137.
+Every command runs as `timeout -k 5 <seconds> <argv>`; GNU `timeout` signals its whole process group, so backgrounded grandchildren go too. A client-side guard stops waiting 15 s (`EXEC_GRACE_MS`) after the timeout and reports exit 137 with the output so far. A command that exits while a background job it started holds its output returns about 2 s after its exit with its own exit code.
 
 An abort (`signal`) **detaches**: dockerode tears down the exec stream, and the command runs on until its `timeout` fires or the workspace is disposed. Every settled run disposes its workspaces (`manager.attach(engine)`), and a drain is followed by `manager.close()`, so nothing outlives the run for long. A dispose removes the container, which kills whatever still runs.
 

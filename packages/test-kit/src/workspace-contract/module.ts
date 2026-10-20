@@ -28,9 +28,9 @@ const sleep = (ms: number) => new Promise<void>((resolve) => {
 
 /**
  * Shared behavioural contract for every `IWorkspace` a sandbox provider
- * creates: argv exec, exit codes, stdin, cwd and path escapes, output caps,
- * process-group kills on timeout, abort, UTF-8 files, size caps and
- * dispose. It runs real processes with short real timeouts.
+ * creates: argv exec, exit codes, stdin, cwd and path escapes, a missing
+ * cwd, a background job holding the output, output caps, process-group
+ * kills on timeout, abort, UTF-8 files, size caps and dispose. It runs real processes with short real timeouts.
  *
  * @param name     Suite name, e.g. the provider name.
  * @param factory  A fresh, repo-less workspace per call; the suite disposes it.
@@ -89,6 +89,27 @@ export function describeWorkspaceContract(name: string, factory: WorkspaceContra
             for (const cwd of ['../..', '/etc', '', 'a\0b']) {
                 await expect(workspace.exec(['pwd'], { cwd })).rejects.toBeInstanceOf(ValidationError);
             }
+        }, TEST_TIMEOUT_MS);
+
+        it('refuses a cwd that is no directory', async () => {
+            await workspace.writeFile('cwd-file.txt', 'x');
+            for (const cwd of ['nope', 'cwd-file.txt']) {
+                const error = await workspace.exec(['pwd'], { cwd }).catch((e: unknown) => e);
+                expect(error).toBeInstanceOf(SandboxError);
+                expect((error as SandboxError).message).toBe(`cwd /workspace/${cwd} is no directory in the workspace.`);
+            }
+        }, TEST_TIMEOUT_MS);
+
+        it('returns when the command exits while a background job holds its output', async () => {
+            const started = Date.now();
+            const result = await workspace.exec(['sh', '-c', 'echo before >&2; sleep 60 & echo started'], { timeoutMs: 20_000 });
+            expect(result).toMatchObject({
+                exitCode: 0,
+                stdout: 'started\n',
+                stderr: 'before\n',
+                timedOut: false,
+            });
+            expect(Date.now() - started).toBeLessThan(10_000);
         }, TEST_TIMEOUT_MS);
 
         it('caps output per stream', async () => {

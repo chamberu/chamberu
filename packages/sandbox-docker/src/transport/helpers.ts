@@ -8,18 +8,18 @@
 import type { Duplex } from 'node:stream';
 import { Writable } from 'node:stream';
 import type { IClock } from '@chamberu/core';
-import type { IOutputCollector } from '@chamberu/sandbox';
+import type { IOutputSink } from '@chamberu/sandbox';
 
 /** An error naming the abort, for the remote workspace to map by its precedence. */
 export function abortError(signal: AbortSignal): Error {
     return signal.reason instanceof Error ? signal.reason : new Error('exec aborted');
 }
 
-/** A sink that hands every chunk to the collector and never applies backpressure. */
-export function collectorSink(collector: IOutputCollector): Writable {
+/** A stream that hands every chunk to the sink and never applies backpressure. */
+export function sinkStream(sink: IOutputSink): Writable {
     return new Writable({
         write(chunk: Uint8Array, _encoding, callback) {
-            collector.write(chunk);
+            sink.write(chunk);
             callback();
         },
     });

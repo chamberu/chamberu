@@ -6,29 +6,31 @@
  */
 
 import type { IClock } from '@chamberu/core';
+import type { IOutputSink } from '../output/types.ts';
 import type { WorkspaceInfo } from '../workspace/types.ts';
 
 export type TransportExecOptions = {
-    /** Absolute inside the container, under `WORKSPACE_ROOT`. */
-    cwd: string;
     stdin?: Uint8Array;
-    /** Cap per output stream; the transport keeps draining past it. */
-    maxOutputBytes: number;
-    /** Aborted on a caller abort, a dispose or the client-side guard: stop waiting and detach. */
+    /** Gets every stdout chunk as it arrives; the workspace caps and keeps it. */
+    stdout: IOutputSink;
+    /** Gets every stderr chunk as it arrives; the workspace caps and keeps it. */
+    stderr: IOutputSink;
+    /**
+     * Aborted on a caller abort, a dispose, the client-side guard, or once the
+     * workspace settled the exec itself (the command exited, a background job
+     * still holds its output): stop waiting and detach.
+     */
     signal: AbortSignal;
 };
 
 export type TransportExecResult = {
     exitCode: number;
-    stdout: Uint8Array;
-    stderr: Uint8Array;
-    stdoutTruncated: boolean;
-    stderrTruncated: boolean;
 };
 
 /**
- * Runs argv in one container or pod. The remote workspace wraps argv in
- * GNU `timeout` itself; a transport only executes and collects.
+ * Runs argv in one container or pod. The remote workspace wraps argv itself
+ * (the working directory, GNU `timeout`, the exit status reported on
+ * stderr); a transport only executes and streams the output.
  */
 export interface IExecTransport {
     /** A command that cannot start reports exit 127. */

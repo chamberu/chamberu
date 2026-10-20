@@ -7,6 +7,7 @@
 
 import { SandboxError, ValidationError, systemClock } from '@chamberu/core';
 import { toSandboxError } from '../manager/helpers.ts';
+import { createOutputCollector } from '../output/module.ts';
 import { resolveWorkspacePath } from '../path/module.ts';
 import {
     EXEC_TIMEOUT_MAX_MS,
@@ -16,14 +17,22 @@ import {
     WORKSPACE_ROOT,
 } from '../workspace/constants.ts';
 import type { ExecOptions, ExecResult, IWorkspace } from '../workspace/types.ts';
-import { ALIVE_PROBE_TIMEOUT_MS, EXEC_GRACE_MS, WRITE_FILE_SCRIPT } from './constants.ts';
+import {
+    ALIVE_PROBE_TIMEOUT_MS,
+    EXEC_GRACE_MS,
+    EXIT_DRAIN_MS,
+    EXIT_MARKER_CWD,
+    WRITE_FILE_SCRIPT,
+} from './constants.ts';
 import {
     assertArgv,
-    capOutput,
+    createExitMarkerFilter,
     decodeOutput,
+    exitMarker,
     isTimeoutExit,
     stderrMessage,
     toAbsolute,
+    wrapExec,
     wrapTimeout,
 } from './helpers.ts';
 import type { RemoteWorkspaceInput, TransportExecResult } from './types.ts';
@@ -36,14 +45,24 @@ type RunInput = {
     signal?: AbortSignal;
 };
 
-type RunResult = TransportExecResult & { timedOut: boolean; durationMs: number };
-
-const EMPTY = new Uint8Array(0);
+type RunResult = {
+    exitCode: number;
+    stdout: Uint8Array;
+    stderr: Uint8Array;
+    stdoutTruncated: boolean;
+    stderrTruncated: boolean;
+    timedOut: boolean;
+    durationMs: number;
+};
 
 /**
  * A workspace in a container or pod, reached through `transport`. Every
- * command runs behind GNU `timeout`; a client-side guard stops waiting at
- * the timeout plus `EXEC_GRACE_MS` and reports exit 137. An abort only
+ * command runs inside `EXEC_SCRIPT` (it enters the working directory, else
+ * the exec rejects like on local, and reports the exit status on stderr)
+ * behind GNU `timeout`. A command that exited while a background job holds
+ * its output returns `EXIT_DRAIN_MS` after its exit with its exit code and
+ * the output so far; a client-side guard stops waiting at the timeout plus
+ * `EXEC_GRACE_MS` and reports exit 137 with the output so far. An abort only
  * detaches (the command runs on until its `timeout` or the dispose); a
  * dispose settles every in-flight exec with `SandboxError('workspace
  * disposed')` and removes the container or pod; a dispose after a failed
@@ -114,20 +133,43 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
 
         const started = clock.now().getTime();
         const guard = new AbortController();
+        // the workspace settled the exec itself (the command exited, its output stays open)
+        const detach = new AbortController();
         const combined = AbortSignal.any(signal ?
-            [guard.signal, disposal.signal, signal] :
-            [guard.signal, disposal.signal]);
+            [guard.signal, detach.signal, disposal.signal, signal] :
+            [guard.signal, detach.signal, disposal.signal]);
+        const stdout = createOutputCollector(options.maxOutputBytes);
+        const stderr = createOutputCollector(options.maxOutputBytes);
+        const marker = exitMarker();
 
         return new Promise<RunResult>((resolve, reject) => {
             let settled = false;
+            /** When the exec script reported the exit. */
+            let exitedAt: number | undefined;
+            let drain: { clear(): void } | undefined;
             const timer = clock.setTimeout(() => guard.abort(), timeoutMs + EXEC_GRACE_MS);
 
             const finish = (): boolean => {
                 if (settled) return false;
                 settled = true;
                 timer.clear();
+                drain?.clear();
                 combined.removeEventListener('abort', onAbort);
                 return true;
+            };
+            /** The output collected so far (also after a guard or a drain). */
+            const result = (exitCode: number, timedOut?: boolean): RunResult => {
+                filter.flush();
+                const durationMs = (exitedAt ?? clock.now().getTime()) - started;
+                return {
+                    exitCode,
+                    stdout: stdout.bytes(),
+                    stderr: stderr.bytes(),
+                    stdoutTruncated: stdout.truncated,
+                    stderrTruncated: stderr.truncated,
+                    timedOut: timedOut ?? isTimeoutExit(exitCode, durationMs, timeoutMs),
+                    durationMs,
+                };
             };
             /** Settles by precedence: disposed, then aborted, then the guard. */
             const interrupted = (): boolean => {
@@ -140,15 +182,7 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
                     return true;
                 }
                 if (guard.signal.aborted) {
-                    resolve({
-                        exitCode: 137,
-                        stdout: EMPTY,
-                        stderr: EMPTY,
-                        stdoutTruncated: false,
-                        stderrTruncated: false,
-                        timedOut: true,
-                        durationMs: clock.now().getTime() - started,
-                    });
+                    resolve(result(137, true));
                     return true;
                 }
                 return false;
@@ -158,32 +192,40 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
             }
             combined.addEventListener('abort', onAbort, { once: true });
 
+            const filter = createExitMarkerFilter(marker, stderr, (value) => {
+                if (settled) return;
+                exitedAt = clock.now().getTime();
+                if (value === EXIT_MARKER_CWD) {
+                    if (!finish()) return;
+                    detach.abort();
+                    reject(new SandboxError(`cwd ${options.cwd} is no directory in the workspace.`));
+                    return;
+                }
+                if (!/^\d{1,3}$/.test(value)) return;
+                const exitCode = Number(value);
+                // a background job may hold the output open: return after the drain
+                drain = clock.setTimeout(() => {
+                    if (!finish()) return;
+                    detach.abort();
+                    resolve(result(exitCode));
+                }, EXIT_DRAIN_MS);
+            });
+
             let pending: Promise<TransportExecResult>;
             try {
-                pending = transport.exec(wrapTimeout(argv, timeoutMs), {
-                    cwd: options.cwd,
+                pending = transport.exec(wrapExec(wrapTimeout(argv, timeoutMs), options.cwd, marker), {
                     stdin: options.stdin,
-                    maxOutputBytes: options.maxOutputBytes,
+                    stdout,
+                    stderr: filter,
                     signal: combined,
                 });
             } catch (error) {
                 pending = Promise.reject(error);
             }
 
-            pending.then((result) => {
+            pending.then(({ exitCode }) => {
                 if (!finish() || interrupted()) return;
-                const durationMs = clock.now().getTime() - started;
-                const stdout = capOutput(result.stdout, result.stdoutTruncated, options.maxOutputBytes);
-                const stderr = capOutput(result.stderr, result.stderrTruncated, options.maxOutputBytes);
-                resolve({
-                    exitCode: result.exitCode,
-                    stdout: stdout.bytes,
-                    stderr: stderr.bytes,
-                    stdoutTruncated: stdout.truncated,
-                    stderrTruncated: stderr.truncated,
-                    timedOut: isTimeoutExit(result.exitCode, durationMs, timeoutMs),
-                    durationMs,
-                });
+                resolve(result(exitCode));
             }, (error: unknown) => {
                 if (!finish() || interrupted()) return;
                 const failure = toSandboxError(error, 'exec failed');

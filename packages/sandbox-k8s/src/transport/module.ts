@@ -6,10 +6,9 @@
  */
 
 import { Writable } from 'node:stream';
-import { createOutputCollector } from '@chamberu/sandbox';
 import type {
     IExecTransport,
-    IOutputCollector,
+    IOutputSink,
     TransportExecOptions,
     TransportExecResult,
 } from '@chamberu/sandbox';
@@ -19,22 +18,19 @@ import { isApiStatus } from '../client/helpers.ts';
 import type { IPodClient } from '../client/types.ts';
 import { podState } from '../provider/helpers.ts';
 
-/** Kubernetes exec has no working directory: a shell changes into it, then execs argv. */
-const CD_SCRIPT = 'cd -- "$1" && shift && exec "$@"';
-
-/** A sink that hands every chunk to the collector and never applies backpressure. */
-function collectorSink(collector: IOutputCollector): Writable {
+/** A stream that hands every chunk to the sink and never applies backpressure. */
+function sinkStream(sink: IOutputSink): Writable {
     return new Writable({
         write(chunk: Uint8Array, _encoding, callback) {
-            collector.write(chunk);
+            sink.write(chunk);
             callback();
         },
     });
 }
 
 /**
- * Runs argv in a workspace pod's container through the pod client: stdout
- * and stderr into capped collectors (drained past the cap). The signal
+ * Runs argv in a workspace pod's container through the pod client, stdout
+ * and stderr into the workspace's sinks. The signal
  * closes the socket and detaches: the process runs on until its `timeout`
  * wrapper fires or the pod is deleted. `alive` is false for a pod that is
  * missing, being deleted, or failed or finished.
@@ -42,22 +38,14 @@ function collectorSink(collector: IOutputCollector): Writable {
 export function createPodTransport(client: IPodClient, name: string): IExecTransport {
     return {
         async exec(argv: readonly string[], options: TransportExecOptions): Promise<TransportExecResult> {
-            const stdout = createOutputCollector(options.maxOutputBytes);
-            const stderr = createOutputCollector(options.maxOutputBytes);
             const { exitCode } = await client.exec(name, {
-                argv: ['sh', '-c', CD_SCRIPT, 'sh', options.cwd, ...argv],
+                argv,
                 ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
-                stdout: collectorSink(stdout),
-                stderr: collectorSink(stderr),
+                stdout: sinkStream(options.stdout),
+                stderr: sinkStream(options.stderr),
                 signal: options.signal,
             });
-            return {
-                exitCode,
-                stdout: stdout.bytes(),
-                stderr: stderr.bytes(),
-                stdoutTruncated: stdout.truncated,
-                stderrTruncated: stderr.truncated,
-            };
+            return { exitCode };
         },
 
         async alive(): Promise<boolean> {

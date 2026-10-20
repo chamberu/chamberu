@@ -66,6 +66,7 @@ For development, the local provider runs everything in a temporary directory:
 - `exec` takes **argv only**; the only shell is the `bash` tool's `sh -c` inside the workspace.
 - stdout and stderr are capped at 64 KiB each (`stdoutTruncated`, `stderrTruncated`); output past the cap is drained, never buffered, so `yes` cannot block the child or fill the host's memory.
 - A command times out after `timeoutMs` (default 5 minutes, at most 30, never past the workspace's expiry) with `timedOut: true` as a result, not an error. The whole process group is killed, background jobs included: local sends `SIGKILL` to the group, Docker and Kubernetes run every command inside GNU `timeout -k 5`. A command that exits on its own returns with its exit code even when a background job it started (`node server.js & echo started`) holds its output (after about 2 seconds); the job runs on until the workspace is disposed, so the next call can probe the server.
+- A `cwd` that is no directory in the workspace rejects with a `SandboxError` on every provider.
 - **Abort** (a cancelled run, a run timeout): local kills the process group. Docker and Kubernetes **detach**: the client stops waiting, and the command runs on until its `timeout` fires or the workspace is disposed, which the settled run's `attach` does right after.
 - A sandbox failure (a failed create or checkout, an unknown or expired workspace, a daemon or API error) is a `SandboxError`: a tool error the model sees, never a failed run.
 

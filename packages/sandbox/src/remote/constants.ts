@@ -14,6 +14,25 @@ export const TIMEOUT_KILL_AFTER_SECONDS = 5;
  */
 export const EXEC_GRACE_MS = 15_000;
 
+/**
+ * How long a command's output may stay open after it exited (held by a
+ * background job it started) before the exec returns with its exit code,
+ * like the Docker daemon's own wait for the streams.
+ */
+export const EXIT_DRAIN_MS = 2_000;
+
+/** What the exec script reports instead of an exit status when the working directory is missing. */
+export const EXIT_MARKER_CWD = 'cwd';
+
+/**
+ * Runs `$3...` in the directory `$2` and reports how it ended on stderr as
+ * the marker `$1` followed by the exit status (or `EXIT_MARKER_CWD` for a
+ * directory it cannot enter) and a newline. The marker tells the workspace
+ * that the command exited, although a background job may hold its output.
+ */
+export const EXEC_SCRIPT = 'cd -- "$2" 2>/dev/null || { printf \'%s%s\\n\' "$1" cwd >&2; exit 127; }; ' +
+    'm=$1; shift 2; "$@"; s=$?; printf \'%s%s\\n\' "$m" "$s" >&2; exit "$s"';
+
 /** How long a failed exec waits for `IExecTransport.alive` before it reads the workspace as alive. */
 export const ALIVE_PROBE_TIMEOUT_MS = 5_000;
 

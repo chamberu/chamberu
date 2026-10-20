@@ -60,7 +60,7 @@ const EXEC_GRACE_MS: 15_000;
 const ALIVE_PROBE_TIMEOUT_MS: 5_000;
 ```
 
-A provider that can run argv in a container implements `IExecTransport`; `createRemoteWorkspace` adds the rest (timeout wrapper and guard, path checks, output caps, file reads and writes, dispose). After a failed exec it asks `alive()` (at most `ALIVE_PROBE_TIMEOUT_MS`); `false` marks the workspace gone (`disposed`).
+A provider that can run argv in a container implements `IExecTransport`: it runs argv, streams stdout and stderr into the sinks it is given and resolves the exit code. `createRemoteWorkspace` adds the rest: the `sh -c` script that enters the working directory, runs the command behind the timeout wrapper and reports its exit on stderr (so an exec returns about 2 s after the command exited, even when a background job holds its output), the guard, path checks, output caps, file reads and writes, dispose. After a failed exec it asks `alive()` (at most `ALIVE_PROBE_TIMEOUT_MS`); `false` marks the workspace gone (`disposed`).
 
 <<< ../../../sandbox/src/remote/types.ts{ts}
 

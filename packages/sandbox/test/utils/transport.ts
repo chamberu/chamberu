@@ -5,29 +5,53 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type {
-    IExecTransport,
-    TransportExecOptions,
-    TransportExecResult,
-} from '@chamberu/sandbox';
+import type { IExecTransport, TransportExecOptions } from '@chamberu/sandbox';
+
+/** The options a fake exec sees, plus what the exec script was given. */
+export type FakeExecOptions = TransportExecOptions & {
+    /** The working directory the exec script enters. */
+    cwd: string;
+    /** The exit marker the exec script reports the exit with. */
+    marker: string;
+};
+
+export type FakeExecAnswer = {
+    exitCode?: number;
+    stdout?: Uint8Array;
+    stderr?: Uint8Array;
+    /** false: report no exit marker (a command the transport ended before the script did). */
+    marker?: boolean;
+    /** true: the exec script found no cwd (marker `cwd`, exit 127). */
+    cwdMissing?: boolean;
+};
 
 export type FakeTransportHandler = (
     argv: readonly string[],
-    options: TransportExecOptions,
-) => Partial<TransportExecResult> | Promise<Partial<TransportExecResult>>;
+    options: FakeExecOptions,
+) => FakeExecAnswer | Promise<FakeExecAnswer>;
 
 export type FakeTransport = IExecTransport & {
-    calls: Array<{ argv: string[]; options: TransportExecOptions }>;
+    /** `argv` is what the exec script runs (from `timeout` on); `raw` is what the transport got. */
+    calls: Array<{
+        argv: string[];
+        raw: string[];
+        options: FakeExecOptions
+    }>;
     /** How often remove() was called. */
     removed: number;
     /** The next remove() rejects with `error`. */
     failNextRemove(error: Error): void;
 };
 
+const encode = (text: string) => new TextEncoder().encode(text);
+
 /**
- * A transport whose exec answers come from `handler` (default: exit 0, no
- * output); every call is recorded. A handler may advance a clock to
- * simulate duration, or return a promise that never settles.
+ * A transport that plays the exec script: it unwraps `sh -c <script> sh
+ * <marker> <cwd> ...argv`, asks `handler` (default: exit 0, no output),
+ * writes the answer's output to the sinks and then the exit marker to
+ * stderr, as the script does. Every call is recorded. A handler may advance
+ * a clock to simulate duration, write to the sinks itself, or return a
+ * promise that never settles.
  */
 export function createFakeTransport(handler: FakeTransportHandler = () => ({})): FakeTransport {
     let nextRemoveError: Error | undefined;
@@ -37,17 +61,28 @@ export function createFakeTransport(handler: FakeTransportHandler = () => ({})):
         failNextRemove(error) {
             nextRemoveError = error;
         },
-        async exec(argv, options) {
-            transport.calls.push({ argv: [...argv], options });
-            const result = await handler(argv, options);
-            return {
-                exitCode: 0,
-                stdout: new Uint8Array(0),
-                stderr: new Uint8Array(0),
-                stdoutTruncated: false,
-                stderrTruncated: false,
-                ...result,
+        async exec(raw, options) {
+            const [, , , , marker = '', cwd = '', ...argv] = raw;
+            const fake: FakeExecOptions = {
+                ...options,
+                cwd,
+                marker,
             };
+            transport.calls.push({
+                argv,
+                raw: [...raw],
+                options: fake,
+            });
+            const answer = await handler(argv, fake);
+            if (answer.cwdMissing) {
+                options.stderr.write(encode(`${marker}cwd\n`));
+                return { exitCode: 127 };
+            }
+            const exitCode = answer.exitCode ?? 0;
+            if (answer.stdout) options.stdout.write(answer.stdout);
+            if (answer.stderr) options.stderr.write(answer.stderr);
+            if (answer.marker !== false) options.stderr.write(encode(`${marker}${exitCode}\n`));
+            return { exitCode };
         },
         async remove() {
             transport.removed++;

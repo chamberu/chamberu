@@ -7,7 +7,6 @@
 
 import type { Duplex } from 'node:stream';
 import type { IClock } from '@chamberu/core';
-import { createOutputCollector } from '@chamberu/sandbox';
 import type { IExecTransport, TransportExecOptions, TransportExecResult } from '@chamberu/sandbox';
 import type Dockerode from 'dockerode';
 import { SANDBOX_USER } from '../provider/constants.ts';
@@ -15,15 +14,15 @@ import { isStatus, removeContainer } from '../provider/helpers.ts';
 import { INSPECT_POLL_INITIAL_MS, INSPECT_POLL_MAX_MS } from './constants.ts';
 import {
     abortError,
-    collectorSink,
     delay,
+    sinkStream,
     streamEnded,
 } from './helpers.ts';
 
 /**
  * Runs argv in a started workspace container through the Docker exec API:
- * stdout and stderr demultiplexed into capped collectors (drained past the
- * cap), stdin written and half-closed, then the exit code read from the exec
+ * stdout and stderr demultiplexed into the workspace's sinks, stdin written
+ * and half-closed, then the exit code read from the exec
  * once it stopped (polled on the clock with backoff). The signal detaches:
  * the HTTP stream is dropped and the process runs on until its `timeout`
  * wrapper fires or the container is removed. `alive` is false for a
@@ -45,7 +44,6 @@ export function createDockerTransport(
                 AttachStderr: true,
                 AttachStdin: stdin !== undefined,
                 Tty: false,
-                WorkingDir: options.cwd,
                 User: SANDBOX_USER,
                 abortSignal: signal,
             });
@@ -55,10 +53,8 @@ export function createDockerTransport(
                 abortSignal: signal,
             }) as Duplex;
 
-            const stdout = createOutputCollector(options.maxOutputBytes);
-            const stderr = createOutputCollector(options.maxOutputBytes);
             const ended = streamEnded(stream, signal);
-            docker.modem.demuxStream(stream, collectorSink(stdout), collectorSink(stderr));
+            docker.modem.demuxStream(stream, sinkStream(options.stdout), sinkStream(options.stderr));
             if (stdin !== undefined) {
                 // after the demux listeners, so no output is lost; end() half-closes the socket (stdin EOF)
                 stream.end(stdin);
@@ -73,14 +69,8 @@ export function createDockerTransport(
                 info = await exec.inspect({ abortSignal: signal });
             }
 
-            return {
-                // a process that could not start reports no exit code
-                exitCode: typeof info.ExitCode === 'number' ? info.ExitCode : 127,
-                stdout: stdout.bytes(),
-                stderr: stderr.bytes(),
-                stdoutTruncated: stdout.truncated,
-                stderrTruncated: stderr.truncated,
-            };
+            // a process that could not start reports no exit code
+            return { exitCode: typeof info.ExitCode === 'number' ? info.ExitCode : 127 };
         },
 
         async alive(signal: AbortSignal): Promise<boolean> {

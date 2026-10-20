@@ -13,10 +13,10 @@ import {
     OUTPUT_MAX_BYTES,
     createRemoteWorkspace,
 } from '@chamberu/sandbox';
-import type { TransportExecResult } from '@chamberu/sandbox';
+import { EXEC_SCRIPT, EXIT_DRAIN_MS } from '../../../src/remote/constants.ts';
 import { ControllableClock } from '../../utils/clock.ts';
 import { createFakeTransport } from '../../utils/transport.ts';
-import type { FakeTransportHandler } from '../../utils/transport.ts';
+import type { FakeExecAnswer, FakeTransportHandler } from '../../utils/transport.ts';
 
 const START = 1_000_000;
 
@@ -47,7 +47,7 @@ function setup(handler?: FakeTransportHandler, lifetimeMs = 1_800_000) {
 }
 
 /** A transport exec that never settles. */
-const hang = () => new Promise<Partial<TransportExecResult>>(() => {
+const hang = () => new Promise<FakeExecAnswer>(() => {
     // never settles
 });
 
@@ -57,8 +57,7 @@ describe('remote workspace: exec', () => {
         const result = await workspace.exec(['npm', 'test'], { timeoutMs: 1500 });
         expect(transport.calls).toHaveLength(1);
         expect(transport.calls[0]!.argv).toEqual(['timeout', '-k', '5', '1.5', 'npm', 'test']);
-        expect(transport.calls[0]!.options).toMatchObject({ cwd: '/workspace', maxOutputBytes: OUTPUT_MAX_BYTES });
-        expect(transport.calls[0]!.options.maxOutputBytes).toBe(65_536);
+        expect(transport.calls[0]!.options.cwd).toBe('/workspace');
         expect(transport.calls[0]!.options.stdin).toBeUndefined();
         expect(result).toEqual({
             exitCode: 0,
@@ -162,9 +161,9 @@ describe('remote workspace: exec', () => {
 
     it('guards a hung transport', async () => {
         const {
-            clock, 
-            transport, 
-            workspace, 
+            clock,
+            transport,
+            workspace,
         } = setup(hang);
         const pending = workspace.exec(['sleep', '30'], { timeoutMs: 1500 });
         await flush();
@@ -189,9 +188,9 @@ describe('remote workspace: exec', () => {
 
     it('clears the guard when the exec settles', async () => {
         const {
-            clock, 
-            transport, 
-            workspace, 
+            clock,
+            transport,
+            workspace,
         } = setup();
         await workspace.exec(['true'], { timeoutMs: 1500 });
         clock.advance(1500 + EXEC_GRACE_MS);
@@ -201,34 +200,126 @@ describe('remote workspace: exec', () => {
     it('decodes and flags output', async () => {
         const { workspace } = setup(() => ({
             exitCode: 2,
-            stdout: encode('é'),
-            stdoutTruncated: true,
-            stderr: encode('boom\n'),
+            stdout: new Uint8Array(OUTPUT_MAX_BYTES + 1).fill(0x61),
+            stderr: encode('boom é\n'),
         }));
         expect(await workspace.exec(['x'])).toMatchObject({
             exitCode: 2,
-            stdout: 'é',
-            stderr: 'boom\n',
+            stdout: 'a'.repeat(OUTPUT_MAX_BYTES),
+            stderr: 'boom é\n',
             stdoutTruncated: true,
             stderrTruncated: false,
         });
     });
 
     it('drops a multi-byte character the cap cut', async () => {
-        const bytes = new Uint8Array(OUTPUT_MAX_BYTES);
+        const bytes = new Uint8Array(OUTPUT_MAX_BYTES + 1);
         bytes.fill(0x61);
-        bytes.set(encode('€').subarray(0, 2), OUTPUT_MAX_BYTES - 2);
-        const { workspace } = setup(() => ({ stdout: bytes, stdoutTruncated: true }));
+        bytes.set(encode('€'), OUTPUT_MAX_BYTES - 2);
+        const { workspace } = setup(() => ({ stdout: bytes }));
         const result = await workspace.exec(['x']);
         expect(result.stdout).toBe('a'.repeat(OUTPUT_MAX_BYTES - 2));
         expect(result.stdoutTruncated).toBe(true);
     });
 
-    it('caps output a transport returns past the limit', async () => {
-        const { workspace } = setup(() => ({ stdout: new Uint8Array(OUTPUT_MAX_BYTES + 10).fill(0x61) }));
-        const result = await workspace.exec(['x']);
-        expect(result.stdout).toHaveLength(OUTPUT_MAX_BYTES);
-        expect(result.stdoutTruncated).toBe(true);
+    it('runs argv inside the exec script with a fresh marker', async () => {
+        const { transport, workspace } = setup();
+        await workspace.exec(['true'], { cwd: 'pkg' });
+        await workspace.exec(['true']);
+        const [first, second] = transport.calls;
+        expect(first!.raw).toEqual(['sh', '-c', EXEC_SCRIPT, 'sh', first!.options.marker, '/workspace/pkg', 'timeout', '-k', '5', '300', 'true']);
+        expect(first!.options.marker).toMatch(/^chamberu-exit-[0-9a-f]{32}:$/);
+        expect(second!.options.marker).not.toBe(first!.options.marker);
+    });
+
+    it('cuts the exit marker out of stderr, also when it is split across chunks', async () => {
+        const { workspace } = setup((_argv, options) => {
+            const line = encode(`err\n${options.marker}3\nlate`);
+            for (const byte of line) options.stderr.write(new Uint8Array([byte]));
+            return { exitCode: 3, marker: false };
+        });
+        expect(await workspace.exec(['x'])).toMatchObject({ exitCode: 3, stderr: 'err\nlate' });
+    });
+
+    it('keeps a marker of another exec in stderr', async () => {
+        const other = 'chamberu-exit-00000000000000000000000000000000:0\n';
+        const { workspace } = setup(() => ({ stderr: encode(other) }));
+        expect((await workspace.exec(['x'])).stderr).toBe(other);
+    });
+
+    it('returns after the drain when a background job holds the output', async () => {
+        let marker = '';
+        const {
+            clock,
+            transport,
+            workspace,
+        } = setup((_argv, options) => {
+            ({ marker } = options);
+            options.stdout.write(encode('started\n'));
+            clock.advance(100);
+            options.stderr.write(encode(`${marker}0\n`));
+            return hang();
+        });
+        const pending = workspace.exec(['sh', '-c', 'sleep 60 & echo started'], { timeoutMs: 1500 });
+        await flush();
+        const { options } = transport.calls[0]!;
+        clock.advance(EXIT_DRAIN_MS - 1);
+        options.stdout.write(encode('job output\n'));
+        await flush();
+        expect(options.signal.aborted).toBe(false);
+
+        clock.advance(1);
+        expect(await pending).toEqual({
+            exitCode: 0,
+            stdout: 'started\njob output\n',
+            stderr: '',
+            stdoutTruncated: false,
+            stderrTruncated: false,
+            timedOut: false,
+            durationMs: 100,
+        });
+        // the transport is detached
+        expect(options.signal.aborted).toBe(true);
+    });
+
+    it('reports a timeout the drain returns', async () => {
+        const { clock, workspace } = setup((_argv, options) => {
+            clock.advance(1500);
+            options.stderr.write(encode(`${options.marker}124\n`));
+            return hang();
+        });
+        const pending = workspace.exec(['sleep', '30'], { timeoutMs: 1500 });
+        await flush();
+        clock.advance(EXIT_DRAIN_MS);
+        expect(await pending).toMatchObject({
+            exitCode: 124,
+            timedOut: true,
+            durationMs: 1500,
+        });
+    });
+
+    it('returns the output so far when the guard gives up', async () => {
+        const { clock, workspace } = setup((_argv, options) => {
+            options.stdout.write(encode('partial'));
+            options.stderr.write(encode('warn'));
+            return hang();
+        });
+        const pending = workspace.exec(['x'], { timeoutMs: 1500 });
+        await flush();
+        clock.advance(1500 + EXEC_GRACE_MS);
+        expect(await pending).toMatchObject({
+            exitCode: 137,
+            timedOut: true,
+            stdout: 'partial',
+            stderr: 'warn',
+        });
+    });
+
+    it('rejects a cwd that is no directory, like a local workspace', async () => {
+        const { workspace } = setup(() => ({ cwdMissing: true }));
+        const error = await workspace.exec(['pwd'], { cwd: 'nope' }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(SandboxError);
+        expect((error as SandboxError).message).toBe('cwd /workspace/nope is no directory in the workspace.');
     });
 
     it('rejects after dispose and when expired', async () => {
@@ -344,9 +435,9 @@ describe('remote workspace: exec', () => {
 
     it('stays usable when the liveness probe does not answer', async () => {
         const {
-            clock, 
-            transport, 
-            workspace, 
+            clock,
+            transport,
+            workspace,
         } = setup(() => { throw new Error('connection reset'); });
         transport.alive = () => new Promise<boolean>(() => {
             // never answers

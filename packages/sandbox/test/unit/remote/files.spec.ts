@@ -46,7 +46,7 @@ describe('remote workspace: readFile', () => {
         expect(await workspace.readFile('/workspace/a/b.txt')).toBe('héllo 👋\n');
         for (const call of transport.calls) {
             expect(call.argv).toEqual(['timeout', '-k', '5', '300', 'cat', '--', '/workspace/a/b.txt']);
-            expect(call.options).toMatchObject({ cwd: '/workspace', maxOutputBytes: 1_048_577 });
+            expect(call.options.cwd).toBe('/workspace');
             expect(call.options.stdin).toBeUndefined();
         }
     });
@@ -86,10 +86,12 @@ describe('remote workspace: readFile', () => {
     });
 
     it('refuses a file larger than the limit', async () => {
-        const { workspace } = setup(() => ({ stdout: new Uint8Array(FILE_MAX_BYTES + 1).fill(0x61), stdoutTruncated: true }));
-        const error = await workspace.readFile('big').catch((e: unknown) => e);
-        expect(error).toBeInstanceOf(SandboxError);
-        expect((error as SandboxError).message).toMatch(/larger than/);
+        for (const size of [FILE_MAX_BYTES + 1, FILE_MAX_BYTES + 100]) {
+            const { workspace } = setup(() => ({ stdout: new Uint8Array(size).fill(0x61) }));
+            const error = await workspace.readFile('big').catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(SandboxError);
+            expect((error as SandboxError).message).toMatch(/larger than/);
+        }
     });
 
     it('accepts a file of exactly the limit', async () => {

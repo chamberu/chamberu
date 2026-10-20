@@ -6,6 +6,7 @@
  */
 
 import type { V1Pod, V1PodStatus } from '@kubernetes/client-node';
+import { expect } from 'vitest';
 import { SandboxError } from '@chamberu/core';
 import type { IPodClient, PodExecInput } from '@chamberu/sandbox-k8s';
 
@@ -122,12 +123,27 @@ export function createFakePodClient(onExec: FakeExecHandler = () => ({})): FakeP
     return client;
 }
 
-/** The argv a fake exec sees for `argv`: the cd wrapper around the timeout wrapper. */
-export function wrapped(argv: readonly string[], timeoutSeconds = '300', cwd = '/workspace'): string[] {
-    return ['sh', '-c', 'cd -- "$1" && shift && exec "$@"', 'sh', cwd, 'timeout', '-k', '5', timeoutSeconds, ...argv];
+/**
+ * The argv a fake exec sees for `argv`: the workspace's exec script (any
+ * script text, any marker) around the timeout wrapper.
+ */
+export function wrapped(argv: readonly string[], timeoutSeconds = '300', cwd = '/workspace'): unknown[] {
+    return [
+        'sh',
+        '-c',
+        expect.any(String),
+        'sh',
+        expect.stringMatching(/^chamberu-exit-[0-9a-f]{32}:$/),
+        cwd,
+        'timeout',
+        '-k',
+        '5',
+        timeoutSeconds,
+        ...argv,
+    ];
 }
 
-/** The command a fake exec runs, without the cd and timeout wrappers. */
+/** The command a fake exec runs, without the exec script and timeout wrappers. */
 export function unwrap(argv: readonly string[]): string[] {
-    return argv.slice(9);
+    return argv.slice(10);
 }

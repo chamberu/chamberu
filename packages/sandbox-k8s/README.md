@@ -108,7 +108,7 @@ The default image is `ghcr.io/chamberu/sandbox-node:24` (`DEFAULT_SANDBOX_IMAGE`
 
 ## Timeouts and abort
 
-Every command runs as `timeout -k 5 <seconds> <argv>`, which signals its whole process group. A client-side guard stops waiting 15 s after the timeout and reports exit 137. An abort (`signal`) **detaches**: the exec WebSocket closes, and the command runs on until its `timeout` fires or the pod is deleted. Every settled run disposes its workspaces (`manager.attach(engine)`), and a drain is followed by `manager.close()`. A dispose deletes the pod without a grace period.
+Every command runs as `timeout -k 5 <seconds> <argv>`, which signals its whole process group. A client-side guard stops waiting 15 s after the timeout and reports exit 137 with the output so far. Kubernetes sends an exec's exit status only once every process holding its output closed it, so the command reports its exit on stderr itself: one that exits while a background job it started holds its output (`node server.js & echo started`) returns about 2 s after its exit with its own exit code, and the job runs on until the pod is deleted. An abort (`signal`) **detaches**: the exec WebSocket closes, and the command runs on until its `timeout` fires or the pod is deleted. Every settled run disposes its workspaces (`manager.attach(engine)`), and a drain is followed by `manager.close()`. A dispose deletes the pod without a grace period.
 
 Stdin is closed only on the `v5.channel.k8s.io` exec protocol (Kubernetes 1.30+); on `v4` it is written but never closed, so a command waiting for stdin EOF hangs until its timeout. `writeFile` does not depend on it (`head -c <bytes>`).
 
