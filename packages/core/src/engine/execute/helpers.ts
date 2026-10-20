@@ -102,7 +102,7 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
     };
     const tools: ToolSet = {
-        ...(schema ? createStateTools(toolContext.state, schema) : {}),
+        ...(schema ? createStateTools(schema) : {}),
         ...(typeof userTools === 'function' ? userTools(toolContext) : userTools),
     };
 
@@ -115,10 +115,10 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         for (const [name, value] of Object.entries(agentToolsContext)) toolsContext[name] = value;
     }
 
-    if (!toolPolicy) return { tools: wrapToolsForRun(tools, runContext, ctx.store), toolsContext };
+    if (!toolPolicy) return { tools: wrapToolsForRun(tools, toolContext, ctx.store), toolsContext };
     const allow = (name: string) => toolPolicy(name, { run: runContext });
     return {
-        tools: wrapToolsForRun(tools, runContext, ctx.store, allow),
+        tools: wrapToolsForRun(tools, toolContext, ctx.store, allow),
         activeTools: Object.keys(tools).filter(allow),
         toolsContext,
     };

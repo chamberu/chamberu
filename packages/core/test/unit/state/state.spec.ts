@@ -17,10 +17,14 @@ import { z } from 'zod';
 import { RunEngine, ValidationError, defineAgent } from '@chamberu/core';
 import { EFFECT } from '../../../src/effect/constants.ts';
 import { wrapToolsForRun } from '../../../src/effect/wrap.ts';
+import { createRunArtifacts } from '../../../src/artifact/module.ts';
+import { systemClock } from '../../../src/clock/index.ts';
 import type { RunContext } from '../../../src/run/types.ts';
 import { createAgentState } from '../../../src/state/module.ts';
 import { createStateTools } from '../../../src/state/tools.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
+import { toolContextSchema } from '../../../src/tool/constants.ts';
+import type { ToolContext } from '../../../src/tool/types.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 
 const schema = {
@@ -30,9 +34,28 @@ const schema = {
 
 const callOpts = { toolCallId: 'c', messages: [] };
 
-async function call(tools: ToolSet, name: string, input: unknown) {
+function toolContext(store: MemoryStore): ToolContext {
+    const run: RunContext = {
+        runId: 'r1',
+        agent: 'alpha',
+        trigger: {
+            agent: 'alpha',
+            trigger: 'http',
+            source: 'http',
+            payload: {},
+        } as RunContext['trigger'],
+        signal: new AbortController().signal,
+    };
+    return {
+        run,
+        state: createAgentState('alpha', schema, store),
+        artifacts: createRunArtifacts(store, { id: 'r1', agent: 'alpha' }, systemClock),
+    };
+}
+
+async function call(tools: ToolSet, name: string, input: unknown, context?: ToolContext) {
     const t = tools[name];
-    return (t?.execute as (i: unknown, o: unknown) => Promise<unknown>)(input, callOpts);
+    return (t?.execute as (i: unknown, o: unknown) => Promise<unknown>)(input, { ...callOpts, context });
 }
 
 const engines: RunEngine[] = [];
@@ -111,8 +134,8 @@ describe('agent state', () => {
 
     it('state tools are generated per collection with expected names', async () => {
         const store = new MemoryStore();
-        const state = createAgentState('alpha', schema, store);
-        const tools = createStateTools(state, schema);
+        const context = toolContext(store);
+        const tools = createStateTools(schema);
 
         expect(Object.keys(tools).sort()).toEqual([
             'state_items_list',
@@ -125,45 +148,37 @@ describe('agent state', () => {
         expect(EFFECT in (tools.state_items_upsert as object)).toBe(true);
         expect(EFFECT in (tools.state_items_remove as object)).toBe(true);
         expect(EFFECT in (tools.state_items_list as object)).toBe(false);
+        // every state tool reads the state from the injected context
+        expect(Object.values(tools).every((t) => t.contextSchema === toolContextSchema)).toBe(true);
 
-        await call(tools, 'state_items_upsert', { id: 'a', doc: { title: 'x', done: false } });
-        expect(await call(tools, 'state_items_list', { where: { done: false } }))
+        await call(tools, 'state_items_upsert', { id: 'a', doc: { title: 'x', done: false } }, context);
+        expect(await call(tools, 'state_items_list', { where: { done: false } }, context))
             .toEqual([{
                 id: 'a',
                 title: 'x',
                 done: false,
             }]);
-        await call(tools, 'state_items_remove', { id: 'a' });
-        expect(await call(tools, 'state_items_list', {})).toEqual([]);
-        await expect(call(tools, 'state_items_upsert', { id: 'b', doc: { title: 'x' } }))
+        await call(tools, 'state_items_remove', { id: 'a' }, context);
+        expect(await call(tools, 'state_items_list', {}, context)).toEqual([]);
+        await expect(call(tools, 'state_items_upsert', { id: 'b', doc: { title: 'x' } }, context))
             .rejects.toBeInstanceOf(ValidationError);
     });
 
     it('repeated writes within a run are not memoized away', async () => {
         const store = new MemoryStore();
-        const runContext: RunContext = {
-            runId: 'r1',
-            agent: 'alpha',
-            trigger: {
-                agent: 'alpha',
-                trigger: 'http',
-                source: 'http',
-                payload: {},
-            } as RunContext['trigger'],
-            signal: new AbortController().signal,
-        };
-        const tools = wrapToolsForRun(createStateTools(createAgentState('alpha', schema, store), schema), runContext, store);
+        const context = toolContext(store);
+        const tools = wrapToolsForRun(createStateTools(schema), context, store);
         const a = { id: 'x', doc: { title: 'a', done: false } };
         const b = { id: 'x', doc: { title: 'b', done: false } };
 
-        await call(tools, 'state_items_upsert', a);
-        await call(tools, 'state_items_upsert', b);
-        await call(tools, 'state_items_upsert', a);
+        await call(tools, 'state_items_upsert', a, context);
+        await call(tools, 'state_items_upsert', b, context);
+        await call(tools, 'state_items_upsert', a, context);
         expect(await store.docList('alpha', 'items')).toEqual([{ id: 'x', doc: a.doc }]);
 
-        await call(tools, 'state_items_remove', { id: 'x' });
-        await call(tools, 'state_items_upsert', b);
-        await call(tools, 'state_items_remove', { id: 'x' });
+        await call(tools, 'state_items_remove', { id: 'x' }, context);
+        await call(tools, 'state_items_upsert', b, context);
+        await call(tools, 'state_items_remove', { id: 'x' }, context);
         expect(await store.docList('alpha', 'items')).toEqual([]);
     });
 

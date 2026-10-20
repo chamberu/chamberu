@@ -22,6 +22,7 @@ import {
     InvalidAgentDefinitionError,
     RunEngine,
     defineAgent,
+    defineEffectTool,
     defineTool,
     requireToolPermission,
     toolContextSchema,
@@ -495,11 +496,55 @@ describe('tool context', () => {
     });
 
     it('injects state tools too', async () => {
-        const { run } = await runOnce({
-            model: mockModel([callTool('state_notes_list'), text('done')]),
+        const {
+            store,
+            run,
+        } = await runOnce({
+            model: mockModel([
+                callTool('state_notes_upsert', { id: 'n1', doc: { title: 'hello' } }),
+                callTool('state_notes_list'),
+                text('done'),
+            ]),
             state: { notes: z.object({ title: z.string() }) },
         });
         expect(run?.status).toBe('completed');
+        expect(await store.docList('release', 'notes')).toEqual([{ id: 'n1', doc: { title: 'hello' } }]);
+    });
+
+    it('rejects a toolsContext entry naming a state tool', async () => {
+        const model = mockModel([text('never')]);
+        const { run } = await runOnce({
+            model,
+            tools: () => ({ lookup }),
+            state: { notes: z.object({ title: z.string() }) },
+            toolsContext: { state_notes_list: {} },
+        });
+        expect(run?.status).toBe('failed');
+        expect(run?.error?.message).toMatch(/toolsContext entry "state_notes_list" names a chamberu tool/);
+        expect(model.doStreamCalls).toHaveLength(0);
+    });
+
+    it('hands the context to an effect tool run by the engine', async () => {
+        let applied = 0;
+        const post = defineEffectTool({
+            inputSchema: z.object({ body: z.string() }),
+            effectKey: (input, c) => `${c.run.trigger.invoker?.id}:post:${input.body}`,
+            execute: async (_input, { context }) => {
+                applied++;
+                return context.run.runId;
+            },
+        });
+        const {
+            store, 
+            runId, 
+            run, 
+        } = await runOnce({
+            model: mockModel([callTool('post', { body: 'hi' }), text('done')]),
+            tools: { post },
+        });
+        expect(run?.status).toBe('completed');
+        expect(applied).toBe(1);
+        expect(await store.getEffect('u-alice:post:hi')).toEqual({ result: runId });
     });
 
     it('keeps policy-hidden tools and the execute re-check working', async () => {

@@ -23,21 +23,36 @@ import {
     wrapToolsForRun,
 } from '../../../src/effect/index.ts';
 import { stableHash } from '../../../src/effect/helpers.ts';
+import { createRunArtifacts } from '../../../src/artifact/module.ts';
+import { systemClock } from '../../../src/clock/index.ts';
 import type { RunContext } from '../../../src/run/types.ts';
+import { createAgentState } from '../../../src/state/module.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
+import { defineTool } from '../../../src/tool/define.ts';
+import { toolContextSchema } from '../../../src/tool/constants.ts';
+import type { ToolContext } from '../../../src/tool/types.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 
-const ctx: RunContext = {
-    runId: 'r1',
-    agent: 'triage',
-    trigger: {
-        agent: 'triage',
-        trigger: 'http',
-        source: 'http',
-        payload: {},
-    } as RunContext['trigger'],
-    signal: new AbortController().signal,
-};
+function toolContext(runId: string): ToolContext {
+    const store = new MemoryStore();
+    return {
+        run: {
+            runId,
+            agent: 'triage',
+            trigger: {
+                agent: 'triage',
+                trigger: 'http',
+                source: 'http',
+                payload: {},
+            } as RunContext['trigger'],
+            signal: new AbortController().signal,
+        },
+        state: createAgentState('triage', undefined, store),
+        artifacts: createRunArtifacts(store, { id: runId, agent: 'triage' }, systemClock),
+    };
+}
+
+const ctx = toolContext('r1');
 const callOpts = { toolCallId: 'c', messages: [] };
 const schema = z.object({ body: z.string(), n: z.number().optional() });
 
@@ -47,12 +62,58 @@ afterEach(() => {
     engines.length = 0;
 });
 
-async function call(tools: ToolSet, name: string, input: unknown) {
+async function call(tools: ToolSet, name: string, input: unknown, context: ToolContext = ctx) {
     const t = tools[name];
-    return (t?.execute as (i: unknown, o: unknown) => Promise<unknown>)(input, callOpts);
+    return (t?.execute as (i: unknown, o: unknown) => Promise<unknown>)(input, { ...callOpts, context });
 }
 
 describe('effect tools', () => {
+    it('hands the tool context to execute, effectKey and alreadyApplied', async () => {
+        const seen: unknown[] = [];
+        const post = defineEffectTool({
+            inputSchema: schema,
+            effectKey: (input, c) => {
+                seen.push(c);
+                return `${c.run.runId}:k:${input.body}`;
+            },
+            alreadyApplied: async (_key, _input, c) => {
+                seen.push(c);
+                return undefined;
+            },
+            execute: async (_input, { context }) => {
+                seen.push(context);
+                return 'ok';
+            },
+        });
+        expect(post.contextSchema).toBe(toolContextSchema);
+        await call(wrapToolsForRun({ post }, ctx, new MemoryStore()), 'post', { body: 'x' });
+        expect(seen).toEqual([ctx, ctx, ctx]);
+        expect(seen.every((c) => c === ctx)).toBe(true);
+    });
+
+    it('keeps contextSchema and forwards options.context through the wrapper', async () => {
+        const plain = defineTool({ inputSchema: schema, execute: async (_i, { context }) => context });
+        const wrapped = wrapToolsForRun({ plain }, ctx, new MemoryStore(), () => true);
+        expect(wrapped.plain!.contextSchema).toBe(toolContextSchema);
+        expect(await call(wrapped, 'plain', { body: 'x' })).toBe(ctx);
+    });
+
+    it('a key built from ctx.run.runId differs per run', async () => {
+        let runs = 0;
+        const post = defineEffectTool({
+            inputSchema: schema,
+            effectKey: (_input, c) => `${c.run.runId}:c`,
+            execute: async () => ++runs,
+        });
+        const store = new MemoryStore();
+        const r2 = toolContext('r2');
+        await call(wrapToolsForRun({ post }, ctx, store), 'post', { body: 'x' });
+        await call(wrapToolsForRun({ post }, r2, store), 'post', { body: 'x' }, r2);
+        expect(runs).toBe(2);
+        expect(await store.getEffect('r1:c')).toEqual({ result: 1 });
+        expect(await store.getEffect('r2:c')).toEqual({ result: 2 });
+    });
+
     it('effect executes once per key', async () => {
         let runs = 0;
         const post = defineEffectTool({

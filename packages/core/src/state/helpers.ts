@@ -12,6 +12,7 @@ import type { StandardJSONSchemaV1 } from '@standard-schema/spec';
 import { buildIssuesForStandardSchemaIssues } from '@validup/standard-schema';
 import type { JSONSchema7 } from 'ai';
 import { ValidationError } from '../errors/index.ts';
+import type { ToolContext } from '../tool/types.ts';
 import type { StateSchema } from './types.ts';
 
 export function describeIssues(issues: readonly Issue[]): string {
@@ -56,4 +57,4 @@ export function docJsonSchema(schema: StateSchema[string]): JSONSchema7 {
  * replay). Every invocation therefore gets its own effect key, so a write is
  * always applied.
  */
-export const perCallKey = (tool: string) => (_input: unknown, ctx: { runId: string }) => `${ctx.runId}:${tool}:${randomUUID()}`;
+export const perCallKey = (tool: string) => (_input: unknown, ctx: ToolContext) => `${ctx.run.runId}:${tool}:${randomUUID()}`;
