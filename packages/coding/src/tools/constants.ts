@@ -5,6 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { JSONSchema7 } from 'ai';
+
 /** Lines `read_file` returns at most (its `limit` default and maximum). */
 export const READ_MAX_LINES = 2_000;
 
@@ -28,3 +30,10 @@ export const LINE_MAX_CHARS = 500;
 
 /** Characters of git's stderr an error message carries. */
 export const GIT_ERROR_MAX_CHARS = 2_000;
+
+/** The `workspace` property every coding tool takes. */
+export const WORKSPACE_PROPERTY: JSONSchema7 = {
+    type: 'string',
+    minLength: 1,
+    description: 'The workspace id from create_workspace. Omit it when the run holds only one workspace.',
+};

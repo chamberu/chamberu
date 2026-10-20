@@ -118,6 +118,29 @@ describe('grep', () => {
         expect(matches[0]!.text).toHaveLength(500);
     });
 
+    it('keeps a NUL past the binary check inside the match text', async () => {
+        // git -I only inspects the first 8000 bytes; a later NUL must not shift the -z records
+        await s.workspace.writeFile('late.txt', `${'x'.repeat(9_000)}\nneedle one\nneedle\0two\nneedle three\n`);
+        const { matches } = await s.call<Grep>('grep', { pattern: 'needle', path: 'late.txt' });
+        expect(matches).toEqual([
+            {
+                path: 'late.txt', 
+                line: 2, 
+                text: 'needle one', 
+            },
+            {
+                path: 'late.txt', 
+                line: 3, 
+                text: 'needle\0two', 
+            },
+            {
+                path: 'late.txt', 
+                line: 4, 
+                text: 'needle three', 
+            },
+        ]);
+    });
+
     it('treats pathspec magic literally', async () => {
         await expect(s.call('grep', { pattern: 'const', path: ':!src' })).resolves.toEqual({ matches: [], truncated: false });
         await expect(s.call('list_files', { path: ':(top)src' })).resolves.toEqual({ files: [], truncated: false });

@@ -12,7 +12,7 @@ import type { ToolContext } from '@chamberu/core';
 import { resolveWorkspacePath } from '@chamberu/sandbox';
 import type { ExecResult, IWorkspace } from '@chamberu/sandbox';
 import { isObject } from 'smob';
-import { GIT_ERROR_MAX_CHARS } from './constants.ts';
+import { GIT_ERROR_MAX_CHARS, WORKSPACE_PROPERTY } from './constants.ts';
 import type { CodingWorkspaces } from './types.ts';
 
 /** The tool input as an object, else a ValidationError (a tool error the model can correct). */
@@ -112,13 +112,6 @@ export function cutText(text: string, max: number): string {
     const end = code >= 0xD800 && code <= 0xDBFF ? max - 1 : max;
     return text.slice(0, end);
 }
-
-/** The `workspace` property every coding tool takes. */
-export const WORKSPACE_PROPERTY: JSONSchema7 = {
-    type: 'string',
-    minLength: 1,
-    description: 'The workspace id from create_workspace. Omit it when the run holds only one workspace.',
-};
 
 /** An object schema of `properties` (plus `workspace`), `required` ones required. */
 export function objectSchema<T>(properties: Record<string, JSONSchema7>, required: string[] = []) {
