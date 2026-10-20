@@ -37,7 +37,21 @@ export type AgentDefinition<S extends StateSchema = StateSchema> = {
     model: LanguageModel;
     instructions: string;
     triggers?: TriggerDefinition[];
-    tools?: (ctx: ToolFactoryContext<S>) => ToolSet;
+    /**
+     * The agent's tools: a plain `ToolSet` (the default), or a factory for
+     * dynamic sets, called once per execution with the same ToolContext the
+     * tools get. Tools built with `defineTool`/`defineEffectTool` receive that
+     * context as `context` in `execute`.
+     */
+    tools?: ToolSet | ((ctx: ToolContext<S>) => ToolSet);
+    /**
+     * Per tool name, the context of a tool that is not chamberu's (e.g. a
+     * third-party tool with its own `contextSchema`), passed through unchanged
+     * by reference to every call of every run: treat it as immutable. An entry
+     * naming a chamberu tool or no tool is an InvalidAgentDefinitionError (at
+     * defineAgent for a plain set, a failed run for a factory).
+     */
+    toolsContext?: Record<string, unknown>;
     /** Filters the merged tool set (state tools included) per run, e.g. requireToolPermission(). */
     toolPolicy?: ToolPolicy;
     /** Record<collection, StandardSchemaV1>. */

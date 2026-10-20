@@ -18,6 +18,7 @@ import type {
 } from 'ai';
 import { NoSuchToolError } from 'ai';
 import { isObject } from 'smob';
+import { assertToolsContext } from '../../agent/helpers.ts';
 import type { ApprovalPolicy } from '../../agent/types.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
@@ -31,6 +32,8 @@ import {
 import type { Budget, Checkpoint, RunContext } from '../../run/types.ts';
 import { createAgentState } from '../../state/module.ts';
 import { createStateTools } from '../../state/tools.ts';
+import { hasToolContext } from '../../tool/helpers.ts';
+import type { ToolContext } from '../../tool/types.ts';
 import type { TriggerEnvelope } from '../../trigger/types.ts';
 import { MAX_ERROR_CAUSE_LENGTH } from './constants.ts';
 import type { ApprovalRequest, ExecuteContext } from './types.ts';
@@ -68,36 +71,56 @@ export function toRunError(error: unknown): { code: string; message: string } {
 
 /**
  * The tools handed to the agent: generated state tools (when the agent declares
- * `state`) merged with the user's tools, which win on a name clash. Every tool
- * stays executable, so an approved call from an older history still gets an
- * answer; `activeTools` (the names the agent's toolPolicy allows, undefined
- * without a policy) is what the model is offered. wrapToolsForRun memoizes
- * effects and re-checks the policy per call, so a refused call is a tool error.
+ * `state`) merged with the user's tools (a plain set or the factory's result),
+ * which win on a name clash. Every tool stays executable, so an approved call
+ * from an older history still gets an answer; `activeTools` (the names the
+ * agent's toolPolicy allows, undefined without a policy) is what the model is
+ * offered. wrapToolsForRun memoizes effects and re-checks the policy per call,
+ * so a refused call is a tool error. `toolsContext` maps every chamberu tool
+ * (policy-hidden ones included) to the execution's one ToolContext, plus the
+ * agent's own `toolsContext` entries for the other tools, by reference.
+ * Throws InvalidAgentDefinitionError for a misconfigured `toolsContext`.
  */
 export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
     tools: ToolSet;
     activeTools?: string[];
+    toolsContext: Record<string, unknown>;
 } {
     const {
-        tools: factory,
+        tools: userTools,
         state: schema,
         toolPolicy,
+        toolsContext: agentToolsContext,
     } = ctx.agent.definition;
-    if (!factory && !schema) return { tools: {} };
-    const state = createAgentState(ctx.agent.name, schema, ctx.store);
-    const tools: ToolSet = {
-        ...(schema ? createStateTools(state, schema) : {}),
-        ...factory?.({
-            state,
-            run: runContext,
-            artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
-        }),
+    if (!userTools && !schema) {
+        if (agentToolsContext) assertToolsContext(ctx.agent.name, {}, agentToolsContext);
+        return { tools: {}, toolsContext: {} };
+    }
+    const toolContext: ToolContext = {
+        run: runContext,
+        state: createAgentState(ctx.agent.name, schema, ctx.store),
+        artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
     };
-    if (!toolPolicy) return { tools: wrapToolsForRun(tools, runContext, ctx.store) };
+    const tools: ToolSet = {
+        ...(schema ? createStateTools(toolContext.state, schema) : {}),
+        ...(typeof userTools === 'function' ? userTools(toolContext) : userTools),
+    };
+
+    const toolsContext: Record<string, unknown> = {};
+    for (const [name, tool] of Object.entries(tools)) {
+        if (hasToolContext(tool)) toolsContext[name] = toolContext;
+    }
+    if (agentToolsContext) {
+        assertToolsContext(ctx.agent.name, tools, agentToolsContext);
+        for (const [name, value] of Object.entries(agentToolsContext)) toolsContext[name] = value;
+    }
+
+    if (!toolPolicy) return { tools: wrapToolsForRun(tools, runContext, ctx.store), toolsContext };
     const allow = (name: string) => toolPolicy(name, { run: runContext });
     return {
         tools: wrapToolsForRun(tools, runContext, ctx.store, allow),
         activeTools: Object.keys(tools).filter(allow),
+        toolsContext,
     };
 }
 

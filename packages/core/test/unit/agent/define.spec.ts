@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { tool } from 'ai';
 import type { LanguageModel } from 'ai';
 import {
     describe,
@@ -12,10 +13,12 @@ import {
     expectTypeOf,
     it,
 } from 'vitest';
+import { z } from 'zod';
 import {
     InvalidAgentDefinitionError,
     cron,
     defineAgent,
+    defineTool,
     http,
     webhook,
 } from '@chamberu/core';
@@ -98,5 +101,37 @@ describe('defineAgent', () => {
         });
         expectTypeOf(agent.definition.triggers).toEqualTypeOf<AgentDefinition['triggers']>();
         expect(agent.definition.triggers?.[0]?.concurrencyKey?.({ repo: 'o/r' })).toBe('o/r');
+    });
+
+    it('accepts a plain tool set', () => {
+        const tools = { lookup: defineTool({ inputSchema: z.object({}), execute: async () => 'ok' }) };
+        expect(defineAgent({
+            ...base, 
+            name: 'a', 
+            tools, 
+        }).definition.tools).toBe(tools);
+    });
+
+    it('keeps toolsContext by reference', () => {
+        const entry = { token: 't' };
+        const map = { third: entry };
+        const third = tool({ inputSchema: z.object({}), execute: async () => 'ok' });
+        const agent = defineAgent({
+            ...base,
+            name: 'a',
+            tools: { third },
+            toolsContext: map,
+        });
+        expect(agent.definition.toolsContext).toBe(map);
+        expect(agent.definition.toolsContext?.third).toBe(entry);
+    });
+
+    it('checks toolsContext only for a plain set', () => {
+        expect(() => defineAgent({
+            ...base,
+            name: 'a',
+            tools: () => ({}),
+            toolsContext: { missing: {} },
+        })).not.toThrow();
     });
 });
