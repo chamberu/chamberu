@@ -16,7 +16,7 @@ import type {
     ToolSet,
 } from 'ai';
 import { hydrateMessages } from '../../artifact/helpers.ts';
-import { ArtifactNotFoundError, FatalToolError } from '../../errors/index.ts';
+import { ArtifactNotFoundError, FatalToolError, IncompleteResponseError } from '../../errors/index.ts';
 import { RunStatus } from '../../run/constants.ts';
 import type { RunContext, Step, Usage } from '../../run/types.ts';
 import {
@@ -123,6 +123,9 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     // errors of approved calls the AI SDK executes before the first model call, by toolCallId
     const preStepErrors = new Map<string, unknown>();
     let beforeFirstStep = true;
+    // set when the provider's finish part arrived for the current step; without
+    // it the AI SDK synthesizes a finish ('other') and never runs the step's tools
+    let modelCallEnded = false;
 
     /**
      * Runs a store write unless the execution was abandoned meanwhile or lost
@@ -152,6 +155,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     };
 
     const handleStepEnd = async (step: StepResult<ToolSet>) => {
+        const complete = modelCallEnded;
+        modelCallEnded = false;
         try {
             const finishedAt = clock.now();
             const tokens = stepTokens(step);
@@ -223,6 +228,10 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                 await ctx.update({ usage: { ...usage }, updatedAt: clock.now() });
             }, { checkOwner: false });
             stepStartedAt = clock.now();
+            // an error part ends the step with 'error' and fails the run with that error
+            if (!complete && step.finishReason === 'other') {
+                fatal ??= { error: new IncompleteResponseError('The model stream ended without a finish part.') };
+            }
         } catch (error) {
             fatal ??= { error };
         }
@@ -291,6 +300,9 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         experimental_toolApprovalSecret: ctx.toolApprovalSecret,
         stopWhen,
         prepareStep,
+        onLanguageModelCallEnd: () => {
+            modelCallEnded = true;
+        },
         onStepEnd,
         output: agent.definition.output,
     });

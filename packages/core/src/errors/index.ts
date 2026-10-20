@@ -11,6 +11,7 @@ export * from './base.ts';
 export * from './budget-exceeded.ts';
 export * from './constants.ts';
 export * from './fatal-tool.ts';
+export * from './incomplete-response.ts';
 export * from './lease-lost.ts';
 export * from './resume-token.ts';
 export * from './run-not-found.ts';

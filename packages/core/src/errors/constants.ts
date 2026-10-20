@@ -9,6 +9,7 @@ export const ErrorCode = {
     ARTIFACT_NOT_FOUND: 'artifact_not_found',
     BUDGET_EXCEEDED: 'BudgetExceeded',
     FATAL_TOOL: 'FatalToolError',
+    INCOMPLETE_RESPONSE: 'incomplete_response',
     INVALID_AGENT_DEFINITION: 'invalid_agent_definition',
     INVALID_RESUME_TOKEN: 'invalid_resume_token',
     INVALID_RUN_STATE: 'invalid_run_state',

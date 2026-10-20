@@ -103,6 +103,34 @@ function chunkModel(chunks: LanguageModelV4StreamPart[]) {
     });
 }
 
+/** A model that streams `turns[n]` as is on call n (stream-start added, no finish). */
+function rawModel(turns: LanguageModelV4StreamPart[][]) {
+    let turn = 0;
+    return new MockLanguageModelV4({
+        doStream: async () => {
+            const chunks = turns[turn++];
+            if (!chunks) throw new Error('mock script exhausted');
+            return { stream: simulateReadableStream({ chunks: [{ type: 'stream-start', warnings: [] }, ...chunks] }) };
+        },
+    });
+}
+
+const textChunks = (text: string): LanguageModelV4StreamPart[] => [
+    { type: 'text-start', id: 't' },
+    {
+        type: 'text-delta',
+        id: 't',
+        delta: text,
+    },
+    { type: 'text-end', id: 't' },
+];
+
+const finishChunk = (unified: 'stop' | 'other', raw?: string): LanguageModelV4StreamPart => ({
+    type: 'finish',
+    finishReason: { unified, raw },
+    usage,
+});
+
 describe('streaming', () => {
     it('emits text deltas in order with the step they are saved under', async () => {
         const model = mockModel([
@@ -281,5 +309,65 @@ describe('streaming', () => {
         expect(run?.status).toBe('failed');
         expect(run?.error).toEqual({ code: 'Error', message: 'mock script exhausted' });
         expect(log).not.toHaveBeenCalled();
+    });
+
+    it('fails a run whose model stream ends without a finish part after text', async () => {
+        const model = rawModel([textChunks('partial')]);
+        const { engine, store } = make(model);
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await engine.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('failed');
+        expect(run?.error?.code).toBe('incomplete_response');
+        expect(run?.error?.message).toMatch(/without a finish/);
+        expect(run?.output).toBeUndefined();
+    });
+
+    it('fails a run whose model stream ends without a finish part after a tool call', async () => {
+        let executed = 0;
+        const model = rawModel([
+            [{
+                type: 'tool-call',
+                toolCallId: 'c1',
+                toolName: 'lookup',
+                input: JSON.stringify({ q: 1 }),
+            }],
+            [...textChunks('done'), finishChunk('stop')],
+        ]);
+        const { engine, store } = make(model, () => ({
+            lookup: tool({
+                inputSchema: z.object({ q: z.number() }),
+                execute: async () => {
+                    executed++;
+                    return 'found';
+                },
+            }),
+        }));
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await engine.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('failed');
+        expect(run?.error?.code).toBe('incomplete_response');
+        expect(executed).toBe(0);
+        expect(model.doStreamCalls).toHaveLength(1);
+    });
+
+    it.each([
+        ['with a raw reason', 'provider_specific'],
+        ['without a raw reason', undefined],
+    ])('completes a run whose model reports finish reason other %s', async (_, raw) => {
+        const model = rawModel([[...textChunks('answer'), finishChunk('other', raw)]]);
+        const { engine, store } = make(model);
+        await engine.start();
+        const { runId } = await engine.dispatch(env);
+        await engine.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('completed');
+        expect(run?.output).toBe('answer');
     });
 });

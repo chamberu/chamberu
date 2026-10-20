@@ -25,6 +25,7 @@ describe('public api', () => {
         'BudgetExceededError',
         'ArtifactNotFoundError',
         'ToolNotAllowedError',
+        'IncompleteResponseError',
         'hasPermission',
         'matchesPermission',
         'toolPermission',
