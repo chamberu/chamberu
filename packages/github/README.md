@@ -103,7 +103,13 @@ export async function createTriageServer(
         engine,
         store,
         agents,
-        auth: staticTokens({ tokens: { [CHAMBERU_TOKEN]: { id: 'ci', permissions: ['*'] } } }),
+        auth: staticTokens({
+            tokens: [{
+                value: CHAMBERU_TOKEN,
+                id: 'ci',
+                permissions: ['*'],
+            }],
+        }),
         // POST /webhooks/github: point the App's webhook URL here
         routes: [gh.webhookRoute()],
         shutdown,

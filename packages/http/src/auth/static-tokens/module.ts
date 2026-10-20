@@ -18,22 +18,31 @@ import type { StaticTokensOptions } from './types.ts';
  * `undefined`, so the chain continues.
  */
 export function staticTokens(options: StaticTokensOptions): Authenticator {
-    const entries = Object.entries(options.tokens ?? {});
-    if (entries.length === 0) {
-        throw new InvalidAgentDefinitionError('staticTokens() needs at least one token.');
+    const { tokens } = options;
+    if (!Array.isArray(tokens) || tokens.length === 0) {
+        throw new InvalidAgentDefinitionError('staticTokens() needs a non-empty array of tokens.');
     }
 
     const principals = new Map<string, Principal>();
-    for (const [token, { id, permissions }] of entries) {
+    for (const {
+        value,
+        id,
+        permissions,
+    } of tokens) {
         if (typeof id !== 'string' || id.length === 0) {
             throw new InvalidAgentDefinitionError('Every static token needs a non-empty id.');
         }
-        if (token.length < STATIC_TOKEN_MIN_LENGTH) {
+        if (typeof value !== 'string' || value.length < STATIC_TOKEN_MIN_LENGTH) {
             throw new InvalidAgentDefinitionError(
                 `The static token of "${id}" must have at least ${STATIC_TOKEN_MIN_LENGTH} characters.`,
             );
         }
-        principals.set(hashToken(token), {
+        const digest = hashToken(value);
+        if (principals.has(digest)) {
+            // a later entry would silently take over the earlier one's grants
+            throw new InvalidAgentDefinitionError(`The static token of "${id}" is given more than once.`);
+        }
+        principals.set(digest, {
             id,
             kind: 'token',
             permissions: [...permissions],

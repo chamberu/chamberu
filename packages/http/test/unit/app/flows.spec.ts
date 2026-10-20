@@ -85,10 +85,18 @@ describe('acceptance flows', () => {
             ],
             auth: [
                 staticTokens({
-                    tokens: {
-                        [ADMIN_TOKEN]: { id: 'admin', permissions: ['*'] },
-                        [READER_TOKEN]: { id: 'reader', permissions: ['run:read'] },
-                    },
+                    tokens: [
+                        {
+                            value: ADMIN_TOKEN,
+                            id: 'admin',
+                            permissions: ['*'],
+                        },
+                        {
+                            value: READER_TOKEN,
+                            id: 'reader',
+                            permissions: ['run:read'],
+                        },
+                    ],
                 }),
                 authup({ verifier: authupVerifier }),
                 oidc({ issuers: [issuer], principal: (result) => openclaw(result.claims) }),
