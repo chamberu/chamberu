@@ -59,9 +59,9 @@ export function buildContainerOptions(input: ContainerOptionsInput): Dockerode.C
             Tmpfs: { '/tmp': `rw,nosuid,nodev,size=${Math.round(parseMemory(TMP_SIZE))}` },
             // anonymous volume, removed with the container (`remove({ v: true })`)
             Mounts: [{
-                Type: 'volume', 
-                Source: '', 
-                Target: WORKSPACE_ROOT, 
+                Type: 'volume',
+                Source: '',
+                Target: WORKSPACE_ROOT,
             }],
             AutoRemove: false,
         },

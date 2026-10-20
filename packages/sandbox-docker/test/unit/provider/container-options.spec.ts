@@ -69,9 +69,9 @@ describe('buildContainerOptions', () => {
             NanoCpus: 500_000_000,
             Tmpfs: { '/tmp': 'rw,nosuid,nodev,size=536870912' },
             Mounts: [{
-                Type: 'volume', 
-                Source: '', 
-                Target: '/workspace', 
+                Type: 'volume',
+                Source: '',
+                Target: '/workspace',
             }],
             AutoRemove: false,
         });
