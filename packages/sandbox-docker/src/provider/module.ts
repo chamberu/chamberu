@@ -30,7 +30,7 @@ import {
     assertDockerOptions,
     buildContainerOptions,
     dockerMessage,
-    isStatus,
+    isMissingImage,
     pullImage,
     removeContainer,
 } from './helpers.ts';
@@ -58,7 +58,7 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
         try {
             return await docker.createContainer(createOptions);
         } catch (error) {
-            if (pull !== 'missing' || !isStatus(error, 404)) {
+            if (pull !== 'missing' || !isMissingImage(error)) {
                 throw new SandboxError(`cannot create a workspace container from ${imageName}: ${dockerMessage(error)}`, { cause: error });
             }
         }
@@ -83,6 +83,9 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
                 throw new ValidationError('image must be a non-empty string.');
             }
             assertSandboxEnv(input.env);
+            if (input.signal?.aborted) {
+                throw new SandboxError('workspace creation aborted');
+            }
             const limits = resolveLimits(options.limits, input.limits);
             const imageName = input.image ?? image;
 

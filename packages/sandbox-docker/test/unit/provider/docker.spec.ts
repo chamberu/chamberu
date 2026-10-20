@@ -117,7 +117,7 @@ describeDocker('docker sandbox', () => {
             .create({ runId })
             .catch((e: unknown) => e);
         expect(error).toBeInstanceOf(SandboxError);
-        expect((error as Error).message).toContain(MISSING_IMAGE);
+        expect((error as Error).message).toContain(`cannot pull the image ${MISSING_IMAGE}`);
         expect(await containersOf(runId)).toEqual([]);
     });
 

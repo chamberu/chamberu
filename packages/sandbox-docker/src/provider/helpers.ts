@@ -41,7 +41,11 @@ export function assertDockerOptions(options: DockerSandboxOptions): void {
         (!isObject(docker) ||
             typeof docker.createContainer !== 'function' ||
             typeof docker.getContainer !== 'function' ||
-            typeof docker.listContainers !== 'function')
+            typeof docker.listContainers !== 'function' ||
+            typeof docker.pull !== 'function' ||
+            !isObject(docker.modem) ||
+            typeof docker.modem.demuxStream !== 'function' ||
+            typeof docker.modem.followProgress !== 'function')
     ) {
         throw new InvalidAgentDefinitionError('docker must be a dockerode client.');
     }
@@ -59,6 +63,11 @@ export function assertDockerOptions(options: DockerSandboxOptions): void {
     }
     assertSandboxEnv(options.env);
     resolveLimits(options.limits);
+}
+
+/** True when a create failed because the image is not present (a 404 also answers a missing network). */
+export function isMissingImage(error: unknown): boolean {
+    return isStatus(error, 404) && /no such image/i.test(dockerMessage(error));
 }
 
 /** True when a dockerode error carries this HTTP status. */
