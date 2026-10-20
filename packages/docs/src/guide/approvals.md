@@ -8,6 +8,8 @@ A tool call can wait for a human. The run pauses in `waiting`, the owner gets a 
 
 <<< @/snippets/approvals.ts#agent
 
+A policy sees the run's invoker as `runtimeContext.trigger.invoker`, so it can let some invokers through without asking (see [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker)).
+
 The engine translates the policies into the AI SDK's `toolApproval` and signs the approval requests with `resumeSecret`.
 
 ## The pause
@@ -30,6 +32,7 @@ The engine throws `InvalidAgentDefinitionError` for an empty `resumeSecret` (any
 
 `resume()` verifies the token against the run's current wait point, moves the run `waiting` to `queued`, appends the `tool-approval-response` to the checkpoint and a `wait` step, and clears the wait point. The next execution runs the approved call, or tells the model it was denied (with your `reason`).
 
+- `decision.approver` (an invoker: `{ id, kind, name?, permissions }`) is recorded on the `wait` step as `output.approver`. `@chamberu/http` sets it from the principal that answered.
 - A token answers its wait point once. A second `resume()` throws `InvalidRunStateError`.
 - A forged, malformed, expired or superseded token throws `InvalidResumeTokenError`.
 - If writing the answer fails, the run goes back to `waiting` and the token stays valid.

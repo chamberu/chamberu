@@ -38,7 +38,7 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 | `/mcp` | authenticated | MCP endpoint |
 | `GET /healthz`, `/readyz`, `/metrics` | none | Liveness, readiness, Prometheus |
 
-`GET /runs` takes rapiq's URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]` (default 50, at most 100), `page[offset]`, `sort=createdAt`. Bodies are JSON of at most `bodyLimit` bytes (default 1 MiB). A protected route checks the bearer token before it reads the body. Runs leave the API without their internal `claim`.
+`GET /runs` takes rapiq's URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]` (default 50, at most 100), `page[offset]`, `sort=createdAt`. Bodies are JSON of at most `bodyLimit` bytes (default 1 MiB). A protected route checks the bearer token before it reads the body. Runs leave the API without their internal `claim`, and the run's invoker and a `wait` step's approver without their `permissions` (see [Invoker](#invoker)).
 
 ## Files
 
@@ -77,11 +77,18 @@ An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_
 | `run:read` | Read and list every run, agents and schedules |
 | `run:cancel` | Cancel runs |
 | `state:read`, `state:write` | Agent state |
+| `tool:<agent>:<tool>` | Read by `requireToolPermission()`: the agent offers the tool to this principal's runs |
 | `*` | Everything |
 
 A `*` segment matches exactly one segment (`agent:*:run`). A client that may start an agent's runs can follow them without `run:read`, but to list runs it must filter to that agent.
 
 `POST /resume` needs the approve permission for the run's agent as well as the [resume token](/guide/approvals): a leaked token alone does nothing. The token's signature and expiry are checked before any store lookup.
+
+## Invoker
+
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name`, `preferred_username` or `email` claim (static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook runs have no invoker, and neither ever comes from a request body.
+
+The invoker is a snapshot: a run keeps the grants it was started with, even when a grant is revoked while it waits on an approval. Responses (REST, SSE, MCP) carry the invoker and the approver without their `permissions`, so a `run:read` holder never learns another principal's grants.
 
 ## MCP
 

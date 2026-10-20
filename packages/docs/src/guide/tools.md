@@ -25,3 +25,16 @@ Every tool factory gets `run.signal`. It aborts on cancel, drain, timeout and a 
 ## Tools with side effects
 
 A recovered run repeats the step that was in progress when the process died. A plain tool that posts a comment would post it again. Use [`defineEffectTool()`](/guide/effect-tools) for every tool that changes something outside the run.
+
+## Restricting tools per invoker
+
+A run started through `@chamberu/http` (REST or MCP) carries its **invoker**, `run.trigger.invoker`: `{ id, kind, name?, permissions }` of the authenticated principal. Cron and webhook runs have none. An agent's `toolPolicy(toolName, { run })` decides per tool whether the run may use it, and a refused tool is not offered to the model at all.
+
+`requireToolPermission()` is the built-in policy: it offers a tool when the invoker holds `tool:<agent>:<tool>` (with the usual matching: `*` alone grants everything, a `*` segment matches one segment). Runs without an invoker get no tools unless you pass `{ withoutInvoker: 'allow' }`. Wrap it for exceptions:
+
+<<< @/snippets/tools.ts#policy
+
+- The policy covers the whole tool set, the generated [state tools](/guide/state) included.
+- The invoker is a snapshot taken at dispatch. A run keeps it across approvals and restarts, so its tool set stays the same; revoking a grant later does not reach a run that already holds it.
+- The engine re-checks every call when it executes. A call to a refused tool (only possible from an older history, e.g. a policy tightened before an approval was answered) gets a `ToolNotAllowedError` tool error and the run goes on.
+- The invoker only ever comes from an authenticator, never from a request body or payload.

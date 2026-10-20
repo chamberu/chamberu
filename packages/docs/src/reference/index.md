@@ -21,6 +21,19 @@ Throws `InvalidAgentDefinitionError` for an invalid name or duplicate trigger id
 
 <<< ../../../core/src/agent/types.ts{ts}
 
+## Permissions
+
+```ts
+function matchesPermission(granted: string, wanted: string): boolean;
+function hasPermission(permissions: readonly string[], wanted: string): boolean;
+function toolPermission(agent: string, tool: string): string; // tool:<agent>:<tool>
+function requireToolPermission(opts?: RequireToolPermissionOptions): ToolPolicy;
+```
+
+`*` alone grants everything, a `*` segment matches exactly one segment, and segment counts must match. `requireToolPermission()` offers a tool when the run's invoker holds `toolPermission(agent, tool)`; runs without an invoker follow `withoutInvoker` (default `'deny'`). See [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker).
+
+<<< ../../../core/src/permission/types.ts{ts}
+
 ## Triggers
 
 ```ts
@@ -185,7 +198,7 @@ const systemClock: IClock;
 
 ## Errors
 
-`ChamberuError`, `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `LeaseLostError`, `ValidationError` and `ErrorCode`:
+`ChamberuError`, `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `ToolNotAllowedError`, `LeaseLostError`, `ValidationError` and `ErrorCode`:
 
 <<< ../../../core/src/errors/constants.ts{ts}
 

@@ -24,6 +24,7 @@ The engine checks the rest when you construct it: agent names must be unique wit
 | `instructions` | `string` | required | System instructions |
 | `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()`. See [Triggers](/guide/triggers) |
 | `tools` | `(ctx) => ToolSet` | none | Tool factory, called for each execution |
+| `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()`. See [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker) |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections. See [Agent State](/guide/state) |
 | `budget` | `Partial<Budget>` | `{ maxSteps: 20, timeoutMs: 900_000 }` | See [Budgets & Timeouts](/guide/budgets) |
 | `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval. See [Approvals](/guide/approvals) |
@@ -42,7 +43,7 @@ The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` ke
 | `state` | `AgentState` | The agent's [state](/guide/state), typed by its `state` schema |
 | `run.runId` | `string` | Id of the run being executed |
 | `run.agent` | `string` | Agent name |
-| `run.trigger` | `TriggerEnvelope` | The envelope that started the run |
+| `run.trigger` | `TriggerEnvelope` | The envelope that started the run; `run.trigger.invoker` is who started it, if an authenticator knew |
 | `run.signal` | `AbortSignal` | Aborts on cancel, drain, a lost lease or the run timeout |
 | `artifacts` | `IRunArtifacts` | The run's files: `put()`, `get(id)`, `list()`. See [Files](#files) |
 
