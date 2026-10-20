@@ -53,7 +53,13 @@ export function createTriage(model: LanguageModel, store: IStore) {
     });
     const app = createHttpApp({
         engine,
-        auth: staticTokens({ tokens: { [process.env.CHAMBERU_TOKEN ?? '']: { id: 'ci', permissions: ['*'] } } }),
+        auth: staticTokens({
+            tokens: [{
+                value: process.env.CHAMBERU_TOKEN ?? '',
+                id: 'ci',
+                permissions: ['*'],
+            }],
+        }),
         // POST /webhooks/github; raise for large push or pull_request deliveries
         bodyLimit: 4 * 1024 * 1024,
         routes: [gh.webhookRoute()],
@@ -61,8 +67,8 @@ export function createTriage(model: LanguageModel, store: IStore) {
     // #endregion http
 
     return {
-        app, 
-        engine, 
-        gh, 
+        app,
+        engine,
+        gh,
     };
 }

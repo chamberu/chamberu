@@ -32,7 +32,7 @@ function authup(options: AuthupOptions): Authenticator;
 function oidc(options: OidcOptions): Authenticator;
 ```
 
-An authenticator resolves `undefined` for a request it does not recognize and throws a 401 for credentials it rejects. `staticTokens` throws `InvalidAgentDefinitionError` for an empty map or a token shorter than 16 characters; `oidc` for an empty `issuers` list, an issuer without `audience` or a missing `principal`.
+An authenticator resolves `undefined` for a request it does not recognize and throws a 401 for credentials it rejects. `staticTokens` throws `InvalidAgentDefinitionError` for an empty `tokens` array, a token `value` shorter than 16 characters, a missing `id` or a `value` given twice; `oidc` for an empty `issuers` list, an issuer without `audience` or a missing `principal`.
 
 <<< ../../../http/src/auth/types.ts{ts}
 

@@ -46,7 +46,13 @@ export async function createTriageServer(
     const app = createHttpApp({
         // the webhook route dispatches to the engine's agents
         engine,
-        auth: staticTokens({ tokens: { [CHAMBERU_TOKEN]: { id: 'ci', permissions: ['*'] } } }),
+        auth: staticTokens({
+            tokens: [{
+                value: CHAMBERU_TOKEN,
+                id: 'ci',
+                permissions: ['*'],
+            }],
+        }),
         // POST /webhooks/github: point the App's webhook URL here
         routes: [gh.webhookRoute()],
         shutdown,

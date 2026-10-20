@@ -29,7 +29,13 @@ export async function createAgentServer(model: LanguageModel) {
     const app = createHttpApp({
         // routes read the store, the agents and the clock from the engine
         engine,
-        auth: staticTokens({ tokens: { [token]: { id: 'ci', permissions: ['*'] } } }),
+        auth: staticTokens({
+            tokens: [{
+                value: token,
+                id: 'ci',
+                permissions: ['*'],
+            }],
+        }),
         shutdown,
     });
 

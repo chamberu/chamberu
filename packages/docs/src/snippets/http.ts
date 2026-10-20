@@ -20,7 +20,13 @@ export function authenticators(verifier: ITokenVerifier): Authenticator[] {
         // CI and service accounts: tokens of at least 16 characters.
         // Static tokens go first: authup() in remote mode introspects every non-JWT bearer.
         ...(ciToken ?
-            [staticTokens({ tokens: { [ciToken]: { id: 'ci', permissions: ['agent:deploy:run', 'run:read'] } } })] :
+            [staticTokens({
+                tokens: [{
+                    value: ciToken,
+                    id: 'ci',
+                    permissions: ['agent:deploy:run', 'run:read'],
+                }],
+            })] :
             []),
         // authup: grants come from global tokens, verified remotely
         authup({ verifier }),

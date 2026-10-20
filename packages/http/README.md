@@ -76,7 +76,13 @@ export async function createAgentServer(model: LanguageModel) {
     const app = createHttpApp({
         // routes read the store, the agents and the clock from the engine
         engine,
-        auth: staticTokens({ tokens: { [token]: { id: 'ci', permissions: ['*'] } } }),
+        auth: staticTokens({
+            tokens: [{
+                value: token,
+                id: 'ci',
+                permissions: ['*'],
+            }],
+        }),
         shutdown,
     });
 
@@ -159,14 +165,22 @@ A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:ru
 const ciToken = process.env.CI_TOKEN;
 auth: [
     // static tokens first: authup() in remote mode introspects every non-JWT bearer
-    ...(ciToken ? [staticTokens({ tokens: { [ciToken]: { id: 'ci', permissions: ['agent:deploy:run'] } } })] : []),
+    ...(ciToken ?
+        [staticTokens({
+            tokens: [{
+                value: ciToken,
+                id: 'ci',
+                permissions: ['agent:deploy:run'],
+            }],
+        })] :
+        []),
     // an authup TokenVerifier in remote mode (with a creator), so tokens carry their grants
     authup({ verifier }),
     oidc({ issuers: [githubActions], principal: mapGithubClaims }),
 ],
 ```
 
-- **`staticTokens({ tokens })`**: bearer tokens of at least 16 characters, compared by SHA-256 digest. Fits CI and service accounts. Put it **before** `authup()` and `oidc()`: `authup()` in remote mode sends every bearer that is not a JWT to the authup server's introspection endpoint, so a static token placed after it leaks to that server on every request.
+- **`staticTokens({ tokens: [{ value, id, permissions }] })`**: bearer tokens (`value`) of at least 16 characters, compared by SHA-256 digest. A `value` may appear once; several tokens may share an `id`, so a rotated token can overlap with the old one. Fits CI and service accounts. Put it **before** `authup()` and `oidc()`: `authup()` in remote mode sends every bearer that is not a JWT to the authup server's introspection endpoint, so a static token placed after it leaks to that server on every request.
 - **`authup({ verifier })`**: verifies through `@authup/server-adapter-web`. A token grants its permissions only when its `scope` contains `global`; other tokens keep their identity but grant nothing (so they answer 403). Local verification always yields no permissions: grants need remote mode (`creator`, introspection). Permission `policies`, `realm_id` and `client_id` are not evaluated. Caching: a cached result is served until the token's `exp`, so in local mode it outlives a disabled signing key and in remote mode a revoked token (`maxRemoteCacheTTL` bounds remote caching); without `cache`, nothing is cached.
 - **`oidc({ issuers, principal })`**: any OIDC issuer through vouchly, e.g. GitHub Actions tokens. Every issuer needs an `audience` (vouchly skips the `aud` check without one, so a public issuer's tokens for any audience would pass; `oidc()` throws otherwise). `principal` is **required** and maps the verified claims to a principal (or `undefined` to refuse it): a public issuer lets anyone mint a token for your audience, so the deployment decides which `sub` or `repository` gets which grants. A token from an issuer that is not configured passes to the next authenticator; an unreachable issuer answers 503.
 
@@ -266,7 +280,7 @@ process.once('SIGTERM', () => {
 | `Permission` | constant | `ALL`, `RUN_READ`, `RUN_CANCEL`, `STATE_READ`, `STATE_WRITE` |
 | `DEFAULT_SHUTDOWN_DRAIN_TIMEOUT_MS`, `DEFAULT_SHUTDOWN_CLOSE_TIMEOUT_MS` | constant | `30_000`, `5_000` |
 
-Types: `HttpAppOptions`, `McpOptions`, `CorsOptions`, `RateLimitOptions`, `PrometheusOptions`, `TrustProxyInput`, `Principal`, `Authenticator`, `PermissionName`, `AgentAction`, `StaticTokensOptions`, `AuthupOptions`, `OidcOptions`, `IShutdown`, `ShutdownOptions`, `RunView`, `InvokerView`, `RunListQuery`, `RunSummary`, `RunToolResult`, `AgentSummary`, `ScheduleSummary`.
+Types: `HttpAppOptions`, `McpOptions`, `CorsOptions`, `RateLimitOptions`, `PrometheusOptions`, `TrustProxyInput`, `Principal`, `Authenticator`, `PermissionName`, `AgentAction`, `StaticToken`, `StaticTokensOptions`, `AuthupOptions`, `OidcOptions`, `IShutdown`, `ShutdownOptions`, `RunView`, `InvokerView`, `RunListQuery`, `RunSummary`, `RunToolResult`, `AgentSummary`, `ScheduleSummary`.
 
 ## License
 

@@ -32,10 +32,18 @@ export const READER_TOKEN = 'reader-token-0123456789';
 
 /** Admin and reader principals by bearer token. */
 export const testAuth = staticTokens({
-    tokens: {
-        [ADMIN_TOKEN]: { id: 'admin', permissions: ['*'] },
-        [READER_TOKEN]: { id: 'reader', permissions: ['run:read'] },
-    },
+    tokens: [
+        {
+            value: ADMIN_TOKEN,
+            id: 'admin',
+            permissions: ['*'],
+        },
+        {
+            value: READER_TOKEN,
+            id: 'reader',
+            permissions: ['run:read'],
+        },
+    ],
 });
 
 export type TestAppOverrides = Partial<HttpAppOptions> & {

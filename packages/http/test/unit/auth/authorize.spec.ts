@@ -14,7 +14,13 @@ import { buildContext, createErrorHandler } from '../../../src/app/helpers.ts';
 import { authorize } from '../../../src/auth/helpers.ts';
 import { READER_TOKEN, createTestApp } from '../../utils/app.ts';
 
-const reader = staticTokens({ tokens: { [READER_TOKEN]: { id: 'reader', permissions: ['run:read'] } } });
+const reader = staticTokens({
+    tokens: [{
+        value: READER_TOKEN,
+        id: 'reader',
+        permissions: ['run:read'],
+    }],
+});
 
 const throwing: Authenticator = async () => {
     throw new UnauthorizedError({ message: 'rejected by the first authenticator' });
@@ -73,25 +79,25 @@ describe('authorize', () => {
 
     it.each([
         ['an empty id', {
-            id: '', 
-            kind: 'custom', 
-            permissions: [], 
+            id: '',
+            kind: 'custom',
+            permissions: [],
         }],
         ['no kind', { id: 'x', permissions: [] }],
         ['an empty kind', {
-            id: 'x', 
-            kind: '', 
-            permissions: [], 
+            id: 'x',
+            kind: '',
+            permissions: [],
         }],
         ['permissions that are no array', {
-            id: 'x', 
-            kind: 'custom', 
-            permissions: 'run:read', 
+            id: 'x',
+            kind: 'custom',
+            permissions: 'run:read',
         }],
         ['a non-string permission', {
-            id: 'x', 
-            kind: 'custom', 
-            permissions: [42], 
+            id: 'x',
+            kind: 'custom',
+            permissions: [42],
         }],
     ])('answers 500 for an authenticator resolving a principal with %s, without trying the next one', async (_name, principal) => {
         let later = 0;
