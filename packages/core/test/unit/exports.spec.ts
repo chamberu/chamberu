@@ -17,6 +17,7 @@ describe('public api', () => {
         'RunEngine',
         'MemoryStore',
         'defineEffectTool',
+        'defineTool',
         'effectMarker',
         'createResumeToken',
         'verifyResumeToken',
@@ -38,6 +39,10 @@ describe('public api', () => {
 
     it('keeps the artifact uri prefix internal', () => {
         expect(core).not.toHaveProperty('ARTIFACT_URI_PREFIX');
+    });
+
+    it('exports the tool context schema', () => {
+        expect(core.toolContextSchema['~standard'].vendor).toBe('chamberu');
     });
 
     it('exports the RunStatus enum', () => {

@@ -17,7 +17,7 @@ const DEFAULT_MAX_STEPS: 20;
 const DEFAULT_TIMEOUT_MS: 900_000; // 15 minutes
 ```
 
-Throws `InvalidAgentDefinitionError` for an invalid name or duplicate trigger ids. See [Agents](/guide/agents).
+Throws `InvalidAgentDefinitionError` for an invalid name, duplicate trigger ids, or a `toolsContext` entry naming a chamberu tool or no tool of a plain tool set. See [Agents](/guide/agents).
 
 <<< ../../../core/src/agent/types.ts{ts}
 
@@ -128,7 +128,7 @@ class MemoryStore implements IStore {
 
 ## Artifacts
 
-`Artifact` (metadata), `ArtifactInput` (a file to store) and `IRunArtifacts` (the tool factory's `artifacts`):
+`Artifact` (metadata), `ArtifactInput` (a file to store) and `IRunArtifacts` (the tool context's `artifacts`):
 
 <<< ../../../core/src/artifact/types.ts{ts}
 
@@ -136,17 +136,43 @@ class MemoryStore implements IStore {
 
 See [Files](/guide/agents#files) and [Attachments](/guide/triggers#attachments).
 
+## Tools
+
+```ts
+function defineTool<I, O, S extends StateSchema = StateSchema>(
+    def: Tool<I, O, ToolContext<S>> & {
+        execute: ToolExecuteFunction<I, O, ToolContext<S>>;
+        contextSchema?: never;
+    },
+): Tool<I, O, ToolContext<S>>;
+
+const toolContextSchema: StandardSchemaV1<ToolContext, ToolContext>; // vendor 'chamberu'
+```
+
+`defineTool()` is `tool()` with `contextSchema: toolContextSchema`; the engine hands the run's `ToolContext` to every tool carrying that schema (by reference, so a copy of the tool keeps it). Its `validate` returns the context unchanged and rejects a missing one, which fails the run (`validation_error`) with `Type validation failed for tool context (<tool>): No chamberu tool context: the tool was built by another copy of @chamberu/core, or runs outside a chamberu agent.` (the marker is the schema object itself, so a tool from a second copy of `@chamberu/core` gets no context).
+
+<<< ../../../core/src/tool/types.ts{ts}
+
+See [Tools and their context](/guide/agents#tools-and-their-context).
+
 ## Effect tools
 
 ```ts
-function defineEffectTool<I, O>(def: Tool<I, O> & {
-    effectKey?: (input: I, ctx: RunContext) => string;
-    alreadyApplied?: (effectKey: string, input: I, ctx: RunContext) => Promise<O | undefined>;
-}): EffectTool<I, O>;
+function defineEffectTool<I, O, S extends StateSchema = StateSchema>(def: Tool<I, O, ToolContext<S>> & {
+    execute: ToolExecuteFunction<I, O, ToolContext<S>>;
+    contextSchema?: never;
+    effectKey?: (input: I, ctx: ToolContext<S>) => string;
+    alreadyApplied?: (effectKey: string, input: I, ctx: ToolContext<S>) => Promise<O | undefined>;
+}): EffectTool<I, O, S>;
 
 function effectMarker(effectKey: string): string; // '<!-- chamberu:effect=<key> -->'
 
-function wrapToolsForRun(tools: ToolSet, ctx: RunContext, store: IEffectStore): ToolSet;
+function wrapToolsForRun(
+    tools: ToolSet,
+    ctx: ToolContext,
+    store: IEffectStore,
+    allow?: (toolName: string) => boolean,
+): ToolSet;
 
 const EFFECT: unique symbol; // marks a tool as an effect tool
 ```
@@ -173,7 +199,7 @@ function createAgentState<S extends StateSchema = StateSchema>(
     store: IStateStore,
 ): IAgentState<S>;
 
-function createStateTools<S extends StateSchema>(state: IAgentState<S>, schema: S): ToolSet;
+function createStateTools<S extends StateSchema>(schema: S): ToolSet; // the tools read context.state
 ```
 
 <<< ../../../core/src/state/types.ts{ts}

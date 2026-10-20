@@ -8,8 +8,8 @@
 import type { ToolSet } from 'ai';
 import { isObject } from 'smob';
 import { ToolNotAllowedError } from '../errors/index.ts';
-import type { RunContext } from '../run/types.ts';
 import type { IEffectStore } from '../store/types.ts';
+import type { ToolContext } from '../tool/types.ts';
 import { EFFECT, EFFECT_HOOKS } from './constants.ts';
 import { stableHash } from './helpers.ts';
 import type { EffectHooks } from './types.ts';
@@ -19,6 +19,8 @@ type Execute = (input: unknown, options: any) => unknown;
 /**
  * Wraps every effect tool so it applies at most once per effect key:
  * stored result, then remote reconciliation, then execute. Other tools pass through.
+ * The hooks get `ctx`, the execution's ToolContext; wrapped tools keep every
+ * field (`contextSchema` included) and forward the call options unchanged.
  * A throwing execute (or alreadyApplied) records nothing, so a retry can still apply.
  * With \`allow\`, every call (effect tool or not) is re-checked first: a refused
  * call throws ToolNotAllowedError, which the AI SDK returns to the model as a
@@ -26,7 +28,7 @@ type Execute = (input: unknown, options: any) => unknown;
  */
 export function wrapToolsForRun(
     tools: ToolSet,
-    ctx: RunContext,
+    ctx: ToolContext,
     store: IEffectStore,
     allow?: (toolName: string) => boolean,
 ): ToolSet {
@@ -87,7 +89,7 @@ export function wrapToolsForRun(
                 if (allow && !allow(name)) throw new ToolNotAllowedError(name);
                 const key = hooks?.effectKey ?
                     hooks.effectKey(input, ctx) :
-                    `${ctx.runId}:${name}:${stableHash(input)}`;
+                    `${ctx.run.runId}:${name}:${stableHash(input)}`;
                 // parallel identical calls within a step share one application
                 let pending = inflight.get(key);
                 if (!pending) {

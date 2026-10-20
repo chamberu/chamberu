@@ -16,7 +16,12 @@ import type {
     ToolSet,
 } from 'ai';
 import { hydrateMessages } from '../../artifact/helpers.ts';
-import { ArtifactNotFoundError, FatalToolError, IncompleteResponseError } from '../../errors/index.ts';
+import {
+    ArtifactNotFoundError,
+    FatalToolError,
+    IncompleteResponseError,
+    InvalidAgentDefinitionError,
+} from '../../errors/index.ts';
 import { RunStatus } from '../../run/constants.ts';
 import type { RunContext, Step, Usage } from '../../run/types.ts';
 import {
@@ -122,7 +127,21 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         signal,
     };
 
-    const { tools, activeTools } = assembleTools(ctx, runContext);
+    let assembled: ReturnType<typeof assembleTools>;
+    try {
+        assembled = assembleTools(ctx, runContext);
+    } catch (error) {
+        local.abort();
+        timeout?.clear();
+        if (!(error instanceof InvalidAgentDefinitionError)) throw error;
+        await ctx.finish({ status: RunStatus.FAILED, error: toRunError(error) });
+        return;
+    }
+    const {
+        tools, 
+        activeTools, 
+        toolsContext, 
+    } = assembled;
 
     const responseMessages: ModelMessage[] = [];
     // AI SDK swallows onStepEnd errors; a fatal one is kept here and stops the loop
@@ -308,6 +327,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         instructions: agent.definition.instructions,
         tools,
         activeTools,
+        // the AI SDK types toolsContext from a concrete tool set; a ToolSet infers none
+        toolsContext: toolsContext as never,
         toolApproval: toToolApproval(agent.definition.approvals, runContext),
         experimental_toolApprovalSecret: ctx.toolApprovalSecret,
         stopWhen,

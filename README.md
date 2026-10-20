@@ -46,7 +46,7 @@ chamberu is that layer as a library, with no orchestrator server and no Redis:
 | **Limits** | `stopWhen` per call | `maxSteps`, `maxTokens` and `timeoutMs` per run, settled as `completed` or `failed` |
 | **Shutdown** | Runs die with the process | `drain()` waits for in-flight runs, then marks the rest `interrupted` for another replica |
 
-Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageModel`, your tool factory returns tools built with `tool()`, and nothing is wrapped in a chamberu type.
+Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageModel` and plain AI SDK tools (`tool()`, or `defineTool()` for tools that read the run context), and nothing is wrapped in a chamberu type.
 
 <p align="center">
     <img src="./.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
@@ -88,14 +88,14 @@ const triage = defineAgent({
     model: anthropic('claude-sonnet-5-5'),
     instructions: 'Label the issue in the trigger payload as bug, feature or question.',
     triggers: [http()],
-    tools: () => ({
+    tools: {
         // recorded per (run, tool, input): a recovered run reuses the result
         addLabel: defineEffectTool({
             description: 'Adds a label to the issue.',
             inputSchema: z.object({ label: z.enum(['bug', 'feature', 'question']) }),
             execute: async ({ label }) => ({ added: label }),
         }),
-    }),
+    },
 });
 
 const engine = new RunEngine({

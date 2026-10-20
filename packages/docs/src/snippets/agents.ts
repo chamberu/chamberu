@@ -1,52 +1,52 @@
-import { Output, tool } from 'ai';
+import { Output } from 'ai';
 import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import {
     cron,
     defineAgent,
     defineEffectTool,
+    defineTool,
     http,
 } from '@chamberu/core';
 
+declare const model: LanguageModel;
 declare function renderChart(points: number[]): Promise<Uint8Array>;
 
-export function createReporter(model: LanguageModel) {
-    // #region define
-    const reporter = defineAgent({
-        name: 'weekly-report',
-        model,
-        instructions: 'Summarize the open work items in the trigger payload.',
-        triggers: [
-            http(),
-            cron('0 8 * * 1', { timezone: 'Europe/Berlin' }),
-        ],
-        budget: {
-            maxSteps: 10,
-            maxTokens: 50_000,
-            timeoutMs: 5 * 60 * 1000,
-        },
-        tools: ({ run, state }) => ({
-            lastReport: tool({
-                description: 'Returns the date of the previous report.',
-                inputSchema: z.object({}),
-                execute: async () => (await state.get<string>('lastReport')) ?? 'never',
-            }),
-            saveReport: tool({
-                description: 'Remembers that a report was written now.',
-                inputSchema: z.object({}),
-                execute: async () => {
-                    await state.set('lastReport', run.trigger.receivedAt.toISOString());
-                    return { saved: true };
-                },
-            }),
-        }),
-    });
-    // #endregion define
+// #region define
+// defined once at module scope: each call gets its run's context
+const lastReport = defineTool({
+    description: 'Returns the date of the previous report.',
+    inputSchema: z.object({}),
+    execute: async (_input, { context }) => (await context.state.get<string>('lastReport')) ?? 'never',
+});
 
-    return reporter;
-}
+const saveReport = defineTool({
+    description: 'Remembers that a report was written now.',
+    inputSchema: z.object({}),
+    execute: async (_input, { context }) => {
+        await context.state.set('lastReport', context.run.trigger.receivedAt.toISOString());
+        return { saved: true };
+    },
+});
 
-export function inspectDefaults(model: LanguageModel) {
+export const reporter = defineAgent({
+    name: 'weekly-report',
+    model,
+    instructions: 'Summarize the open work items in the trigger payload.',
+    triggers: [
+        http(),
+        cron('0 8 * * 1', { timezone: 'Europe/Berlin' }),
+    ],
+    budget: {
+        maxSteps: 10,
+        maxTokens: 50_000,
+        timeoutMs: 5 * 60 * 1000,
+    },
+    tools: { lastReport, saveReport },
+});
+// #endregion define
+
+export function inspectDefaults() {
     // #region defaults
     const agent = defineAgent({
         name: 'echo',
@@ -61,7 +61,7 @@ export function inspectDefaults(model: LanguageModel) {
     return agent;
 }
 
-export function createLabeler(model: LanguageModel) {
+export function createLabeler() {
     // #region output
     const labeler = defineAgent({
         name: 'labeler',
@@ -81,30 +81,26 @@ export function createLabeler(model: LanguageModel) {
     return labeler;
 }
 
-export function createCharter(model: LanguageModel) {
-    // #region artifacts
-    const charter = defineAgent({
-        name: 'charter',
-        model,
-        instructions: 'Chart the numbers in the attached CSV.',
-        triggers: [http()],
-        tools: ({ artifacts }) => ({
-            // an effect tool: a recovered run does not store the chart twice
-            saveChart: defineEffectTool({
-                description: 'Renders the points as a PNG chart and stores it with the run.',
-                inputSchema: z.object({ points: z.array(z.number()) }),
-                execute: async ({ points }) => {
-                    const artifact = await artifacts.put({
-                        mediaType: 'image/png',
-                        filename: 'chart.png',
-                        data: await renderChart(points),
-                    });
-                    return { artifactId: artifact.id };
-                },
-            }),
-        }),
-    });
-    // #endregion artifacts
+// #region artifacts
+// an effect tool: a recovered run does not store the chart twice
+const saveChart = defineEffectTool({
+    description: 'Renders the points as a PNG chart and stores it with the run.',
+    inputSchema: z.object({ points: z.array(z.number()) }),
+    execute: async ({ points }, { context }) => {
+        const artifact = await context.artifacts.put({
+            mediaType: 'image/png',
+            filename: 'chart.png',
+            data: await renderChart(points),
+        });
+        return { artifactId: artifact.id };
+    },
+});
 
-    return charter;
-}
+export const charter = defineAgent({
+    name: 'charter',
+    model,
+    instructions: 'Chart the numbers in the attached CSV.',
+    triggers: [http()],
+    tools: { saveChart },
+});
+// #endregion artifacts

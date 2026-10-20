@@ -8,7 +8,7 @@ Every agent has a budget. `defineAgent()` fills in the defaults, and your values
 | `maxTokens` | none | stop condition | Input plus output tokens per run, across all executions |
 | `timeoutMs` | `900_000` (15 min) | abort signal | Wall-clock limit **per execution** |
 
-<<< @/snippets/agents.ts#define{9-13}
+<<< @/snippets/agents.ts#define{25-29}
 
 ## How a budget settles a run
 

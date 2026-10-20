@@ -5,9 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { tool } from 'ai';
-import type { Tool } from 'ai';
-import type { RunContext } from '../run/types.ts';
+import type { Tool, ToolExecuteFunction } from 'ai';
+import type { StateSchema } from '../state/types.ts';
+import { defineTool } from '../tool/define.ts';
+import type { ToolContext } from '../tool/types.ts';
 import { EFFECT, EFFECT_HOOKS } from './constants.ts';
 import type { EffectHooks, EffectTool } from './types.ts';
 
@@ -16,18 +17,24 @@ export function effectMarker(effectKey: string): string {
     return `<!-- chamberu:effect=${effectKey} -->`;
 }
 
-export function defineEffectTool<I, O>(def: Tool<I, O> & {
-    /** Default: `${runId}:${toolName}:${stableHash(input)}`. */
-    effectKey?: (input: I, ctx: RunContext) => string;
+/**
+ * A side-effecting tool applied at most once per effect key. Built through
+ * `defineTool`, so `execute` and both hooks receive the run's ToolContext.
+ */
+export function defineEffectTool<I, O, S extends StateSchema = StateSchema>(def: Tool<I, O, ToolContext<S>> & {
+    execute: ToolExecuteFunction<I, O, ToolContext<S>>;
+    contextSchema?: never;
+    /** Default: `${ctx.run.runId}:${toolName}:${stableHash(input)}`. */
+    effectKey?: (input: I, ctx: ToolContext<S>) => string;
     /** Remote reconciliation (e.g. find a comment by its hidden marker). */
-    alreadyApplied?: (effectKey: string, input: I, ctx: RunContext) => Promise<O | undefined>;
-}): EffectTool<I, O> {
+    alreadyApplied?: (effectKey: string, input: I, ctx: ToolContext<S>) => Promise<O | undefined>;
+}): EffectTool<I, O, S> {
     const {
         effectKey,
         alreadyApplied,
         ...rest
     } = def;
-    const defined = tool(rest as Tool<I, O>) as Tool<I, O>;
+    const defined = defineTool<I, O, S>(rest as typeof def);
     return Object.assign(defined, {
         [EFFECT]: true as const,
         [EFFECT_HOOKS]: {

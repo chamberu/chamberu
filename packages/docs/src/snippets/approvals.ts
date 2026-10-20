@@ -32,13 +32,13 @@ export async function approvalFlow(model: LanguageModel) {
         name: 'deployer',
         model,
         instructions: 'Deploy the requested version.',
-        tools: () => ({
+        tools: {
             deploy: tool({
                 description: 'Deploys a version to an environment.',
                 inputSchema: z.object({ version: z.string(), env: z.enum(['staging', 'prod']) }),
                 execute: async ({ version, env }) => deployVersion(version, env),
             }),
-        }),
+        },
         approvals: {
             // staging deploys run right away, prod deploys wait for the owner
             deploy: (input) => ((input as { env: string }).env === 'prod' ? 'user' : 'allow'),

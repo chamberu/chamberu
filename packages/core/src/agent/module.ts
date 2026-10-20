@@ -13,6 +13,7 @@ import {
     NAME_MAX_LENGTH,
     NAME_PATTERN,
 } from './constants.ts';
+import { assertToolsContext } from './helpers.ts';
 import type { Agent, AgentDefinition } from './types.ts';
 
 export function defineAgent<S extends StateSchema = StateSchema>(def: AgentDefinition<S>): Agent<S> {
@@ -34,6 +35,11 @@ export function defineAgent<S extends StateSchema = StateSchema>(def: AgentDefin
             );
         }
         seen.add(trigger.id);
+    }
+
+    // a factory's set is only known per execution, the engine checks it there
+    if (typeof def.tools !== 'function' && def.toolsContext) {
+        assertToolsContext(def.name, def.tools ?? {}, def.toolsContext);
     }
 
     return {

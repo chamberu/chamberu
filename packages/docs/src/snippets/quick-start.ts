@@ -17,7 +17,7 @@ export async function triageIssue(model: LanguageModel) {
         instructions: 'Label the issue in the trigger payload as bug, feature or question.',
         triggers: [http()],
         budget: { maxSteps: 5 },
-        tools: () => ({
+        tools: {
             // the result is recorded per (run, tool, input): a resumed run reuses it
             addLabel: defineEffectTool({
                 description: 'Adds a label to the issue.',
@@ -27,7 +27,7 @@ export async function triageIssue(model: LanguageModel) {
                     return { added: label };
                 },
             }),
-        }),
+        },
     });
 
     const engine = new RunEngine({

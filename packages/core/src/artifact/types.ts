@@ -26,7 +26,7 @@ export type ArtifactInput = {
 };
 
 /**
- * The artifacts of one run, handed to the tool factory. Not an effect by
+ * The artifacts of one run, part of the tool context. Not an effect by
  * itself: put `put()` inside a `defineEffectTool` to store a file exactly once.
  */
 export interface IRunArtifacts {

@@ -11,35 +11,28 @@ interface Comment {
     url: string;
 }
 
+declare const model: LanguageModel;
 declare function findComment(issue: number, marker: string): Promise<Comment | undefined>;
 declare function postComment(issue: number, body: string): Promise<Comment>;
 
-export function createResponder(model: LanguageModel) {
-    // #region reconcile
-    const responder = defineAgent({
-        name: 'responder',
-        model,
-        instructions: 'Answer new issues.',
-        tools: ({ run }) => {
-            const keyOf = ({ issue }: { issue: number }) => `${run.runId}:comment:${issue}`;
+// #region reconcile
+const comment = defineEffectTool({
+    description: 'Posts a comment on the issue.',
+    inputSchema: z.object({ issue: z.number(), body: z.string() }),
+    // one comment per run and issue, whatever the body says
+    effectKey: ({ issue }, ctx) => `${ctx.run.runId}:comment:${issue}`,
+    // finds a comment an earlier, crashed attempt already posted
+    alreadyApplied: async (key, { issue }) => findComment(issue, effectMarker(key)),
+    execute: async ({ issue, body }, { context }) => postComment(
+        issue,
+        `${body}\n${effectMarker(`${context.run.runId}:comment:${issue}`)}`,
+    ),
+});
 
-            return {
-                comment: defineEffectTool({
-                    description: 'Posts a comment on the issue.',
-                    inputSchema: z.object({ issue: z.number(), body: z.string() }),
-                    // one comment per run and issue, whatever the body says
-                    effectKey: keyOf,
-                    // finds a comment an earlier, crashed attempt already posted
-                    alreadyApplied: async (key, { issue }) => findComment(issue, effectMarker(key)),
-                    execute: async (input) => postComment(
-                        input.issue,
-                        `${input.body}\n${effectMarker(keyOf(input))}`,
-                    ),
-                }),
-            };
-        },
-    });
-    // #endregion reconcile
-
-    return responder;
-}
+export const responder = defineAgent({
+    name: 'responder',
+    model,
+    instructions: 'Answer new issues.',
+    tools: { comment },
+});
+// #endregion reconcile
