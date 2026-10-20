@@ -107,6 +107,7 @@ A workspace is keyed by `(run, repository)` and lives until the first of:
 - the run settles (`completed`, `failed`, `cancelled`; through `attach(engine)`); it is kept while the run is `waiting` for an approval or `interrupted` on this replica,
 - `dispose_workspace` or `manager.release(runId, id?)`,
 - its expiry (`limits.timeoutMs`, default 30 minutes), checked on every `get` and `acquire`,
+- it was found gone (`workspace.disposed`; see [Workspaces](#workspaces)), checked on every `get` and `acquire`,
 - `manager.close()`,
 - garbage collection: `acquire` runs `manager.collectGarbage()` at most every `gcIntervalMs` (10 minutes), which disposes the manager's expired workspaces and then calls the provider's `collectGarbage()` (expired containers, pods or directories left behind by crashed processes). Call it from your own timer too if runs are rare.
 
@@ -118,6 +119,7 @@ A run resumed on another replica or after a restart gets "workspace not found" a
 interface IWorkspace {
     readonly id: string;              // randomUUID()
     readonly info: WorkspaceInfo;     // runId, provider, repo, ref, commit, createdAt, expiresAt
+    readonly disposed: boolean;       // disposed, or found gone
     exec(argv: readonly string[], options?: ExecOptions): Promise<ExecResult>;
     readFile(path: string): Promise<string>;
     writeFile(path: string, content: string): Promise<void>;
@@ -132,6 +134,7 @@ interface IWorkspace {
 - **Files**: `readFile` and `writeFile` take UTF-8 text of at most `FILE_MAX_BYTES` (1 MiB).
 - **Abort**: `signal` stops waiting on the command. Local kills the process group; Docker and Kubernetes detach, and the command runs on until its `timeout` wrapper fires or the workspace is disposed (which every settled run does).
 - **Dispose** is idempotent; an exec in flight rejects with `SandboxError('workspace disposed')`, and every call after it rejects.
+- **Gone**: a workspace whose container stopped or was removed (a `docker kill`, a daemon restart without live-restore), whose pod failed, was evicted or deleted, or whose local directory was removed, reads as `disposed` once a call found it so, and that call rejects with "workspace ... is gone; call create_workspace for a new one". The manager then drops it: `create_workspace` creates a new one (`reused: false`) and disposes the old one, which removes what is left of it.
 
 Failures of the sandbox itself (a create, start or checkout that failed, a missing or oversized file, an unknown, expired or disposed workspace, a provider API error) are core `SandboxError`s (`sandbox_error`): a tool error the model sees, never a failed run.
 
@@ -171,7 +174,7 @@ No host environment reaches a workspace. Containers and pods get `SANDBOX_ENV` (
 
 ## Writing a provider
 
-A provider implements `ISandboxProvider` (`name`, `create(options)`, `collectGarbage()`). A container-like provider only needs an `IExecTransport` (`exec(argv, { cwd, stdin, maxOutputBytes, signal })` and `remove()`): `createRemoteWorkspace({ id, info, transport, clock })` adds the `timeout` wrapper and the client-side guard, path checks, output caps, file reads and writes and dispose semantics. After creating, call `prepareWorkspace(workspace, { repo, ref, signal })` and set `info.commit`. `describeWorkspaceContract()` from `@chamberu/test-kit` is the Vitest suite every provider must pass.
+A provider implements `ISandboxProvider` (`name`, `create(options)`, `collectGarbage()`). A container-like provider only needs an `IExecTransport` (`exec(argv, { cwd, stdin, maxOutputBytes, signal })`, `remove()` and optionally `alive(signal)`, asked after a failed exec: `false` marks the workspace gone): `createRemoteWorkspace({ id, info, transport, clock })` adds the `timeout` wrapper and the client-side guard, path checks, output caps, file reads and writes and dispose semantics. After creating, call `prepareWorkspace(workspace, { repo, ref, signal })` and set `info.commit`. `describeWorkspaceContract()` from `@chamberu/test-kit` is the Vitest suite every provider must pass.
 
 ## Options
 
@@ -206,7 +209,7 @@ Misconfiguration throws core `InvalidAgentDefinitionError`.
 | `WORKSPACE_ROOT`, `OUTPUT_MAX_BYTES`, `FILE_MAX_BYTES`, `EXEC_TIMEOUT_MS`, `EXEC_TIMEOUT_MAX_MS`, `SANDBOX_ENV` | constant | Workspace rules |
 | `DEFAULT_LIMITS`, `DEFAULT_SANDBOX_IMAGE`, `TMP_SIZE`, `SANDBOX_LABELS`, `RUN_LABEL`, `WORKSPACE_LABEL`, `EXPIRES_AT_KEY` | constant | Provider defaults and labels |
 | `MAX_WORKSPACES_PER_RUN`, `GC_INTERVAL_MS` | constant | Manager defaults |
-| `TIMEOUT_KILL_AFTER_SECONDS`, `EXEC_GRACE_MS` | constant | Remote timeout handling |
+| `TIMEOUT_KILL_AFTER_SECONDS`, `EXEC_GRACE_MS`, `ALIVE_PROBE_TIMEOUT_MS` | constant | Remote timeout handling and the liveness probe bound |
 
 Types: `IWorkspace`, `WorkspaceInfo`, `ExecOptions`, `ExecResult`, `ISandboxProvider`, `WorkspaceCreateOptions`, `SandboxLimits`, `IExecTransport`, `TransportExecOptions`, `TransportExecResult`, `RemoteWorkspaceInput`, `IWorkspaceManager`, `WorkspaceManagerOptions`, `AcquireInput`, `AcquireResult`, `WorkspaceToolResult`, `DisposeWorkspaceResult`, `IOutputCollector`, `NormalizeRepoOptions`.
 

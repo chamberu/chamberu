@@ -11,7 +11,7 @@ import { createOutputCollector } from '@chamberu/sandbox';
 import type { IExecTransport, TransportExecOptions, TransportExecResult } from '@chamberu/sandbox';
 import type Dockerode from 'dockerode';
 import { SANDBOX_USER } from '../provider/constants.ts';
-import { removeContainer } from '../provider/helpers.ts';
+import { isStatus, removeContainer } from '../provider/helpers.ts';
 import { INSPECT_POLL_INITIAL_MS, INSPECT_POLL_MAX_MS } from './constants.ts';
 import {
     abortError,
@@ -26,7 +26,8 @@ import {
  * cap), stdin written and half-closed, then the exit code read from the exec
  * once it stopped (polled on the clock with backoff). The signal detaches:
  * the HTTP stream is dropped and the process runs on until its `timeout`
- * wrapper fires or the container is removed.
+ * wrapper fires or the container is removed. `alive` is false for a
+ * container that stopped or is missing.
  */
 export function createDockerTransport(
     docker: Dockerode,
@@ -80,6 +81,16 @@ export function createDockerTransport(
                 stdoutTruncated: stdout.truncated,
                 stderrTruncated: stderr.truncated,
             };
+        },
+
+        async alive(signal: AbortSignal): Promise<boolean> {
+            try {
+                const info = await container.inspect({ abortSignal: signal });
+                return info.State.Running;
+            } catch (error) {
+                if (isStatus(error, 404)) return false;
+                throw error;
+            }
         },
 
         remove: () => removeContainer(container),

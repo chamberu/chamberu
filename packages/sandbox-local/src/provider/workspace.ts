@@ -68,6 +68,9 @@ export class LocalWorkspace implements IWorkspace {
 
     protected disposing: Promise<void> | undefined;
 
+    /** Set once the workspace directory was found missing (removed outside chamberu). */
+    protected gone = false;
+
     constructor(input: LocalWorkspaceInput) {
         this.id = input.id;
         this.info = input.info;
@@ -76,6 +79,10 @@ export class LocalWorkspace implements IWorkspace {
         this.env = input.env;
         this.clock = input.clock;
         this.onDispose = input.onDispose;
+    }
+
+    get disposed(): boolean {
+        return this.disposing !== undefined || this.gone;
     }
 
     async exec(argv: readonly string[], options: ExecOptions = {}): Promise<ExecResult> {
@@ -93,6 +100,7 @@ export class LocalWorkspace implements IWorkspace {
         const directory = join(this.root, cwd);
         const stats = await stat(directory).catch(() => undefined);
         if (!stats?.isDirectory()) {
+            await this.assertRoot();
             throw new SandboxError(`cwd ${displayPath(cwd)} is no directory in the workspace.`);
         }
         this.assertUsable();
@@ -115,6 +123,7 @@ export class LocalWorkspace implements IWorkspace {
             if (error instanceof SandboxError) throw error;
             const code = errnoCode(error);
             if (code === 'ENOENT' || code === 'ENOTDIR') {
+                await this.assertRoot();
                 throw new SandboxError(`file not found: ${shown}`);
             }
             throw new SandboxError(`cannot read ${shown} (${code ?? 'unknown error'}).`, { cause: error });
@@ -162,6 +171,8 @@ export class LocalWorkspace implements IWorkspace {
         }
 
         const file = join(this.root, relative);
+        // mkdir would bring a removed workspace directory back
+        await this.assertRoot();
         try {
             await mkdir(dirname(file), { recursive: true });
             await writeFile(file, content, 'utf8');
@@ -195,9 +206,24 @@ export class LocalWorkspace implements IWorkspace {
         if (this.disposing) {
             throw new SandboxError('workspace disposed');
         }
+        if (this.gone) {
+            throw new SandboxError(this.goneMessage());
+        }
         if (this.clock.now().getTime() >= this.info.expiresAt.getTime()) {
             throw new SandboxError('workspace expired');
         }
+    }
+
+    /** Marks the workspace gone and throws when its directory no longer exists. */
+    protected async assertRoot(): Promise<void> {
+        const stats = await stat(this.root).catch(() => undefined);
+        if (stats?.isDirectory() || this.disposing) return;
+        this.gone = true;
+        throw new SandboxError(this.goneMessage());
+    }
+
+    protected goneMessage(): string {
+        return `workspace ${this.id} is gone (its directory was removed); call create_workspace for a new one.`;
     }
 
     /** The requested timeout (default `EXEC_TIMEOUT_MS`), at most `EXEC_TIMEOUT_MAX_MS` and never past the expiry. */

@@ -72,6 +72,7 @@ describe('public api', () => {
     it('exports the remote constants', () => {
         expect(sandbox.TIMEOUT_KILL_AFTER_SECONDS).toBe(5);
         expect(sandbox.EXEC_GRACE_MS).toBe(15_000);
+        expect(sandbox.ALIVE_PROBE_TIMEOUT_MS).toBe(5_000);
     });
 
     it('freezes the shared constants', () => {

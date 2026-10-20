@@ -51,6 +51,7 @@ A workspace is keyed by run and repository. It lives until the first of:
 - the run settles: `completed`, `failed` or `cancelled` (through `workspaces.attach(engine)`). A run `waiting` for an approval or `interrupted` on this replica keeps its workspaces.
 - `dispose_workspace`, or `workspaces.release(runId, id?)`
 - its expiry, `limits.timeoutMs` (default 30 minutes), checked on every use
+- it was found gone: its container stopped or was removed, its pod failed, was evicted or deleted, or its local directory was removed. The call that found it says "workspace ... is gone; call create_workspace for a new one", and `create_workspace` then creates a new one
 - `workspaces.close()`: call it **after** `engine.drain()` at shutdown
 - garbage collection: `acquire` runs `workspaces.collectGarbage()` at most every 10 minutes, which also asks the provider to remove expired containers, pods or directories left behind by crashed processes
 

@@ -234,6 +234,41 @@ describe('kubernetes sandbox', () => {
         expect(client.created).toHaveLength(0);
     });
 
+    it('marks a workspace whose pod failed as gone', async () => {
+        const { client, provider } = setup();
+        const workspace = await provider.create({ runId: 'r1' });
+        client.onExec = () => { throw new SandboxError('cannot exec in pod: container not found ("sandbox")'); };
+        client.statuses = [{ phase: 'Failed', reason: 'Evicted' }];
+        expect(workspace.disposed).toBe(false);
+
+        await expect(workspace.exec(['true'])).rejects.toThrow(/is gone.*container not found.*create_workspace/);
+        expect(workspace.disposed).toBe(true);
+        await expect(workspace.readFile('a.txt')).rejects.toThrow(/is gone/);
+        await workspace.dispose();
+        expect(client.deleted).toEqual([`chamberu-ws-${workspace.id}`]);
+    });
+
+    it('marks a workspace whose pod was deleted as gone', async () => {
+        const { client, provider } = setup();
+        const workspace = await provider.create({ runId: 'r1' });
+        client.pods.delete(`chamberu-ws-${workspace.id}`);
+        client.onExec = () => { throw new SandboxError('cannot exec in pod: Unexpected server response: 404'); };
+
+        await expect(workspace.exec(['true'])).rejects.toThrow(/is gone/);
+        expect(workspace.disposed).toBe(true);
+    });
+
+    it('keeps a workspace whose pod still runs after a failed exec', async () => {
+        const { client, provider } = setup();
+        const workspace = await provider.create({ runId: 'r1' });
+        client.onExec = () => { throw new SandboxError('exec connection closed without an exit status'); };
+
+        await expect(workspace.exec(['true'])).rejects.toThrow('exec connection closed without an exit status');
+        expect(workspace.disposed).toBe(false);
+        client.onExec = () => ({});
+        expect((await workspace.exec(['true'])).exitCode).toBe(0);
+    });
+
     it('dispose deletes the pod once', async () => {
         const { client, provider } = setup();
         const workspace = await provider.create({ runId: 'r1' });

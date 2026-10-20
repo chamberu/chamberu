@@ -14,6 +14,9 @@ export const TIMEOUT_KILL_AFTER_SECONDS = 5;
  */
 export const EXEC_GRACE_MS = 15_000;
 
+/** How long a failed exec waits for `IExecTransport.alive` before it reads the workspace as alive. */
+export const ALIVE_PROBE_TIMEOUT_MS = 5_000;
+
 /** How much of a command's stderr a file error carries. */
 export const ERROR_STDERR_MAX_LENGTH = 2_000;
 

@@ -56,9 +56,10 @@ function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace;
 
 const TIMEOUT_KILL_AFTER_SECONDS: 5;
 const EXEC_GRACE_MS: 15_000;
+const ALIVE_PROBE_TIMEOUT_MS: 5_000;
 ```
 
-A provider that can run argv in a container implements `IExecTransport`; `createRemoteWorkspace` adds the rest (timeout wrapper and guard, path checks, output caps, file reads and writes, dispose).
+A provider that can run argv in a container implements `IExecTransport`; `createRemoteWorkspace` adds the rest (timeout wrapper and guard, path checks, output caps, file reads and writes, dispose). After a failed exec it asks `alive()` (at most `ALIVE_PROBE_TIMEOUT_MS`); `false` marks the workspace gone (`disposed`).
 
 <<< ../../../sandbox/src/remote/types.ts{ts}
 

@@ -51,15 +51,15 @@ export type AcquireResult = {
 export interface IWorkspaceManager {
     /**
      * The run's workspace of `repo` (none: the repo-less one), created when
-     * missing. Concurrent calls share one create. ValidationError for a
+     * missing, expired or gone (`IWorkspace.disposed`). Concurrent calls share one create. ValidationError for a
      * repository or ref the rules refuse; SandboxError for another ref of a
      * held repository, a reached per-run cap or a failed create.
      */
     acquire(runId: string, input: AcquireInput): Promise<AcquireResult>;
     /**
      * The run's workspace by id, or its only live one when id is omitted
-     * (expired ones are disposed first). SandboxError: unknown, expired (disposed then), none; ValidationError:
-     * several and no id.
+     * (expired and gone ones are disposed first). SandboxError: unknown,
+     * expired or gone (disposed then), none; ValidationError: several and no id.
      */
     get(runId: string, workspaceId?: string): IWorkspace;
     /**

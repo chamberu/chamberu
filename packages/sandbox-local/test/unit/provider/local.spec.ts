@@ -222,6 +222,40 @@ describe('local sandbox', () => {
         }
     }, 30_000);
 
+    it('marks itself gone when its directory vanished', async () => {
+        const workspace = await createLocalSandbox({ root }).create({ runId: 'r1' });
+        expect(workspace.disposed).toBe(false);
+        await rm(join(root, workspace.id), { recursive: true, force: true });
+
+        await expect(workspace.exec(['true'])).rejects.toThrow(/is gone.*create_workspace/);
+        expect(workspace.disposed).toBe(true);
+        await expect(workspace.writeFile('a.txt', 'x')).rejects.toThrow(/gone/);
+        await expect(workspace.readFile('a.txt')).rejects.toThrow(/gone/);
+        // a write never brings the directory back
+        expect(await readdir(root)).toEqual([]);
+        await workspace.dispose();
+    });
+
+    it('reads a vanished directory as gone on write and read too', async () => {
+        const sandbox = createLocalSandbox({ root });
+        const writer = await sandbox.create({ runId: 'r1' });
+        await rm(join(root, writer.id), { recursive: true, force: true });
+        await expect(writer.writeFile('a.txt', 'x')).rejects.toThrow(/is gone/);
+        expect(writer.disposed).toBe(true);
+        expect(await readdir(root)).toEqual([]);
+
+        const reader = await sandbox.create({ runId: 'r1' });
+        await rm(join(root, reader.id), { recursive: true, force: true });
+        await expect(reader.readFile('a.txt')).rejects.toThrow(/is gone/);
+        expect(reader.disposed).toBe(true);
+    });
+
+    it('is disposed after dispose', async () => {
+        const workspace = await createLocalSandbox({ root }).create({ runId: 'r1' });
+        await workspace.dispose();
+        expect(workspace.disposed).toBe(true);
+    });
+
     it('rejects invalid options', () => {
         expect(() => createLocalSandbox({ env: { 'A-B': 'x' } })).toThrow(InvalidAgentDefinitionError);
         expect(() => createLocalSandbox({ limits: { timeoutMs: 10 } })).toThrow(InvalidAgentDefinitionError);

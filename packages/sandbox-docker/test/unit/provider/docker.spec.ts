@@ -53,6 +53,30 @@ describeDocker('docker sandbox', () => {
         expect(workspace.info).toMatchObject({ runId, provider: 'docker' });
     });
 
+    it('marks a workspace whose container stopped as gone', async () => {
+        const { workspace } = await create();
+        const container = docker.getContainer(`${CONTAINER_NAME_PREFIX}${workspace.id}`);
+        await container.kill();
+        expect(workspace.disposed).toBe(false);
+
+        await expect(workspace.exec(['true'])).rejects.toThrow(/is gone.*not running.*create_workspace/);
+        expect(workspace.disposed).toBe(true);
+        await expect(workspace.readFile('a.txt')).rejects.toThrow(/is gone/);
+
+        // dispose removes the stopped container
+        await workspace.dispose();
+        await expect(container.inspect()).rejects.toSatisfy((error) => statusCode(error) === 404);
+    });
+
+    it('marks a workspace whose container was removed as gone', async () => {
+        const { workspace } = await create();
+        await docker.getContainer(`${CONTAINER_NAME_PREFIX}${workspace.id}`).remove({ force: true, v: true });
+
+        await expect(workspace.exec(['true'])).rejects.toThrow(/is gone/);
+        expect(workspace.disposed).toBe(true);
+        await workspace.dispose();
+    });
+
     it('dispose removes container and volume', async () => {
         const { workspace } = await create();
         const container = docker.getContainer(`${CONTAINER_NAME_PREFIX}${workspace.id}`);

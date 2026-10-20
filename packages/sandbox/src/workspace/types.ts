@@ -46,6 +46,13 @@ export type ExecResult = {
 export interface IWorkspace {
     readonly id: string;
     readonly info: WorkspaceInfo;
+    /**
+     * True after `dispose()`, or once the workspace found its container, pod
+     * or directory gone (stopped, killed or removed outside chamberu). Every
+     * call then rejects with SandboxError; the manager drops such a workspace
+     * and disposes it, which removes what is left of it.
+     */
+    readonly disposed: boolean;
     exec(argv: readonly string[], options?: ExecOptions): Promise<ExecResult>;
     /** UTF-8 text of at most `FILE_MAX_BYTES`. */
     readFile(path: string): Promise<string>;

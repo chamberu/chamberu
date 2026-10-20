@@ -120,6 +120,9 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
             const workspace: IWorkspace = {
                 id,
                 info,
+                get disposed() {
+                    return remote.disposed;
+                },
                 exec: remote.exec,
                 readFile: remote.readFile,
                 writeFile: remote.writeFile,

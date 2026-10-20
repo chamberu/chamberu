@@ -88,7 +88,8 @@ export function createFakePodClient(onExec: FakeExecHandler = () => ({})): FakeP
         async read(name) {
             client.reads++;
             const pod = client.pods.get(name);
-            if (!pod) throw new SandboxError(`pod ${name} not found`);
+            // like the real client: the ApiException as the cause
+            if (!pod) throw new SandboxError(`cannot read pod ${name}: not found`, { cause: { code: 404 } });
             const status = client.statuses.length > 1 ? client.statuses.shift() : client.statuses[0];
             pod.status = structuredClone(status ?? running) as V1PodStatus;
             return structuredClone(pod);

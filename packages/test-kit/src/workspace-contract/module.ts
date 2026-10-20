@@ -146,7 +146,9 @@ export function describeWorkspaceContract(name: string, factory: WorkspaceContra
 
         it('is unusable after dispose and disposes idempotently', async () => {
             const own = await factory();
+            expect(own.disposed).toBe(false);
             await own.dispose();
+            expect(own.disposed).toBe(true);
             await own.dispose();
             await expect(own.exec(['true'])).rejects.toBeInstanceOf(SandboxError);
             await expect(own.readFile('x')).rejects.toBeInstanceOf(SandboxError);

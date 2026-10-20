@@ -33,6 +33,12 @@ export type TransportExecResult = {
 export interface IExecTransport {
     /** A command that cannot start reports exit 127. */
     exec(argv: readonly string[], options: TransportExecOptions): Promise<TransportExecResult>;
+    /**
+     * Whether the container or pod still runs; asked after a failed exec. False
+     * marks the workspace gone. A rejection, or no answer within
+     * `ALIVE_PROBE_TIMEOUT_MS` (the signal then aborts), reads as alive.
+     */
+    alive?(signal: AbortSignal): Promise<boolean>;
     /** Deletes the container or pod; idempotent, a missing one is fine. */
     remove(): Promise<void>;
 }

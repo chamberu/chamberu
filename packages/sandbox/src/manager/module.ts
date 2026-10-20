@@ -42,7 +42,8 @@ const NOT_FOUND = 'workspace not found in this run (disposed, expired or never c
 
 /**
  * Run-scoped workspaces over `provider`: one per (run, repository), created
- * on `acquire`, disposed on `release`, on expiry (checked on every get), when
+ * on `acquire`, disposed on `release`, on expiry (checked on every get), once
+ * found gone (`IWorkspace.disposed`, dropped on every get and acquire), when
  * the run settles (`attach`), on `close()` and by garbage collection. A run
  * can only ever reach its own workspaces.
  */
@@ -82,12 +83,12 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         if (entries.size === 0) runs.delete(runId);
     };
 
-    /** Forgets and disposes every expired workspace of the run; returns them. */
+    /** Forgets every expired or gone workspace of the run; returns them for disposal. */
     const sweep = (runId: string): IWorkspace[] => {
         const now = clock.now();
         const expired: IWorkspace[] = [];
         for (const entry of runs.get(runId)?.values() ?? []) {
-            if (entry.workspace && isExpired(entry.workspace, now)) {
+            if (entry.workspace && (entry.workspace.disposed || isExpired(entry.workspace, now))) {
                 forget(runId, entry);
                 expired.push(entry.workspace);
             }
@@ -101,13 +102,16 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
     const collectGarbage = async (): Promise<number> => {
         lastGcAt = clock.now().getTime();
         const expired = runs.keys().toArray().flatMap((runId) => sweep(runId));
+        // a workspace found gone may still leave a stopped container behind,
+        // but only the expired live ones count as collected here
+        const counted = expired.filter((workspace) => !workspace.disposed).length;
         // own disposals first: the provider's collection would find the same
         // expired workspaces, count them twice and dispose them concurrently
         const disposed = await Promise.allSettled(expired.map((workspace) => disposeOrThrow(workspace)));
         for (const result of disposed) {
             if (result.status === 'rejected') onError(result.reason);
         }
-        return expired.length + await provider.collectGarbage();
+        return counted + await provider.collectGarbage();
     };
 
     const maybeCollectGarbage = (): void => {
@@ -184,19 +188,22 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         return { workspace: await entry.pending, reused: false };
     };
 
-    const expiredError = (workspace: IWorkspace): SandboxError => new SandboxError(
-        `workspace ${workspace.id} expired at ${workspace.info.expiresAt.toISOString()} and was disposed; call create_workspace for a new one.`,
-    );
+    /** Why `workspace` can no longer be used: gone (disposed outside the manager, container stopped) or expired. */
+    const deadError = (workspace: IWorkspace): SandboxError => new SandboxError(workspace.disposed ?
+        `workspace ${workspace.id} is gone (disposed, or its container, pod or directory stopped or was removed); call create_workspace for a new one.` :
+        `workspace ${workspace.id} expired at ${workspace.info.expiresAt.toISOString()} and was disposed; call create_workspace for a new one.`);
 
     const get = (runId: string, workspaceId?: string): IWorkspace => {
         let entry: Entry | undefined;
         if (workspaceId === undefined) {
             // only live workspaces count when picking the run's one workspace
             const expired = sweep(runId);
+            // the reason before the disposal: a disposed workspace reads as gone
+            const dead = expired.length > 0 ? deadError(expired[0]!) : undefined;
             for (const workspace of expired) disposeInBackground(workspace);
             const held = heldEntries(runId);
             if (held.length === 0) {
-                if (expired.length > 0) throw expiredError(expired[0]!);
+                if (dead) throw dead;
                 throw new SandboxError('This run has no workspace; call create_workspace first.');
             }
             if (held.length > 1) {
@@ -210,10 +217,11 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
         }
 
         const workspace = entry!.workspace!;
-        if (isExpired(workspace, clock.now())) {
+        if (workspace.disposed || isExpired(workspace, clock.now())) {
+            const dead = deadError(workspace);
             forget(runId, entry!);
             disposeInBackground(workspace);
-            throw expiredError(workspace);
+            throw dead;
         }
         return workspace;
     };

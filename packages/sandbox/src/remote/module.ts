@@ -16,7 +16,7 @@ import {
     WORKSPACE_ROOT,
 } from '../workspace/constants.ts';
 import type { ExecOptions, ExecResult, IWorkspace } from '../workspace/types.ts';
-import { EXEC_GRACE_MS, WRITE_FILE_SCRIPT } from './constants.ts';
+import { ALIVE_PROBE_TIMEOUT_MS, EXEC_GRACE_MS, WRITE_FILE_SCRIPT } from './constants.ts';
 import {
     assertArgv,
     capOutput,
@@ -47,7 +47,8 @@ const EMPTY = new Uint8Array(0);
  * detaches (the command runs on until its `timeout` or the dispose); a
  * dispose settles every in-flight exec with `SandboxError('workspace
  * disposed')` and removes the container or pod; a dispose after a failed
- * removal tries it again.
+ * removal tries it again. A failed exec asks `transport.alive`: a container
+ * or pod that no longer runs marks the workspace gone (`disposed`).
  */
 export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
     const {
@@ -58,11 +59,18 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
     const clock = input.clock ?? systemClock;
     const disposal = new AbortController();
     let disposed = false;
+    let gone = false;
     let removing: Promise<void> | undefined;
+
+    const goneMessage = (detail?: string): string => `workspace ${id} is gone (its container or pod stopped or was removed` +
+        `${detail ? `: ${detail}` : ''}); call create_workspace for a new one.`;
 
     const assertUsable = () => {
         if (disposed) {
             throw new SandboxError('workspace disposed');
+        }
+        if (gone) {
+            throw new SandboxError(goneMessage());
         }
         if (clock.now().getTime() >= info.expiresAt.getTime()) {
             throw new SandboxError('workspace expired');
@@ -76,6 +84,26 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
         }
         const remaining = info.expiresAt.getTime() - clock.now().getTime();
         return Math.max(1, Math.min(requested ?? EXEC_TIMEOUT_MS, EXEC_TIMEOUT_MAX_MS, remaining));
+    };
+
+    /** `transport.alive`, bounded by ALIVE_PROBE_TIMEOUT_MS; anything but a plain `false` reads as alive. */
+    const probeAlive = (): Promise<boolean> => {
+        const { alive } = transport;
+        if (!alive) return Promise.resolve(true);
+        const controller = new AbortController();
+        return new Promise<boolean>((resolve) => {
+            const timer = clock.setTimeout(() => {
+                controller.abort();
+                resolve(true);
+            }, ALIVE_PROBE_TIMEOUT_MS);
+            const answer = (value: boolean) => {
+                timer.clear();
+                resolve(value);
+            };
+            Promise.resolve()
+                .then(() => alive.call(transport, controller.signal))
+                .then((value) => answer(value !== false), () => answer(true));
+        });
     };
 
     const run = (argv: readonly string[], options: RunInput): Promise<RunResult> => {
@@ -158,7 +186,17 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
                 });
             }, (error: unknown) => {
                 if (!finish() || interrupted()) return;
-                reject(toSandboxError(error, 'exec failed'));
+                const failure = toSandboxError(error, 'exec failed');
+                probeAlive().then((alive) => {
+                    if (disposed) {
+                        reject(new SandboxError('workspace disposed'));
+                    } else if (alive) {
+                        reject(failure);
+                    } else {
+                        gone = true;
+                        reject(new SandboxError(goneMessage(failure.message), { cause: error }));
+                    }
+                });
             });
         });
     };
@@ -166,6 +204,10 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
     return {
         id,
         info,
+
+        get disposed() {
+            return disposed || gone;
+        },
 
         async exec(argv: readonly string[], options: ExecOptions = {}): Promise<ExecResult> {
             assertUsable();

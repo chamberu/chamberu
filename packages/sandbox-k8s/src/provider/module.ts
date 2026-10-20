@@ -121,6 +121,9 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
             const workspace: IWorkspace = {
                 id,
                 info,
+                get disposed() {
+                    return remote.disposed;
+                },
                 exec: remote.exec,
                 readFile: remote.readFile,
                 writeFile: remote.writeFile,

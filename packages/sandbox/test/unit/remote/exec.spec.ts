@@ -7,7 +7,12 @@
 
 import { describe, expect, it } from 'vitest';
 import { SandboxError, ValidationError } from '@chamberu/core';
-import { EXEC_GRACE_MS, OUTPUT_MAX_BYTES, createRemoteWorkspace } from '@chamberu/sandbox';
+import {
+    ALIVE_PROBE_TIMEOUT_MS,
+    EXEC_GRACE_MS,
+    OUTPUT_MAX_BYTES,
+    createRemoteWorkspace,
+} from '@chamberu/sandbox';
 import type { TransportExecResult } from '@chamberu/sandbox';
 import { ControllableClock } from '../../utils/clock.ts';
 import { createFakeTransport } from '../../utils/transport.ts';
@@ -304,6 +309,61 @@ describe('remote workspace: exec', () => {
         expect(error).toBeInstanceOf(SandboxError);
         expect((error as SandboxError).message).toMatch(/connection reset/);
         expect((error as SandboxError).cause).toBe(cause);
+    });
+
+    it('marks itself gone when the transport finds its container gone', async () => {
+        const cause = new Error('container is not running');
+        const { transport, workspace } = setup(() => { throw cause; });
+        transport.alive = async () => false;
+        expect(workspace.disposed).toBe(false);
+
+        const error = await workspace.exec(['true']).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(SandboxError);
+        expect((error as SandboxError).message).toMatch(/ws-1 is gone/);
+        expect((error as SandboxError).message).toMatch(/not running/);
+        expect((error as SandboxError).message).toMatch(/create_workspace/);
+        expect(workspace.disposed).toBe(true);
+
+        await expect(workspace.readFile('a.txt')).rejects.toThrow(/gone/);
+        expect(transport.calls).toHaveLength(1);
+        // dispose still removes what is left of it
+        await workspace.dispose();
+        expect(transport.removed).toBe(1);
+    });
+
+    it('stays usable when the transport finds its container alive or cannot tell', async () => {
+        const cause = new Error('connection reset');
+        for (const alive of [async () => true, async () => { throw new Error('daemon down'); }]) {
+            const { transport, workspace } = setup(() => { throw cause; });
+            transport.alive = alive;
+            const error = await workspace.exec(['true']).catch((e: unknown) => e);
+            expect((error as SandboxError).message).toBe('exec failed: connection reset');
+            expect(workspace.disposed).toBe(false);
+        }
+    });
+
+    it('stays usable when the liveness probe does not answer', async () => {
+        const {
+            clock, 
+            transport, 
+            workspace, 
+        } = setup(() => { throw new Error('connection reset'); });
+        transport.alive = () => new Promise<boolean>(() => {
+            // never answers
+        });
+        const pending = workspace.exec(['true']).catch((e: unknown) => e);
+        await flush();
+        clock.advance(ALIVE_PROBE_TIMEOUT_MS);
+        const error = await pending;
+        expect((error as SandboxError).message).toBe('exec failed: connection reset');
+        expect(workspace.disposed).toBe(false);
+    });
+
+    it('is disposed after dispose', async () => {
+        const { workspace } = setup();
+        expect(workspace.disposed).toBe(false);
+        await workspace.dispose();
+        expect(workspace.disposed).toBe(true);
     });
 
     it('keeps a SandboxError of the transport', async () => {

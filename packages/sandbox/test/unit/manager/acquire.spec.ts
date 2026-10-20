@@ -324,6 +324,42 @@ describe('workspace manager: acquire', () => {
         expect(() => manager.get('r1')).toThrow(/create_workspace first/);
     });
 
+    it('creates anew on acquire when the workspace died outside the manager', async () => {
+        const { provider, manager } = setup();
+        const first = await manager.acquire('r1', { repo: 'octo/demo' });
+        // e.g. the provider's own collection disposed it, or its container stopped
+        await first.workspace.dispose();
+        expect(first.workspace.disposed).toBe(true);
+
+        const second = await manager.acquire('r1', { repo: 'octo/demo' });
+        expect(second.reused).toBe(false);
+        expect(second.workspace.id).not.toBe(first.workspace.id);
+        expect(second.workspace.disposed).toBe(false);
+        expect(provider.created).toHaveLength(2);
+        expect(manager.get('r1')).toBe(second.workspace);
+    });
+
+    it('reports a workspace that died outside the manager as gone', async () => {
+        const { manager } = setup();
+        const { workspace } = await manager.acquire('r1', {});
+        await workspace.dispose();
+        expect(() => manager.get('r1', workspace.id)).toThrow(/gone/);
+        expect(() => manager.get('r1', workspace.id)).toThrow(/not found/);
+
+        const other = await manager.acquire('r2', {});
+        await other.workspace.dispose();
+        expect(() => manager.get('r2')).toThrow(/gone.*create_workspace/);
+        expect(() => manager.get('r2')).toThrow(/create_workspace first/);
+    });
+
+    it('does not count a workspace that died outside the manager as collected', async () => {
+        const { manager } = setup();
+        const { workspace } = await manager.acquire('r1', {});
+        await workspace.dispose();
+        expect(await manager.collectGarbage()).toBe(0);
+        expect(() => manager.get('r1', workspace.id)).toThrow(/not found/);
+    });
+
     it('refuses to acquire after close', async () => {
         const { provider, manager } = setup();
         const { workspace } = await manager.acquire('r1', {});
