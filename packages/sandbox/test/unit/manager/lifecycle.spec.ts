@@ -212,6 +212,47 @@ describe('workspace manager: run lifecycle', () => {
         await expect(manager.close()).resolves.toBeUndefined();
     });
 
+    it('close() waits for disposals the settled runs started', async () => {
+        const clock = new ControllableClock(new Date(1_000_000));
+        const provider = createFakeProvider({ clock });
+        const errors: unknown[] = [];
+        const manager = createWorkspaceManager({
+            provider,
+            clock,
+            gcIntervalMs: 0,
+            onError: (error) => { errors.push(error); },
+        });
+        const engine = fakeEngine();
+        manager.attach(engine);
+
+        const gate = Promise.withResolvers<void>();
+        const gated = async (runId: string) => {
+            const { workspace } = await manager.acquire(runId, {});
+            const dispose = workspace.dispose.bind(workspace);
+            workspace.dispose = async () => {
+                await gate.promise;
+                await dispose();
+            };
+            return workspace;
+        };
+        // one released when its run settled, one dropped when found expired
+        await gated('r1');
+        const expiring = await gated('r2');
+        engine.emit({ id: 'r1', status: RunStatus.COMPLETED });
+        Object.assign(expiring.info, { expiresAt: new Date(clock.now().getTime()) });
+        expect(() => manager.get('r2')).toThrow(/expired/);
+
+        let closed = false;
+        const closing = manager.close().then(() => { closed = true; });
+        await flush();
+        expect(closed).toBe(false);
+
+        gate.resolve();
+        await closing;
+        expect(provider.disposed).toHaveLength(2);
+        expect(errors).toEqual([]);
+    });
+
     it('subscribes nothing when attached after close()', async () => {
         const { manager } = await run({ script: [text('done')] });
         await manager.close();

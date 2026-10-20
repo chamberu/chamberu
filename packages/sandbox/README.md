@@ -86,7 +86,7 @@ await engine.drain();
 await workspaces.close();
 ```
 
-`close()` aborts the creates still in flight and waits for them and for every disposal, at most `timeoutMs` (`CLOSE_TIMEOUT_MS`, 30 s): then it resolves and reports what is still being disposed to `onError`, so a hanging Docker daemon or Kubernetes API cannot stall the shutdown. `release(runId)` waits for the run's creates in flight the same way.
+`close()` aborts the creates still in flight and waits for them and for every disposal, also those a run that settled during `engine.drain()` started, at most `timeoutMs` (`CLOSE_TIMEOUT_MS`, 30 s): then it resolves and reports what is still being disposed to `onError`, so a hanging Docker daemon or Kubernetes API cannot stall the shutdown. `release(runId)` waits for the run's creates in flight the same way.
 
 ## Workspace tools
 

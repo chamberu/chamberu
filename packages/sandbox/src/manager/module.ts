@@ -66,13 +66,24 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
     let closed = false;
     let tools: ToolSet | undefined;
 
-    const disposeOrThrow = async (workspace: IWorkspace): Promise<void> => {
-        try {
-            await workspace.dispose();
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            throw new SandboxError(`workspace dispose failed: ${message}`, { cause: error });
-        }
+    /** Every disposal started and not settled yet, with its workspace id: close() waits for them. */
+    const disposals = new Map<Promise<void>, string>();
+
+    const disposeOrThrow = (workspace: IWorkspace): Promise<void> => {
+        const disposal = (async () => {
+            try {
+                await workspace.dispose();
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                throw new SandboxError(`workspace dispose failed: ${message}`, { cause: error });
+            }
+        })();
+        disposals.set(disposal, workspace.id);
+        const settled = () => {
+            disposals.delete(disposal);
+        };
+        disposal.then(settled, settled);
+        return disposal;
     };
 
     const disposeInBackground = (workspace: IWorkspace): void => {
@@ -300,6 +311,13 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
 
             // what is still being disposed or created, for the timeout report
             const left = new Set<string>();
+            // disposals started before (a settled run, an expired or gone
+            // workspace): their runs are no longer held, but their containers
+            // must not outlive the close
+            const started = disposals.entries().toArray().map(([disposal, id]) => {
+                left.add(id);
+                return disposal.catch(() => undefined).finally(() => left.delete(id));
+            });
             const work = runs.entries().toArray().map(([runId, entries]) => {
                 const labels = entries.values().toArray()
                     .map((entry) => entry.workspace?.id ?? `a workspace of run ${runId} still being created`);
@@ -311,7 +329,7 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
 
             let timer: { clear(): void } | undefined;
             const timedOut = await Promise.race([
-                Promise.all(work).then(() => false),
+                Promise.all([...started, ...work]).then(() => false),
                 new Promise<boolean>((resolve) => {
                     timer = clock.setTimeout(() => resolve(true), timeoutMs);
                 }),
