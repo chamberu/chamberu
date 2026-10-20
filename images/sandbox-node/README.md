@@ -36,7 +36,7 @@ No secrets, tokens or credentials are baked in or passed to a workspace.
 Built for `linux/amd64` and `linux/arm64` by `.github/workflows/images.yml`:
 
 - `24`: the latest build, rebuilt on every change under `images/` on `master` and weekly (base image security updates)
-- `24-<short sha>`: one immutable tag per build
+- `24-<short sha>`: one tag per commit on `master` that changes the image, pushed once with that commit; the weekly and manual rebuilds move only `24`
 
 Pin a digest (`ghcr.io/chamberu/sandbox-node@sha256:...`) in production, or use `pull: 'always'` (Docker) / `imagePullPolicy: 'Always'` (Kubernetes) to follow the mutable `24` tag.
 

@@ -27,7 +27,7 @@ Agents that run untrusted code (reproducing a bug, running tests) do it in [work
 
 - **Contents:** `node:24-trixie-slim` (Node.js 24, npm, corepack), git, ca-certificates, `tini` as the entrypoint, GNU coreutils `timeout`; `/workspace` owned by uid 1000, `USER 1000:1000`. npm's cache, global prefix and corepack live under `/tmp`, so everything works on the read-only root filesystem the providers enforce.
 - **Platforms:** `linux/amd64` and `linux/arm64`.
-- **Tags:** `24`, rebuilt on every change under `images/` on `master` and weekly for base image security updates, and `24-<short sha>`, one immutable tag per build. Pull requests that touch the image build and smoke-test it without pushing.
+- **Tags:** `24`, rebuilt on every change under `images/` on `master` and weekly for base image security updates, and `24-<short sha>`, pushed once per commit that changes the image (the weekly rebuild moves only `24`). Pull requests that touch the image build and smoke-test it without pushing.
 - **Pinning:** reference a digest in production (`ghcr.io/chamberu/sandbox-node@sha256:...`), or follow the mutable `24` tag with `pull: 'always'` (Docker) or `imagePullPolicy: 'Always'` (Kubernetes).
 - **Extending:** build `FROM ghcr.io/chamberu/sandbox-node:24`, install packages as root, switch back to `USER 1000:1000` and pass the image as `image` to the provider. The providers need `sh`, `cat`, `head`, `mkdir`, `dirname`, `cp`, `mv`, `rm`, GNU `timeout` and `git`.
 

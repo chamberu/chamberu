@@ -40,5 +40,9 @@ updates:
       directory: "/images/sandbox-node"
       schedule:
           interval: "daily"
+      # the image is published as `24`: a Node.js major is a new image, not a bump
+      ignore:
+          - dependency-name: "node"
+            update-types: ["version-update:semver-major"]
       commit-message:
           prefix: "build"

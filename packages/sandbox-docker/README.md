@@ -76,7 +76,7 @@ Each workspace is a container `chamberu-ws-<id>`:
 
 ## Image
 
-The default image is `ghcr.io/chamberu/sandbox-node:24` (`DEFAULT_SANDBOX_IMAGE`): Node.js 24, npm, corepack, git, `tini` and GNU coreutils, built for `linux/amd64` and `linux/arm64` from [`images/sandbox-node`](../../images/sandbox-node). Tags: `24` (rebuilt on changes and weekly for base image updates) and `24-<short sha>` (immutable).
+The default image is `ghcr.io/chamberu/sandbox-node:24` (`DEFAULT_SANDBOX_IMAGE`): Node.js 24, npm, corepack, git, `tini` and GNU coreutils, built for `linux/amd64` and `linux/arm64` from [`images/sandbox-node`](../../images/sandbox-node). Tags: `24` (rebuilt on changes and weekly for base image updates) and `24-<short sha>` (pushed once per commit that changes the image).
 
 - `pull: 'missing'` (default) pulls the image once when the daemon lacks it, `'always'` before every create (a mutable tag such as `:24` then follows its rebuilds), `'never'` never.
 - Pin a digest in production (`image: 'ghcr.io/chamberu/sandbox-node@sha256:...'`), or use `pull: 'always'`.

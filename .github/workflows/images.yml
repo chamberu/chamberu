@@ -40,9 +40,17 @@ jobs:
                   echo "$output"
                   test "$(echo "$output" | tail -n 1)" = "1000"
 
-            - name: Short sha
-              id: short-sha
-              run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+            # 24-<short sha> only for the push of a commit: a scheduled or
+            # manual rebuild of the same commit would move it to a new digest
+            - name: Tags
+              id: tags
+              run: |
+                  {
+                      echo 'list<<TAGS'
+                      echo '24'
+                      if [ "$GITHUB_EVENT_NAME" = 'push' ]; then echo "24-$(git rev-parse --short HEAD)"; fi
+                      echo 'TAGS'
+                  } >> "$GITHUB_OUTPUT"
 
             - name: Publish
               if: github.event_name != 'pull_request'
@@ -50,7 +58,5 @@ jobs:
               with:
                   dockerFilePath: images/sandbox-node
                   registryRepository: chamberu/sandbox-node
-                  registryTag: |
-                      24
-                      24-${{ steps.short-sha.outputs.sha }}
+                  registryTag: ${{ steps.tags.outputs.list }}
                   platforms: linux/amd64,linux/arm64
