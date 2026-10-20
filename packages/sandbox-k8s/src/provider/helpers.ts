@@ -1,0 +1,234 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { KubeConfig } from '@kubernetes/client-node';
+import type { V1Pod } from '@kubernetes/client-node';
+import type { IClock } from '@chamberu/core';
+import { ChamberuError, InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
+import {
+    EXPIRES_AT_KEY,
+    RUN_LABEL,
+    SANDBOX_ENV,
+    SANDBOX_LABELS,
+    TMP_SIZE,
+    WORKSPACE_LABEL,
+    WORKSPACE_ROOT,
+    assertSandboxEnv,
+    resolveLimits,
+} from '@chamberu/sandbox';
+import { isObject } from 'smob';
+import {
+    CONTAINER_NAME,
+    FATAL_WAITING_REASONS,
+    POD_NAME_PREFIX,
+} from './constants.ts';
+import type { KubernetesSandboxOptions, PodInput } from './types.ts';
+
+/** uid and gid of every workspace process (the image's `node` user). */
+const SANDBOX_UID = 1000;
+
+const PULL_POLICIES = ['Always', 'IfNotPresent'];
+
+const MANAGED_LABELS = [...Object.keys(SANDBOX_LABELS), RUN_LABEL, WORKSPACE_LABEL];
+
+const CLIENT_METHODS = ['create', 'read', 'delete', 'list', 'exec'];
+
+function isName(value: unknown): boolean {
+    return typeof value === 'string' && value.length > 0 && !value.includes('\0');
+}
+
+function assertPositiveInteger(name: string, value: unknown): void {
+    if (value !== undefined && (!Number.isSafeInteger(value) || (value as number) < 1)) {
+        throw new InvalidAgentDefinitionError(`${name} must be a positive integer, got ${JSON.stringify(value)}.`);
+    }
+}
+
+/** Checks the provider options; InvalidAgentDefinitionError for a misconfiguration. */
+export function assertKubernetesOptions(options: KubernetesSandboxOptions): void {
+    if (!isObject(options)) {
+        throw new InvalidAgentDefinitionError('createKubernetesSandbox() options must be an object.');
+    }
+    if (!isName(options.namespace)) {
+        throw new InvalidAgentDefinitionError('namespace must be a non-empty string.');
+    }
+    const {
+        client,
+        clock,
+        podLabels,
+    } = options;
+    if (client !== undefined && (!isObject(client) || CLIENT_METHODS.some((method) => typeof client[method as keyof typeof client] !== 'function'))) {
+        throw new InvalidAgentDefinitionError('client must be an IPodClient.');
+    }
+    if (options.kubeConfig !== undefined && !isObject(options.kubeConfig)) {
+        throw new InvalidAgentDefinitionError('kubeConfig must be a KubeConfig.');
+    }
+    if (options.image !== undefined && !isName(options.image)) {
+        throw new InvalidAgentDefinitionError('image must be a non-empty string.');
+    }
+    if (options.imagePullPolicy !== undefined && !PULL_POLICIES.includes(options.imagePullPolicy)) {
+        throw new InvalidAgentDefinitionError(`imagePullPolicy must be one of ${PULL_POLICIES.join(', ')}, got ${JSON.stringify(options.imagePullPolicy)}.`);
+    }
+    if (podLabels !== undefined) {
+        if (!isObject(podLabels)) {
+            throw new InvalidAgentDefinitionError('podLabels must be an object of strings.');
+        }
+        for (const [key, value] of Object.entries(podLabels)) {
+            if (MANAGED_LABELS.includes(key)) {
+                throw new InvalidAgentDefinitionError(`podLabels may not set the managed label ${key}.`);
+            }
+            if (typeof value !== 'string') {
+                throw new InvalidAgentDefinitionError(`podLabels ${key} must be a string.`);
+            }
+        }
+    }
+    assertPositiveInteger('startTimeoutMs', options.startTimeoutMs);
+    assertPositiveInteger('pollMs', options.pollMs);
+    if (clock !== undefined && (!isObject(clock) || typeof clock.now !== 'function' || typeof clock.setTimeout !== 'function')) {
+        throw new InvalidAgentDefinitionError('clock must be an IClock.');
+    }
+    assertSandboxEnv(options.env);
+    resolveLimits(options.limits);
+}
+
+/**
+ * The pod of one workspace: non-root (uid 1000) with a RuntimeDefault
+ * seccomp profile, no service account token, no service links, no
+ * privilege escalation, a read-only root, no capabilities, equal requests
+ * and limits, an emptyDir `/workspace` and an in-memory `/tmp`, and only
+ * `SANDBOX_ENV` plus the configured `env` (never the host's). It sleeps for
+ * its lifetime and `activeDeadlineSeconds` ends it, so an expired pod stops
+ * even when nothing collects it.
+ */
+export function buildPod(input: PodInput): V1Pod {
+    const seconds = Math.ceil(input.limits.timeoutMs / 1000);
+    const env = { ...SANDBOX_ENV, ...input.env };
+    const resources = {
+        cpu: input.limits.cpu,
+        memory: input.limits.memory,
+        'ephemeral-storage': input.limits.storage,
+    };
+
+    return {
+        apiVersion: 'v1',
+        kind: 'Pod',
+        metadata: {
+            name: `${POD_NAME_PREFIX}${input.id}`,
+            namespace: input.namespace,
+            labels: {
+                ...input.labels,
+                ...SANDBOX_LABELS,
+                [RUN_LABEL]: input.runId,
+                [WORKSPACE_LABEL]: input.id,
+            },
+            annotations: { [EXPIRES_AT_KEY]: String(input.expiresAt.getTime()) },
+        },
+        spec: {
+            restartPolicy: 'Never',
+            automountServiceAccountToken: false,
+            enableServiceLinks: false,
+            activeDeadlineSeconds: seconds,
+            terminationGracePeriodSeconds: 5,
+            securityContext: {
+                runAsNonRoot: true,
+                runAsUser: SANDBOX_UID,
+                runAsGroup: SANDBOX_UID,
+                fsGroup: SANDBOX_UID,
+                seccompProfile: { type: 'RuntimeDefault' },
+            },
+            containers: [{
+                name: CONTAINER_NAME,
+                image: input.image,
+                imagePullPolicy: input.imagePullPolicy,
+                // the image's entrypoint (tini) stays
+                args: ['sleep', String(seconds)],
+                workingDir: WORKSPACE_ROOT,
+                env: Object.entries(env).map(([name, value]) => ({ name, value })),
+                securityContext: {
+                    allowPrivilegeEscalation: false,
+                    readOnlyRootFilesystem: true,
+                    privileged: false,
+                    runAsNonRoot: true,
+                    capabilities: { drop: ['ALL'] },
+                },
+                resources: {
+                    limits: { ...resources },
+                    requests: { ...resources },
+                },
+                volumeMounts: [
+                    { name: 'workspace', mountPath: WORKSPACE_ROOT },
+                    { name: 'tmp', mountPath: '/tmp' },
+                ],
+            }],
+            volumes: [
+                { name: 'workspace', emptyDir: { sizeLimit: input.limits.storage } },
+                { name: 'tmp', emptyDir: { medium: 'Memory', sizeLimit: TMP_SIZE } },
+            ],
+        },
+    };
+}
+
+/** `running`, `pending`, or the reason the pod will never run. */
+export function podState(pod: V1Pod): { state: 'running' | 'pending' } | { state: 'failed'; reason: string } {
+    const status = pod.status ?? {};
+    if (status.phase === 'Failed' || status.phase === 'Succeeded') {
+        const detail = [status.reason, status.message].filter(Boolean).join(': ');
+        return { state: 'failed', reason: `phase ${status.phase}${detail ? ` (${detail})` : ''}` };
+    }
+    const container = status.containerStatuses?.find((item) => item.name === CONTAINER_NAME);
+    const waiting = container?.state?.waiting;
+    if (waiting?.reason && FATAL_WAITING_REASONS.includes(waiting.reason)) {
+        return { state: 'failed', reason: `${waiting.reason}${waiting.message ? `: ${waiting.message}` : ''}` };
+    }
+    if (container?.state?.terminated) {
+        const { terminated } = container.state;
+        return { state: 'failed', reason: `container terminated (${terminated.reason ?? `exit ${terminated.exitCode}`})` };
+    }
+    return { state: status.phase === 'Running' ? 'running' : 'pending' };
+}
+
+/** True when the pod's expiry annotation is at or before `now`. */
+export function isExpired(pod: V1Pod, now: number): boolean {
+    const value = pod.metadata?.annotations?.[EXPIRES_AT_KEY];
+    const expiresAt = Number(value);
+    return !!value && Number.isFinite(expiresAt) && expiresAt <= now;
+}
+
+/** Waits `ms` on the clock; rejects with SandboxError when the signal fires first. */
+export function delay(clock: IClock, ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(new SandboxError('workspace creation aborted'));
+            return;
+        }
+        const timer = clock.setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+        }, ms);
+        function onAbort() {
+            timer.clear();
+            reject(new SandboxError('workspace creation aborted'));
+        }
+        signal?.addEventListener('abort', onAbort, { once: true });
+    });
+}
+
+/** Runs a client call; an error that is no ChamberuError (a custom client's) becomes a SandboxError. */
+export async function guard<T>(action: string, run: () => Promise<T>): Promise<T> {
+    try {
+        return await run();
+    } catch (error) {
+        if (error instanceof ChamberuError) throw error;
+        throw new SandboxError(`cannot ${action}`, { cause: error });
+    }
+}
+
+/** The in-cluster config, else `KUBECONFIG` or `~/.kube/config`. */
+export function loadDefaultKubeConfig(): KubeConfig {
+    const kubeConfig = new KubeConfig();
+    kubeConfig.loadFromDefault();
+    return kubeConfig;
+}

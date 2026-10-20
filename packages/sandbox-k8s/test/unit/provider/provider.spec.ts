@@ -1,0 +1,335 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
+import { DEFAULT_SANDBOX_IMAGE } from '@chamberu/sandbox';
+import { POLL_MS, START_TIMEOUT_MS, createKubernetesSandbox } from '@chamberu/sandbox-k8s';
+import type { KubernetesSandboxOptions } from '@chamberu/sandbox-k8s';
+import { ControllableClock } from '@chamberu/test-kit';
+import {
+    createFakePodClient,
+    unwrap,
+    wrapped,
+} from '../../utils/client.ts';
+import type { FakeExecHandler } from '../../utils/client.ts';
+import { drive, flush } from '../../utils/drive.ts';
+
+const START = 1_000_000;
+const COMMIT = 'a'.repeat(40);
+const REPO = 'https://github.com/octo/demo.git';
+
+const pending = { phase: 'Pending' };
+
+const answerRevParse: FakeExecHandler = (argv) => (
+    unwrap(argv)[1] === 'rev-parse' ? { stdout: `${COMMIT}\n` } : {}
+);
+
+function setup(onExec: FakeExecHandler = answerRevParse, options: Partial<KubernetesSandboxOptions> = {}) {
+    const clock = new ControllableClock(new Date(START));
+    const client = createFakePodClient(onExec);
+    const provider = createKubernetesSandbox({
+        namespace: 'agents',
+        image: 'img',
+        client,
+        clock,
+        ...options,
+    });
+    return {
+        clock,
+        client,
+        provider,
+    };
+}
+
+describe('kubernetes sandbox', () => {
+    it('waits for Running, then checks out', async () => {
+        const {
+            client,
+            clock,
+            provider,
+        } = setup();
+        client.statuses = [pending, pending, { phase: 'Running' }];
+
+        const creating = provider.create({
+            runId: 'r1',
+            repo: REPO,
+            ref: 'v1',
+        });
+        let done = false;
+        creating.then(() => { done = true; }, () => { done = true; });
+
+        await flush();
+        expect(client.reads).toBe(1);
+        expect(client.execs).toHaveLength(0);
+        clock.advance(POLL_MS);
+        await flush();
+        expect(client.reads).toBe(2);
+        expect(done).toBe(false);
+        clock.advance(POLL_MS);
+
+        const workspace = await creating;
+        expect(client.reads).toBe(3);
+        expect(client.created).toHaveLength(1);
+        const name = `chamberu-ws-${workspace.id}`;
+        expect(client.created[0]!.metadata?.name).toBe(name);
+        expect(client.created[0]!.metadata?.labels?.['chamberu.dev/run']).toBe('r1');
+        expect(client.execs.map((call) => call.name)).toEqual(Array(5).fill(name));
+        expect(client.execs.map((call) => call.argv)).toEqual([
+            wrapped(['git', 'init', '-q', '.']),
+            wrapped(['git', 'remote', 'add', 'origin', REPO]),
+            wrapped(['git', '-c', 'credential.helper=', 'fetch', '-q', '--depth', '1', 'origin', 'v1']),
+            wrapped(['git', '-c', 'advice.detachedHead=false', 'checkout', '-q', 'FETCH_HEAD']),
+            wrapped(['git', 'rev-parse', 'HEAD']),
+        ]);
+        expect(workspace.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+        expect(workspace.info).toEqual({
+            runId: 'r1',
+            provider: 'k8s',
+            repo: REPO,
+            ref: 'v1',
+            commit: COMMIT,
+            createdAt: new Date(START),
+            expiresAt: new Date(START + 1_800_000),
+        });
+        expect(client.deleted).toEqual([]);
+    });
+
+    it('runs commands in the pod', async () => {
+        const { client, provider } = setup((argv, input) => (
+            unwrap(argv)[0] === 'cat' ? { stdout: new TextDecoder().decode(input.stdin), exitCode: 3 } : {}
+        ));
+        const workspace = await provider.create({ runId: 'r1' });
+        expect(client.execs.map((call) => call.argv)).toEqual([wrapped(['git', 'init', '-q', '.'])]);
+        expect(workspace.info.commit).toBeUndefined();
+
+        const result = await workspace.exec(['cat'], {
+            cwd: 'sub',
+            stdin: 'piped ✓',
+            timeoutMs: 1500,
+        });
+        expect(client.execs.at(-1)).toEqual({
+            name: `chamberu-ws-${workspace.id}`,
+            argv: wrapped(['cat'], '1.5', '/workspace/sub'),
+            stdin: 'piped ✓',
+        });
+        expect(result).toMatchObject({
+            exitCode: 3,
+            stdout: 'piped ✓',
+            stderr: '',
+            stdoutTruncated: false,
+            timedOut: false,
+        });
+    });
+
+    it('fails fast on an image pull error', async () => {
+        const { client, provider } = setup();
+        client.statuses = [{
+            phase: 'Pending',
+            containerStatuses: [{
+                name: 'sandbox',
+                image: 'img',
+                imageID: '',
+                ready: false,
+                restartCount: 0,
+                state: { waiting: { reason: 'ErrImagePull', message: 'pull access denied for img' } },
+            }],
+        }];
+
+        const error = await provider.create({ runId: 'r1' }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(SandboxError);
+        expect((error as Error).message).toContain('ErrImagePull');
+        expect((error as Error).message).toContain('pull access denied');
+        expect(client.reads).toBe(1);
+        expect(client.deleted).toEqual([client.created[0]!.metadata!.name]);
+        expect(client.execs).toHaveLength(0);
+    });
+
+    it('times out a pod that never starts', async () => {
+        const {
+            client,
+            clock,
+            provider,
+        } = setup();
+        client.statuses = [pending];
+
+        const creating = provider.create({ runId: 'r1' });
+        await flush();
+        clock.advance(START_TIMEOUT_MS - 1);
+        await flush();
+        clock.advance(1);
+
+        await expect(drive(creating, clock, POLL_MS)).rejects.toThrow(/did not start/);
+        await expect(creating).rejects.toBeInstanceOf(SandboxError);
+        expect(client.deleted).toEqual([client.created[0]!.metadata!.name]);
+        expect(client.execs).toHaveLength(0);
+    });
+
+    it('fails a pod in phase Failed', async () => {
+        const { client, provider } = setup();
+        client.statuses = [{
+            phase: 'Failed',
+            reason: 'Evicted',
+            message: 'low on memory',
+        }];
+
+        const error = await provider.create({ runId: 'r1' }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(SandboxError);
+        expect((error as Error).message).toMatch(/Failed/);
+        expect((error as Error).message).toContain('Evicted');
+        expect(client.deleted).toHaveLength(1);
+    });
+
+    it('disposes a failed checkout', async () => {
+        const { client, provider } = setup((argv) => (
+            unwrap(argv)[3] === 'fetch' ?
+                { exitCode: 128, stderr: "fatal: couldn't find remote ref nope\n" } :
+                {}
+        ));
+
+        const error = await provider.create({
+            runId: 'r1',
+            repo: REPO,
+            ref: 'nope',
+        }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(SandboxError);
+        expect((error as Error).message).toContain("couldn't find remote ref nope");
+        expect(client.deleted).toEqual([client.created[0]!.metadata!.name]);
+    });
+
+    it('disposes when the pod cannot be created', async () => {
+        const { client, provider } = setup();
+        client.create = async () => {
+            throw new SandboxError('cannot create pod: forbidden');
+        };
+        await expect(provider.create({ runId: 'r1' })).rejects.toThrow(/forbidden/);
+    });
+
+    it('stops waiting when aborted', async () => {
+        const {
+            client,
+            clock,
+            provider,
+        } = setup();
+        client.statuses = [pending];
+        const controller = new AbortController();
+
+        const creating = provider.create({ runId: 'r1', signal: controller.signal });
+        await flush();
+        controller.abort();
+        clock.advance(POLL_MS);
+
+        await expect(creating).rejects.toThrow(/aborted/);
+        await expect(creating).rejects.toBeInstanceOf(SandboxError);
+        expect(client.deleted).toHaveLength(1);
+    });
+
+    it('creates no pod for an already aborted signal', async () => {
+        const { client, provider } = setup();
+        await expect(provider.create({ runId: 'r1', signal: AbortSignal.abort() })).rejects.toThrow(/aborted/);
+        expect(client.created).toHaveLength(0);
+    });
+
+    it('dispose deletes the pod once', async () => {
+        const { client, provider } = setup();
+        const workspace = await provider.create({ runId: 'r1' });
+
+        await workspace.dispose();
+        await workspace.dispose();
+        expect(client.deleted).toEqual([`chamberu-ws-${workspace.id}`]);
+        await expect(workspace.exec(['true'])).rejects.toThrow(SandboxError);
+    });
+
+    it('uses the default image and pull policy', async () => {
+        const { client, provider } = setup(undefined, { image: undefined });
+        await provider.create({ runId: 'r1' });
+
+        const container = client.created[0]!.spec!.containers[0]!;
+        expect(container.image).toBe(DEFAULT_SANDBOX_IMAGE);
+        expect(container.imagePullPolicy).toBe('IfNotPresent');
+    });
+
+    it('applies options, limits and the create input', async () => {
+        const { client, provider } = setup(undefined, {
+            env: { A: '1', B: '1' },
+            limits: { memory: '1Gi' },
+            podLabels: { team: 'x' },
+            imagePullPolicy: 'Always',
+        });
+        await provider.create({
+            runId: 'r1',
+            image: 'other',
+            env: { B: '2' },
+            limits: { cpu: '2', timeoutMs: 60_000 },
+        });
+
+        const pod = client.created[0]!;
+        const container = pod.spec!.containers[0]!;
+        expect(pod.metadata?.namespace).toBe('agents');
+        expect(pod.metadata?.labels?.team).toBe('x');
+        expect(pod.spec?.activeDeadlineSeconds).toBe(60);
+        expect(container.image).toBe('other');
+        expect(container.imagePullPolicy).toBe('Always');
+        expect(container.resources?.limits).toEqual({
+            cpu: '2',
+            memory: '1Gi',
+            'ephemeral-storage': '4Gi',
+        });
+        expect(container.env?.filter((entry) => entry.name === 'A' || entry.name === 'B')).toEqual([
+            { name: 'A', value: '1' },
+            { name: 'B', value: '2' },
+        ]);
+    });
+
+    it('requires a namespace', () => {
+        const client = createFakePodClient();
+        expect(() => createKubernetesSandbox({ namespace: '', client })).toThrow(InvalidAgentDefinitionError);
+        expect(() => createKubernetesSandbox({ client } as never)).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it.each([
+        'chamberu.dev/run',
+        'chamberu.dev/workspace',
+        'app.kubernetes.io/managed-by',
+        'app.kubernetes.io/component',
+    ])('rejects podLabels that override %s', (key) => {
+        const client = createFakePodClient();
+        expect(() => createKubernetesSandbox({
+            namespace: 'agents',
+            client,
+            podLabels: { [key]: 'x' },
+        }))
+            .toThrow(InvalidAgentDefinitionError);
+    });
+
+    it.each([
+        ['non-object podLabels', { podLabels: ['x'] }],
+        ['a non-string podLabels value', { podLabels: { team: 1 } }],
+        ['an unknown pull policy', { imagePullPolicy: 'Never' }],
+        ['an empty image', { image: '' }],
+        ['a bad env key', { env: { 'A-B': 'x' } }],
+        ['bad limits', { limits: { pids: 0 } }],
+        ['a zero start timeout', { startTimeoutMs: 0 }],
+        ['a fractional poll interval', { pollMs: 1.5 }],
+        ['a client without the API', { client: {} }],
+    ])('rejects %s', (_name, options) => {
+        const client = createFakePodClient();
+        expect(() => createKubernetesSandbox({
+            namespace: 'agents',
+            client,
+            ...options,
+        } as never))
+            .toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('validates the create input', async () => {
+        const { client, provider } = setup();
+        await expect(provider.create({ runId: '' })).rejects.toThrow(/runId/);
+        await expect(provider.create({ runId: 'r1', env: { 'A B': 'x' } })).rejects.toBeInstanceOf(InvalidAgentDefinitionError);
+        expect(client.created).toHaveLength(0);
+    });
+});
