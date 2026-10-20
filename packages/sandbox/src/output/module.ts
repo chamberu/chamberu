@@ -30,7 +30,8 @@ export function createOutputCollector(maxBytes: number): IOutputCollector {
             if (chunk.length > room) truncated = true;
             const kept = Math.min(room, chunk.length);
             if (kept <= 0) return;
-            chunks.push(chunk.slice(0, kept));
+            // A copy, also for a Buffer, whose slice() is a view of the caller's memory.
+            chunks.push(new Uint8Array(chunk.subarray(0, kept)));
             size += kept;
         },
         get truncated() {

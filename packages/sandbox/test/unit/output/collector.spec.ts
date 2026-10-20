@@ -80,4 +80,20 @@ describe('createOutputCollector', () => {
         chunk.fill(0x7a);
         expect(collector.text()).toBe('abc');
     });
+
+    it('copies a Buffer chunk, whose slice is a view', () => {
+        const collector = createOutputCollector(16);
+        const chunk = Buffer.from('abc');
+        collector.write(chunk);
+        chunk.fill(0x7a);
+        expect(collector.text()).toBe('abc');
+    });
+
+    it('copies a Buffer chunk cut by the cap', () => {
+        const collector = createOutputCollector(2);
+        const chunk = Buffer.from('abc');
+        collector.write(chunk);
+        chunk.fill(0x7a);
+        expect(collector.text()).toBe('ab');
+    });
 });

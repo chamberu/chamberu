@@ -27,7 +27,8 @@ export function resolveWorkspacePath(path: string): string {
     if (relative === WORKSPACE_ROOT) {
         relative = '.';
     } else if (relative.startsWith(`${WORKSPACE_ROOT}/`)) {
-        relative = relative.slice(WORKSPACE_ROOT.length + 1) || '.';
+        // `/workspace//src` names `/workspace/src`, as on POSIX.
+        relative = relative.slice(WORKSPACE_ROOT.length + 1).replace(/^\/+/, '') || '.';
     }
     if (relative.startsWith('/')) {
         throw new ValidationError(`path must be relative to the workspace or under ${WORKSPACE_ROOT}/, got ${JSON.stringify(path)}.`);
