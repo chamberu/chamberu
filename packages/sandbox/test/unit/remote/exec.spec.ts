@@ -254,6 +254,18 @@ describe('remote workspace: exec', () => {
         expect((error as SandboxError).cause).toBe(cause);
     });
 
+    it('tries a failed remove again on the next dispose', async () => {
+        const { transport, workspace } = setup();
+        transport.failNextRemove(new Error('daemon down'));
+        await expect(workspace.dispose()).rejects.toBeInstanceOf(SandboxError);
+        await expect(workspace.exec(['true'])).rejects.toThrow(/disposed/);
+
+        await workspace.dispose();
+        await workspace.dispose();
+        expect(transport.removed).toBe(2);
+        expect(transport.calls).toHaveLength(0);
+    });
+
     it.each([
         ['resolves exit 137', () => ({ exitCode: 137 })],
         ['rejects a 404', () => { throw Object.assign(new Error('no such container'), { statusCode: 404 }); }],

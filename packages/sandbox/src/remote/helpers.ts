@@ -73,7 +73,3 @@ export function decodeOutput(bytes: Uint8Array, truncated: boolean): string {
 export function stderrMessage(stderr: Uint8Array): string {
     return new TextDecoder().decode(stderr).trim().slice(0, ERROR_STDERR_MAX_LENGTH);
 }
-
-export function messageOf(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
-}

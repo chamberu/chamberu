@@ -6,6 +6,7 @@
  */
 
 import { SandboxError, ValidationError, systemClock } from '@chamberu/core';
+import { toSandboxError } from '../manager/helpers.ts';
 import { resolveWorkspacePath } from '../path/module.ts';
 import {
     EXEC_TIMEOUT_MAX_MS,
@@ -21,7 +22,6 @@ import {
     capOutput,
     decodeOutput,
     isTimeoutExit,
-    messageOf,
     stderrMessage,
     toAbsolute,
     wrapTimeout,
@@ -46,7 +46,8 @@ const EMPTY = new Uint8Array(0);
  * the timeout plus `EXEC_GRACE_MS` and reports exit 137. An abort only
  * detaches (the command runs on until its `timeout` or the dispose); a
  * dispose settles every in-flight exec with `SandboxError('workspace
- * disposed')` and removes the container or pod.
+ * disposed')` and removes the container or pod; a dispose after a failed
+ * removal tries it again.
  */
 export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
     const {
@@ -56,10 +57,11 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
     } = input;
     const clock = input.clock ?? systemClock;
     const disposal = new AbortController();
-    let disposing: Promise<void> | undefined;
+    let disposed = false;
+    let removing: Promise<void> | undefined;
 
     const assertUsable = () => {
-        if (disposing) {
+        if (disposed) {
             throw new SandboxError('workspace disposed');
         }
         if (clock.now().getTime() >= info.expiresAt.getTime()) {
@@ -156,9 +158,7 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
                 });
             }, (error: unknown) => {
                 if (!finish() || interrupted()) return;
-                reject(error instanceof SandboxError ?
-                    error :
-                    new SandboxError(`exec failed: ${messageOf(error)}`, { cause: error }));
+                reject(toSandboxError(error, 'exec failed'));
             });
         });
     };
@@ -196,7 +196,11 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
 
         async readFile(path: string): Promise<string> {
             assertUsable();
-            const file = toAbsolute(resolveWorkspacePath(path));
+            const relative = resolveWorkspacePath(path);
+            if (relative === '.') {
+                throw new SandboxError(`${WORKSPACE_ROOT} is no file.`);
+            }
+            const file = toAbsolute(relative);
 
             // one byte past the limit tells an oversized file apart
             const result = await run(['cat', '--', file], {
@@ -251,18 +255,17 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
         },
 
         dispose(): Promise<void> {
-            disposing ??= (async () => {
-                // settles every in-flight exec before the container goes
-                disposal.abort();
-                try {
-                    await transport.remove();
-                } catch (error) {
-                    throw error instanceof SandboxError ?
-                        error :
-                        new SandboxError(`cannot remove workspace ${id}: ${messageOf(error)}`, { cause: error });
-                }
-            })();
-            return disposing;
+            // settles every in-flight exec before the container goes
+            disposed = true;
+            disposal.abort();
+            removing ??= Promise.resolve()
+                .then(() => transport.remove())
+                .catch((error: unknown) => {
+                    // a later dispose tries the removal again
+                    removing = undefined;
+                    throw toSandboxError(error, `cannot remove workspace ${id}`);
+                });
+            return removing;
         },
     };
 }

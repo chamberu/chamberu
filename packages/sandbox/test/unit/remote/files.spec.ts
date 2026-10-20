@@ -65,6 +65,14 @@ describe('remote workspace: readFile', () => {
         expect(transport.calls).toHaveLength(0);
     });
 
+    it('refuses the workspace root without a call', async () => {
+        const { transport, workspace } = setup();
+        for (const path of ['.', '/workspace']) {
+            await expect(workspace.readFile(path)).rejects.toThrow('/workspace is no file.');
+        }
+        expect(transport.calls).toHaveLength(0);
+    });
+
     it('throws SandboxError with stderr on a non-zero exit', async () => {
         const { workspace } = setup(() => ({ exitCode: 1, stderr: encode('cat: /workspace/a.txt: Permission denied\n') }));
         const error = await workspace.readFile('a.txt').catch((e: unknown) => e);
