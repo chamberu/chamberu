@@ -59,17 +59,22 @@ export function toRunError(error: unknown): { code: string; message: string } {
 
 /**
  * The tools handed to the agent: generated state tools (when the agent declares
- * `state`) merged with the user's tools, which win on a name clash, without
- * those the agent's toolPolicy refuses. Seam for effect memoization and the
- * execute-time policy re-check (wrapToolsForRun).
+ * `state`) merged with the user's tools, which win on a name clash. Every tool
+ * stays executable, so an approved call from an older history still gets an
+ * answer; `activeTools` (the names the agent's toolPolicy allows, undefined
+ * without a policy) is what the model is offered. wrapToolsForRun memoizes
+ * effects and re-checks the policy per call, so a refused call is a tool error.
  */
-export function assembleTools(ctx: ExecuteContext, runContext: RunContext): ToolSet {
+export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
+    tools: ToolSet;
+    activeTools?: string[];
+} {
     const {
-        tools: factory, 
-        state: schema, 
-        toolPolicy, 
+        tools: factory,
+        state: schema,
+        toolPolicy,
     } = ctx.agent.definition;
-    if (!factory && !schema) return {};
+    if (!factory && !schema) return { tools: {} };
     const state = createAgentState(ctx.agent.name, schema, ctx.store);
     const tools: ToolSet = {
         ...(schema ? createStateTools(state, schema) : {}),
@@ -79,11 +84,12 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): Tool
             artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
         }),
     };
-    if (!toolPolicy) return wrapToolsForRun(tools, runContext, ctx.store);
+    if (!toolPolicy) return { tools: wrapToolsForRun(tools, runContext, ctx.store) };
     const allow = (name: string) => toolPolicy(name, { run: runContext });
-    const allowed: ToolSet = {};
-    for (const [name, def] of Object.entries(tools)) if (allow(name)) allowed[name] = def;
-    return wrapToolsForRun(allowed, runContext, ctx.store, allow);
+    return {
+        tools: wrapToolsForRun(tools, runContext, ctx.store, allow),
+        activeTools: Object.keys(tools).filter(allow),
+    };
 }
 
 export function toApprovalStatus(decision: 'user' | 'allow' | 'deny'): ToolApprovalStatus {

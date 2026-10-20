@@ -281,10 +281,12 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const spentTokens = run.usage.inputTokens + run.usage.outputTokens;
     if (budget.maxTokens !== undefined) stopWhen.push(tokensExceeded(budget.maxTokens, spentTokens));
 
+    const { tools, activeTools } = assembleTools(ctx, runContext);
     const loop = new ToolLoopAgent({
         model: agent.definition.model,
         instructions: agent.definition.instructions,
-        tools: assembleTools(ctx, runContext),
+        tools,
+        activeTools,
         toolApproval: toToolApproval(agent.definition.approvals, runContext),
         experimental_toolApprovalSecret: ctx.toolApprovalSecret,
         stopWhen,

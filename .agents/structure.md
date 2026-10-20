@@ -79,7 +79,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `effect/` | `defineEffectTool()`, `effectMarker()` (`define.ts`), `wrapToolsForRun()` (`wrap.ts`), `EFFECT` |
 | `approval/` | Signed resume tokens |
 | `notify/types.ts` | `INotifier`, `Notification` |
-| `permission/` | `matchesPermission()`, `hasPermission()`, `toolPermission()` (`match.ts`), `requireToolPermission()` (`policy.ts`) |
+| `permission/` | `matchesPermission()`, `hasPermission()`, `toolPermission()` (`match.ts`), `requireToolPermission()` (`policy.ts`), `RequireToolPermissionOptions` (`types.ts`), `PERMISSION_ALL` (`constants.ts`, internal) |
 | `state/` | `createAgentState()` (`module.ts`, validation via `@validup/standard-schema`), generated tools (`tools.ts`) |
 | `clock/` | `IClock`, `systemClock` |
 

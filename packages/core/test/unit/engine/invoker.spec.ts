@@ -337,6 +337,69 @@ describe('tool policy', () => {
         });
     });
 
+    it('answers an approved call the policy now refuses with a tool error', async () => {
+        let deployed = 0;
+        const model = mockModel([callTool('deploy'), text('could not deploy')]);
+        const tools: AgentDefinition['tools'] = () => ({
+            deploy: tool({
+                inputSchema: z.object({}),
+                execute: async () => {
+                    deployed++;
+                    return 'deployed';
+                },
+            }),
+            rollback,
+        });
+        const {
+            engine,
+            store,
+            clock,
+            notifier,
+        } = setup({
+            model,
+            tools,
+            toolPolicy: () => true,
+            approvals: { deploy: 'user' },
+        });
+        await engine.start();
+        const { runId } = await engine.dispatch(env(alice));
+        await engine.idle();
+        expect((await store.getRun(runId))?.status).toBe('waiting');
+        engine.stop();
+
+        // redeployed with a tighter policy: deploy is refused now
+        const tightened = new RunEngine({
+            store,
+            agents: [defineAgent({
+                name: 'release',
+                instructions: 'You release.',
+                model,
+                tools,
+                toolPolicy: (name) => name !== 'deploy',
+                approvals: { deploy: 'user' },
+                notify: 'owner',
+            })],
+            notifiers: { owner: notifier },
+            resumeSecret: 'secret',
+            clock,
+            claimTtlMs: 30,
+            onError: () => {},
+        });
+        engines.push(tightened);
+        await tightened.start();
+        await tightened.resume(notifier.calls[0]!.resumeToken!, { approved: true });
+        await tightened.idle();
+
+        const run = await store.getRun(runId);
+        expect(run?.status).toBe('completed');
+        expect(run?.output).toBe('could not deploy');
+        expect(deployed).toBe(0);
+        const prompt = JSON.stringify(model.doStreamCalls[1]?.prompt);
+        expect(prompt).toContain('error-text');
+        expect(prompt).toContain('not allowed');
+        expect(toolNames(model, 1)).toEqual(['rollback']);
+    });
+
     it('rejects an invalid approver before answering', async () => {
         const model = mockModel([callTool('deploy'), text('done')]);
         const {

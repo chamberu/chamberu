@@ -317,14 +317,15 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |
 | `EFFECT` | symbol | Marks a tool created by `defineEffectTool()` |
-| `wrapToolsForRun` | function | Applies effect recording to a `ToolSet` outside the engine |
+| `wrapToolsForRun` | function | Applies effect recording to a `ToolSet` outside the engine; an optional `allow(toolName)` re-checks each call (a refused call throws `ToolNotAllowedError`) |
 | `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API and generated state tools over a store |
 | `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
 | `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
 | `ChamberuError` | class | Base class of every error below |
-| `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `ToolNotAllowedError` | class | Rejections of definitions and engine calls |
+| `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
+| `ToolNotAllowedError` | class | Returned to the model as a tool error when a call reaches a tool the `toolPolicy` refuses |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
