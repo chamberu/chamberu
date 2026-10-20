@@ -170,7 +170,7 @@ describe('webhook to comment', () => {
             body: ISSUES_OPENED,
         });
         const { runs } = await response.json() as { runs: Array<{ runId: string }> };
-        const runId = runs[0]!.runId;
+        const { runId } = runs[0]!;
         await engine.start();
         await engine.idle();
 
@@ -188,6 +188,38 @@ describe('webhook to comment', () => {
         for (const [step, body] of bodies.entries()) {
             expect(body).toContain(`<!-- chamberu:effect=${runId}:github_create_comment:octo/demo#5:${step} -->`);
         }
+        await engine.drain();
+    });
+
+    it('keeps one comment per step when the provider reuses tool call ids', async () => {
+        const comment = (body: string) => ({
+            parts: [{
+                type: 'tool-call' as const,
+                toolName: 'github_create_comment',
+                toolCallId: 'call_0',
+                input: { ...ISSUE, body },
+            }],
+        });
+        const {
+            app,
+            engine,
+            store,
+            fake,
+        } = setup([comment('zero'), comment('one'), { parts: [{ type: 'text', text: 'Done.' }] }]);
+        const response = await deliver(app, {
+            event: 'issues',
+            delivery: 'd-1',
+            body: ISSUES_OPENED,
+        });
+        const { runs } = await response.json() as { runs: Array<{ runId: string }> };
+        const { runId } = runs[0]!;
+        await engine.start();
+        await engine.idle();
+
+        expect((await store.getRun(runId))?.status).toBe('completed');
+        const bodies = (fake.comments.get('octo/demo#5') ?? []).map((c) => String(c.body));
+        expect(bodies).toHaveLength(2);
+        expect(bodies[1]).toContain(`${runId}:github_create_comment:octo/demo#5:1 -->`);
         await engine.drain();
     });
 });

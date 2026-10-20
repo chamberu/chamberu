@@ -6,7 +6,7 @@
  */
 
 import { jsonSchema } from 'ai';
-import type { JSONSchema7, ToolExecutionOptions } from 'ai';
+import type { JSONSchema7, ModelMessage, ToolExecutionOptions } from 'ai';
 import { ChamberuError, FatalToolError, ValidationError } from '@chamberu/core';
 import type { ToolContext } from '@chamberu/core';
 import { isObject } from 'smob';
@@ -56,22 +56,30 @@ export function requireString(value: unknown, name: string): string {
     return value;
 }
 
-function isToolCallOf(part: unknown, toolCallId: string): boolean {
-    return isObject(part) && part.type === 'tool-call' && part.toolCallId === toolCallId;
+function hasPart(message: ModelMessage, type: string, toolCallId: string): boolean {
+    return Array.isArray(message.content) &&
+        message.content.some((part: unknown) => isObject(part) && part.type === type && part.toolCallId === toolCallId);
 }
 
 /**
- * The model step a call belongs to: the assistant messages before the one
- * carrying a tool-call part with `options.toolCallId` (the approval path,
- * where the AI SDK passes messages that already hold the requesting
- * assistant message), else all of them.
+ * The model step a call belongs to. On the approval path the AI SDK passes
+ * messages that already hold the requesting assistant message: the one
+ * carrying a tool-call with `options.toolCallId` whose result is not among
+ * the tool messages after it, so a provider that reuses call ids across
+ * steps never points the call at an earlier step. Its step is the number of
+ * assistant messages before it; without one (the normal path) all of them.
  */
 export function stepOf(options: Pick<ToolExecutionOptions<unknown>, 'toolCallId' | 'messages'>): number {
+    const { messages, toolCallId } = options;
     let step = 0;
-    for (const message of options.messages) {
+    for (const [index, message] of messages.entries()) {
         if (message.role !== 'assistant') continue;
-        if (Array.isArray(message.content) && message.content.some((part) => isToolCallOf(part, options.toolCallId))) {
-            return step;
+        if (hasPart(message, 'tool-call', toolCallId)) {
+            let answered = false;
+            for (let next = index + 1; next < messages.length && messages[next]!.role !== 'assistant'; next++) {
+                if (messages[next]!.role === 'tool' && hasPart(messages[next]!, 'tool-result', toolCallId)) answered = true;
+            }
+            if (!answered) return step;
         }
         step++;
     }

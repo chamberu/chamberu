@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { ModelMessage } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { ValidationError } from '@chamberu/core';
 import { REPO_PATTERN } from '../../../src/tools/constants.ts';
@@ -24,6 +25,36 @@ describe('stepOf', () => {
         expect(stepOf({ toolCallId: 'c-7', messages: [...before, assistant('c-7'), assistant()] })).toBe(1);
         // another call id: counted as an earlier step
         expect(stepOf({ toolCallId: 'c-8', messages: [...before, assistant('c-7')] })).toBe(2);
+    });
+});
+
+describe('stepOf with reused tool call ids', () => {
+    const result = (toolCallId: string): ModelMessage => ({
+        role: 'tool',
+        content: [{
+            type: 'tool-result',
+            toolCallId,
+            toolName: 'github_create_comment',
+            output: { type: 'text', value: 'ok' },
+        }],
+    });
+    const approval: ModelMessage = {
+        role: 'tool',
+        content: [{
+            type: 'tool-approval-response',
+            approvalId: 'a-1',
+            approved: true,
+        }],
+    };
+    const user: ModelMessage = { role: 'user', content: 'x' };
+
+    it('does not take an earlier step that ran a call with the same id for the approval path', () => {
+        expect(stepOf({ toolCallId: 'call_0', messages: [user, assistant('call_0'), result('call_0')] })).toBe(1);
+        expect(stepOf({ toolCallId: 'call_0', messages: [user, assistant('call_0'), result('call_0'), assistant('call_0'), result('call_0')] })).toBe(2);
+    });
+
+    it('finds the pending call on the approval path when earlier steps reused its id', () => {
+        expect(stepOf({ toolCallId: 'call_0', messages: [user, assistant('call_0'), result('call_0'), assistant('call_0'), approval] })).toBe(1);
     });
 });
 
