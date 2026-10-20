@@ -6,6 +6,7 @@
  */
 
 export * from './limits/index.ts';
+export * from './manager/index.ts';
 export * from './output/index.ts';
 export * from './path/index.ts';
 export * from './provider/index.ts';

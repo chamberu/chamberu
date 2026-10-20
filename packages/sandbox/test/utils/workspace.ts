@@ -26,11 +26,12 @@ export type ScriptedWorkspace = IWorkspace & {
 export function createScriptedWorkspace(
     handler: (argv: readonly string[], options: ExecOptions) => Partial<ExecResult> = () => ({}),
     info: Partial<WorkspaceInfo> = {},
+    id = 'scripted',
 ): ScriptedWorkspace {
     const calls: Array<{ argv: string[]; options: ExecOptions }> = [];
     const files = new Map<string, string>();
     const workspace: ScriptedWorkspace = {
-        id: 'scripted',
+        id,
         info: {
             runId: 'run-1',
             provider: 'scripted',

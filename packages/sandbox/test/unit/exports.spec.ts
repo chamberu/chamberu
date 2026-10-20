@@ -19,6 +19,7 @@ describe('public api', () => {
         'parseCpu',
         'parseMemory',
         'assertSandboxEnv',
+        'createWorkspaceManager',
     ])('exports %s', (name) => {
         expect(sandbox).toHaveProperty(name);
         expect(sandbox[name as keyof typeof sandbox]).toBeTypeOf('function');
@@ -62,6 +63,11 @@ describe('public api', () => {
         expect(sandbox.EXPIRES_AT_KEY).toBe('chamberu.dev/expires-at');
     });
 
+    it('exports the manager constants', () => {
+        expect(sandbox.MAX_WORKSPACES_PER_RUN).toBe(3);
+        expect(sandbox.GC_INTERVAL_MS).toBe(600_000);
+    });
+
     it('freezes the shared constants', () => {
         expect(Object.isFrozen(sandbox.SANDBOX_ENV)).toBe(true);
         expect(Object.isFrozen(sandbox.SANDBOX_LABELS)).toBe(true);
@@ -70,6 +76,7 @@ describe('public api', () => {
 
     it.each([
         'checkoutCommands',
+        'createWorkspaceTools',
     ])('keeps %s internal', (name) => {
         expect(sandbox).not.toHaveProperty(name);
     });
