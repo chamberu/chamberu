@@ -284,6 +284,19 @@ describe('pod client: exec', () => {
         expect((error as Error).message).toContain('403');
     });
 
+    it('names the reason of a connection rejected with an event that is no Error', async () => {
+        // @kubernetes/client-node rejects with the `ws` ErrorEvent, which is no Error
+        const event = Object.create({ type: 'error' }, {
+            message: { value: 'Unexpected server response: 403', enumerable: true },
+            error: { value: new Error('Unexpected server response: 403') },
+        });
+        const { client, failConnect } = setup();
+        failConnect(event);
+        const error = await client.exec('p', execInput().input).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(SandboxError);
+        expect((error as Error).message).toBe('cannot exec in pod p: Unexpected server response: 403');
+    });
+
     it('ends stdin on a v5 socket', async () => {
         const { client, execs } = setup(() => {
             // never answers

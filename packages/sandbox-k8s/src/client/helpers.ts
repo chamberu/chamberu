@@ -18,10 +18,15 @@ import type {
     PodExecInput,
 } from './types.ts';
 
-/** The API server's own message (an `ApiException` body is the raw `Status` JSON), else the error's. */
+/**
+ * The API server's own message (an `ApiException` body is the raw `Status`
+ * JSON), else the error's: also of an object that is no Error, such as the
+ * `ws` ErrorEvent a failed exec connect rejects with.
+ */
 export function apiMessage(error: unknown): string {
-    let message = error instanceof Error ? error.message : String(error);
+    let message = String(error);
     if (isObject(error)) {
+        if (typeof error.message === 'string') ({ message } = error);
         let { body } = error;
         if (typeof body === 'string') {
             try {
