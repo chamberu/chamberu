@@ -331,7 +331,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
 | `cron`, `http`, `webhook` | function | Trigger definitions |
-| `RunEngine` | class | `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
+| `RunEngine` | class | `store`, `clock`, `getAgent`, `listAgents`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineTool` | function | An AI SDK `tool()` whose `execute` gets the run's `ToolContext` as `context` |
 | `toolContextSchema` | object | The `contextSchema` that marks a chamberu tool |

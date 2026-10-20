@@ -62,6 +62,11 @@ See [Triggers & the Envelope](/guide/triggers).
 class RunEngine {
     constructor(opts: RunEngineOptions);
 
+    readonly store: IStore;
+    readonly clock: IClock;
+    getAgent(name: string): Agent | undefined;
+    listAgents(): Agent[];
+
     dispatch(envelope: DispatchEnvelope): Promise<{ runId: string; deduplicated: boolean }>;
     getRun(id: string): Promise<Run | undefined>;
     on(event: RunEvent['type'], listener: (e: RunEvent) => void): () => void;
@@ -81,6 +86,8 @@ class RunEngine {
 
 | Method | Description | Guide |
 |---|---|---|
+| `store`, `clock` | The store and clock the engine was built with (`clock` defaults to `systemClock`) | |
+| `getAgent`, `listAgents` | One registered agent by name; all of them in registration order (a new array) | |
 | `dispatch` | Stores a `queued` run (and its attachments as artifacts); deduplicates by `idempotencyKey` | [Triggers](/guide/triggers) |
 | `getRun` | Reads a run from the store | [Run Lifecycle](/guide/run-lifecycle) |
 | `on` | Subscribes to `run.updated`, `step.appended` or `run.delta`; returns an unsubscribe function | [Run Lifecycle](/guide/run-lifecycle#watching-runs) |

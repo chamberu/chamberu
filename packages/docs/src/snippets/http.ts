@@ -50,11 +50,8 @@ export async function start(store: IStore, agents: Agent[], resumeSecret: string
         agents,
         resumeSecret,
     });
-    const scheduler = createScheduler({
-        engine,
-        agents,
-        store,
-    });
+    // the scheduler and the app read the store, agents and clock from the engine
+    const scheduler = createScheduler({ engine });
 
     let server: ReturnType<typeof serve> | undefined;
     const shutdown = createShutdown({
@@ -67,8 +64,6 @@ export async function start(store: IStore, agents: Agent[], resumeSecret: string
 
     const app = createHttpApp({
         engine,
-        store,
-        agents,
         auth: authenticators(verifier),
         shutdown,
         basePath: '/api',

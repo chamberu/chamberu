@@ -46,16 +46,13 @@ export function createTriage(model: LanguageModel, store: IStore) {
     // #endregion agent
 
     // #region http
-    const agents = [triage];
     const engine = new RunEngine({
         store,
-        agents,
+        agents: [triage],
         resumeSecret: process.env.RESUME_SECRET ?? '',
     });
     const app = createHttpApp({
         engine,
-        store,
-        agents,
         auth: staticTokens({ tokens: { [process.env.CHAMBERU_TOKEN ?? '']: { id: 'ci', permissions: ['*'] } } }),
         // POST /webhooks/github; raise for large push or pull_request deliveries
         bodyLimit: 4 * 1024 * 1024,

@@ -12,8 +12,6 @@ export async function serve(store: IStore, agents: Agent[], resumeSecret: string
     // every replica runs the same scheduler; a store lock fires each tick once
     const scheduler = createScheduler({
         engine,
-        agents,
-        store,
         onError: (error, { agent, trigger }) => console.error('[cron]', agent, trigger, error),
     });
     await engine.start();
@@ -40,7 +38,6 @@ export async function job(store: IStore, agent: Agent, resumeSecret: string) {
     });
     const { status, exitCode } = await runJob({
         engine,
-        store,
         agent,
         drainTimeoutMs: 120_000,
     });

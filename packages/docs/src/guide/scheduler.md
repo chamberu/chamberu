@@ -8,7 +8,7 @@ npm install @chamberu/scheduler @chamberu/core --save
 
 <<< @/snippets/scheduler.ts#scheduler
 
-`createScheduler()` creates one [hubwire](https://github.com/tada5hi/hubwire) scheduled component per cron trigger and validates every trigger up front: an expression or timezone the scheduler cannot use throws `InvalidAgentDefinitionError`, naming the agent and trigger, before `start()`. Pass the same `agents` list the engine was built with.
+`createScheduler()` creates one [hubwire](https://github.com/tada5hi/hubwire) scheduled component per cron trigger and validates every trigger up front: an expression or timezone the scheduler cannot use throws `InvalidAgentDefinitionError`, naming the agent and trigger, before `start()`. It schedules the engine's agents and takes its lock over the engine's store.
 
 ## One dispatch per tick
 
