@@ -69,6 +69,42 @@ describe('extra routes', () => {
         expect(seen?.onError).toBeTypeOf('function');
     });
 
+    it('hands a request without the body, so readBody() is the only way in', async () => {
+        let body: unknown;
+        let method: string | undefined;
+        let contentType: string | null | undefined;
+        const { app } = createTestApp({
+            routes: [route({
+                handler: async ({ request }) => {
+                    body = request.body;
+                    method = request.method;
+                    contentType = request.headers.get('content-type');
+                    return { status: 204 };
+                },
+            })],
+        });
+        await send(app, '/extra', { body: '{"a":1}' });
+        expect(body).toBeNull();
+        expect(method).toBe('POST');
+        expect(contentType).toBe('application/json');
+    });
+
+    it('returns the same bytes from repeated readBody() calls', async () => {
+        const texts: string[] = [];
+        const { app } = createTestApp({
+            routes: [route({
+                handler: async ({ readBody }) => {
+                    const decoder = new TextDecoder();
+                    texts.push(decoder.decode(await readBody()), decoder.decode(await readBody()));
+                    return { status: 204 };
+                },
+            })],
+        });
+        const response = await send(app, '/extra', { body: '{"a":1}' });
+        expect(response.status).toBe(204);
+        expect(texts).toEqual(['{"a":1}', '{"a":1}']);
+    });
+
     it('answers a body-less result', async () => {
         const { app } = createTestApp({ routes: [route({ handler: async () => ({ status: 204 }) })] });
         const response = await send(app, '/extra');

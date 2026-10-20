@@ -78,13 +78,13 @@ export type HttpAppOptions = {
 export type HttpRouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export type HttpRouteRequest = {
-    /** Headers, URL, signal. Read the body only through readBody(). */
+    /** URL, method, headers and signal; without the body, which only readBody() reads. */
     request: Request;
     /**
      * The raw body, at most `bodyLimit` bytes: 413 above it (content-length
      * refused unread, else drained like readJsonBody), 415 for a non-JSON
      * media type with a non-empty body; an empty body is a 0-length array.
-     * Call once.
+     * Memoized: every call answers the same bytes (or the same error).
      */
     readBody(): Promise<Uint8Array>;
 };

@@ -10,12 +10,26 @@ import type { App, IAppEvent } from 'routup';
 import type { HttpContext, HttpRouteContext, HttpRouteRequest } from '../app/types.ts';
 import { assertContentLength, isJsonMediaType, readBodyBytes } from '../request/helpers.ts';
 
+/**
+ * The route's view of the request: URL, method, headers and signal without
+ * the body, so the limited `readBody()` (memoized: every call gets the same
+ * bytes) is the only way to it.
+ */
 function toRouteRequest(event: IAppEvent, ctx: HttpContext): HttpRouteRequest {
+    const { request } = event;
+    let body: Promise<Uint8Array> | undefined;
     return {
-        request: event.request,
-        readBody: async () => {
-            assertContentLength(event, ctx.bodyLimit);
-            return readBodyBytes(event, ctx.bodyLimit, isJsonMediaType(event.request.headers.get('content-type')));
+        request: new Request(request.url, {
+            method: request.method,
+            headers: request.headers,
+            signal: request.signal,
+        }),
+        readBody: () => {
+            body ??= (async () => {
+                assertContentLength(event, ctx.bodyLimit);
+                return readBodyBytes(event, ctx.bodyLimit, isJsonMediaType(request.headers.get('content-type')));
+            })();
+            return body;
         },
     };
 }
