@@ -17,8 +17,9 @@ export const WORKSPACE_RECORD = 'workspace.json';
 export const REPO_DIR = 'repo';
 
 /**
- * After a kill, how long the output pipes may stay open (held by a process
- * that left the group) before they are closed and the exec settles.
+ * After a kill or the command's own exit, how long the output pipes may stay
+ * open (held by a process that left the group, or a background job the
+ * command started) before they are closed and the exec settles.
  */
 export const KILL_GRACE_MS = 2_000;
 

@@ -140,6 +140,29 @@ describe('local sandbox', () => {
         await waitFor(async () => (isAlive(pid) ? undefined : true), 2_000);
     }, 30_000);
 
+    it('returns once the command exited while a background job holds its output', async () => {
+        const workspace = await createLocalSandbox({ root }).create({ runId: 'r1' });
+        const pidFile = join(tmp, 'pid');
+        try {
+            const started = Date.now();
+            const result = await workspace.exec(['sh', '-c', 'sleep 60 & echo $! > "$1"; echo started', 'sh', pidFile], { timeoutMs: 20_000 });
+            expect(Date.now() - started).toBeLessThan(10_000);
+            expect(result).toMatchObject({
+                exitCode: 0, 
+                stdout: 'started\n', 
+                timedOut: false, 
+            });
+
+            // the job runs on, like on Docker and Kubernetes, until the dispose
+            const pid = Number((await readFile(pidFile, 'utf8')).trim());
+            expect(isAlive(pid)).toBe(true);
+            await workspace.dispose();
+            await waitFor(async () => (isAlive(pid) ? undefined : true), 2_000);
+        } finally {
+            await workspace.dispose();
+        }
+    }, 30_000);
+
     it('clears the kill timer when the child exits', async () => {
         const clock = new ControllableClock();
         const workspace = await createLocalSandbox({ root, clock }).create({ runId: 'r1' });

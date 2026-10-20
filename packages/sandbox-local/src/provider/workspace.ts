@@ -47,7 +47,10 @@ type LiveExec = { fail(error: SandboxError): void };
 /**
  * A workspace in a host directory. Each exec is its own process group
  * (`detached`), so a timeout, an abort or a dispose kills every process the
- * command started. No isolation: the command runs as the host user.
+ * command started. A command that exits while a background job of it holds
+ * its output settles `KILL_GRACE_MS` later with its own exit code; the job
+ * runs on until the dispose, as on Docker and Kubernetes. No isolation: the
+ * command runs as the host user.
  */
 export class LocalWorkspace implements IWorkspace {
     readonly id: string;
@@ -65,6 +68,9 @@ export class LocalWorkspace implements IWorkspace {
     protected readonly onDispose: () => void;
 
     protected readonly live = new Set<LiveExec>();
+
+    /** Process groups of finished execs whose background jobs held the output; the dispose kills them. */
+    protected readonly lingering = new Set<number>();
 
     protected disposing: Promise<void> | undefined;
 
@@ -190,6 +196,8 @@ export class LocalWorkspace implements IWorkspace {
         for (const entry of [...this.live]) {
             entry.fail(new SandboxError('workspace disposed'));
         }
+        for (const pid of this.lingering) killGroup(pid);
+        this.lingering.clear();
         this.onDispose();
         try {
             await rm(this.dir, {
@@ -264,6 +272,7 @@ export class LocalWorkspace implements IWorkspace {
             let timedOut = false;
             let killTimer: { clear(): void } | undefined;
             let graceTimer: { clear(): void } | undefined;
+            let pipeTimer: { clear(): void } | undefined;
 
             const kill = () => {
                 if (child.pid !== undefined) killGroup(child.pid);
@@ -278,6 +287,7 @@ export class LocalWorkspace implements IWorkspace {
                 settled = true;
                 killTimer?.clear();
                 graceTimer?.clear();
+                pipeTimer?.clear();
                 signal?.removeEventListener('abort', onAbort);
                 this.live.delete(entry);
                 return true;
@@ -325,6 +335,17 @@ export class LocalWorkspace implements IWorkspace {
                 } else {
                     reject(new SandboxError(`cannot start ${argv[0]} (${code ?? 'unknown error'}).`, { cause: error }));
                 }
+            });
+
+            child.on('exit', () => {
+                if (settled || timedOut) return;
+                // the command finished on its own: no timeout any more, but a
+                // background job it started may hold the pipes open
+                killTimer?.clear();
+                pipeTimer = this.clock.setTimeout(() => {
+                    if (child.pid !== undefined) this.lingering.add(child.pid);
+                    closePipes();
+                }, KILL_GRACE_MS);
             });
 
             child.on('close', (code, closeSignal) => {
