@@ -29,6 +29,6 @@ Agents that run untrusted code (reproducing a bug, running tests) do it in [work
 - **Platforms:** `linux/amd64` and `linux/arm64`.
 - **Tags:** `24`, rebuilt on every change under `images/` on `master` and weekly for base image security updates, and `24-<short sha>`, one immutable tag per build. Pull requests that touch the image build and smoke-test it without pushing.
 - **Pinning:** reference a digest in production (`ghcr.io/chamberu/sandbox-node@sha256:...`), or follow the mutable `24` tag with `pull: 'always'` (Docker) or `imagePullPolicy: 'Always'` (Kubernetes).
-- **Extending:** build `FROM ghcr.io/chamberu/sandbox-node:24`, install packages as root, switch back to `USER 1000:1000` and pass the image as `image` to the provider. The providers need `sh`, `cat`, `head`, `mkdir`, `dirname`, GNU `timeout` and `git`.
+- **Extending:** build `FROM ghcr.io/chamberu/sandbox-node:24`, install packages as root, switch back to `USER 1000:1000` and pass the image as `image` to the provider. The providers need `sh`, `cat`, `head`, `mkdir`, `dirname`, `cp`, `mv`, `rm`, GNU `timeout` and `git`.
 
 On a Docker host, the agent needs access to the Docker API to start sandbox containers. That access is root on the host: give the agent a socket proxy that allows only containers, exec and images, or run rootless Docker. See [`@chamberu/sandbox-docker`](/reference/sandbox#chamberu-sandbox-docker).

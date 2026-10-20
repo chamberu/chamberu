@@ -149,6 +149,22 @@ export function describeWorkspaceContract(name: string, factory: WorkspaceContra
             expect(await workspace.readFile('/workspace/a/b/ü.txt')).toBe(content);
         }, TEST_TIMEOUT_MS);
 
+        it('writes a file whole, also with a concurrent write, and keeps its mode', async () => {
+            const long = 'a'.repeat(1_000_000);
+            const short = 'b'.repeat(10);
+            for (let round = 0; round < 3; round++) {
+                await Promise.all([workspace.writeFile('race.txt', long), workspace.writeFile('race.txt', short)]);
+                expect([long, short]).toContain(await workspace.readFile('race.txt'));
+            }
+
+            await workspace.writeFile('run.sh', '#!/bin/sh\necho one\n');
+            expect((await workspace.exec(['chmod', '755', 'run.sh'])).exitCode).toBe(0);
+            await workspace.writeFile('run.sh', '#!/bin/sh\necho two\n');
+            expect((await workspace.exec(['./run.sh'])).stdout).toBe('two\n');
+            const listing = await workspace.exec(['ls', '-a']);
+            expect(listing.stdout).not.toContain('.chamberu-write-');
+        }, TEST_TIMEOUT_MS);
+
         it('refuses escaping, missing and oversized files', async () => {
             await expect(workspace.readFile('../x')).rejects.toBeInstanceOf(ValidationError);
             await expect(workspace.readFile('')).rejects.toBeInstanceOf(ValidationError);

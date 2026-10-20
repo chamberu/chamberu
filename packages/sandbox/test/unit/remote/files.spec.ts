@@ -8,13 +8,13 @@
 import { describe, expect, it } from 'vitest';
 import { SandboxError, ValidationError } from '@chamberu/core';
 import { FILE_MAX_BYTES, createRemoteWorkspace } from '@chamberu/sandbox';
+import { WRITE_FILE_SCRIPT } from '../../../src/remote/constants.ts';
 import { ControllableClock } from '../../utils/clock.ts';
 import { createFakeTransport } from '../../utils/transport.ts';
 import type { FakeTransportHandler } from '../../utils/transport.ts';
 
 const START = 1_000_000;
 
-const WRITE_SCRIPT = 'mkdir -p -- "$(dirname -- "$1")" && head -c "$2" > "$1"';
 
 const encode = (text: string) => new TextEncoder().encode(text);
 
@@ -120,10 +120,11 @@ describe('remote workspace: writeFile', () => {
             '300',
             'sh',
             '-c',
-            WRITE_SCRIPT,
+            WRITE_FILE_SCRIPT,
             'sh',
             '/workspace/a/b.txt',
             '3',
+            expect.stringMatching(/^[0-9a-f]{16}$/),
         ]);
         const { stdin } = transport.calls[0]!.options;
         expect(stdin).toEqual(encode('hé'));
@@ -134,7 +135,7 @@ describe('remote workspace: writeFile', () => {
     it('writes an empty file', async () => {
         const { transport, workspace } = setup();
         await workspace.writeFile('/workspace/empty', '');
-        expect(transport.calls[0]!.argv.slice(-2)).toEqual(['/workspace/empty', '0']);
+        expect(transport.calls[0]!.argv.slice(-3, -1)).toEqual(['/workspace/empty', '0']);
         expect(transport.calls[0]!.options.stdin).toHaveLength(0);
     });
 

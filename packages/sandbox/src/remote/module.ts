@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { randomBytes } from 'node:crypto';
 import { SandboxError, ValidationError, systemClock } from '@chamberu/core';
 import { toSandboxError } from '../manager/helpers.ts';
 import { createOutputCollector } from '../output/module.ts';
@@ -323,7 +324,8 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
             }
 
             const file = toAbsolute(relative);
-            const result = await run(['sh', '-c', WRITE_FILE_SCRIPT, 'sh', file, String(bytes.length)], {
+            const temporary = randomBytes(8).toString('hex');
+            const result = await run(['sh', '-c', WRITE_FILE_SCRIPT, 'sh', file, String(bytes.length), temporary], {
                 cwd: WORKSPACE_ROOT,
                 stdin: bytes,
                 timeoutMs: timeoutOf(undefined),

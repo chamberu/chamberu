@@ -54,7 +54,7 @@ RUN apt-get update \
 USER 1000:1000
 ```
 
-The providers need `sh`, `cat`, `head`, `mkdir`, `dirname`, GNU `timeout` and `git` in the image.
+The providers need `sh`, `cat`, `head`, `mkdir`, `dirname`, `cp`, `mv`, `rm`, GNU `timeout` and `git` in the image.
 
 ## Building locally
 

@@ -80,7 +80,7 @@ The default image is `ghcr.io/chamberu/sandbox-node:24` (`DEFAULT_SANDBOX_IMAGE`
 
 - `pull: 'missing'` (default) pulls the image once when the daemon lacks it, `'always'` before every create (a mutable tag such as `:24` then follows its rebuilds), `'never'` never.
 - Pin a digest in production (`image: 'ghcr.io/chamberu/sandbox-node@sha256:...'`), or use `pull: 'always'`.
-- Your own image works when it keeps uid 1000, `/workspace`, and has `sh`, `cat`, `head`, `mkdir`, `dirname`, GNU `timeout` and `git`.
+- Your own image works when it keeps uid 1000, `/workspace`, and has `sh`, `cat`, `head`, `mkdir`, `dirname`, `cp`, `mv`, `rm`, GNU `timeout` and `git`.
 
 ## Security
 
