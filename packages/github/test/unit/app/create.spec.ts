@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { createPrivateKey } from 'node:crypto';
+import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { InvalidAgentDefinitionError } from '@chamberu/core';
 import { createGithubApp } from '@chamberu/github';
@@ -41,6 +41,10 @@ describe('createGithubApp', () => {
         ['an empty webhookSecret', { webhookSecret: '' }],
         ['an empty webhookSecret list', { webhookSecret: [] }],
         ['an empty secret in the list', { webhookSecret: ['a', ''] }],
+        ['a zero installationId', { installationId: 0 }],
+        ['a negative installationId', { installationId: -1 }],
+        ['a fractional installationId', { installationId: 1.5 }],
+        ['a non-RSA privateKey', { privateKey: generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString() }],
     ])('refuses %s', (_name, overrides) => {
         expect(() => createGithubApp(options(overrides))).toThrow(InvalidAgentDefinitionError);
     });
