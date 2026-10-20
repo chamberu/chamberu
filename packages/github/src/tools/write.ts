@@ -9,6 +9,7 @@ import type { ToolExecutionOptions, ToolSet } from 'ai';
 import { ValidationError, defineEffectTool, effectMarker } from '@chamberu/core';
 import type { ToolContext } from '@chamberu/core';
 import { isObject } from 'smob';
+import { isSameLogin } from '../app/helpers.ts';
 import type { IGithubApp } from '../app/types.ts';
 import { LABELS_MAX } from './constants.ts';
 import {
@@ -124,7 +125,7 @@ export function createWriteTools(app: IGithubApp): ToolSet {
                         for (const comment of data) {
                             if (!comment.body?.includes(marker)) continue;
                             const user = isObject(comment.user) ? comment.user : undefined;
-                            if (user?.type !== 'Bot' || user.login !== await app.botLogin()) continue;
+                            if (user?.type !== 'Bot' || !isSameLogin(user.login, await app.botLogin())) continue;
                             return { id: Number(comment.id), url: comment.html_url };
                         }
                     }

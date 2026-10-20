@@ -6,7 +6,7 @@
  */
 
 import type { ToolSet } from 'ai';
-import { systemClock } from '@chamberu/core';
+import { ChamberuError, systemClock } from '@chamberu/core';
 import { GITHUB_USER_AGENT } from '../auth/constants.ts';
 import { normalizePrivateKey } from '../auth/helpers.ts';
 import { createInstallationTokens } from '../auth/module.ts';
@@ -16,8 +16,10 @@ import {
     normalizeAppId,
     normalizeInstallationId,
     normalizeSecrets,
+    normalizeSlug,
 } from './helpers.ts';
 import { createReadTools } from '../tools/read.ts';
+import { GITHUB_REQUEST_ERROR_CODE } from '../tools/constants.ts';
 import { createWriteTools } from '../tools/write.ts';
 import { verifySignature } from '../webhook/helpers.ts';
 import { createWebhookRoute } from '../webhook/module.ts';
@@ -34,6 +36,7 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
     const key = normalizePrivateKey(options.privateKey);
     const secrets = normalizeSecrets(options.webhookSecret);
     const installationId = normalizeInstallationId(options.installationId);
+    const slug = normalizeSlug(options.slug);
     const clock = options.clock ?? systemClock;
     const baseUrl = (options.baseUrl ?? DEFAULT_GITHUB_API_URL).replace(/\/+$/, '');
     const request = options.fetch ? { fetch: options.fetch } : {};
@@ -46,7 +49,7 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
         fetch: options.fetch,
     });
 
-    let login: Promise<string> | undefined = options.slug ? Promise.resolve(`${options.slug}[bot]`) : undefined;
+    let login: Promise<string> | undefined = slug ? Promise.resolve(`${slug}[bot]`) : undefined;
 
     const app: IGithubApp = {
         appId,
@@ -65,7 +68,11 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
                 login = tokens.app()
                     .then(async (octokit) => {
                         const { data } = await octokit.request('GET /app');
-                        return `${data?.slug ?? ''}[bot]`;
+                        if (typeof data?.slug !== 'string' || data.slug.length === 0) {
+                            // a login of `[bot]` would never match and disable the self-sender guard
+                            throw new ChamberuError({ message: 'GET /app answered without the App slug; set slug on createGithubApp().', code: GITHUB_REQUEST_ERROR_CODE });
+                        }
+                        return `${data.slug}[bot]`;
                     })
                     .catch((error: unknown) => {
                         login = undefined;

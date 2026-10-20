@@ -238,6 +238,18 @@ describe('webhook route', () => {
         expect((await other.json() as Answer).runs).toHaveLength(1);
     });
 
+    it('compares the sender with the bot login case-insensitively', async () => {
+        const { app } = createGithubTestApp({ agents: [agent('chat', { events: ['issue_comment'] })], github: { slug: 'chamberu-test' } });
+        const comment = JSON.parse(BOT_COMMENT) as { sender: { login: string } };
+        comment.sender.login = 'Chamberu-Test[bot]';
+        const response = await deliver(app, {
+            event: 'issue_comment',
+            delivery: 'd-1',
+            body: JSON.stringify(comment),
+        });
+        expect((await response.json() as Answer).runs).toEqual([]);
+    });
+
     it('answers 500 when the bot login cannot be read, and retries it on the next delivery', async () => {
         const {
             app, 

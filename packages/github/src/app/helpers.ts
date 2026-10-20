@@ -35,3 +35,24 @@ export function normalizeInstallationId(input: number | undefined): number | und
     }
     return input;
 }
+
+/** GitHub App slugs: the App name lower-cased, runs of other characters as `-`. */
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * The App slug as GitHub spells it in the bot login (`<slug>[bot]`), or
+ * `undefined`. A miscased or malformed slug would never equal the sender's
+ * login and silently disable the self-sender guard, so it is refused.
+ */
+export function normalizeSlug(input: string | undefined): string | undefined {
+    if (input === undefined) return undefined;
+    if (typeof input !== 'string' || !SLUG_PATTERN.test(input)) {
+        throw new InvalidAgentDefinitionError(`slug must be the App's slug as in its URL (lower case letters, digits and "-"), got ${JSON.stringify(input)}.`);
+    }
+    return input;
+}
+
+/** True when two GitHub logins name the same account (logins are case-insensitive). */
+export function isSameLogin(a: unknown, b: string): boolean {
+    return typeof a === 'string' && a.toLowerCase() === b.toLowerCase();
+}

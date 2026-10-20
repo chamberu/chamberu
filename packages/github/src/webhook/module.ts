@@ -9,6 +9,7 @@ import type { DispatchEnvelope, TriggerDefinition } from '@chamberu/core';
 import type { HttpRoute, HttpRouteResult } from '@chamberu/http';
 import { UnauthorizedError } from '@ebec/http';
 import { DEFAULT_WEBHOOK_PATH } from '../app/constants.ts';
+import { isSameLogin } from '../app/helpers.ts';
 import type { IGithubApp } from '../app/types.ts';
 import { matchesGithubTrigger } from '../trigger/helpers.ts';
 import type { GithubEvent } from '../trigger/types.ts';
@@ -33,7 +34,7 @@ const DISPATCH_FAILED: HttpRouteResult = {
 async function isSelfSent(app: IGithubApp, event: GithubEvent): Promise<boolean> {
     const { sender } = event.payload;
     if (sender?.type !== 'Bot') return false;
-    return sender.login === await app.botLogin();
+    return isSameLogin(sender.login, await app.botLogin());
 }
 
 /**

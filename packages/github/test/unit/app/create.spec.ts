@@ -44,6 +44,11 @@ describe('createGithubApp', () => {
         ['a zero installationId', { installationId: 0 }],
         ['a negative installationId', { installationId: -1 }],
         ['a fractional installationId', { installationId: 1.5 }],
+        ['a slug with upper case', { slug: 'Chamberu-Test' }],
+        ['a slug with a space', { slug: 'Chamberu Test' }],
+        ['a slug with a trailing space', { slug: 'chamberu-test ' }],
+        ['an empty slug', { slug: '' }],
+        ['a slug with the [bot] suffix', { slug: 'chamberu-test[bot]' }],
         ['a non-RSA privateKey', { privateKey: generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString() }],
     ])('refuses %s', (_name, overrides) => {
         expect(() => createGithubApp(options(overrides))).toThrow(InvalidAgentDefinitionError);
@@ -65,5 +70,25 @@ describe('createGithubApp', () => {
         const gh = createGithubApp(options({ privateKey: pkcs8 }));
         await (await gh.octokit(43)).request('GET /rate_limit');
         expect(fake.tokensIssued).toBe(issued + 1);
+    });
+
+    it('takes the bot login from a valid slug without GET /app', async () => {
+        const gh = createGithubApp(options({ slug: 'chamberu-test' }));
+        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
+    });
+
+    it('refuses a GET /app answer without a slug and does not cache it', async () => {
+        let slug: string | undefined;
+        const fetch: typeof globalThis.fetch = async (input, init) => {
+            const url = new URL(input instanceof Request ? input.url : String(input));
+            if (url.pathname === '/app') {
+                return new Response(JSON.stringify({ id: 123, ...(slug ? { slug } : {}) }), { headers: { 'content-type': 'application/json' } });
+            }
+            return fake.fetch(input, init);
+        };
+        const gh = createGithubApp(options({ fetch }));
+        await expect(gh.botLogin()).rejects.toThrow(/slug/);
+        slug = 'chamberu-test';
+        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
     });
 });
