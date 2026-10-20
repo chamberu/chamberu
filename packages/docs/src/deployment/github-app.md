@@ -37,8 +37,8 @@ The private key may be PKCS#1 or PKCS#8; literal `\n` sequences become newlines,
 
 The route is not rate limited and not behind the app's authenticators: the signature is its credential.
 
-::: warning The delivery id is not signed
-`X-Hub-Signature-256` covers the body only. A captured signed delivery replayed under a new `X-GitHub-Delivery` starts new runs, each spending model tokens. On an exposed endpoint, give the trigger an `idempotencyKey` derived from the content, for example the event, the issue and its `updated_at`.
+::: warning The delivery id and the event name are not signed
+`X-Hub-Signature-256` covers the body only, not `X-GitHub-Delivery` or `X-GitHub-Event`. A captured signed delivery replayed under a new delivery id, or under another event name an agent listens on, starts new runs, each spending model tokens. On an exposed endpoint, give the trigger an `idempotencyKey` built from body fields only (the action, the repository, the issue and its `updated_at`, never `e.name` or `e.delivery`), and a `filter` that checks the body carries what the event name implies (`issue` for `issues`, `comment` for `issue_comment`).
 :::
 
 ::: warning GitHub does not redeliver failed deliveries

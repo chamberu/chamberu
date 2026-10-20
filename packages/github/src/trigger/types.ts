@@ -22,10 +22,10 @@ export type GithubPayload = {
 
 /** The envelope payload of a `source: 'github'` run. */
 export type GithubEvent = {
-    /** X-GitHub-Event, e.g. 'issues'. */
+    /** X-GitHub-Event, e.g. 'issues'; not covered by the signature, so never a key on its own. */
     name: string;
     action?: string;
-    /** X-GitHub-Delivery. */
+    /** X-GitHub-Delivery; not covered by the signature. */
     delivery: string;
     installationId?: number;
     payload: GithubPayload;
