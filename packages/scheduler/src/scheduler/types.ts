@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Agent, IStore, RunEngine } from '@chamberu/core';
+import type { RunEngine } from '@chamberu/core';
 
 export type SchedulerErrorContext = {
     agent: string;
@@ -13,14 +13,8 @@ export type SchedulerErrorContext = {
 };
 
 export type SchedulerOptions = {
+    /** Its agents' cron triggers are scheduled; its store holds the tick locks. */
     engine: RunEngine;
-    /**
-     * The agents whose cron triggers are scheduled. Must be the list the engine
-     * was built with: a tick for an agent the engine does not know fails with
-     * InvalidAgentDefinitionError, reported to onError.
-     */
-    agents: Agent[];
-    store: IStore;
     /** Lock owner. Default `${hostname()}-${pid}`. */
     owner?: string;
     /**

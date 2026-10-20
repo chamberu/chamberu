@@ -7,7 +7,6 @@
 
 import type {
     Agent,
-    IRunStore,
     OverlapPolicy,
     RunEngine,
     TriggerDefinition,
@@ -22,7 +21,6 @@ export type CronTriggerOptions = {
 
 export type CronTickContext = {
     engine: RunEngine;
-    store: Pick<IRunStore, 'listRuns'>;
     agent: Agent;
     trigger: TriggerDefinition;
     /** The tick's planned fire time; forms the idempotency key. */

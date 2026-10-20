@@ -60,7 +60,6 @@ function setup(
 describe('runJob', () => {
     it('returns 0 for a completed run', async () => {
         const {
-            clock,
             store,
             agent,
             engine,
@@ -68,9 +67,7 @@ describe('runJob', () => {
 
         const result = await runJob({
             engine,
-            store,
             agent,
-            clock,
         });
 
         expect(result).toMatchObject({ status: 'completed', exitCode: 0 });
@@ -78,19 +75,30 @@ describe('runJob', () => {
         expect(run?.trigger.idempotencyKey).toMatch(/@2026-03-01T08:00:00\.000Z$/);
     });
 
-    it('returns 1 for a failed run', async () => {
+    it('takes scheduledAt from the engine clock', async () => {
         const {
             clock,
             store,
+            agent,
+            engine,
+        } = setup(textModel());
+        clock.advance(7 * 60_000);
+
+        const result = await runJob({ engine, agent });
+
+        const run = await store.getRun(result.runId as string);
+        expect(run?.trigger.payload).toEqual({ scheduledAt: '2026-03-01T08:07:00.000Z' });
+    });
+
+    it('returns 1 for a failed run', async () => {
+        const {
             agent,
             engine,
         } = setup(failingModel());
 
         const result = await runJob({
             engine,
-            store,
             agent,
-            clock,
         });
 
         expect(result).toMatchObject({ status: 'failed', exitCode: 1 });
@@ -98,7 +106,6 @@ describe('runJob', () => {
 
     it('returns when the run waits for an approval', async () => {
         const {
-            clock,
             store,
             agent,
             engine,
@@ -109,9 +116,7 @@ describe('runJob', () => {
 
         const result = await runJob({
             engine,
-            store,
             agent,
-            clock,
         });
 
         expect(result).toMatchObject({ status: 'waiting', exitCode: 0 });
@@ -120,15 +125,12 @@ describe('runJob', () => {
 
     it('skips under the overlap policy, still running the engine once', async () => {
         const {
-            clock,
-            store,
             agent,
             engine,
         } = setup(textModel());
         const trigger = agent.definition.triggers?.[0] as TriggerDefinition;
         await fireCronTrigger({
             engine,
-            store,
             agent,
             trigger,
             scheduledAt: new Date(T.getTime() - 300_000),
@@ -138,9 +140,7 @@ describe('runJob', () => {
 
         const result = await runJob({
             engine,
-            store,
             agent,
-            clock,
         });
 
         expect(result).toEqual({ status: 'skipped', exitCode: 0 });
@@ -159,7 +159,6 @@ describe('runJob', () => {
         const trigger = agent.definition.triggers?.[0] as TriggerDefinition;
         const tick = await fireCronTrigger({
             engine,
-            store,
             agent,
             trigger,
             scheduledAt: T,
@@ -178,9 +177,7 @@ describe('runJob', () => {
         });
         const result = await runJob({
             engine: pod2,
-            store,
             agent,
-            clock,
         });
 
         expect(result).toEqual({ status: 'skipped', exitCode: 0 });
@@ -199,9 +196,7 @@ describe('runJob', () => {
         });
         const first = await runJob({
             engine,
-            store,
             agent,
-            clock,
         });
         expect(first.status).toBe('waiting');
         clock.advance(25 * 60 * 60_000);
@@ -214,9 +209,7 @@ describe('runJob', () => {
         });
         const second = await runJob({
             engine: pod2,
-            store,
             agent,
-            clock,
         });
 
         expect(second).toEqual({ status: 'skipped', exitCode: 0 });
@@ -235,9 +228,7 @@ describe('runJob', () => {
         });
         const first = await runJob({
             engine,
-            store,
             agent,
-            clock,
         });
         expect(first.status).toBe('waiting');
         clock.advance(300_000);
@@ -251,9 +242,7 @@ describe('runJob', () => {
         const drain = vi.spyOn(pod2, 'drain');
         const second = await runJob({
             engine: pod2,
-            store,
             agent,
-            clock,
         });
 
         expect(second).toMatchObject({ status: 'queued', exitCode: 0 });
@@ -287,9 +276,7 @@ describe('runJob', () => {
 
         const job = runJob({
             engine: a,
-            store,
             agent,
-            clock,
             pollMs: 1_000,
         });
         await vi.waitFor(async () => expect((await store.listRuns({ agent: 'sweep' })).total).toBe(1));
@@ -318,9 +305,7 @@ describe('runJob', () => {
 
         const job = runJob({
             engine,
-            store,
             agent,
-            clock,
             pollMs: 1_000,
         });
         await vi.waitFor(() => expect(getRun).toHaveBeenCalledTimes(1));
@@ -342,8 +327,6 @@ describe('runJob', () => {
 
     it('drains the engine when waiting for the run fails', async () => {
         const {
-            clock,
-            store,
             agent,
             engine,
         } = setup(textModel());
@@ -354,17 +337,13 @@ describe('runJob', () => {
 
         await expect(runJob({
             engine,
-            store,
             agent,
-            clock,
         })).rejects.toBe(error);
         expect(drain).toHaveBeenCalledWith({ timeoutMs: 30_000 });
     });
 
     it('drains the engine before returning', async () => {
         const {
-            clock,
-            store,
             agent,
             engine,
         } = setup(textModel());
@@ -372,9 +351,7 @@ describe('runJob', () => {
 
         await runJob({
             engine,
-            store,
             agent,
-            clock,
         });
 
         expect(drain).toHaveBeenCalledTimes(1);
@@ -383,7 +360,7 @@ describe('runJob', () => {
 
     it('requires a trigger id when the agent has several cron triggers', async () => {
         const several = setup(textModel(), [cron('*/5 * * * *'), cron('0 * * * *')]);
-        await expect(runJob({ ...several, clock: several.clock })).rejects.toThrow(InvalidAgentDefinitionError);
+        await expect(runJob({ ...several })).rejects.toThrow(InvalidAgentDefinitionError);
         await expect(runJob({ ...several, trigger: 'cron:nope' })).rejects.toThrow(InvalidAgentDefinitionError);
 
         const none = setup(textModel(), [http()]);

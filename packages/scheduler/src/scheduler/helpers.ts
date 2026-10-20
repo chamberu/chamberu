@@ -15,7 +15,7 @@ import type { SchedulerOptions } from './types.ts';
  * wired: on N replicas, N - 1 skip every tick.
  */
 export function buildComponentOptions(
-    ctx: Required<Pick<SchedulerOptions, 'engine' | 'store' | 'lockTtlMs' | 'onError'>> & { lock: IScheduleLock },
+    ctx: Required<Pick<SchedulerOptions, 'engine' | 'lockTtlMs' | 'onError'>> & { lock: IScheduleLock },
     agent: Agent,
     trigger: TriggerDefinition,
 ): ScheduledComponentOptions {
@@ -31,7 +31,6 @@ export function buildComponentOptions(
         run: async ({ scheduledAt }) => {
             await fireCronTrigger({
                 engine: ctx.engine,
-                store: ctx.store,
                 agent,
                 trigger,
                 scheduledAt,

@@ -50,8 +50,6 @@ describe('createScheduler', () => {
         });
         const scheduler = createScheduler({
             engine,
-            agents,
-            store,
             onError: () => {},
             ...opts,
         });
@@ -183,26 +181,5 @@ describe('createScheduler', () => {
         const store = new MemoryStore();
         const agents = [agentWith([cron('* * * * *')])];
         expect(() => make(store, agents, { lockTtlMs: 0 })).toThrow(InvalidAgentDefinitionError);
-    });
-
-    it('rejects two agents with the same name', () => {
-        const store = new MemoryStore();
-        const engine = new RunEngine({
-            store,
-            agents: [],
-            resumeSecret: 's',
-        });
-        const agents = [agentWith([cron('* * * * *')]), agentWith([cron('0 * * * *')])];
-
-        expect(() => createScheduler({
-            engine,
-            agents,
-            store,
-        })).toThrow(InvalidAgentDefinitionError);
-        expect(() => createScheduler({
-            engine,
-            agents,
-            store,
-        })).toThrow('"sweep" is used more than once');
     });
 });

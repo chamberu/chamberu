@@ -44,7 +44,6 @@ function setup() {
     const onError = vi.fn();
     const options = buildComponentOptions({
         engine,
-        store,
         lock,
         lockTtlMs: 600_000,
         onError,

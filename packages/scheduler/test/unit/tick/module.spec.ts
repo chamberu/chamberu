@@ -39,7 +39,6 @@ function setup(trigger: TriggerDefinition = cron('*/5 * * * *')) {
     });
     const fire = (scheduledAt: Date = T, t: TriggerDefinition = trigger) => fireCronTrigger({
         engine,
-        store,
         agent,
         trigger: t,
         scheduledAt,

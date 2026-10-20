@@ -7,21 +7,20 @@
 
 import type {
     Agent,
-    IClock,
-    IStore,
     RunEngine,
     RunStatusLiteral,
 } from '@chamberu/core';
 
 export type RunJobOptions = {
-    /** Not started yet; runJob starts and drains it, also when the tick is skipped. */
+    /**
+     * Not started yet; runJob starts and drains it, also when the tick is
+     * skipped. Its store is polled and its clock gives scheduledAt and drives
+     * the poll.
+     */
     engine: RunEngine;
-    store: IStore;
     agent: Agent;
     /** Cron trigger id; optional when the agent has exactly one cron trigger. */
     trigger?: string;
-    /** Default systemClock; gives scheduledAt and drives the poll. */
-    clock?: IClock;
     /** Fallback poll of engine.getRun, default 1_000. */
     pollMs?: number;
     /** Passed to engine.drain, default 30_000. */

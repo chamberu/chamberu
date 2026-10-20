@@ -38,7 +38,6 @@ function setup(triggers: TriggerDefinition[]) {
     });
     const fire = (tick: number, trigger: TriggerDefinition = triggers[0] as TriggerDefinition) => fireCronTrigger({
         engine,
-        store,
         agent,
         trigger,
         scheduledAt: at(tick),

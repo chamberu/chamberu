@@ -16,21 +16,15 @@ export async function startScheduling(model: LanguageModel) {
         triggers: [cron('*/30 * * * *', { timezone: 'Europe/Berlin' })],
     });
 
-    const agents = [sweep];
     // MemoryStore is per process; with several replicas, pass one shared store
     // (e.g. TypeormStore) so its lock fires each tick once across them
-    const store = new MemoryStore();
     const engine = new RunEngine({
-        store,
-        agents,
+        store: new MemoryStore(),
+        agents: [sweep],
         resumeSecret: 'change-me',
     });
-    // every replica runs the same scheduler against that store
-    const scheduler = createScheduler({
-        engine,
-        agents,
-        store,
-    });
+    // every replica runs the same scheduler; it reads agents and store from the engine
+    const scheduler = createScheduler({ engine });
 
     await engine.start();
     await scheduler.start();
