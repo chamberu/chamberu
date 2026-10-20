@@ -67,7 +67,7 @@ describe('buildContainerOptions', () => {
             Memory: 1_073_741_824,
             MemorySwap: 1_073_741_824,
             NanoCpus: 500_000_000,
-            Tmpfs: { '/tmp': 'rw,nosuid,nodev,size=536870912' },
+            Tmpfs: { '/tmp': 'rw,exec,nosuid,nodev,size=536870912' },
             Mounts: [{
                 Type: 'volume',
                 Source: '',

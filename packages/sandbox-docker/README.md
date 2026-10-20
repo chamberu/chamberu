@@ -67,7 +67,7 @@ Each workspace is a container `chamberu-ws-<id>`:
 | Capabilities | all dropped, `no-new-privileges:true`, not privileged |
 | Limits | `NanoCpus` from `cpu`, `Memory` and `MemorySwap` (no swap) from `memory`, `PidsLimit` from `pids` |
 | `/workspace` | an anonymous volume, removed with the container (`remove({ force: true, v: true })`) |
-| `/tmp` | a 512 MiB tmpfs (`nosuid`, `nodev`) |
+| `/tmp` | a 512 MiB tmpfs (`exec`, `nosuid`, `nodev`): npm's global prefix and cache and corepack live there, as in a Kubernetes pod's memory `emptyDir` |
 | Network | `network` (default `bridge`) |
 | Environment | `SANDBOX_ENV` plus `env`, nothing from the host |
 | Labels | `app.kubernetes.io/managed-by=chamberu`, `app.kubernetes.io/component=sandbox`, `chamberu.dev/run=<runId>`, `chamberu.dev/workspace=<id>`, `chamberu.dev/expires-at=<epoch ms>` |

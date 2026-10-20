@@ -77,6 +77,16 @@ describeDocker('sandbox image', () => {
         expect(result.exitCode).toBe(0);
     });
 
+    it('runs programs from /tmp, where npm installs global bins', async () => {
+        const mount = await run(['sh', '-c', 'grep " /tmp " /proc/self/mounts']);
+        expect(mount.stdout).toMatch(/nosuid/);
+        expect(mount.stdout).toMatch(/nodev/);
+        expect(mount.stdout).not.toMatch(/noexec/);
+
+        const script = await run(['sh', '-c', 'mkdir -p /tmp/.npm-global/bin && printf "#!/bin/sh\\necho ran\\n" > /tmp/.npm-global/bin/probe && chmod +x /tmp/.npm-global/bin/probe && probe']);
+        expect(script).toMatchObject({ exitCode: 0, stdout: 'ran\n' });
+    });
+
     it('holds no capabilities', async () => {
         const result = await run(['grep', 'CapEff', '/proc/self/status']);
         expect(result.stdout).toMatch(/CapEff:\s+0000000000000000/);

@@ -174,7 +174,8 @@ export function buildContainerOptions(input: ContainerOptionsInput): Dockerode.C
             // equal to Memory: no swap on top
             MemorySwap: memory,
             NanoCpus: Math.round(parseCpu(input.limits.cpu) * 1e9),
-            Tmpfs: { '/tmp': `rw,nosuid,nodev,size=${Math.round(parseMemory(TMP_SIZE))}` },
+            // Docker mounts a tmpfs noexec unless told: npm's global bins and corepack live in /tmp
+            Tmpfs: { '/tmp': `rw,exec,nosuid,nodev,size=${Math.round(parseMemory(TMP_SIZE))}` },
             // anonymous volume, removed with the container (`remove({ v: true })`)
             Mounts: [{
                 Type: 'volume',
