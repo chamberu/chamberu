@@ -101,7 +101,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
 import {
     MemoryStore,
-    RunEngine,
+    Engine,
     defineAgent,
     defineEffectTool,
     http,
@@ -122,7 +122,7 @@ const triage = defineAgent({
     },
 });
 
-const engine = new RunEngine({
+const engine = new Engine({
     store: new MemoryStore(),
     agents: [triage],
     resumeSecret: process.env.RESUME_SECRET ?? 'change-me',

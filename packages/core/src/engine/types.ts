@@ -28,7 +28,7 @@ export type RunEvent = { type: 'run.updated'; run: Run } |
     { type: 'step.appended'; step: Step } |
     { type: 'run.delta'; delta: RunDelta };
 
-export type RunEngineOptions = {
+export type EngineOptions = {
     store: IStore;
     agents: Agent[];
     notifiers?: Record<string, INotifier>;

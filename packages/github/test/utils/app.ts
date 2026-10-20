@@ -6,7 +6,7 @@
  */
 
 import { createHmac } from 'node:crypto';
-import { MemoryStore, RunEngine } from '@chamberu/core';
+import { Engine, MemoryStore } from '@chamberu/core';
 import type { Agent, INotifier } from '@chamberu/core';
 import { createGithubApp } from '@chamberu/github';
 import type { GithubAppOptions, GithubWebhookRouteOptions, IGithubApp } from '@chamberu/github';
@@ -24,10 +24,8 @@ export const WEBHOOK_SECRET = 'webhook-secret';
 export const START = new Date('2026-10-20T10:00:00Z');
 
 export type GithubTestAppInput = {
-    /** Agents the http app (and so the webhook route) knows; a function of the GitHub app for agents whose tools come from it. */
+    /** Agents the engine (and so the webhook route) knows; a function of the GitHub app for agents whose tools come from it. */
     agents: Agent[] | ((gh: IGithubApp) => Agent[]);
-    /** Agents the engine knows; default `agents`. */
-    engineAgents?: Agent[] | ((gh: IGithubApp) => Agent[]);
     rateLimit?: HttpAppOptions['rateLimit'];
     bodyLimit?: number;
     route?: GithubWebhookRouteOptions;
@@ -39,7 +37,7 @@ export type GithubTestAppInput = {
 
 export type GithubTestApp = {
     app: App;
-    engine: RunEngine;
+    engine: Engine;
     store: MemoryStore;
     clock: ControllableClock;
     fake: FakeGithub;
@@ -77,18 +75,15 @@ export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
         gh,
     } = createGithubFixture(input.github);
     const agents = typeof input.agents === 'function' ? input.agents(gh) : input.agents;
-    const engineAgents = typeof input.engineAgents === 'function' ?
-        input.engineAgents(gh) :
-        (input.engineAgents ?? agents);
     const errors: unknown[] = [];
     const onError = (error: unknown) => {
         errors.push(error);
         input.onError?.(error);
     };
     const store = new MemoryStore({ clock });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
-        agents: engineAgents,
+        agents,
         resumeSecret: 'test-secret',
         clock,
         notifiers: input.notifiers,
@@ -96,9 +91,6 @@ export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
     });
     const app = createHttpApp({
         engine,
-        store,
-        agents,
-        clock,
         auth: [staticTokens({
             tokens: [{
                 value: 'admin-token-0123456789',

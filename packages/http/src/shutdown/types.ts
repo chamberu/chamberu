@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IClock, RunEngine } from '@chamberu/core';
+import type { Engine } from '@chamberu/core';
 
 export interface IShutdown {
     /** True from the first `shutdown()` call on; `/readyz` then fails. */
@@ -17,7 +17,8 @@ export interface IShutdown {
 }
 
 export type ShutdownOptions = {
-    engine: RunEngine;
+    /** Drained on shutdown; its `clock` times the delays. */
+    engine: Engine;
     scheduler?: { stop(): Promise<void> };
     /** srvx `Server` (pass `gracefulShutdown: false` to `serve`). */
     server?: { close(closeActiveConnections?: boolean): Promise<void> };
@@ -27,7 +28,6 @@ export type ShutdownOptions = {
     drainTimeoutMs?: number;
     /** Wait for open connections after the drain, then close them. Default 5 s. */
     closeTimeoutMs?: number;
-    clock?: IClock;
     /** Default `console.error`. */
     onError?: (error: unknown) => void;
 };

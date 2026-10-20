@@ -17,14 +17,14 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { FatalToolError, RunEngine, defineAgent } from '@chamberu/core';
-import type { Budget, RunEngineOptions } from '@chamberu/core';
+import { Engine, FatalToolError, defineAgent } from '@chamberu/core';
+import type { Budget, EngineOptions } from '@chamberu/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 /** Lets already-queued microtasks settle; not a sleep. */
 const flush = () => new Promise<void>((resolve) => { setImmediate(resolve); });
@@ -78,7 +78,7 @@ type TestAgent = {
     budget?: Partial<Budget>;
 };
 
-function make(def: TestAgent, opts: Partial<RunEngineOptions> & { store?: MemoryStore } = {}) {
+function make(def: TestAgent, opts: Partial<EngineOptions> & { store?: MemoryStore } = {}) {
     const store = opts.store ?? new MemoryStore({ clock: opts.clock });
     const agent = defineAgent({
         name: 'triage',
@@ -87,7 +87,7 @@ function make(def: TestAgent, opts: Partial<RunEngineOptions> & { store?: Memory
         tools: def.tools,
         budget: def.budget,
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret: 's',

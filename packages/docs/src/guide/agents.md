@@ -12,7 +12,7 @@ An agent is a typed config object passed to `defineAgent()`. It names a model, i
 - two triggers of the agent share an id,
 - a `toolsContext` entry names a chamberu tool or no tool of a plain tool set (see [Third-party tools with their own context](/guide/tools#third-party-tools-with-their-own-context)).
 
-The engine checks the rest when you construct it: agent names must be unique within one `RunEngine`, and every `notify` must name a notifier registered on the engine.
+The engine checks the rest when you construct it: agent names must be unique within one `Engine`, and every `notify` must name a notifier registered on the engine.
 
 <<< @/snippets/agents.ts#defaults
 

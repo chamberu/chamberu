@@ -11,7 +11,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import type { RunEngine } from '@chamberu/core';
+import type { Engine } from '@chamberu/core';
 import { ControllableClock } from '@chamberu/test-kit';
 import { createShutdown } from '@chamberu/http';
 import type { ShutdownOptions } from '@chamberu/http';
@@ -25,7 +25,7 @@ function setup(overrides: Partial<ShutdownOptions> = {}) {
     const drain = vi.fn<(opts?: { timeoutMs?: number }) => Promise<void>>(async () => {
         order.push('drain');
     });
-    const engine = { drain } as unknown as RunEngine;
+    const engine = { drain, clock } as unknown as Engine;
     const errors: unknown[] = [];
     const scheduler = {
         stop: vi.fn(async () => {
@@ -41,7 +41,6 @@ function setup(overrides: Partial<ShutdownOptions> = {}) {
         engine,
         scheduler,
         server,
-        clock,
         onError: (error) => {
             errors.push(error);
         },

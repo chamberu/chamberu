@@ -15,9 +15,9 @@ import {
 } from 'vitest';
 import type { Agent, TriggerDefinition } from '@chamberu/core';
 import {
+    Engine,
     InvalidAgentDefinitionError,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
     http,
@@ -42,7 +42,7 @@ describe('createScheduler', () => {
         agents: Agent[],
         opts: Partial<SchedulerOptions> = {},
     ) => {
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents,
             resumeSecret: 's',
@@ -50,8 +50,6 @@ describe('createScheduler', () => {
         });
         const scheduler = createScheduler({
             engine,
-            agents,
-            store,
             onError: () => {},
             ...opts,
         });
@@ -179,30 +177,32 @@ describe('createScheduler', () => {
         expect(() => make(store, [malformed])).toThrow(/sweep.*bad/);
     });
 
+    it('schedules only the named agents', async () => {
+        const store = new MemoryStore();
+        const digest = defineAgent({
+            name: 'digest',
+            model: textModel(),
+            instructions: 'x',
+            triggers: [cron('* * * * *')],
+        });
+        const scheduler = make(store, [agentWith([cron('* * * * *')]), digest], { agents: ['digest'] });
+        await scheduler.start();
+
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        expect((await store.listRuns({})).data.map((run) => run.agent)).toEqual(['digest']);
+    });
+
+    it('rejects an agent name the engine lacks or a name given twice', () => {
+        const store = new MemoryStore();
+        const agents = [agentWith([cron('* * * * *')])];
+        expect(() => make(store, agents, { agents: ['missing'] })).toThrow(InvalidAgentDefinitionError);
+        expect(() => make(store, agents, { agents: ['sweep', 'sweep'] })).toThrow(InvalidAgentDefinitionError);
+    });
+
     it('rejects an invalid lockTtlMs', () => {
         const store = new MemoryStore();
         const agents = [agentWith([cron('* * * * *')])];
         expect(() => make(store, agents, { lockTtlMs: 0 })).toThrow(InvalidAgentDefinitionError);
-    });
-
-    it('rejects two agents with the same name', () => {
-        const store = new MemoryStore();
-        const engine = new RunEngine({
-            store,
-            agents: [],
-            resumeSecret: 's',
-        });
-        const agents = [agentWith([cron('* * * * *')]), agentWith([cron('0 * * * *')])];
-
-        expect(() => createScheduler({
-            engine,
-            agents,
-            store,
-        })).toThrow(InvalidAgentDefinitionError);
-        expect(() => createScheduler({
-            engine,
-            agents,
-            store,
-        })).toThrow('"sweep" is used more than once');
     });
 });

@@ -7,9 +7,8 @@
 
 import type {
     Agent,
-    IRunStore,
+    Engine,
     OverlapPolicy,
-    RunEngine,
     TriggerDefinition,
 } from '@chamberu/core';
 
@@ -21,8 +20,7 @@ export type CronTriggerOptions = {
 };
 
 export type CronTickContext = {
-    engine: RunEngine;
-    store: Pick<IRunStore, 'listRuns'>;
+    engine: Engine;
     agent: Agent;
     trigger: TriggerDefinition;
     /** The tick's planned fire time; forms the idempotency key. */

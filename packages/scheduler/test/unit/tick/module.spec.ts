@@ -8,9 +8,9 @@
 import { describe, expect, it } from 'vitest';
 import type { TriggerDefinition } from '@chamberu/core';
 import {
+    Engine,
     InvalidAgentDefinitionError,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
     http,
@@ -31,7 +31,7 @@ function setup(trigger: TriggerDefinition = cron('*/5 * * * *')) {
         instructions: 'x',
         triggers: [trigger],
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret: 's',
@@ -39,7 +39,6 @@ function setup(trigger: TriggerDefinition = cron('*/5 * * * *')) {
     });
     const fire = (scheduledAt: Date = T, t: TriggerDefinition = trigger) => fireCronTrigger({
         engine,
-        store,
         agent,
         trigger: t,
         scheduledAt,

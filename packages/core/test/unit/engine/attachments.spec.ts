@@ -16,8 +16,8 @@ import {
 } from 'vitest';
 import { z } from 'zod';
 import {
+    Engine,
     ErrorCode,
-    RunEngine,
     ValidationError,
     defineAgent,
 } from '@chamberu/core';
@@ -32,7 +32,7 @@ import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 afterEach(() => {
     for (const e of engines) e.stop();
@@ -69,7 +69,7 @@ function setup(
         ...opts.definition,
     });
     const errors: unknown[] = [];
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         notifiers: { owner: notifier },

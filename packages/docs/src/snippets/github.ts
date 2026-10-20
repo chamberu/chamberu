@@ -1,7 +1,7 @@
 import type { LanguageModel } from 'ai';
 import type { IStore } from '@chamberu/core';
 import {
-    RunEngine,
+    Engine,
     cron,
     defineAgent,
     requireToolPermission,
@@ -46,16 +46,13 @@ export function createTriage(model: LanguageModel, store: IStore) {
     // #endregion agent
 
     // #region http
-    const agents = [triage];
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
-        agents,
+        agents: [triage],
         resumeSecret: process.env.RESUME_SECRET ?? '',
     });
     const app = createHttpApp({
         engine,
-        store,
-        agents,
         auth: staticTokens({
             tokens: [{
                 value: process.env.CHAMBERU_TOKEN ?? '',

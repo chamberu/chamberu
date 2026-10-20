@@ -7,9 +7,9 @@
 
 import type {
     Agent,
+    Engine,
     IClock,
     IStore,
-    RunEngine,
 } from '@chamberu/core';
 import type { Options as CorsPluginOptions } from '@routup/cors';
 import type { Options as PrometheusPluginOptions } from '@routup/prometheus';
@@ -35,9 +35,13 @@ export type McpOptions = {
 };
 
 export type HttpAppOptions = {
-    engine: RunEngine;
-    store: IStore;
-    agents: Agent[];
+    /** Its `store`, agents and `clock` serve every route. */
+    engine: Engine;
+    /**
+     * Names of the engine's agents to serve (routes, MCP tools, hooks, extra
+     * routes); the others are unknown to this app. Default: every agent.
+     */
+    agents?: string[];
     /** One authenticator or a chain; the first principal wins. */
     auth: Authenticator | Authenticator[];
     /** Prefix of every route, e.g. `/api`. Default: none. */
@@ -65,7 +69,6 @@ export type HttpAppOptions = {
     metrics?: false | Partial<PrometheusOptions>;
     /** How long `/readyz` waits for the store. Default: 2 s. */
     readyTimeoutMs?: number;
-    clock?: IClock;
     /** Receives 5xx causes and background failures. Default: `console.error`. */
     onError?: (error: unknown) => void;
     /** Extra routes other packages contribute (e.g. a GitHub webhook), served under `basePath`. */
@@ -99,7 +102,7 @@ export type HttpRouteResult = {
 };
 
 export type HttpRouteContext = {
-    engine: RunEngine;
+    engine: Engine;
     agents: readonly Agent[];
     clock: IClock;
     onError: (error: unknown) => void;
@@ -122,7 +125,7 @@ export type HttpRoute = {
 
 /** Shared by every route module; internal. */
 export type HttpContext = {
-    engine: RunEngine;
+    engine: Engine;
     store: IStore;
     agents: Map<string, Agent>;
     authenticators: Authenticator[];

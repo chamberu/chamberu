@@ -12,36 +12,29 @@ import type { IScheduledComponent } from 'hubwire';
 import { defineScheduledComponent } from 'hubwire';
 import { createStoreScheduleLock } from '../lock/index.ts';
 import { SCHEDULE_LOCK_TTL_MS } from './constants.ts';
-import { buildComponentOptions } from './helpers.ts';
+import { buildComponentOptions, selectAgents } from './helpers.ts';
 import type { IScheduler, SchedulerOptions } from './types.ts';
 
 /**
- * Schedules every cron trigger of `agents` as one hubwire component, guarded by
- * a per-tick lock in the store, so replicas sharing the store dispatch each tick
- * once. Validates every trigger up front: throws InvalidAgentDefinitionError
- * for a duplicate agent name or a trigger hubwire cannot schedule.
+ * Schedules every cron trigger of the engine's agents (or of `agents`) as one hubwire component,
+ * guarded by a per-tick lock in the engine's store, so replicas sharing the
+ * store dispatch each tick once. Validates every trigger up front: throws
+ * InvalidAgentDefinitionError for a trigger hubwire cannot schedule or a name
+ * in `agents` the engine lacks.
  * Shutdown order: `await scheduler.stop()`, then `await engine.drain()`.
  */
 export function createScheduler(opts: SchedulerOptions): IScheduler {
-    const names = new Set<string>();
-    for (const agent of opts.agents) {
-        if (names.has(agent.name)) {
-            throw new InvalidAgentDefinitionError(`Agent name "${agent.name}" is used more than once.`);
-        }
-        names.add(agent.name);
-    }
-
+    const agents = selectAgents(opts.engine, opts.agents);
     const ctx = {
         engine: opts.engine,
-        store: opts.store,
-        lock: createStoreScheduleLock(opts.store, opts.owner ?? `${hostname()}-${pid}`),
+        lock: createStoreScheduleLock(opts.engine.store, opts.owner ?? `${hostname()}-${pid}`),
         lockTtlMs: opts.lockTtlMs ?? SCHEDULE_LOCK_TTL_MS,
         // eslint-disable-next-line no-console
         onError: opts.onError ?? ((error, errorCtx) => console.error('[chamberu]', error, errorCtx)),
     } satisfies Parameters<typeof buildComponentOptions>[0];
 
     const components: IScheduledComponent[] = [];
-    for (const agent of opts.agents) {
+    for (const agent of agents) {
         for (const trigger of agent.definition.triggers ?? []) {
             if (trigger.source !== 'cron') continue;
             try {

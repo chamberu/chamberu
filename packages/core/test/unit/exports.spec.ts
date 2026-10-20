@@ -14,7 +14,7 @@ describe('public api', () => {
         'cron',
         'http',
         'webhook',
-        'RunEngine',
+        'Engine',
         'MemoryStore',
         'defineEffectTool',
         'defineTool',

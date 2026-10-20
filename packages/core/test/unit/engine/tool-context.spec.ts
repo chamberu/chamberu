@@ -19,8 +19,8 @@ import {
 } from 'vitest';
 import { z } from 'zod';
 import {
+    Engine,
     InvalidAgentDefinitionError,
-    RunEngine,
     defineAgent,
     defineEffectTool,
     defineTool,
@@ -39,7 +39,7 @@ import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 afterEach(() => {
     for (const e of engines) e.stop();
@@ -101,6 +101,7 @@ type Setup = {
     toolsContext?: AgentDefinition['toolsContext'];
     store?: MemoryStore;
     owner?: string;
+    claimTtlMs?: number;
 };
 
 function setup(s: Setup) {
@@ -118,13 +119,13 @@ function setup(s: Setup) {
         toolsContext: s.toolsContext,
         notify: 'owner',
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         notifiers: { owner: notifier },
         resumeSecret: 'secret',
         clock: s.store ? undefined : clock,
-        claimTtlMs: 30,
+        claimTtlMs: s.claimTtlMs ?? 30,
         owner: s.owner,
         onError: () => {},
     });
@@ -664,17 +665,21 @@ describe('tool context', () => {
     it('hands the context to a call after recovery', async () => {
         const { model, calls } = scripted(['hang', callTool('lookup'), text('done')]);
         const store = new MemoryStore();
+        // real time: a short lease could expire on a slow runner and let A re-run
+        // the run itself; drain releases the claim, so B recovers it at once
         const a = setup({
             model,
             tools: { lookup },
             store,
             owner: 'A',
+            claimTtlMs: 60_000,
         });
         const b = setup({
             model,
             tools: { lookup },
             store,
             owner: 'B',
+            claimTtlMs: 60_000,
         });
         await a.engine.start();
         const { runId } = await a.engine.dispatch(env());

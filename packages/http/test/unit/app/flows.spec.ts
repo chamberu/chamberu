@@ -213,7 +213,6 @@ describe('acceptance flows', () => {
             engine: base.engine,
             server: { close: async () => { closed.push(true); } },
             readinessDelayMs: 1_000,
-            clock: base.clock,
         });
         const {
             app,
@@ -222,8 +221,6 @@ describe('acceptance flows', () => {
         } = setup({
             shutdown,
             engine: base.engine,
-            store: base.store,
-            clock: base.clock,
         });
 
         const started = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN });

@@ -81,8 +81,8 @@ One agent, an in-memory store and one manually dispatched run:
 import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     defineAgent,
     defineEffectTool,
     http,
@@ -110,7 +110,7 @@ export async function triageIssue(model: LanguageModel) {
         },
     });
 
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage],
         resumeSecret: 'change-me',
@@ -203,7 +203,7 @@ const deployer = defineAgent({
 const resumeSecret = process.env.RESUME_SECRET;
 if (!resumeSecret) throw new Error('RESUME_SECRET is not set');
 
-const engine = new RunEngine({
+const engine = new Engine({
     store,
     agents: [deployer],
     notifiers: { owner: notifier },
@@ -292,7 +292,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 
 ## Options
 
-`new RunEngine(options)`:
+`new Engine(options)`:
 
 | Option | Type | Default | Description |
 |---|---|---|---|
@@ -331,7 +331,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
 | `cron`, `http`, `webhook` | function | Trigger definitions |
-| `RunEngine` | class | `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
+| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineTool` | function | An AI SDK `tool()` whose `execute` gets the run's `ToolContext` as `context` |
 | `toolContextSchema` | object | The `contextSchema` that marks a chamberu tool |
@@ -350,7 +350,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `ToolContext`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `RunEngineOptions`, `IClock`.
+Types: `Agent`, `AgentDefinition`, `ToolContext`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
 
 Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamberu/test-kit`](../test-kit).
 

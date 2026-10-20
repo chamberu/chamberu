@@ -14,7 +14,7 @@ import {
     it,
 } from 'vitest';
 import { z } from 'zod';
-import { RunEngine, ValidationError, defineAgent } from '@chamberu/core';
+import { Engine, ValidationError, defineAgent } from '@chamberu/core';
 import { EFFECT } from '../../../src/effect/constants.ts';
 import { wrapToolsForRun } from '../../../src/effect/wrap.ts';
 import { createRunArtifacts } from '../../../src/artifact/module.ts';
@@ -58,14 +58,14 @@ async function call(tools: ToolSet, name: string, input: unknown, context?: Tool
     return (t?.execute as (i: unknown, o: unknown) => Promise<unknown>)(input, { ...callOpts, context });
 }
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 afterEach(() => {
     for (const e of engines) e.stop();
     engines.length = 0;
 });
 
 async function runOnce(store: MemoryStore, agent: Parameters<typeof defineAgent>[0]) {
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [defineAgent(agent)],
         resumeSecret: 's',

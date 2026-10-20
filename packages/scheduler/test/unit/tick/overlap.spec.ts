@@ -8,8 +8,8 @@
 import { describe, expect, it } from 'vitest';
 import type { RunStatusLiteral, TriggerDefinition } from '@chamberu/core';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
 } from '@chamberu/core';
@@ -30,7 +30,7 @@ function setup(triggers: TriggerDefinition[]) {
         instructions: 'x',
         triggers,
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret: 's',
@@ -38,7 +38,6 @@ function setup(triggers: TriggerDefinition[]) {
     });
     const fire = (tick: number, trigger: TriggerDefinition = triggers[0] as TriggerDefinition) => fireCronTrigger({
         engine,
-        store,
         agent,
         trigger,
         scheduledAt: at(tick),

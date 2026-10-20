@@ -6,7 +6,6 @@
  */
 
 import type { Run } from '@chamberu/core';
-import { systemClock } from '@chamberu/core';
 import { fireCronTrigger } from '../tick/index.ts';
 import { SETTLING } from './constants.ts';
 import { isQueuedBehindApproval, resolveCronTrigger } from './helpers.ts';
@@ -14,7 +13,7 @@ import type { RunJobOptions, RunJobResult } from './types.ts';
 
 /**
  * Fires one cron trigger once (for a Kubernetes CronJob): dispatches the tick
- * at `clock.now()` (the overlap policy applies), then starts the engine and
+ * at the engine clock's `now()` (the overlap policy applies), then starts the engine and
  * runs one approval tick, so leftovers of earlier jobs (a run whose pod was
  * killed, an interrupted run, an answered or expired approval) are recovered
  * and executed even when the tick is skipped. It waits for the dispatched run
@@ -32,17 +31,15 @@ import type { RunJobOptions, RunJobResult } from './types.ts';
 export async function runJob(opts: RunJobOptions): Promise<RunJobResult> {
     const {
         engine,
-        store,
         agent,
-        clock = systemClock,
         pollMs = 1_000,
         drainTimeoutMs = 30_000,
     } = opts;
+    const { clock, store } = engine;
     const trigger = resolveCronTrigger(agent, opts.trigger);
 
     const tick = await fireCronTrigger({
         engine,
-        store,
         agent,
         trigger,
         scheduledAt: clock.now(),

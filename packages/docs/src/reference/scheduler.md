@@ -16,7 +16,7 @@ function createScheduler(opts: SchedulerOptions): IScheduler;
 const SCHEDULE_LOCK_TTL_MS: 600_000;
 ```
 
-Throws `InvalidAgentDefinitionError` for a duplicate agent name or a cron trigger the scheduler cannot use (expression, timezone, `lockTtlMs`).
+Schedules `engine.listAgents()` (or only the agents named in `agents`) and locks over `engine.store`. Throws `InvalidAgentDefinitionError` for a cron trigger the scheduler cannot use (expression, timezone, `lockTtlMs`) and for a name in `agents` the engine lacks or that is given twice.
 
 <<< ../../../scheduler/src/scheduler/types.ts{ts}
 

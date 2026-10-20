@@ -1,7 +1,7 @@
 import type { LanguageModel } from 'ai';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     defineAgent,
 } from '@chamberu/core';
 
@@ -11,7 +11,7 @@ export async function watchRuns(model: LanguageModel) {
         model,
         instructions: 'Repeat the payload.',
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [agent],
         resumeSecret: 'change-me',

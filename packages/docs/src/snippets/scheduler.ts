@@ -1,10 +1,10 @@
 import type { Agent, IStore } from '@chamberu/core';
-import { RunEngine } from '@chamberu/core';
+import { Engine } from '@chamberu/core';
 import { createScheduler, runJob } from '@chamberu/scheduler';
 
 export async function serve(store: IStore, agents: Agent[], resumeSecret: string) {
     // #region scheduler
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents,
         resumeSecret,
@@ -12,8 +12,6 @@ export async function serve(store: IStore, agents: Agent[], resumeSecret: string
     // every replica runs the same scheduler; a store lock fires each tick once
     const scheduler = createScheduler({
         engine,
-        agents,
-        store,
         onError: (error, { agent, trigger }) => console.error('[cron]', agent, trigger, error),
     });
     await engine.start();
@@ -33,14 +31,13 @@ export async function serve(store: IStore, agents: Agent[], resumeSecret: string
 export async function job(store: IStore, agent: Agent, resumeSecret: string) {
     // #region job
     // a Kubernetes CronJob: fire the agent's cron trigger once and exit with its outcome
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret,
     });
     const { status, exitCode } = await runJob({
         engine,
-        store,
         agent,
         drainTimeoutMs: 120_000,
     });

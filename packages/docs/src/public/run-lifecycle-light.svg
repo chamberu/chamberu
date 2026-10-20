@@ -39,7 +39,7 @@
     </defs>
 
     <rect class="panel" x="16" y="16" width="928" height="310" rx="18"/>
-    <text class="label" x="36" y="42">run lifecycle · RunEngine + Store</text>
+    <text class="label" x="36" y="42">run lifecycle · Engine + Store</text>
 
     <!-- intake -->
     <rect class="card s-accent" x="36" y="56" width="170" height="84" rx="12" stroke="#C8303B" stroke-width="1.5"/>

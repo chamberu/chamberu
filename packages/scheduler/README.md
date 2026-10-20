@@ -45,8 +45,8 @@ ESM only, Node.js `>=22`. `@chamberu/core` is a peer dependency; [`hubwire`](htt
 ```typescript
 import type { LanguageModel } from 'ai';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     cron,
     defineAgent,
 } from '@chamberu/core';
@@ -61,21 +61,15 @@ export async function startScheduling(model: LanguageModel) {
         triggers: [cron('*/30 * * * *', { timezone: 'Europe/Berlin' })],
     });
 
-    const agents = [sweep];
     // MemoryStore is per process; with several replicas, pass one shared store
     // (e.g. TypeormStore) so its lock fires each tick once across them
-    const store = new MemoryStore();
-    const engine = new RunEngine({
-        store,
-        agents,
+    const engine = new Engine({
+        store: new MemoryStore(),
+        agents: [sweep],
         resumeSecret: 'change-me',
     });
-    // every replica runs the same scheduler against that store
-    const scheduler = createScheduler({
-        engine,
-        agents,
-        store,
-    });
+    // every replica runs the same scheduler; it reads agents and store from the engine
+    const scheduler = createScheduler({ engine });
 
     await engine.start();
     await scheduler.start();
@@ -131,7 +125,7 @@ await engine.drain();   // waits for running runs, then interrupts the rest
 `runJob()` fires one cron trigger once and waits for its run, for a Kubernetes CronJob instead of a long-lived replica:
 
 ```ts
-const { exitCode } = await runJob({ engine, store, agent: sweep });
+const { exitCode } = await runJob({ engine, agent: sweep });
 process.exitCode = exitCode;
 ```
 
@@ -157,9 +151,8 @@ A run that pauses for an approval does not hold the pod: the job returns, the ap
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Dispatches the runs |
-| `agents` | `Agent[]` | required | The agents whose cron triggers are scheduled; the same list the engine was built with |
-| `store` | `IStore` | required | Holds the tick locks and the runs the overlap check reads |
+| `engine` | `Engine` | required | Dispatches the runs; its agents' cron triggers are scheduled, its store holds the tick locks and the runs the overlap check reads |
+| `agents` | `string[]` | every agent | Names of the engine's agents whose cron triggers are scheduled, e.g. to split them across deployments. A name the engine lacks or given twice throws `InvalidAgentDefinitionError` |
 | `owner` | `string` | `` `${hostname}-${pid}` `` | Lock owner |
 | `lockTtlMs` | `number` | `600_000` | How long a tick's lock key is held; a tick firing this late or later is skipped |
 | `onError` | `(error, { agent, trigger }) => void` | `console.error` | Failing ticks |
@@ -168,11 +161,9 @@ A run that pauses for an approval does not hold the pod: the job returns, the ap
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `engine` | `RunEngine` | required | Not started yet; started and drained by the job, also when the tick is skipped |
-| `store` | `IStore` | required | The store the engine uses |
+| `engine` | `Engine` | required | Not started yet; started and drained by the job, also when the tick is skipped. Its clock gives `scheduledAt` and drives the poll |
 | `agent` | `Agent` | required | The agent to fire |
 | `trigger` | `string` | the only cron trigger | Cron trigger id; required when the agent has several |
-| `clock` | `IClock` | `systemClock` | Gives `scheduledAt` and drives the poll |
 | `pollMs` | `number` | `1_000` | Poll of `engine.getRun`, which also sees a run finished by another replica |
 | `drainTimeoutMs` | `number` | `30_000` | Passed to `engine.drain()` |
 
@@ -180,7 +171,7 @@ A run that pauses for an approval does not hold the pod: the job returns, the ap
 
 | Export | Kind | Purpose |
 |---|---|---|
-| `createScheduler` | function | Schedules every cron trigger of the agents; returns `{ start, stop }` |
+| `createScheduler` | function | Schedules every cron trigger of the engine's agents; returns `{ start, stop }` |
 | `runJob` | function | Fires one cron trigger once and waits for its run |
 | `fireCronTrigger` | function | One tick: overlap check and dispatch, for a given `scheduledAt` |
 | `readCronOptions` | function | Reads and validates the options `cron()` stores on a trigger |

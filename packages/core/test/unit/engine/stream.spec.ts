@@ -17,12 +17,12 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { RunEngine, defineAgent } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamberu/core';
 import type { RunDelta } from '@chamberu/core';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 afterEach(() => {
     for (const e of engines) e.stop();
@@ -45,7 +45,7 @@ function make(model: LanguageModel, tools?: () => ToolSet) {
         model,
         tools,
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         resumeSecret: 's',
@@ -418,7 +418,7 @@ describe('streaming', () => {
             },
         });
         const store = new MemoryStore();
-        const engine = new RunEngine({
+        const engine = new Engine({
             store,
             agents: [defineAgent({
                 name: 'triage',

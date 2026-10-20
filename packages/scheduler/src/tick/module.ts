@@ -53,14 +53,13 @@ export function readCronOptions(agent: Agent, trigger: TriggerDefinition): CronT
 export async function fireCronTrigger(ctx: CronTickContext): Promise<CronTickResult> {
     const {
         engine,
-        store,
         agent,
         trigger,
         scheduledAt,
     } = ctx;
     const options = readCronOptions(agent, trigger);
 
-    if (await isOverlapping(store, agent.name, trigger.id, options.overlap)) {
+    if (await isOverlapping(engine.store, agent.name, trigger.id, options.overlap)) {
         return { dispatched: false, reason: 'overlap' };
     }
 

@@ -9,8 +9,8 @@ import {
     ChamberuError,
     ErrorCode,
     InvalidAgentDefinitionError,
-    systemClock,
 } from '@chamberu/core';
+import type { Agent, Engine } from '@chamberu/core';
 import type { Issue } from '@ebec/core';
 import { isHTTPError } from '@ebec/http';
 import type { IHTTPError } from '@ebec/http';
@@ -77,15 +77,27 @@ function validateRoutes(options: HttpAppOptions): HttpRoute[] {
     return routes;
 }
 
-export function buildContext(options: HttpAppOptions): HttpContext {
-    const agents = new Map<string, HttpAppOptions['agents'][number]>();
-    for (const agent of options.agents) {
-        if (agents.has(agent.name)) {
-            throw new InvalidAgentDefinitionError(`Agent "${agent.name}" is registered twice.`);
+/**
+ * The engine's agents, or only the named ones (in the given order); a name the
+ * engine lacks or a name given twice throws InvalidAgentDefinitionError.
+ */
+export function selectAgents(engine: Engine, names?: readonly string[]): Agent[] {
+    if (names === undefined) return engine.listAgents();
+    const seen = new Set<string>();
+    return names.map((name) => {
+        if (seen.has(name)) {
+            throw new InvalidAgentDefinitionError(`Agent "${name}" is named more than once.`);
         }
-        agents.set(agent.name, agent);
-    }
+        seen.add(name);
+        const agent = engine.getAgent(name);
+        if (!agent) {
+            throw new InvalidAgentDefinitionError(`The engine has no agent "${name}".`);
+        }
+        return agent;
+    });
+}
 
+export function buildContext(options: HttpAppOptions): HttpContext {
     const authenticators = Array.isArray(options.auth) ? [...options.auth] : [options.auth];
     if (authenticators.length === 0) {
         throw new InvalidAgentDefinitionError('The http app needs at least one authenticator.');
@@ -98,8 +110,8 @@ export function buildContext(options: HttpAppOptions): HttpContext {
 
     return {
         engine: options.engine,
-        store: options.store,
-        agents,
+        store: options.engine.store,
+        agents: new Map(selectAgents(options.engine, options.agents).map((agent) => [agent.name, agent])),
         authenticators,
         basePath: options.basePath ?? '',
         bodyLimit: options.bodyLimit ?? DEFAULT_BODY_LIMIT,
@@ -107,7 +119,7 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         maxOpenStreams,
         openStreams: 0,
         readyTimeoutMs: options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS,
-        clock: options.clock ?? systemClock,
+        clock: options.engine.clock,
         shutdown: options.shutdown,
         closers: new Set(),
         closed: false,

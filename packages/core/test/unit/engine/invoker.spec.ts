@@ -15,7 +15,7 @@ import {
 } from 'vitest';
 import { z } from 'zod';
 import {
-    RunEngine,
+    Engine,
     ValidationError,
     defineAgent,
     requireToolPermission,
@@ -32,7 +32,7 @@ import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 afterEach(() => {
     for (const e of engines) e.stop();
@@ -87,7 +87,7 @@ function setup(s: Setup) {
         approvals: s.approvals,
         notify: 'owner',
     });
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         notifiers: { owner: notifier },
@@ -458,7 +458,7 @@ describe('tool policy', () => {
         engine.stop();
 
         // redeployed with a tighter policy: deploy is refused now
-        const tightened = new RunEngine({
+        const tightened = new Engine({
             store,
             agents: [defineAgent({
                 name: 'release',

@@ -47,13 +47,14 @@ import type { ApprovalRequest } from './execute/types.ts';
 import { RunQueue } from './queue/module.ts';
 import type {
     DispatchEnvelope,
+    EngineOptions,
     ResumeDecision,
-    RunEngineOptions,
     RunEvent,
 } from './types.ts';
 
-export class RunEngine {
-    protected readonly store: IStore;
+export class Engine {
+    /** The store runs, steps and state live in; packages built on the engine read through it. */
+    readonly store: IStore;
 
     protected readonly agents: Map<string, Agent>;
 
@@ -61,7 +62,8 @@ export class RunEngine {
 
     protected readonly owner: string;
 
-    protected readonly clock: IClock;
+    /** Every time-based decision of the engine; packages built on it share it. */
+    readonly clock: IClock;
 
     protected readonly resumeSecret: string;
 
@@ -90,7 +92,7 @@ export class RunEngine {
 
     protected lastCreatedAt = 0;
 
-    constructor(opts: RunEngineOptions) {
+    constructor(opts: EngineOptions) {
         this.store = opts.store;
         this.agents = new Map(opts.agents.map((a) => [a.name, a]));
         this.notifiers = opts.notifiers ?? {};
@@ -199,6 +201,16 @@ export class RunEngine {
         this.emit({ type: 'run.updated', run });
         if (this.started) void this.queue.pump();
         return { runId, deduplicated: false };
+    }
+
+    /** The registered agent of that name. */
+    getAgent(name: string): Agent | undefined {
+        return this.agents.get(name);
+    }
+
+    /** The registered agents in registration order, as a new array. */
+    listAgents(): Agent[] {
+        return this.agents.values().toArray();
     }
 
     getRun(id: string): Promise<Run | undefined> {

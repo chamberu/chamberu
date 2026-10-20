@@ -53,7 +53,7 @@ One GitHub App per agent repository (or organisation):
 
 ```typescript
 import type { LanguageModel } from 'ai';
-import { MemoryStore, RunEngine, defineAgent } from '@chamberu/core';
+import { Engine, MemoryStore, defineAgent } from '@chamberu/core';
 import { createGithubApp, githubWebhook } from '@chamberu/github';
 import type { GithubAppOptions } from '@chamberu/github';
 import { createHttpApp, createShutdown, staticTokens } from '@chamberu/http';
@@ -90,19 +90,16 @@ export async function createTriageServer(
         approvals: { github_close_issue: 'user' },
     });
 
-    const agents = [triage];
-    const store = new MemoryStore();
-    const engine = new RunEngine({
-        store,
-        agents,
+    const engine = new Engine({
+        store: new MemoryStore(),
+        agents: [triage],
         resumeSecret: RESUME_SECRET,
     });
 
     const shutdown = createShutdown({ engine });
     const app = createHttpApp({
+        // the webhook route dispatches to the engine's agents
         engine,
-        store,
-        agents,
         auth: staticTokens({
             tokens: [{
                 value: CHAMBERU_TOKEN,

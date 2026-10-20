@@ -6,7 +6,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 
 | Package | Contents |
 |---|---|
-| `@chamberu/core` | `defineAgent()`, trigger definitions, `RunEngine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore` |
+| `@chamberu/core` | `defineAgent()`, trigger definitions, `Engine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore` |
 | `@chamberu/test-kit` | `describeStoreContract`, `ControllableClock` |
 | `@chamberu/scheduler` | `createScheduler()` (one locked hubwire component per `cron()` trigger, overlap policies, timezones), `runJob()` for one-shot jobs |
 | `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |

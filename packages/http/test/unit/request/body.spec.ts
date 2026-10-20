@@ -16,17 +16,8 @@ import { isDefined } from '../../../src/request/validators.ts';
 import { createTestApp, testAuth } from '../../utils/app.ts';
 
 function echoApp() {
-    const {
-        engine,
-        store,
-        agents,
-    } = createTestApp();
-    const ctx = buildContext({
-        engine,
-        store,
-        agents,
-        auth: testAuth,
-    });
+    const { engine } = createTestApp();
+    const ctx = buildContext({ engine, auth: testAuth });
     const app = new App();
     app.post('/echo', defineCoreHandler(async (event) => {
         const body = await readJsonBody(event, 16);

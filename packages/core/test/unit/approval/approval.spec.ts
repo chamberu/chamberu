@@ -16,26 +16,26 @@ import {
 } from 'vitest';
 import { z } from 'zod';
 import {
+    Engine,
     FatalToolError,
     InvalidAgentDefinitionError,
     InvalidResumeTokenError,
     InvalidRunStateError,
-    RunEngine,
     createResumeToken,
     defineAgent,
 } from '@chamberu/core';
 import type {
     AgentDefinition,
+    EngineOptions,
     INotifier,
     Notification,
-    RunEngineOptions,
 } from '@chamberu/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockPart, MockResponse } from '../../utils/mock-model.ts';
 
-const engines: RunEngine[] = [];
+const engines: Engine[] = [];
 
 afterEach(() => {
     for (const e of engines) e.stop();
@@ -82,7 +82,7 @@ type Setup = {
     budget?: AgentDefinition['budget'];
     /** Replaces the deploy tool's body (after recording the call). */
     deploy?: (input: { env: string }) => Promise<string>;
-    engine?: Partial<RunEngineOptions>;
+    engine?: Partial<EngineOptions>;
 };
 
 function setup(s: Setup) {
@@ -109,7 +109,7 @@ function setup(s: Setup) {
         budget: s.budget,
     });
     const errors: unknown[] = [];
-    const engine = new RunEngine({
+    const engine = new Engine({
         store,
         agents: [agent],
         notifiers: { owner: notifier },
@@ -637,7 +637,7 @@ describe('approvals', () => {
             model: mockModel([]),
             notify: 'nobody',
         });
-        expect(() => new RunEngine({
+        expect(() => new Engine({
             store: new MemoryStore(),
             agents: [agent],
             resumeSecret: SECRET,
@@ -767,7 +767,7 @@ describe('approvals', () => {
     });
 });
 
-describe('RunEngine.inspectResumeToken', () => {
+describe('Engine.inspectResumeToken', () => {
     const claims = {
         runId: 'r1', 
         approvalId: 'a1', 

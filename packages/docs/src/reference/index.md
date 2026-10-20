@@ -3,7 +3,7 @@
 The public API of `@chamberu/core`, taken from `packages/core/src/index.ts`. Contract interfaces carry an `I` prefix (`IStore`, `IClock`, `INotifier`, `IAgentState`); data shapes are unprefixed types.
 
 ```ts
-import { RunEngine, defineAgent } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamberu/core';
 ```
 
 Test helpers live in [`@chamberu/test-kit`](/reference/test-kit).
@@ -56,11 +56,16 @@ function webhook(opts: WebhookTriggerOptions): TriggerDefinition;
 
 See [Triggers & the Envelope](/guide/triggers).
 
-## RunEngine
+## Engine
 
 ```ts
-class RunEngine {
-    constructor(opts: RunEngineOptions);
+class Engine {
+    constructor(opts: EngineOptions);
+
+    readonly store: IStore;
+    readonly clock: IClock;
+    getAgent(name: string): Agent | undefined;
+    listAgents(): Agent[];
 
     dispatch(envelope: DispatchEnvelope): Promise<{ runId: string; deduplicated: boolean }>;
     getRun(id: string): Promise<Run | undefined>;
@@ -81,6 +86,8 @@ class RunEngine {
 
 | Method | Description | Guide |
 |---|---|---|
+| `store`, `clock` | The store and clock the engine was built with (`clock` defaults to `systemClock`) | |
+| `getAgent`, `listAgents` | One registered agent by name; all of them in registration order (a new array) | |
 | `dispatch` | Stores a `queued` run (and its attachments as artifacts); deduplicates by `idempotencyKey` | [Triggers](/guide/triggers) |
 | `getRun` | Reads a run from the store | [Run Lifecycle](/guide/run-lifecycle) |
 | `on` | Subscribes to `run.updated`, `step.appended` or `run.delta`; returns an unsubscribe function | [Run Lifecycle](/guide/run-lifecycle#watching-runs) |

@@ -2,8 +2,8 @@ import { tool } from 'ai';
 import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import {
+    Engine,
     MemoryStore,
-    RunEngine,
     RunStatus,
     defineAgent,
 } from '@chamberu/core';
@@ -53,7 +53,7 @@ export async function approvalFlow(model: LanguageModel) {
     if (!resumeSecret) throw new Error('RESUME_SECRET is not set');
 
     const inbox = new InboxNotifier();
-    const engine = new RunEngine({
+    const engine = new Engine({
         store: new MemoryStore(),
         agents: [deployer],
         notifiers: { owner: inbox },
