@@ -16,6 +16,7 @@ import {
 } from '@chamberu/core';
 import { isObject } from 'smob';
 import { assertSandboxEnv, resolveLimits } from '../limits/module.ts';
+import { assertImageOption } from '../provider/module.ts';
 import { WORKSPACE_ROOT } from '../workspace/constants.ts';
 import type { IWorkspace } from '../workspace/types.ts';
 import type { WorkspaceManagerOptions, WorkspaceToolResult } from './types.ts';
@@ -33,9 +34,7 @@ export function assertManagerOptions(options: WorkspaceManagerOptions): void {
     ) {
         throw new InvalidAgentDefinitionError('provider must be an ISandboxProvider (create, collectGarbage).');
     }
-    if (options.image !== undefined && (typeof options.image !== 'string' || options.image.length === 0 || options.image.includes('\0'))) {
-        throw new InvalidAgentDefinitionError('image must be a non-empty string.');
-    }
+    assertImageOption(options.image);
     assertSandboxEnv(options.env);
     resolveLimits(options.limits);
     if (options.allowRepo !== undefined && typeof options.allowRepo !== 'function') {

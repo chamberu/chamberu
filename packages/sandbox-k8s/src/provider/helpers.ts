@@ -7,7 +7,6 @@
 
 import { KubeConfig } from '@kubernetes/client-node';
 import type { V1Pod } from '@kubernetes/client-node';
-import type { IClock } from '@chamberu/core';
 import { ChamberuError, InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
 import {
     EXPIRES_AT_KEY,
@@ -17,7 +16,10 @@ import {
     TMP_SIZE,
     WORKSPACE_LABEL,
     WORKSPACE_ROOT,
+    assertClockOption,
+    assertImageOption,
     assertSandboxEnv,
+    isExpiredAt,
     resolveLimits,
 } from '@chamberu/sandbox';
 import { isObject } from 'smob';
@@ -45,10 +47,6 @@ const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0
 
 /** A label name or value: alphanumeric ends, `-`, `_` and `.` inside, at most 63 characters. */
 const LABEL_NAME = /^[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$/;
-
-function isName(value: unknown): boolean {
-    return typeof value === 'string' && value.length > 0 && !value.includes('\0');
-}
 
 /** True for a Kubernetes label key: `[prefix/]name`. */
 function isLabelKey(key: string): boolean {
@@ -90,9 +88,7 @@ export function assertKubernetesOptions(options: KubernetesSandboxOptions): void
     if (options.kubeConfig !== undefined && !isObject(options.kubeConfig)) {
         throw new InvalidAgentDefinitionError('kubeConfig must be a KubeConfig.');
     }
-    if (options.image !== undefined && !isName(options.image)) {
-        throw new InvalidAgentDefinitionError('image must be a non-empty string.');
-    }
+    assertImageOption(options.image);
     if (options.imagePullPolicy !== undefined && !PULL_POLICIES.includes(options.imagePullPolicy)) {
         throw new InvalidAgentDefinitionError(`imagePullPolicy must be one of ${PULL_POLICIES.join(', ')}, got ${JSON.stringify(options.imagePullPolicy)}.`);
     }
@@ -114,9 +110,7 @@ export function assertKubernetesOptions(options: KubernetesSandboxOptions): void
     }
     assertPositiveInteger('startTimeoutMs', options.startTimeoutMs);
     assertPositiveInteger('pollMs', options.pollMs);
-    if (clock !== undefined && (!isObject(clock) || typeof clock.now !== 'function' || typeof clock.setTimeout !== 'function')) {
-        throw new InvalidAgentDefinitionError('clock must be an IClock.');
-    }
+    assertClockOption(clock);
     assertSandboxEnv(options.env);
     resolveLimits(options.limits);
 }
@@ -219,28 +213,7 @@ export function podState(pod: V1Pod): { state: 'running' | 'pending' } | { state
 
 /** True when the pod's expiry annotation is at or before `now`. */
 export function isExpired(pod: V1Pod, now: number): boolean {
-    const value = pod.metadata?.annotations?.[EXPIRES_AT_KEY];
-    const expiresAt = Number(value);
-    return !!value && Number.isFinite(expiresAt) && expiresAt <= now;
-}
-
-/** Waits `ms` on the clock; rejects with SandboxError when the signal fires first. */
-export function delay(clock: IClock, ms: number, signal?: AbortSignal): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        if (signal?.aborted) {
-            reject(new SandboxError('workspace creation aborted'));
-            return;
-        }
-        const timer = clock.setTimeout(() => {
-            signal?.removeEventListener('abort', onAbort);
-            resolve();
-        }, ms);
-        function onAbort() {
-            timer.clear();
-            reject(new SandboxError('workspace creation aborted'));
-        }
-        signal?.addEventListener('abort', onAbort, { once: true });
-    });
+    return isExpiredAt(pod.metadata?.annotations?.[EXPIRES_AT_KEY], now);
 }
 
 /** Runs a client call; an error that is no ChamberuError (a custom client's) becomes a SandboxError. */
@@ -258,17 +231,4 @@ export function loadDefaultKubeConfig(): KubeConfig {
     const kubeConfig = new KubeConfig();
     kubeConfig.loadFromDefault();
     return kubeConfig;
-}
-
-/**
- * One SandboxError for the removals a garbage collection could not do (the
- * others went on): the count, the first message, every failure in the cause.
- */
-export function collectionError(count: number, failures: readonly unknown[]): SandboxError {
-    const [first] = failures;
-    const message = first instanceof Error ? first.message : String(first);
-    return new SandboxError(
-        `garbage collection removed ${count} workspaces, ${failures.length} failed (first: ${message})`,
-        { cause: new AggregateError(failures) },
-    );
 }

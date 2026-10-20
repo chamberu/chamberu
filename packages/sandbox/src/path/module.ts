@@ -43,3 +43,8 @@ export function resolveWorkspacePath(path: string): string {
     }
     return normalized;
 }
+
+/** The absolute path of a workspace-relative one (`'.'` is the root), as the model names it. */
+export function absoluteWorkspacePath(relative: string): string {
+    return relative === '.' ? WORKSPACE_ROOT : `${WORKSPACE_ROOT}/${relative}`;
+}

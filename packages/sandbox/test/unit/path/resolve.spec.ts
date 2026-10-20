@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { ValidationError } from '@chamberu/core';
-import { resolveWorkspacePath } from '@chamberu/sandbox';
+import { absoluteWorkspacePath, resolveWorkspacePath } from '@chamberu/sandbox';
 
 describe('resolveWorkspacePath', () => {
     it.each([
@@ -44,5 +44,12 @@ describe('resolveWorkspacePath', () => {
 
     it('rejects a non-string', () => {
         expect(() => resolveWorkspacePath(42 as unknown as string)).toThrow(ValidationError);
+    });
+});
+
+describe('absoluteWorkspacePath', () => {
+    it('puts a relative path under the workspace root', () => {
+        expect(absoluteWorkspacePath('.')).toBe('/workspace');
+        expect(absoluteWorkspacePath('src/a.ts')).toBe('/workspace/src/a.ts');
     });
 });

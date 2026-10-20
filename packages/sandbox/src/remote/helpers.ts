@@ -7,10 +7,8 @@
 
 import { Buffer } from 'node:buffer';
 import { randomBytes } from 'node:crypto';
-import { ValidationError } from '@chamberu/core';
 import { completeLength } from '../output/helpers.ts';
 import type { IOutputSink } from '../output/types.ts';
-import { WORKSPACE_ROOT } from '../workspace/constants.ts';
 import { ERROR_STDERR_MAX_LENGTH, EXEC_SCRIPT, TIMEOUT_KILL_AFTER_SECONDS } from './constants.ts';
 
 /**
@@ -35,23 +33,6 @@ export function wrapTimeout(argv: readonly string[], timeoutMs: number): string[
  */
 export function isTimeoutExit(exitCode: number, durationMs: number, timeoutMs: number): boolean {
     return (exitCode === 124 || exitCode === 137) && durationMs >= timeoutMs;
-}
-
-/** `argv` is a non-empty list of strings without NUL, the first one non-empty. */
-export function assertArgv(argv: readonly string[]): void {
-    if (
-        !Array.isArray(argv) ||
-        argv.length === 0 ||
-        argv[0] === '' ||
-        argv.some((arg) => !(typeof arg === 'string' && !arg.includes('\0')))
-    ) {
-        throw new ValidationError('argv must be a non-empty list of strings without NUL, starting with the command.');
-    }
-}
-
-/** The absolute path of a workspace-relative one (`'.'` is the root). */
-export function toAbsolute(relative: string): string {
-    return relative === '.' ? WORKSPACE_ROOT : `${WORKSPACE_ROOT}/${relative}`;
 }
 
 /** UTF-8 text of `bytes`; a sequence the cap cut short is dropped. */

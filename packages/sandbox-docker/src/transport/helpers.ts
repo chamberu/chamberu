@@ -6,23 +6,10 @@
  */
 
 import type { Duplex } from 'node:stream';
-import { Writable } from 'node:stream';
-import type { IClock } from '@chamberu/core';
-import type { IOutputSink } from '@chamberu/sandbox';
 
 /** An error naming the abort, for the remote workspace to map by its precedence. */
 export function abortError(signal: AbortSignal): Error {
     return signal.reason instanceof Error ? signal.reason : new Error('exec aborted');
-}
-
-/** A stream that hands every chunk to the sink and never applies backpressure. */
-export function sinkStream(sink: IOutputSink): Writable {
-    return new Writable({
-        write(chunk: Uint8Array, _encoding, callback) {
-            sink.write(chunk);
-            callback();
-        },
-    });
 }
 
 /** Resolves when the hijacked stream ends or closes; rejects on its error or the signal. */
@@ -55,24 +42,5 @@ export function streamEnded(stream: Duplex, signal: AbortSignal): Promise<void> 
         stream.on('end', onEnd);
         stream.on('close', onEnd);
         stream.on('error', onError);
-    });
-}
-
-/** Waits `ms` on the clock; rejects when the signal fires first. */
-export function delay(clock: IClock, ms: number, signal: AbortSignal): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        if (signal.aborted) {
-            reject(abortError(signal));
-            return;
-        }
-        const timer = clock.setTimeout(() => {
-            signal.removeEventListener('abort', onAbort);
-            resolve();
-        }, ms);
-        function onAbort() {
-            timer.clear();
-            reject(abortError(signal));
-        }
-        signal.addEventListener('abort', onAbort, { once: true });
     });
 }

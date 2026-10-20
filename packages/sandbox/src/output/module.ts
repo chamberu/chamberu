@@ -5,8 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { Writable } from 'node:stream';
 import { completeLength } from './helpers.ts';
-import type { IOutputCollector } from './types.ts';
+import type { IOutputCollector, IOutputSink } from './types.ts';
 
 export function createOutputCollector(maxBytes: number): IOutputCollector {
     const chunks: Uint8Array[] = [];
@@ -43,4 +44,14 @@ export function createOutputCollector(maxBytes: number): IOutputCollector {
             return decoder.decode(truncated ? all.subarray(0, completeLength(all)) : all);
         },
     };
+}
+
+/** A stream that hands every chunk to the sink and never applies backpressure. */
+export function createSinkStream(sink: IOutputSink): Writable {
+    return new Writable({
+        write(chunk: Uint8Array, _encoding, callback) {
+            sink.write(chunk);
+            callback();
+        },
+    });
 }

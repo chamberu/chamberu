@@ -9,14 +9,15 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { InvalidAgentDefinitionError, SandboxError, systemClock } from '@chamberu/core';
 import {
-    InvalidAgentDefinitionError,
-    SandboxError,
-    ValidationError,
-    systemClock,
-} from '@chamberu/core';
-import { assertSandboxEnv, prepareWorkspace, resolveLimits } from '@chamberu/sandbox';
-import type { ISandboxProvider, IWorkspace, WorkspaceInfo } from '@chamberu/sandbox';
+    assertCreateInput,
+    assertSandboxEnv,
+    buildWorkspaceInfo,
+    prepareWorkspace,
+    resolveLimits,
+} from '@chamberu/sandbox';
+import type { ISandboxProvider, IWorkspace } from '@chamberu/sandbox';
 import {
     DEFAULT_ROOT_NAME,
     LOCAL_PROVIDER_NAME,
@@ -49,37 +50,24 @@ export function createLocalSandbox(options: LocalSandboxOptions = {}): ISandboxP
         name: LOCAL_PROVIDER_NAME,
 
         async create(input) {
-            if (typeof input?.runId !== 'string' || input.runId.length === 0) {
-                throw new ValidationError('runId must be a non-empty string.');
-            }
-            assertSandboxEnv(input.env);
+            assertCreateInput(input);
             const limits = resolveLimits(options.limits, input.limits);
 
             const id = randomUUID();
             const dir = join(root, id);
-            const createdAt = clock.now();
-            const expiresAt = new Date(createdAt.getTime() + limits.timeoutMs);
+            const info = buildWorkspaceInfo(input, LOCAL_PROVIDER_NAME, clock.now(), limits.timeoutMs);
             try {
                 for (const sub of [REPO_DIR, 'home', 'tmp']) {
                     await mkdir(join(dir, sub), { recursive: true });
                 }
                 await writeFile(
                     join(dir, WORKSPACE_RECORD),
-                    JSON.stringify({ runId: input.runId, expiresAt: expiresAt.toISOString() }),
+                    JSON.stringify({ runId: input.runId, expiresAt: info.expiresAt.toISOString() }),
                 );
             } catch (error) {
                 await rm(dir, { recursive: true, force: true }).catch(() => undefined);
                 throw new SandboxError(`cannot create the workspace directory (${errnoCode(error) ?? 'unknown error'}).`, { cause: error });
             }
-
-            const info: WorkspaceInfo = {
-                runId: input.runId,
-                provider: LOCAL_PROVIDER_NAME,
-                createdAt,
-                expiresAt,
-            };
-            if (input.repo !== undefined) info.repo = input.repo;
-            if (input.ref !== undefined) info.ref = input.ref;
 
             const workspace = new LocalWorkspace({
                 id,

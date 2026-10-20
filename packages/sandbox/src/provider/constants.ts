@@ -26,6 +26,9 @@ export const SANDBOX_LABELS: Readonly<Record<string, string>> = Object.freeze({
     'app.kubernetes.io/component': 'sandbox',
 });
 
+/** `SANDBOX_LABELS` as `key=value` selectors: a Docker label filter, joined by `,` a Kubernetes label selector. */
+export const SANDBOX_LABEL_SELECTORS: readonly string[] = Object.freeze(Object.entries(SANDBOX_LABELS).map(([key, value]) => `${key}=${value}`));
+
 export const RUN_LABEL = 'chamberu.dev/run';
 
 export const WORKSPACE_LABEL = 'chamberu.dev/workspace';

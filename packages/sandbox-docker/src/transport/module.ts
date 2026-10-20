@@ -7,17 +7,13 @@
 
 import type { Duplex } from 'node:stream';
 import type { IClock } from '@chamberu/core';
+import { createSinkStream, delay } from '@chamberu/sandbox';
 import type { IExecTransport, TransportExecOptions, TransportExecResult } from '@chamberu/sandbox';
 import type Dockerode from 'dockerode';
 import { SANDBOX_USER } from '../provider/constants.ts';
 import { isStatus, removeContainer } from '../provider/helpers.ts';
 import { INSPECT_POLL_INITIAL_MS, INSPECT_POLL_MAX_MS } from './constants.ts';
-import {
-    abortError,
-    delay,
-    sinkStream,
-    streamEnded,
-} from './helpers.ts';
+import { abortError, streamEnded } from './helpers.ts';
 
 /**
  * Runs argv in a started workspace container through the Docker exec API:
@@ -57,7 +53,7 @@ export function createDockerTransport(
             // queued and fails (EPIPE) once the daemon closes the connection
             stream.on('error', () => undefined);
             const ended = streamEnded(stream, signal);
-            docker.modem.demuxStream(stream, sinkStream(options.stdout), sinkStream(options.stderr));
+            docker.modem.demuxStream(stream, createSinkStream(options.stdout), createSinkStream(options.stderr));
             if (stdin !== undefined) {
                 // after the demux listeners, so no output is lost; end() half-closes the socket (stdin EOF)
                 stream.end(stdin);
@@ -72,7 +68,7 @@ export function createDockerTransport(
             let wait = INSPECT_POLL_INITIAL_MS;
             let info = await exec.inspect({ abortSignal: signal });
             while (info.Running) {
-                await delay(clock, wait, signal);
+                await delay(clock, wait, signal, () => abortError(signal));
                 wait = Math.min(wait * 2, INSPECT_POLL_MAX_MS);
                 info = await exec.inspect({ abortSignal: signal });
             }

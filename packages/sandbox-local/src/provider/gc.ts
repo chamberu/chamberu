@@ -9,9 +9,10 @@ import { readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { IClock } from '@chamberu/core';
 import { SandboxError } from '@chamberu/core';
+import { collectionError } from '@chamberu/sandbox';
 import type { IWorkspace } from '@chamberu/sandbox';
 import { WORKSPACE_ID_PATTERN, WORKSPACE_RECORD } from './constants.ts';
-import { collectionError, errnoCode } from './helpers.ts';
+import { errnoCode } from './helpers.ts';
 
 /** Expiry (epoch ms) from a workspace folder's record; undefined when it has none. */
 async function readExpiry(dir: string): Promise<number | undefined> {

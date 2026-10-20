@@ -141,29 +141,30 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 
 | Path | Purpose |
 |------|---------|
-| `workspace/` | `IWorkspace`, `WorkspaceInfo`, `ExecOptions`, `ExecResult` (`types.ts`); `WORKSPACE_ROOT`, `OUTPUT_MAX_BYTES`, `FILE_MAX_BYTES`, `EXEC_TIMEOUT_MS`, `EXEC_TIMEOUT_MAX_MS`, `SANDBOX_ENV` (`constants.ts`) |
-| `provider/` | `ISandboxProvider`, `WorkspaceCreateOptions`, `SandboxLimits` (`types.ts`); `DEFAULT_LIMITS`, `DEFAULT_SANDBOX_IMAGE`, `TMP_SIZE`, `SANDBOX_LABELS`, `RUN_LABEL`, `WORKSPACE_LABEL`, `EXPIRES_AT_KEY` (`constants.ts`) |
+| `workspace/` | `IWorkspace`, `WorkspaceInfo`, `ExecOptions`, `ExecResult` (`types.ts`); `assertArgv()` (`module.ts`); `WORKSPACE_ROOT`, `OUTPUT_MAX_BYTES`, `FILE_MAX_BYTES`, `EXEC_TIMEOUT_MS`, `EXEC_TIMEOUT_MAX_MS`, `SANDBOX_ENV` (`constants.ts`) |
+| `provider/` | `ISandboxProvider`, `WorkspaceCreateOptions`, `SandboxLimits` (`types.ts`); `DEFAULT_LIMITS`, `DEFAULT_SANDBOX_IMAGE`, `TMP_SIZE`, `SANDBOX_LABELS`, `SANDBOX_LABEL_SELECTORS`, `RUN_LABEL`, `WORKSPACE_LABEL`, `EXPIRES_AT_KEY` (`constants.ts`); the helpers every provider shares: `assertCreateInput()`, `abortedCreate()`, `assertImageOption()`, `assertClockOption()`, `buildWorkspaceInfo()`, `isExpiredAt()`, `collectionError()` (`module.ts`), `isName()` (`helpers.ts`, internal) |
+| `clock/` | `delay()` (a wait on the `IClock` that rejects with the caller's abort error) |
 | `limits/` | `resolveLimits()`, `parseCpu()`, `parseMemory()`, `assertSandboxEnv()` (`module.ts`); patterns and units (`constants.ts`, internal) |
-| `output/` | `createOutputCollector()` (`module.ts`), `IOutputCollector` (`types.ts`), `completeLength()` (UTF-8 cut, `helpers.ts`) |
-| `path/` | `resolveWorkspacePath()` |
+| `output/` | `createOutputCollector()`, `createSinkStream()` (a `Writable` into an `IOutputSink`) (`module.ts`), `IOutputCollector` (`types.ts`), `completeLength()` (UTF-8 cut, `helpers.ts`) |
+| `path/` | `resolveWorkspacePath()`, `absoluteWorkspacePath()` |
 | `repo/` | `normalizeRepo()`, `assertGitRef()`, `prepareWorkspace()` (`module.ts`), `checkoutCommands()` and URL checks (`helpers.ts`, internal), `NormalizeRepoOptions` |
-| `remote/` | `createRemoteWorkspace()` over an `IExecTransport` (`module.ts`), `wrapTimeout()`, `wrapExec()`, `exitMarker()`, `createExitMarkerFilter()`, `isTimeoutExit()`, output and argv helpers (`helpers.ts`, internal), `TIMEOUT_KILL_AFTER_SECONDS`, `EXEC_GRACE_MS`, `ALIVE_PROBE_TIMEOUT_MS` (public), `EXIT_DRAIN_MS`, `EXIT_MARKER_CWD`, `EXEC_SCRIPT` and `WRITE_FILE_SCRIPT` (`constants.ts`, internal) |
+| `remote/` | `createRemoteWorkspace()` over an `IExecTransport` (`module.ts`), `wrapTimeout()`, `wrapExec()`, `exitMarker()`, `createExitMarkerFilter()`, `isTimeoutExit()`, output helpers (`helpers.ts`, internal), `TIMEOUT_KILL_AFTER_SECONDS`, `EXEC_GRACE_MS`, `ALIVE_PROBE_TIMEOUT_MS` (public), `EXIT_DRAIN_MS`, `EXIT_MARKER_CWD`, `EXEC_SCRIPT` and `WRITE_FILE_SCRIPT` (`constants.ts`, internal) |
 | `manager/` | `createWorkspaceManager()` (`module.ts`), `createWorkspaceTools()` (`tools.ts`, internal), option checks and tool input helpers (`helpers.ts`), `MAX_WORKSPACES_PER_RUN`, `GC_INTERVAL_MS`, `CLOSE_TIMEOUT_MS` (`constants.ts`) |
 
-`@chamberu/sandbox-local` (`packages/sandbox-local/src/provider/`): `createLocalSandbox()` (`module.ts`), `LocalWorkspace` (`workspace.ts`, spawn per exec in its own process group), `collectExpired()` (`gc.ts`), `buildEnv()`, `killGroup()`, `exitCodeOf()`, `collectionError()` (`helpers.ts`), `LOCAL_PROVIDER_NAME`, `REPO_DIR`, `WORKSPACE_RECORD`, `KILL_GRACE_MS` (`constants.ts`, internal; only `createLocalSandbox` is exported).
+`@chamberu/sandbox-local` (`packages/sandbox-local/src/provider/`): `createLocalSandbox()` (`module.ts`), `LocalWorkspace` (`workspace.ts`, spawn per exec in its own process group), `collectExpired()` (`gc.ts`), `buildEnv()`, `killGroup()`, `exitCodeOf()` (`helpers.ts`), `LOCAL_PROVIDER_NAME`, `REPO_DIR`, `WORKSPACE_RECORD`, `KILL_GRACE_MS` (`constants.ts`, internal; only `createLocalSandbox` is exported).
 
 ## Docker Sandbox Module Map (`packages/sandbox-docker/src`)
 
 | Path | Purpose |
 |------|---------|
-| `provider/` | `createDockerSandbox()` (`module.ts`), `buildContainerOptions()`, `assertDockerOptions()`, `pullImage()`, `removeContainer()`, `collectionError()` (`helpers.ts`, internal), `DEFAULT_NETWORK`, `CONTAINER_NAME_PREFIX`, `SANDBOX_USER` (`constants.ts`), `DockerSandboxOptions` (`types.ts`) |
+| `provider/` | `createDockerSandbox()` (`module.ts`), `buildContainerOptions()`, `assertDockerOptions()`, `pullImage()`, `removeContainer()` (`helpers.ts`, internal), `DEFAULT_NETWORK`, `CONTAINER_NAME_PREFIX`, `SANDBOX_USER` (`constants.ts`), `DockerSandboxOptions` (`types.ts`) |
 | `transport/` | No barrel: `createDockerTransport()`, the `IExecTransport` over the Docker exec API (demuxed streams into the workspace's sinks, exit code by inspect poll, `alive` by container inspect) |
 
 ## Kubernetes Sandbox Module Map (`packages/sandbox-k8s/src`)
 
 | Path | Purpose |
 |------|---------|
-| `provider/` | `createKubernetesSandbox()` (`module.ts`), `buildPod()`, `podState()`, `assertKubernetesOptions()`, `loadDefaultKubeConfig()`, `collectionError()` (`helpers.ts`, internal), `CONTAINER_NAME`, `POD_NAME_PREFIX`, `START_TIMEOUT_MS`, `POLL_MS`, `FATAL_WAITING_REASONS` (`constants.ts`), `KubernetesSandboxOptions` (`types.ts`) |
+| `provider/` | `createKubernetesSandbox()` (`module.ts`), `buildPod()`, `podState()`, `assertKubernetesOptions()`, `loadDefaultKubeConfig()` (`helpers.ts`, internal), `CONTAINER_NAME`, `POD_NAME_PREFIX`, `START_TIMEOUT_MS`, `POLL_MS`, `FATAL_WAITING_REASONS` (`constants.ts`), `KubernetesSandboxOptions` (`types.ts`) |
 | `client/` | `createPodClient()` (`module.ts`), `createPodClientFrom()` (`helpers.ts`, the test seam over `core`/`exec`), `IPodClient` and parts (`types.ts`), `STDIN_CLOSE_PROTOCOL` (`v5.channel.k8s.io`) |
 | `transport/` | No barrel: `createPodTransport()`, the `IExecTransport` over `IPodClient.exec` (`alive` by pod read) |
 

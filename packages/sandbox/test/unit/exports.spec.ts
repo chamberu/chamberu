@@ -21,6 +21,17 @@ describe('public api', () => {
         'assertSandboxEnv',
         'createWorkspaceManager',
         'createRemoteWorkspace',
+        'absoluteWorkspacePath',
+        'assertArgv',
+        'assertCreateInput',
+        'abortedCreate',
+        'assertImageOption',
+        'assertClockOption',
+        'buildWorkspaceInfo',
+        'isExpiredAt',
+        'collectionError',
+        'createSinkStream',
+        'delay',
     ])('exports %s', (name) => {
         expect(sandbox).toHaveProperty(name);
         expect(sandbox[name as keyof typeof sandbox]).toBeTypeOf('function');
@@ -62,6 +73,10 @@ describe('public api', () => {
         expect(sandbox.RUN_LABEL).toBe('chamberu.dev/run');
         expect(sandbox.WORKSPACE_LABEL).toBe('chamberu.dev/workspace');
         expect(sandbox.EXPIRES_AT_KEY).toBe('chamberu.dev/expires-at');
+        expect(sandbox.SANDBOX_LABEL_SELECTORS).toEqual([
+            'app.kubernetes.io/managed-by=chamberu',
+            'app.kubernetes.io/component=sandbox',
+        ]);
     });
 
     it('exports the manager constants', () => {
@@ -80,6 +95,7 @@ describe('public api', () => {
         expect(Object.isFrozen(sandbox.SANDBOX_ENV)).toBe(true);
         expect(Object.isFrozen(sandbox.SANDBOX_LABELS)).toBe(true);
         expect(Object.isFrozen(sandbox.DEFAULT_LIMITS)).toBe(true);
+        expect(Object.isFrozen(sandbox.SANDBOX_LABEL_SELECTORS)).toBe(true);
     });
 
     it.each([
@@ -87,6 +103,7 @@ describe('public api', () => {
         'createWorkspaceTools',
         'wrapTimeout',
         'isTimeoutExit',
+        'isName',
     ])('keeps %s internal', (name) => {
         expect(sandbox).not.toHaveProperty(name);
     });

@@ -6,31 +6,28 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import {
-    ChamberuError,
-    SandboxError,
-    ValidationError,
-    systemClock,
-} from '@chamberu/core';
+import { ChamberuError, SandboxError, systemClock } from '@chamberu/core';
 import {
     DEFAULT_SANDBOX_IMAGE,
     EXPIRES_AT_KEY,
-    SANDBOX_LABELS,
+    SANDBOX_LABEL_SELECTORS,
     WORKSPACE_LABEL,
-    assertSandboxEnv,
+    abortedCreate,
+    assertCreateInput,
+    buildWorkspaceInfo,
+    collectionError,
     createRemoteWorkspace,
+    isExpiredAt,
     prepareWorkspace,
     resolveLimits,
 } from '@chamberu/sandbox';
-import type { ISandboxProvider, IWorkspace, WorkspaceInfo } from '@chamberu/sandbox';
+import type { ISandboxProvider, IWorkspace } from '@chamberu/sandbox';
 import Docker from 'dockerode';
 import { createDockerTransport } from '../transport/module.ts';
 import { DEFAULT_NETWORK } from './constants.ts';
 import {
-    abortedCreate,
     assertDockerOptions,
     buildContainerOptions,
-    collectionError,
     dockerMessage,
     isMissingImage,
     pullImage,
@@ -96,22 +93,15 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
         name: PROVIDER_NAME,
 
         async create(input) {
-            if (typeof input?.runId !== 'string' || input.runId.length === 0) {
-                throw new ValidationError('runId must be a non-empty string.');
-            }
-            if (input.image !== undefined && (typeof input.image !== 'string' || input.image.length === 0 || input.image.includes('\0'))) {
-                throw new ValidationError('image must be a non-empty string.');
-            }
-            assertSandboxEnv(input.env);
+            assertCreateInput(input, { image: true });
             if (input.signal?.aborted) {
-                throw new SandboxError('workspace creation aborted');
+                throw abortedCreate();
             }
             const limits = resolveLimits(options.limits, input.limits);
             const imageName = input.image ?? image;
 
             const id = randomUUID();
-            const createdAt = clock.now();
-            const expiresAt = new Date(createdAt.getTime() + limits.timeoutMs);
+            const info = buildWorkspaceInfo(input, PROVIDER_NAME, clock.now(), limits.timeoutMs);
             const container = await createContainer(buildContainerOptions({
                 id,
                 runId: input.runId,
@@ -119,17 +109,8 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
                 network,
                 env: { ...options.env, ...input.env },
                 limits,
-                expiresAt,
+                expiresAt: info.expiresAt,
             }), imageName, input.signal);
-
-            const info: WorkspaceInfo = {
-                runId: input.runId,
-                provider: PROVIDER_NAME,
-                createdAt,
-                expiresAt,
-            };
-            if (input.repo !== undefined) info.repo = input.repo;
-            if (input.ref !== undefined) info.ref = input.ref;
 
             const remote = createRemoteWorkspace({
                 id,
@@ -178,7 +159,7 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
             try {
                 containers = await docker.listContainers({
                     all: true,
-                    filters: { label: Object.entries(SANDBOX_LABELS).map(([key, value]) => `${key}=${value}`) },
+                    filters: { label: [...SANDBOX_LABEL_SELECTORS] },
                 });
             } catch (error) {
                 throw new SandboxError(`cannot list the workspace containers: ${dockerMessage(error)}`, { cause: error });
@@ -190,8 +171,7 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
             const failures: SandboxError[] = [];
             for (const container of containers) {
                 const labels = container.Labels ?? {};
-                const expiresAt = Number(labels[EXPIRES_AT_KEY]);
-                if (!labels[EXPIRES_AT_KEY] || !Number.isFinite(expiresAt) || expiresAt > now) continue;
+                if (!isExpiredAt(labels[EXPIRES_AT_KEY], now)) continue;
 
                 // one open here is disposed, so its in-flight commands settle too
                 const workspace = live.get(labels[WORKSPACE_LABEL] ?? '');

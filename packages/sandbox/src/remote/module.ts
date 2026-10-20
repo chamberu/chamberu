@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { SandboxError, ValidationError, systemClock } from '@chamberu/core';
 import { toSandboxError } from '../manager/helpers.ts';
 import { createOutputCollector } from '../output/module.ts';
-import { resolveWorkspacePath } from '../path/module.ts';
+import { absoluteWorkspacePath, resolveWorkspacePath } from '../path/module.ts';
 import {
     EXEC_TIMEOUT_MAX_MS,
     EXEC_TIMEOUT_MS,
@@ -17,6 +17,7 @@ import {
     OUTPUT_MAX_BYTES,
     WORKSPACE_ROOT,
 } from '../workspace/constants.ts';
+import { assertArgv } from '../workspace/module.ts';
 import type { ExecOptions, ExecResult, IWorkspace } from '../workspace/types.ts';
 import {
     ALIVE_PROBE_TIMEOUT_MS,
@@ -26,13 +27,11 @@ import {
     WRITE_FILE_SCRIPT,
 } from './constants.ts';
 import {
-    assertArgv,
     createExitMarkerFilter,
     decodeOutput,
     exitMarker,
     isTimeoutExit,
     stderrMessage,
-    toAbsolute,
     wrapExec,
     wrapTimeout,
 } from './helpers.ts';
@@ -255,7 +254,7 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
         async exec(argv: readonly string[], options: ExecOptions = {}): Promise<ExecResult> {
             assertUsable();
             assertArgv(argv);
-            const cwd = toAbsolute(options.cwd === undefined ? '.' : resolveWorkspacePath(options.cwd));
+            const cwd = absoluteWorkspacePath(options.cwd === undefined ? '.' : resolveWorkspacePath(options.cwd));
             if (options.stdin !== undefined && typeof options.stdin !== 'string') {
                 throw new ValidationError('stdin must be a string.');
             }
@@ -285,7 +284,7 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
             if (relative === '.') {
                 throw new SandboxError(`${WORKSPACE_ROOT} is no file.`);
             }
-            const file = toAbsolute(relative);
+            const file = absoluteWorkspacePath(relative);
 
             // one byte past the limit tells an oversized file apart
             const result = await run(['cat', '--', file], {
@@ -323,7 +322,7 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
                 throw new ValidationError(`content has ${bytes.length} bytes, more than the ${FILE_MAX_BYTES} a file may have.`);
             }
 
-            const file = toAbsolute(relative);
+            const file = absoluteWorkspacePath(relative);
             const temporary = randomBytes(8).toString('hex');
             const result = await run(['sh', '-c', WRITE_FILE_SCRIPT, 'sh', file, String(bytes.length), temporary], {
                 cwd: WORKSPACE_ROOT,

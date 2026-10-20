@@ -6,22 +6,21 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import {
-    ChamberuError,
-    SandboxError,
-    ValidationError,
-    systemClock,
-} from '@chamberu/core';
+import { ChamberuError, SandboxError, systemClock } from '@chamberu/core';
 import {
     DEFAULT_SANDBOX_IMAGE,
-    SANDBOX_LABELS,
+    SANDBOX_LABEL_SELECTORS,
     WORKSPACE_LABEL,
-    assertSandboxEnv,
+    abortedCreate,
+    assertCreateInput,
+    buildWorkspaceInfo,
+    collectionError,
     createRemoteWorkspace,
+    delay,
     prepareWorkspace,
     resolveLimits,
 } from '@chamberu/sandbox';
-import type { ISandboxProvider, IWorkspace, WorkspaceInfo } from '@chamberu/sandbox';
+import type { ISandboxProvider, IWorkspace } from '@chamberu/sandbox';
 import { createPodClient } from '../client/module.ts';
 import { createPodTransport } from '../transport/module.ts';
 import {
@@ -32,8 +31,6 @@ import {
 import {
     assertKubernetesOptions,
     buildPod,
-    collectionError,
-    delay,
     guard,
     isExpired,
     loadDefaultKubeConfig,
@@ -43,7 +40,7 @@ import type { KubernetesSandboxOptions } from './types.ts';
 
 const PROVIDER_NAME = 'k8s';
 
-const MANAGED_SELECTOR = Object.entries(SANDBOX_LABELS).map(([key, value]) => `${key}=${value}`).join(',');
+const MANAGED_SELECTOR = SANDBOX_LABEL_SELECTORS.join(',');
 
 /**
  * One hardened pod per workspace (see `buildPod`), commands run through the
@@ -70,7 +67,7 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
     async function waitForRunning(name: string, signal?: AbortSignal): Promise<void> {
         const started = clock.now().getTime();
         for (;;) {
-            if (signal?.aborted) throw new SandboxError('workspace creation aborted');
+            if (signal?.aborted) throw abortedCreate();
             const state = podState(await client.read(name));
             if (state.state === 'running') return;
             if (state.state === 'failed') {
@@ -80,7 +77,7 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
             if (remaining <= 0) {
                 throw new SandboxError(`workspace pod ${name} did not start within ${startTimeoutMs} ms.`);
             }
-            await delay(clock, Math.min(pollMs, remaining), signal);
+            await delay(clock, Math.min(pollMs, remaining), signal, () => abortedCreate());
         }
     }
 
@@ -88,30 +85,15 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
         name: PROVIDER_NAME,
 
         async create(input) {
-            if (typeof input?.runId !== 'string' || input.runId.length === 0) {
-                throw new ValidationError('runId must be a non-empty string.');
-            }
-            if (input.image !== undefined && (typeof input.image !== 'string' || input.image.length === 0 || input.image.includes('\0'))) {
-                throw new ValidationError('image must be a non-empty string.');
-            }
-            assertSandboxEnv(input.env);
+            assertCreateInput(input, { image: true });
             if (input.signal?.aborted) {
-                throw new SandboxError('workspace creation aborted');
+                throw abortedCreate();
             }
             const limits = resolveLimits(options.limits, input.limits);
 
             const id = randomUUID();
             const name = `${POD_NAME_PREFIX}${id}`;
-            const createdAt = clock.now();
-            const expiresAt = new Date(createdAt.getTime() + limits.timeoutMs);
-            const info: WorkspaceInfo = {
-                runId: input.runId,
-                provider: PROVIDER_NAME,
-                createdAt,
-                expiresAt,
-            };
-            if (input.repo !== undefined) info.repo = input.repo;
-            if (input.ref !== undefined) info.ref = input.ref;
+            const info = buildWorkspaceInfo(input, PROVIDER_NAME, clock.now(), limits.timeoutMs);
 
             const remote = createRemoteWorkspace({
                 id,
@@ -143,7 +125,7 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
                     image: input.image ?? image,
                     env: { ...options.env, ...input.env },
                     limits,
-                    expiresAt,
+                    expiresAt: info.expiresAt,
                     labels: options.podLabels ?? {},
                     imagePullPolicy,
                 }));

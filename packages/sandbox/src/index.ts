@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+export * from './clock/index.ts';
 export * from './limits/index.ts';
 export * from './manager/index.ts';
 export * from './output/index.ts';

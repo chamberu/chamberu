@@ -5,28 +5,13 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Writable } from 'node:stream';
-import type {
-    IExecTransport,
-    IOutputSink,
-    TransportExecOptions,
-    TransportExecResult,
-} from '@chamberu/sandbox';
+import { createSinkStream } from '@chamberu/sandbox';
+import type { IExecTransport, TransportExecOptions, TransportExecResult } from '@chamberu/sandbox';
 import type { V1Pod } from '@kubernetes/client-node';
 import { isObject } from 'smob';
 import { isApiStatus } from '../client/helpers.ts';
 import type { IPodClient } from '../client/types.ts';
 import { podState } from '../provider/helpers.ts';
-
-/** A stream that hands every chunk to the sink and never applies backpressure. */
-function sinkStream(sink: IOutputSink): Writable {
-    return new Writable({
-        write(chunk: Uint8Array, _encoding, callback) {
-            sink.write(chunk);
-            callback();
-        },
-    });
-}
 
 /**
  * Runs argv in a workspace pod's container through the pod client, stdout
@@ -41,8 +26,8 @@ export function createPodTransport(client: IPodClient, name: string): IExecTrans
             const { exitCode } = await client.exec(name, {
                 argv,
                 ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
-                stdout: sinkStream(options.stdout),
-                stderr: sinkStream(options.stderr),
+                stdout: createSinkStream(options.stdout),
+                stderr: createSinkStream(options.stderr),
                 signal: options.signal,
             });
             return { exitCode };

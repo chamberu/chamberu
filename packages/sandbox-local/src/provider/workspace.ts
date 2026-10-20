@@ -33,6 +33,8 @@ import {
     EXEC_TIMEOUT_MS,
     FILE_MAX_BYTES,
     OUTPUT_MAX_BYTES,
+    absoluteWorkspacePath,
+    assertArgv,
     createOutputCollector,
     resolveWorkspacePath,
 } from '@chamberu/sandbox';
@@ -44,8 +46,6 @@ import type {
 } from '@chamberu/sandbox';
 import { KILL_GRACE_MS, LINGER_CHECK_MS, REPO_DIR } from './constants.ts';
 import {
-    assertArgv,
-    displayPath,
     errnoCode,
     exitCodeOf,
     groupAlive,
@@ -124,7 +124,7 @@ export class LocalWorkspace implements IWorkspace {
         const stats = await stat(directory).catch(() => undefined);
         if (!stats?.isDirectory()) {
             await this.assertRoot();
-            throw new SandboxError(`cwd ${displayPath(cwd)} is no directory in the workspace.`);
+            throw new SandboxError(`cwd ${absoluteWorkspacePath(cwd)} is no directory in the workspace.`);
         }
         this.assertUsable();
         // the abort listener only sees aborts after the spawn: check the ones during the awaits
@@ -138,7 +138,7 @@ export class LocalWorkspace implements IWorkspace {
     async readFile(path: string): Promise<string> {
         this.assertUsable();
         const relative = resolveWorkspacePath(path);
-        const shown = displayPath(relative);
+        const shown = absoluteWorkspacePath(relative);
         const file = await this.realPath(relative);
 
         let size: number;
@@ -211,7 +211,7 @@ export class LocalWorkspace implements IWorkspace {
             await rename(temporary, file);
         } catch (error) {
             await rm(temporary, { force: true }).catch(() => undefined);
-            throw new SandboxError(`cannot write ${displayPath(relative)} (${errnoCode(error) ?? 'unknown error'}).`, { cause: error });
+            throw new SandboxError(`cannot write ${absoluteWorkspacePath(relative)} (${errnoCode(error) ?? 'unknown error'}).`, { cause: error });
         }
     }
 
@@ -263,7 +263,7 @@ export class LocalWorkspace implements IWorkspace {
      * no isolation).
      */
     protected async realPath(relative: string): Promise<string> {
-        const shown = displayPath(relative);
+        const shown = absoluteWorkspacePath(relative);
         let root: string;
         try {
             root = await realpath(this.root);

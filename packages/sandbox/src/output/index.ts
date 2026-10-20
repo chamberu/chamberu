@@ -5,5 +5,5 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export { createOutputCollector } from './module.ts';
+export { createOutputCollector, createSinkStream } from './module.ts';
 export type * from './types.ts';

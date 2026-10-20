@@ -14,6 +14,9 @@ import {
     TMP_SIZE,
     WORKSPACE_LABEL,
     WORKSPACE_ROOT,
+    abortedCreate,
+    assertClockOption,
+    assertImageOption,
     assertSandboxEnv,
     parseCpu,
     parseMemory,
@@ -49,18 +52,14 @@ export function assertDockerOptions(options: DockerSandboxOptions): void {
     ) {
         throw new InvalidAgentDefinitionError('docker must be a dockerode client.');
     }
-    if (options.image !== undefined && !isName(options.image)) {
-        throw new InvalidAgentDefinitionError('image must be a non-empty string.');
-    }
+    assertImageOption(options.image);
     if (options.network !== undefined && !isName(options.network)) {
         throw new InvalidAgentDefinitionError('network must be a non-empty string.');
     }
     if (options.pull !== undefined && !PULL_POLICIES.includes(options.pull)) {
         throw new InvalidAgentDefinitionError(`pull must be one of ${PULL_POLICIES.join(', ')}, got ${JSON.stringify(options.pull)}.`);
     }
-    if (clock !== undefined && (!isObject(clock) || typeof clock.now !== 'function' || typeof clock.setTimeout !== 'function')) {
-        throw new InvalidAgentDefinitionError('clock must be an IClock.');
-    }
+    assertClockOption(clock);
     assertSandboxEnv(options.env);
     resolveLimits(options.limits);
 }
@@ -95,11 +94,6 @@ export async function removeContainer(container: Dockerode.Container): Promise<v
         }
         throw error;
     }
-}
-
-/** The error of a create that `signal` stopped. */
-export function abortedCreate(cause?: unknown): SandboxError {
-    return new SandboxError('workspace creation aborted', cause === undefined ? undefined : { cause });
 }
 
 /**
@@ -185,17 +179,4 @@ export function buildContainerOptions(input: ContainerOptionsInput): Dockerode.C
             AutoRemove: false,
         },
     };
-}
-
-/**
- * One SandboxError for the removals a garbage collection could not do (the
- * others went on): the count, the first message, every failure in the cause.
- */
-export function collectionError(count: number, failures: readonly unknown[]): SandboxError {
-    const [first] = failures;
-    const message = first instanceof Error ? first.message : String(first);
-    return new SandboxError(
-        `garbage collection removed ${count} workspaces, ${failures.length} failed (first: ${message})`,
-        { cause: new AggregateError(failures) },
-    );
 }
