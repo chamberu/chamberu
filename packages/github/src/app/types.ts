@@ -43,4 +43,9 @@ export interface IGithubApp {
     webhookRoute(options?: GithubWebhookRouteOptions): HttpRoute;
     /** The read-only tools (`github_get_issue`, `github_search_issues`, ...), acting as the run's installation. */
     readTools(): ToolSet;
+    /**
+     * The write tools (`github_add_labels`, `github_create_comment`,
+     * `github_close_issue`), effect tools applied at most once per run.
+     */
+    writeTools(): ToolSet;
 }

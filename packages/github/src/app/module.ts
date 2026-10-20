@@ -18,6 +18,7 @@ import {
     normalizeSecrets,
 } from './helpers.ts';
 import { createReadTools } from '../tools/read.ts';
+import { createWriteTools } from '../tools/write.ts';
 import { verifySignature } from '../webhook/helpers.ts';
 import { createWebhookRoute } from '../webhook/module.ts';
 import type { GithubWebhookRouteOptions } from '../webhook/types.ts';
@@ -81,6 +82,9 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
         },
         readTools(): ToolSet {
             return createReadTools(app);
+        },
+        writeTools(): ToolSet {
+            return createWriteTools(app);
         },
     };
     return app;

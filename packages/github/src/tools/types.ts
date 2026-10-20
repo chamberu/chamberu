@@ -78,3 +78,21 @@ export type GithubRelease = {
     url: string;
     body: string | null;
 } | { none: true };
+
+/** `github_create_comment`: the posted (or found) comment. */
+export type GithubComment = {
+    id: number;
+    url: string;
+};
+
+/** `github_add_labels`: every label the issue carries afterwards. */
+export type GithubIssueLabels = {
+    labels: string[];
+};
+
+/** `github_close_issue`. */
+export type GithubClosedIssue = {
+    number: number;
+    state: 'closed';
+    stateReason: string | null;
+};
