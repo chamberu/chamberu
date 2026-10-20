@@ -24,6 +24,7 @@ import {
     DEFAULT_STREAM_POLL_MS,
     STREAM_RETRY_AFTER_SECONDS,
 } from './constants.ts';
+import { boundIssues } from '../request/helpers.ts';
 import type { HttpAppOptions, HttpContext } from './types.ts';
 
 type ErrorBody = {
@@ -131,8 +132,9 @@ export function refuseStreamOverCap(event: IAppEvent): Response {
     });
 }
 
+/** A large `received` value is dropped (`boundIssues`), whatever produced the issue. */
 function withIssues(body: ErrorBody, issues: readonly Issue[] | undefined): ErrorBody {
-    return issues && issues.length > 0 ? { ...body, issues } : body;
+    return issues && issues.length > 0 ? { ...body, issues: boundIssues(issues) } : body;
 }
 
 /** routup wraps what a handler throws in an AppError carrying it as `cause`. */

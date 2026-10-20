@@ -131,7 +131,7 @@ export async function triageIssue(model: LanguageModel) {
 }
 ```
 
-The run settles `completed`, and its `output` is the text of the model's last answer. This is the code of [`test/fixtures/readme-example.ts`](./test/fixtures/readme-example.ts), which the test suite runs against a scripted model.
+The run settles `completed`, and its `output` is the text of the model's last answer (with structured `output`, the parsed value). This is the code of [`test/fixtures/readme-example.ts`](./test/fixtures/readme-example.ts), which the test suite runs against a scripted model.
 
 ### Agents and triggers
 
@@ -139,10 +139,11 @@ The run settles `completed`, and its `output` is the text of the model's last an
 - `tools` is a factory. It gets the agent's `state` and the run context (`runId`, `agent`, `trigger`, `signal`) and returns an AI SDK `ToolSet`.
 - `cron()`, `http()` and `webhook()` describe triggers. `cron()` validates the expression and defaults its overlap policy to `skip`. `http()` is the control-plane trigger (id `http`, at most one per agent) that REST, the UI and MCP start runs through; `webhook({ path })` is a generic webhook (id `webhook:<path>`, many per agent). In this package only `engine.dispatch()` starts runs: firing cron, HTTP and webhook triggers belongs to the scheduler and HTTP packages.
 - The trigger envelope (source, trigger id, payload) becomes the run's first user message, as a JSON block.
-- `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments`, and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
+- `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments` (ids `<runId>.0000`, `<runId>.0001`, ..., so a listing keeps the input order), and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
 - The tool factory also gets `artifacts`, scoped to the run: `put({ mediaType, filename?, data })`, `get(id)` and `list()`. `put()` is no effect by itself; call it inside a `defineEffectTool` to store a file exactly once.
-- `output` takes an AI SDK `Output` (e.g. `Output.object({ schema })`): a completed run's `output` is then the parsed value instead of the text, and a final answer that does not parse fails the run with `validation_error`.
+- `output` takes an AI SDK `Output` (e.g. `Output.object({ schema })`): a completed run's `output` is then the parsed value instead of the text, and a final answer that does not parse fails the run with `validation_error` (the quoted cause cut to 500 characters; the whole answer stays in the `llm` step). An answer cut off at the output token limit, or a loop that ended on a tool call nothing executed, fails it with `incomplete_response`.
 - The engine streams every model call: `engine.on('run.delta', ({ delta }) => ...)` gets `{ runId, step, kind: 'text' | 'reasoning', text }` while the model writes. Deltas are never stored and reach only listeners in the process executing the run.
+- A model call that fails mid-stream still ends its step: the `llm` step (text so far, finish reason `error`) and a checkpoint are written, then the run fails with the model's error. A stream that closes without the provider's finish part fails the run with `incomplete_response` and never runs that step's tool calls.
 
 ### Effect tools
 
@@ -203,6 +204,45 @@ await engine.resume(token, { approved: true });
 - A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
 - An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied, and the model sees the denial.
 
+### Invokers and tool access
+
+A run can carry its invoker: who started it, as an authenticator resolved it (`@chamberu/http` sets it from the request's principal). `toolPolicy` decides per tool whether the run may use it; a refused tool is not offered to the model.
+
+```typescript
+const ops = defineAgent({
+    name: 'ops',
+    model,
+    instructions: 'Operate the service.',
+    tools: () => ({ deploy, rollback }),
+    // offers a tool only when the invoker holds tool:ops:<tool>; cron and webhook runs get none
+    toolPolicy: requireToolPermission(),
+    approvals: {
+        // release managers deploy without asking
+        deploy: (_input, { runtimeContext }) => {
+            const invoker = runtimeContext.trigger.invoker;
+            return invoker && hasPermission(invoker.permissions, 'release:manage') ? 'allow' : 'user';
+        },
+    },
+});
+
+await engine.dispatch({
+    agent: 'ops',
+    trigger: 'http',
+    source: 'http',
+    payload: {},
+    invoker: { id: 'u-42', kind: 'user', permissions: ['tool:ops:deploy'] },
+});
+
+// the approver is recorded on the run's wait step
+await engine.resume(token, { approved: true, approver: { id: 'u-7', kind: 'user', permissions: [] } });
+```
+
+- The invoker (`{ id, kind, name?, permissions }`) is a snapshot taken at dispatch. A run keeps it across approvals and restarts; revoking a grant later does not reach a run that already holds it.
+- With an invoker, the `idempotencyKey` is scoped to it (`<agent>:<source>:<kind>:<id>`): only the same invoker's retry is deduplicated, another invoker with the same key gets its own run.
+- Tool code sees it as `run.trigger.invoker` in the tool factory and `ctx.trigger.invoker` in effect hooks; approval policies see it as `runtimeContext.trigger.invoker`.
+- The policy covers state tools too. A call to a refused tool that still arrives fails as a tool error and the run goes on: the step records it as `tool_not_allowed` (`ToolNotAllowedError`), whether the model called it anyway (the model sees the AI SDK's unavailable-tool error) or an approved call from an older history reached the engine's re-check.
+- Permissions are `:`-separated: `*` alone grants everything, a `*` segment matches one segment, and segment counts must match. `requireToolPermission({ withoutInvoker: 'allow' })` lets runs without an invoker use every tool.
+
 ### Agent state
 
 ```typescript
@@ -261,6 +301,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()` |
 | `tools` | `(ctx) => ToolSet` | none | Tool factory, called for each execution |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections |
+| `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()` |
 | `budget` | `{ maxSteps, maxTokens?, timeoutMs? }` | `{ maxSteps: 20, timeoutMs: 900_000 }` | Per run; the timeout applies to each execution |
 | `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval: `'user'` or a function |
 | `approvalTimeoutMs` | `number` | `86_400_000` | After this, the approval is denied |
@@ -278,16 +319,20 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |
 | `EFFECT` | symbol | Marks a tool created by `defineEffectTool()` |
-| `wrapToolsForRun` | function | Applies effect recording to a `ToolSet` outside the engine |
+| `wrapToolsForRun` | function | Applies effect recording to a `ToolSet` outside the engine; an optional `allow(toolName)` re-checks each call (a refused call throws `ToolNotAllowedError`) |
 | `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API and generated state tools over a store |
+| `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
+| `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
+| `isArtifactMediaType` | function | The media type rule for attachments and artifacts (`type/subtype`, no parameters) |
 | `ChamberuError` | class | Base class of every error below |
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
-| `BudgetExceededError`, `FatalToolError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
+| `BudgetExceededError`, `FatalToolError`, `IncompleteResponseError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
+| `ToolNotAllowedError` | class | The tool error recorded for a call to a tool the `toolPolicy` refuses |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `TriggerDefinition`, `TriggerEnvelope`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `RunEngineOptions`, `IClock`.
+Types: `Agent`, `AgentDefinition`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `RunEngineOptions`, `IClock`.
 
 Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamberu/test-kit`](../test-kit).
 

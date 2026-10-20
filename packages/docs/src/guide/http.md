@@ -8,7 +8,7 @@ npm install @chamberu/http @chamberu/core --save
 
 <<< @/snippets/http.ts#app
 
-Every HTTP or MCP start ends in `engine.dispatch()`; nothing runs synchronously in a request. Errors are always JSON `{ status, code, message, issues? }`, unmatched routes included; a 5xx body says `Internal Server Error` and the cause goes to `onError`.
+Every HTTP or MCP start ends in `engine.dispatch()`; nothing runs synchronously in a request. Errors are always JSON `{ status, code, message, issues? }`, unmatched routes included; a 5xx body says `Internal Server Error` and the cause goes to `onError`. An issue carries the `received` value only when it is small (at most 256 characters as JSON), so a 400 for an oversized list, a long string or a large file never echoes the body back.
 
 ## Triggers decide what is reachable
 
@@ -38,7 +38,7 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 | `/mcp` | authenticated | MCP endpoint |
 | `GET /healthz`, `/readyz`, `/metrics` | none | Liveness, readiness, Prometheus |
 
-`GET /runs` takes rapiq's URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]` (default 50, at most 100), `page[offset]`, `sort=createdAt`. Bodies are JSON of at most `bodyLimit` bytes (default 1 MiB). A protected route checks the bearer token before it reads the body. Runs leave the API without their internal `claim`.
+`GET /runs` takes rapiq's URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]` (default 50, at most 100), `page[offset]`, `sort=createdAt`. Bodies are JSON of at most `bodyLimit` bytes (default 1 MiB). A protected route checks the bearer token before it reads the body. Runs leave the API without their internal `claim`, and the run's invoker and a `wait` step's approver without their `permissions` (see [Invoker](#invoker)).
 
 ## Files
 
@@ -62,13 +62,13 @@ An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_
 
 ## Authentication and permissions
 
-`auth` takes one authenticator or a chain; the first principal wins.
+`auth` takes one authenticator or a chain; the first principal wins. A resolved principal needs a non-empty `id` and `kind` and a `permissions` array of strings; anything else is a server misconfiguration (500, reported to `onError`) and ends the chain.
 
 <<< @/snippets/http.ts#auth
 
-- `staticTokens()`: bearer tokens of at least 16 characters. Put it before `authup()` and `oidc()`: `authup()` in remote mode introspects every bearer that is not a JWT, so a static token placed after it is sent to the authup server.
+- `staticTokens()`: bearer tokens of at least 16 characters, each with a non-empty `id` (the principal and run invoker id). Put it before `authup()` and `oidc()`: `authup()` in remote mode introspects every bearer that is not a JWT, so a static token placed after it is sent to the authup server.
 - `authup()`: authup tokens through `@authup/server-adapter-web`. Only tokens with the `global` scope grant their permissions; others authenticate and get 403. Grants need remote verification (introspection); a cached result lives until the token's `exp`.
-- `oidc()`: any OIDC issuer through [vouchly](https://github.com/tada5hi/vouchly). Every issuer needs an `audience`, and `principal` is required: a public issuer such as GitHub Actions lets anyone mint a token for your audience, so the mapper decides which claims get which grants.
+- `oidc()`: any OIDC issuer through [vouchly](https://github.com/tada5hi/vouchly). Every issuer needs an `audience`, and `principal` is required: a public issuer such as GitHub Actions lets anyone mint a token for your audience, so the mapper decides which claims get which grants. A mapper result without a non-empty `id` and `kind` and a `permissions` array of strings is a server error (500, reported to `onError`), not a client one.
 
 | Permission | Grants |
 |---|---|
@@ -77,11 +77,18 @@ An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_
 | `run:read` | Read and list every run, agents and schedules |
 | `run:cancel` | Cancel runs |
 | `state:read`, `state:write` | Agent state |
+| `tool:<agent>:<tool>` | Read by `requireToolPermission()`: the agent offers the tool to this principal's runs |
 | `*` | Everything |
 
 A `*` segment matches exactly one segment (`agent:*:run`). A client that may start an agent's runs can follow them without `run:read`, but to list runs it must filter to that agent.
 
 `POST /resume` needs the approve permission for the run's agent as well as the [resume token](/guide/approvals): a leaked token alone does nothing. The token's signature and expiry are checked before any store lookup.
+
+## Invoker
+
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name` or `preferred_username` claim (never `email`, since every reader of the run sees the name; static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook runs have no invoker, and neither ever comes from a request body.
+
+The invoker is a snapshot: a run keeps the grants it was started with, even when a grant is revoked while it waits on an approval. Responses (REST, SSE, MCP) carry the invoker and the approver without their `permissions`, so a `run:read` holder never learns another principal's grants.
 
 ## MCP
 
@@ -91,7 +98,7 @@ A `*` segment matches exactly one segment (`agent:*:run`). A client that may sta
 - `get_run`, `list_runs`: the REST read rule applies.
 - `resume_run`: `{ token, approved, reason? }`, with the approve permission.
 
-An MCP start dedupes its `idempotencyKey` under `<agent>:mcp`, a REST start under `<agent>:http`. A client registers the endpoint like any HTTP MCP server:
+An MCP start dedupes its `idempotencyKey` under `<agent>:mcp:<kind>:<id>`, a REST start under `<agent>:http:<kind>:<id>` (the principal's `kind` and `id`, URI-encoded): one key used over both transports, or by two principals, creates two runs. A client registers the endpoint like any HTTP MCP server:
 
 <<< @/snippets/http.ts#mcp
 

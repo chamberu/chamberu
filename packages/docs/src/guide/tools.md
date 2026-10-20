@@ -20,8 +20,22 @@ Infrastructure failures fail the run as well: a store write that throws, or an u
 
 ## Cancellation inside tools
 
-Every tool factory gets `run.signal`. It aborts on cancel, drain, timeout and a lost lease. Pass it to `fetch`, child processes and other cancellable work so an aborted run stops quickly.
+Every tool factory gets `run.signal`. It aborts on cancel, drain, timeout and a lost lease, and once the execution has ended (so work a tool left running does not outlive it). Pass it to `fetch`, child processes and other cancellable work so an aborted run stops quickly.
 
 ## Tools with side effects
 
 A recovered run repeats the step that was in progress when the process died. A plain tool that posts a comment would post it again. Use [`defineEffectTool()`](/guide/effect-tools) for every tool that changes something outside the run.
+
+## Restricting tools per invoker
+
+A run started through `@chamberu/http` (REST or MCP) carries its **invoker**, `run.trigger.invoker`: `{ id, kind, name?, permissions }` of the authenticated principal (`kind` is the authenticator's label: `staticTokens()` sets `token` and `authup()` sets `authup`; `oidc()` keeps the kind its `principal` mapper returns, `oidc` in these docs). Cron and webhook runs have none. An agent's `toolPolicy(toolName, { run })` decides per tool whether the run may use it, and a refused tool is not offered to the model at all.
+
+`requireToolPermission()` is the built-in policy: it offers a tool when the invoker holds `tool:<agent>:<tool>` (with the usual matching: `*` alone grants everything, a `*` segment matches one segment). Runs without an invoker get no tools unless you pass `{ withoutInvoker: 'allow' }`. Wrap it for exceptions:
+
+<<< @/snippets/tools.ts#policy
+
+- The policy covers the whole tool set, the generated [state tools](/guide/state) included.
+- The invoker is a snapshot taken at dispatch. A run keeps it across approvals and restarts, so its tool set stays the same; revoking a grant later does not reach a run that already holds it.
+- A model that calls a refused tool anyway gets the AI SDK's unavailable-tool error as the tool result; the tool step records it with code `tool_not_allowed`. The run goes on.
+- The engine re-checks every call when it executes. An approved call from an older history (e.g. a policy tightened before the approval was answered) gets a `ToolNotAllowedError` tool error and the run goes on.
+- The invoker only ever comes from an authenticator, never from a request body or payload.

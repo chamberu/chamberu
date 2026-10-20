@@ -7,6 +7,7 @@
 
 import type { ToolSet } from 'ai';
 import { isObject } from 'smob';
+import { ToolNotAllowedError } from '../errors/index.ts';
 import type { RunContext } from '../run/types.ts';
 import type { IEffectStore } from '../store/types.ts';
 import { EFFECT, EFFECT_HOOKS } from './constants.ts';
@@ -19,16 +20,36 @@ type Execute = (input: unknown, options: any) => unknown;
  * Wraps every effect tool so it applies at most once per effect key:
  * stored result, then remote reconciliation, then execute. Other tools pass through.
  * A throwing execute (or alreadyApplied) records nothing, so a retry can still apply.
+ * With \`allow\`, every call (effect tool or not) is re-checked first: a refused
+ * call throws ToolNotAllowedError, which the AI SDK returns to the model as a
+ * tool error.
  */
-export function wrapToolsForRun(tools: ToolSet, ctx: RunContext, store: IEffectStore): ToolSet {
+export function wrapToolsForRun(
+    tools: ToolSet,
+    ctx: RunContext,
+    store: IEffectStore,
+    allow?: (toolName: string) => boolean,
+): ToolSet {
     const inflight = new Map<string, Promise<unknown>>();
     const wrapped: ToolSet = {};
 
     for (const [name, def] of Object.entries(tools)) {
         const hooks = (def as { [EFFECT_HOOKS]?: EffectHooks })[EFFECT_HOOKS];
         const execute = def.execute as Execute | undefined;
-        if (!(EFFECT in def) || !execute) {
+        if (!execute) {
             wrapped[name] = def;
+            continue;
+        }
+        if (!(EFFECT in def)) {
+            wrapped[name] = allow ?
+                {
+                    ...def,
+                    execute: (input: unknown, options: unknown) => {
+                        if (!allow(name)) throw new ToolNotAllowedError(name);
+                        return execute.call(def, input, options);
+                    },
+                } as ToolSet[string] :
+                def;
             continue;
         }
 
@@ -63,6 +84,7 @@ export function wrapToolsForRun(tools: ToolSet, ctx: RunContext, store: IEffectS
         wrapped[name] = {
             ...def,
             execute: async (input: unknown, options: unknown) => {
+                if (allow && !allow(name)) throw new ToolNotAllowedError(name);
                 const key = hooks?.effectKey ?
                     hooks.effectKey(input, ctx) :
                     `${ctx.runId}:${name}:${stableHash(input)}`;

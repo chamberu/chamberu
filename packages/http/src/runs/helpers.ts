@@ -10,13 +10,16 @@ import {
     InvalidResumeTokenError,
     RunNotFoundError,
     RunStatus,
+    hasPermission,
 } from '@chamberu/core';
 import type {
     Agent,
     Artifact,
     ArtifactInput,
+    Invoker,
     Run,
     RunStatusLiteral,
+    Step,
     TriggerDefinition,
 } from '@chamberu/core';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@ebec/http';
@@ -25,7 +28,7 @@ import type { IFilter } from '@rapiq/core';
 import { parseFilterScalar } from '@rapiq/parser-simple';
 import { isObject } from 'smob';
 import { Container } from 'validup';
-import { agentPermission, hasPermission } from '../auth/module.ts';
+import { agentPermission } from '../auth/module.ts';
 import { Permission } from '../auth/constants.ts';
 import type { Principal } from '../auth/types.ts';
 import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
@@ -47,23 +50,43 @@ import {
     RESUME_TOKEN_MAX_LENGTH,
 } from './constants.ts';
 import type {
+    InvokerView,
     ResumeBody,
     RunListQuery,
     RunView,
     StartRunBody,
 } from './types.ts';
 
-/** Drops the internal `claim` (owner and lease expiry) from a run. */
+/** An invoker without its `permissions`: a reader must not learn another principal's grants. */
+function viewInvoker(invoker: Invoker): InvokerView {
+    const view: InvokerView & { permissions?: unknown } = { ...invoker };
+    delete view.permissions;
+    return view;
+}
+
+/**
+ * Drops the internal `claim` (owner and lease expiry) and the invoker's
+ * `permissions` from a run.
+ */
 export function serializeRun(run: Run): RunView {
     const view: RunView & { claim?: unknown } = { ...run };
     delete view.claim;
+    if (run.trigger.invoker) view.trigger = { ...run.trigger, invoker: viewInvoker(run.trigger.invoker) };
     return view;
+}
+
+/** A step as it leaves the package: a `wait` step's approver without its `permissions`. */
+export function serializeStep(step: Step): Step {
+    if (step.kind !== 'wait' || !isObject(step.output)) return step;
+    const { approver } = step.output as { approver?: unknown };
+    if (!isObject(approver)) return step;
+    return { ...step, output: { ...step.output, approver: viewInvoker(approver as Invoker) } };
 }
 
 /** `run:read`, or `agent:<run.agent>:run`. */
 export function canReadRun(principal: Principal, run: Run): boolean {
-    return hasPermission(principal, Permission.RUN_READ) ||
-        hasPermission(principal, agentPermission(run.agent, 'run'));
+    return hasPermission(principal.permissions, Permission.RUN_READ) ||
+        hasPermission(principal.permissions, agentPermission(run.agent, 'run'));
 }
 
 /** The run, once the principal may read it: 404, then 403. */
@@ -81,8 +104,8 @@ export async function loadReadableRun(ctx: HttpContext, principal: Principal, id
  * agent it may run (one store query keeps `total` and paging exact).
  */
 export function assertCanListRuns(principal: Principal, agent: string | undefined): void {
-    if (hasPermission(principal, Permission.RUN_READ)) return;
-    if (agent !== undefined && hasPermission(principal, agentPermission(agent, 'run'))) return;
+    if (hasPermission(principal.permissions, Permission.RUN_READ)) return;
+    if (agent !== undefined && hasPermission(principal.permissions, agentPermission(agent, 'run'))) return;
     throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
 }
 
@@ -227,7 +250,7 @@ export async function resolveResumeTarget(ctx: HttpContext, principal: Principal
     if (!run) throw new InvalidResumeTokenError();
 
     const permission = agentPermission(run.agent, 'approve');
-    if (!hasPermission(principal, permission)) {
+    if (!hasPermission(principal.permissions, permission)) {
         throw new ForbiddenError({ message: `Missing permission "${permission}".` });
     }
     return run;

@@ -11,7 +11,7 @@ import { pid } from 'node:process';
 import type { Agent } from '../agent/types.ts';
 import { createResumeToken, verifyResumeToken } from '../approval/module.ts';
 import { assertArtifactInput } from '../artifact/helpers.ts';
-import { storeArtifact } from '../artifact/module.ts';
+import { attachmentIds, storeArtifact } from '../artifact/module.ts';
 import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
 import type { IClock } from '../clock/index.ts';
@@ -32,6 +32,7 @@ import type {
     WaitPoint,
 } from '../run/types.ts';
 import type { IStore } from '../store/types.ts';
+import { idempotencyScope, toInvoker } from '../trigger/helpers.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 import {
     APPROVAL_TIMED_OUT,
@@ -134,15 +135,21 @@ export class RunEngine {
         if (!this.agents.has(envelope.agent)) {
             throw new InvalidAgentDefinitionError(`unknown agent: ${envelope.agent}`);
         }
-        const { attachments, ...rest } = envelope;
+        const {
+            attachments, 
+            invoker, 
+            ...rest 
+        } = envelope;
         // before any store write: an invalid attachment stores nothing
         if (attachments !== undefined && !Array.isArray(attachments)) {
             throw new ValidationError('The attachments must be an array.');
         }
         attachments?.forEach((attachment, i) => assertArtifactInput(attachment, `attachment ${i}`));
+        const snapshot = invoker !== undefined ? toInvoker(invoker) : undefined;
         const now = this.nextCreatedAt();
         const trigger: TriggerEnvelope = {
             ...rest,
+            ...(snapshot ? { invoker: snapshot } : {}),
             id: envelope.id ?? randomUUID(),
             receivedAt: envelope.receivedAt ?? now,
         };
@@ -150,7 +157,7 @@ export class RunEngine {
 
         if (trigger.idempotencyKey !== undefined) {
             const claimed = await this.store.claimKey(
-                `${trigger.agent}:${trigger.source}`,
+                idempotencyScope(trigger),
                 trigger.idempotencyKey,
                 runId,
                 IDEMPOTENCY_TTL_MS,
@@ -164,10 +171,12 @@ export class RunEngine {
         }
 
         if (attachments?.length) {
-            // stored before the run, so an executing run finds them; a crash in between leaves orphans
+            // stored before the run, so an executing run finds them; a crash in between leaves orphans.
+            // Ids derive from the run id: a concurrent healer of the same run writes no-ops.
+            const ids = attachmentIds(runId, attachments.length);
             trigger.attachments = [];
-            for (const attachment of attachments) {
-                trigger.attachments.push(await storeArtifact(this.store, { id: runId, agent: trigger.agent }, attachment, now));
+            for (const [i, attachment] of attachments.entries()) {
+                trigger.attachments.push(await storeArtifact(this.store, { id: runId, agent: trigger.agent }, attachment, now, ids[i]));
             }
         }
 
@@ -387,6 +396,9 @@ export class RunEngine {
      * Throws InvalidResumeTokenError for a forged, expired or superseded token.
      */
     async resume(token: string, decision: ResumeDecision): Promise<void> {
+        if (decision.approver !== undefined) {
+            decision = { ...decision, approver: toInvoker(decision.approver, 'approver') };
+        }
         const claims = verifyResumeToken(this.resumeSecret, token, this.clock.now());
         const run = await this.store.getRun(claims.runId);
         if (!run) throw new RunNotFoundError(claims.runId);
@@ -480,6 +492,7 @@ export class RunEngine {
                     approvalId: waiting.approvalId,
                     approved: decision.approved,
                     reason: decision.reason,
+                    ...(decision.approver ? { approver: decision.approver } : {}),
                 },
                 startedAt: run.updatedAt,
                 finishedAt: now,

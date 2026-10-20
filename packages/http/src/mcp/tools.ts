@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError, RunStatus } from '@chamberu/core';
+import { InvalidAgentDefinitionError, RunStatus, hasPermission } from '@chamberu/core';
 import type { Agent, RunStatusLiteral } from '@chamberu/core';
 import { fromJsonSchema } from '@modelcontextprotocol/server';
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -13,7 +13,8 @@ import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '../app/constants.ts';
 import { acquireStreamSlot } from '../app/helpers.ts';
 import type { HttpContext } from '../app/types.ts';
-import { agentPermission, hasPermission } from '../auth/module.ts';
+import { toInvoker } from '../auth/helpers.ts';
+import { agentPermission } from '../auth/module.ts';
 import type { Principal } from '../auth/types.ts';
 import { KEY_MAX_LENGTH } from '../request/constants.ts';
 import { validatePayload } from '../request/helpers.ts';
@@ -221,7 +222,7 @@ function registerRunTool(
         trigger, 
         schema, 
     } = tool;
-    if (!hasPermission(extra.principal, agentPermission(agent.name, 'run'))) return;
+    if (!hasPermission(extra.principal.permissions, agentPermission(agent.name, 'run'))) return;
 
     server.registerTool(`run_${agent.name}`, {
         title: `Run ${agent.name}`,
@@ -236,6 +237,7 @@ function registerRunTool(
             payload,
             ...(args.idempotencyKey !== undefined ? { idempotencyKey: args.idempotencyKey } : {}),
             ...(args.thread !== undefined ? { thread: args.thread } : {}),
+            invoker: toInvoker(extra.principal),
         });
 
         const waitSeconds = Math.min(args.waitSeconds ?? 0, options.maxWaitSeconds);
@@ -275,6 +277,7 @@ function registerResumeTool(server: McpServer, ctx: HttpContext, principal: Prin
         await ctx.engine.resume(args.token, {
             approved: args.approved,
             ...(args.reason !== undefined ? { reason: args.reason } : {}),
+            approver: toInvoker(principal),
         });
         return toolResult({ runId: run.id, status: RunStatus.QUEUED });
     }));

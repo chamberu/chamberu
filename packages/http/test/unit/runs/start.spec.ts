@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { defineAgent, http } from '@chamberu/core';
+import { staticTokens } from '@chamberu/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
@@ -46,6 +47,26 @@ describe('POST /agents/:name/runs', () => {
         const first = await (await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { idempotencyKey: 'k1' } })).json();
         const second = await (await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { idempotencyKey: 'k1' } })).json();
         expect(second).toEqual({ runId: first.runId, deduplicated: true });
+    });
+
+    it('scopes an idempotency key to the principal', async () => {
+        const low = 'low-runner-token-0123456789';
+        const high = 'high-runner-token-0123456789';
+        const { app, store } = createRunTestApp({
+            auth: [staticTokens({
+                tokens: {
+                    [low]: { id: 'u-low', permissions: ['agent:echo:run'] },
+                    [high]: { id: 'u-high', permissions: ['agent:echo:run', 'tool:echo:*'] },
+                },
+            })],
+        });
+        const start = async (token: string) => (await call(app, 'POST', '/agents/echo/runs', { token, body: { idempotencyKey: 'issue-42' } })).json();
+        const first = await start(low);
+        const second = await start(high);
+        expect(second.deduplicated).toBe(false);
+        expect(second.runId).not.toBe(first.runId);
+        expect((await store.getRun(second.runId))?.trigger.invoker?.id).toBe('u-high');
+        expect(await start(high)).toEqual({ runId: second.runId, deduplicated: true });
     });
 
     it('dedupes by the Idempotency-Key header', async () => {
@@ -227,6 +248,20 @@ describe('POST /agents/:name/runs', () => {
             const body = await response.json();
             expect(body.issues).toHaveLength(1);
             expect(body.issues[0].path).toEqual(['attachments']);
+        });
+
+        it.each([
+            ['an oversized list of large attachments', { attachments: Array.from({ length: 17 }, () => ({ mediaType: 'text/plain', data: b64('x'.repeat(45_000)) })) }, ['attachments']],
+            ['a long string as attachments', { attachments: 'A'.repeat(100_000) }, ['attachments']],
+            ['a long mediaType', { attachments: [{ mediaType: 'x'.repeat(100_000), data: 'aGk=' }] }, ['attachments', 0, 'mediaType']],
+            ['a long thread', { thread: 'x'.repeat(500_000) }, ['thread']],
+        ])('answers %s with a small 400 body', async (_, body, path) => {
+            const { app } = createRunTestApp({ bodyLimit: 4 * 1024 * 1024 });
+            const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body });
+            expect(response.status).toBe(400);
+            const text = await response.text();
+            expect(text.length).toBeLessThan(2048);
+            expect(JSON.parse(text).issues.map((i: { path: unknown }) => i.path)).toContainEqual(path);
         });
 
         it('stores nothing for a deduplicated dispatch', async () => {

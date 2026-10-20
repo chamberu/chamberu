@@ -18,7 +18,7 @@ export class IdempotencyKeyEntity {
     @PrimaryColumn({
         name: 'scope', 
         type: 'varchar', 
-        length: 255, 
+        length: 1024, 
     })
     scope!: string;
 

@@ -16,7 +16,11 @@ import {
     RunEntity,
     StepEntity,
 } from '../entities/index.ts';
-import { Artifacts1792368000000, Init1792195200000 } from '../migrations/index.ts';
+import {
+    Artifacts1792368000000,
+    IdempotencyScope1792454400000,
+    Init1792195200000,
+} from '../migrations/index.ts';
 
 export const STORE_ENTITIES = [
     RunEntity,
@@ -30,6 +34,6 @@ export const STORE_ENTITIES = [
     ArtifactEntity,
 ];
 
-export const STORE_MIGRATIONS = [Init1792195200000, Artifacts1792368000000];
+export const STORE_MIGRATIONS = [Init1792195200000, Artifacts1792368000000, IdempotencyScope1792454400000];
 
 export const MIGRATION_LOCK_NAME = 'chamberu:migrations';

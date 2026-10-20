@@ -11,3 +11,9 @@
  * `runs.thread` and `runs.concurrency_key` columns.
  */
 export const KEY_MAX_LENGTH = 255;
+
+/**
+ * Characters (as JSON) a validation issue's `received` value may have;
+ * a larger one is dropped, so a 400 never echoes a large body back.
+ */
+export const RECEIVED_MAX_LENGTH = 256;

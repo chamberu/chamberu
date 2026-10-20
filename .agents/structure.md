@@ -70,8 +70,8 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 |------|---------|
 | `errors/` | `ChamberuError` (`base.ts`), one file per subclass, `ErrorCode` (`constants.ts`) |
 | `agent/` | `defineAgent()`, `AgentDefinition`, name rules and budget defaults (`constants.ts`) |
-| `trigger/` | `TriggerDefinition`, `TriggerEnvelope` (`types.ts`); `cron/`, `http/`, `webhook/` each hold their factory (`module.ts`) and options type (`types.ts`) |
-| `artifact/` | `Artifact`, `ArtifactInput`, `IRunArtifacts` (`types.ts`); `ARTIFACT_URI_PREFIX` (`constants.ts`, internal); `createRunArtifacts()` (`module.ts`); `assertArtifactInput()`, `toFilePart()`, `hydrateMessages()` (`helpers.ts`) |
+| `trigger/` | `TriggerDefinition`, `TriggerEnvelope`, `Invoker` (`types.ts`), `toInvoker()` validation (`helpers.ts`, internal); `cron/`, `http/`, `webhook/` each hold their factory (`module.ts`) and options type (`types.ts`) |
+| `artifact/` | `Artifact`, `ArtifactInput`, `IRunArtifacts` (`types.ts`); `ARTIFACT_URI_PREFIX` (`constants.ts`, internal); `createRunArtifacts()`, `storeArtifact()`, `attachmentIds()` (`module.ts`, the latter two internal); `isArtifactMediaType()` (`media-type.ts`, public); `assertArtifactInput()`, `toFilePart()`, `hydrateMessages()` (`helpers.ts`) |
 | `run/` | `RunStatus` enum (`constants.ts`); `Run`, `RunStatusLiteral`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage` |
 | `store/types.ts` | `IStore` and its parts (see architecture) |
 | `store/memory/` | `MemoryStore` |
@@ -79,6 +79,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `effect/` | `defineEffectTool()`, `effectMarker()` (`define.ts`), `wrapToolsForRun()` (`wrap.ts`), `EFFECT` |
 | `approval/` | Signed resume tokens |
 | `notify/types.ts` | `INotifier`, `Notification` |
+| `permission/` | `matchesPermission()`, `hasPermission()`, `toolPermission()` (`match.ts`), `requireToolPermission()` (`policy.ts`), `RequireToolPermissionOptions` (`types.ts`), `PERMISSION_ALL` (`constants.ts`, internal) |
 | `state/` | `createAgentState()` (`module.ts`, validation via `@validup/standard-schema`), generated tools (`tools.ts`) |
 | `clock/` | `IClock`, `systemClock` |
 
@@ -100,10 +101,10 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | Path | Purpose |
 |------|---------|
 | `app/` | `createHttpApp()` (`module.ts`), `HttpAppOptions` and the internal `HttpContext` (`types.ts`), defaults (`constants.ts`), `buildContext()` and the JSON error handler (`helpers.ts`) |
-| `auth/` | `Principal`, `Authenticator` (`types.ts`), `Permission` (`constants.ts`), `hasPermission()`, `agentPermission()` (`module.ts`), `authenticate()`, `authorize()`, `readBearerToken()` (`helpers.ts`, internal); `static-tokens/`, `authup/`, `oidc/` hold the built-in authenticators |
-| `request/` | No barrel: `readJsonBody()`, `validateBody()`, `validatePayload()`, `decodeQuery()` (rapiq), `readIdempotencyHeader()` (`helpers.ts`); validup validators `isString()`, `isBoolean()`, `isDefined()`, `isArrayOf()`, `isMediaType()`, `isBase64()` (`validators.ts`) |
+| `auth/` | `Principal`, `Authenticator` (`types.ts`), `Permission` (`constants.ts`), `agentPermission()` (`module.ts`; permission matching is core's `hasPermission(principal.permissions, ...)`), `authenticate()`, `authorize()`, `readBearerToken()`, `toInvoker()` (`helpers.ts`, internal; display name from `name` or `preferred_username`, never `email`); `static-tokens/`, `authup/`, `oidc/` hold the built-in authenticators |
+| `request/` | No barrel: `readJsonBody()`, `validateBody()`, `validatePayload()`, `decodeQuery()` (rapiq), `readIdempotencyHeader()`, `boundReceived()`, `boundIssues()` (`helpers.ts`); `KEY_MAX_LENGTH`, `RECEIVED_MAX_LENGTH` (`constants.ts`); validup validators `isString()`, `isBoolean()`, `isDefined()`, `isArrayOf()`, `isMediaType()`, `isBase64()` (`validators.ts`) |
 | `health/` | No barrel: `/healthz`, `/readyz` |
-| `runs/` | Run and artifact routes (`module.ts`), `serializeRun()`, `canReadRun()`, `loadReadableRun()`, `loadRunArtifact()`, `contentDisposition()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `MAX_ATTACHMENTS` (`constants.ts`, internal), `RunView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE, incl. `delta`) |
+| `runs/` | Run and artifact routes (`module.ts`), `serializeRun()`, `serializeStep()`, `canReadRun()`, `loadReadableRun()`, `loadRunArtifact()`, `contentDisposition()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `MAX_ATTACHMENTS` (`constants.ts`, internal), `RunView`, `InvokerView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE, incl. `delta`) |
 | `hooks/` | No barrel: `POST /hooks/:agent<path>` |
 | `agents/` | `/agents`, `/schedules` and state routes (`module.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
 | `mcp/` | `createMcpEndpoint()`, `registerMcpRoutes()` (`module.ts`), the tools (`tools.ts`), `waitForRun()`, `toJsonSchema()` (`helpers.ts`), `RunSummary`, `RunToolResult` (`types.ts`) |
@@ -115,6 +116,6 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | Path | Purpose |
 |------|---------|
 | `entities/` | One TypeORM entity per table, the repositories the store queries through; `TableName` and the jsonb transformers (`JSON_VALUE_TRANSFORMER`, `OPTIONAL_JSON_TRANSFORMER`) in `constants.ts`, `toJsonParameter()` (jsonb sanitizing) in `helpers.ts` |
-| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), `1792368000000-artifacts.ts` (table `chamberu_artifacts`), generated from the entities |
+| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), `1792368000000-artifacts.ts` (table `chamberu_artifacts`), generated from the entities; `1792454400000-idempotency-scope.ts` (`scope` varchar(1024), hand-written) |
 | `schema/` | `migrateStore()` (`module.ts`), `STORE_ENTITIES`, `STORE_MIGRATIONS`, `MIGRATION_LOCK_NAME` |
 | `store/` | `TypeormStore` (`module.ts`), entity to domain mapping, value builders and `RETURNING` row hydration (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |

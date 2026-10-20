@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { Run } from '@chamberu/core';
-import { serializeRun } from '../../../src/runs/helpers.ts';
+import type { Run, Step } from '@chamberu/core';
+import { serializeRun, serializeStep } from '../../../src/runs/helpers.ts';
 
 describe('serializeRun', () => {
     it('drops the claim and keeps every other key', () => {
@@ -42,5 +42,82 @@ describe('serializeRun', () => {
         expect(view).toEqual({ ...run, claim: undefined });
         expect(Object.keys(view)).toEqual(Object.keys(run).filter((key) => key !== 'claim'));
         expect(view.waiting?.tokenId).toBe('tok');
+    });
+
+    it('drops the invoker permissions and keeps id, kind and name', () => {
+        const now = new Date(0);
+        const run: Run = {
+            id: 'r1',
+            agent: 'gate',
+            status: 'queued',
+            trigger: {
+                id: 't1',
+                agent: 'gate',
+                trigger: 'http',
+                source: 'http',
+                payload: undefined,
+                invoker: {
+                    id: 'u1',
+                    kind: 'authup',
+                    name: 'alice',
+                    permissions: ['*'],
+                },
+                receivedAt: now,
+            },
+            usage: { inputTokens: 0, outputTokens: 0 },
+            createdAt: now,
+            updatedAt: now,
+        };
+        const view = serializeRun(run);
+        expect(view.trigger.invoker).toEqual({
+            id: 'u1', 
+            kind: 'authup', 
+            name: 'alice', 
+        });
+        expect(run.trigger.invoker?.permissions).toEqual(['*']);
+    });
+});
+
+describe('serializeStep', () => {
+    const now = new Date(0);
+    const base: Step = {
+        runId: 'r1',
+        index: 2,
+        kind: 'wait',
+        name: 'deploy',
+        startedAt: now,
+        finishedAt: now,
+    };
+
+    it('drops the approver permissions of a wait step', () => {
+        const step: Step = {
+            ...base,
+            output: {
+                approvalId: 'a1',
+                approved: true,
+                approver: {
+                    id: 'u1',
+                    kind: 'token',
+                    permissions: ['agent:gate:approve'],
+                },
+            },
+        };
+        expect(serializeStep(step).output).toEqual({
+            approvalId: 'a1',
+            approved: true,
+            approver: { id: 'u1', kind: 'token' },
+        });
+        expect((step.output as { approver: { permissions: string[] } }).approver.permissions).toEqual(['agent:gate:approve']);
+    });
+
+    it('leaves other steps and a wait step without approver as they are', () => {
+        const wait: Step = { ...base, output: { approvalId: 'a1', approved: false } };
+        expect(serializeStep(wait)).toBe(wait);
+        const toolStep: Step = {
+            ...base, 
+            kind: 'tool', 
+            output: { approver: { permissions: ['x'] } }, 
+        };
+        expect(serializeStep(toolStep)).toBe(toolStep);
     });
 });

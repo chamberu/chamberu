@@ -25,6 +25,9 @@ export function staticTokens(options: StaticTokensOptions): Authenticator {
 
     const principals = new Map<string, Principal>();
     for (const [token, { id, permissions }] of entries) {
+        if (typeof id !== 'string' || id.length === 0) {
+            throw new InvalidAgentDefinitionError('Every static token needs a non-empty id.');
+        }
         if (token.length < STATIC_TOKEN_MIN_LENGTH) {
             throw new InvalidAgentDefinitionError(
                 `The static token of "${id}" must have at least ${STATIC_TOKEN_MIN_LENGTH} characters.`,

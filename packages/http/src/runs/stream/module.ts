@@ -16,7 +16,7 @@ import { createEventStream } from 'routup';
 import type { IAppEvent } from 'routup';
 import { acquireStreamSlot, refuseStreamOverCap, refuseWhenClosed } from '../../app/helpers.ts';
 import type { HttpContext } from '../../app/types.ts';
-import { serializeRun } from '../helpers.ts';
+import { serializeRun, serializeStep } from '../helpers.ts';
 import {
     isNewer,
     isSettled,
@@ -103,7 +103,7 @@ export async function streamRun(event: IAppEvent, ctx: HttpContext, runId: strin
         return write({
             event: 'step.appended',
             id: String(step.index),
-            data: JSON.stringify(step),
+            data: JSON.stringify(serializeStep(step)),
         });
     }
 

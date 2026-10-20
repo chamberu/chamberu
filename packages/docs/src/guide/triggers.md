@@ -30,13 +30,15 @@ The engine renders the source, trigger id and payload as a JSON block and makes 
 
 `thread` is stored on the run. Loading the history of earlier runs of the same thread is planned for the mail digest milestone.
 
+`invoker` is who started the run. Only an intake layer sets it, from its authenticated caller (`@chamberu/http` fills it from the principal), never from a payload. It is not part of the rendered block, so the model never sees it. See [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker).
+
 ## Attachments
 
 `dispatch()` also takes files for the model, `attachments: [{ mediaType, filename?, data }]` with `data` a `Uint8Array`:
 
 <<< @/snippets/triggers.ts#attachments
 
-Each attachment is checked before anything is written (`mediaType` of the form `type/subtype` without parameters, `data` a `Uint8Array`; `ValidationError` otherwise), then stored as an [artifact](/guide/agents#files) of the run, after the idempotency check (a deduplicated dispatch stores nothing) and before the run is created. The run's `trigger.attachments` holds their metadata. The first user message then carries the rendered envelope as text followed by one file part per attachment, so a model that reads images or PDFs gets them directly. A crash between storing the files and creating the run leaves orphan artifacts; nothing purges them yet. Two dispatches that race to create the run of the same reserved idempotency key (its first run was never created) both store their files under that run id, so the losing dispatch's files stay listed among the run's artifacts.
+Each attachment is checked before anything is written (`mediaType` of the form `type/subtype` without parameters, `data` a `Uint8Array`; `ValidationError` otherwise), then stored as an [artifact](/guide/agents#files) of the run, after the idempotency check (a deduplicated dispatch stores nothing) and before the run is created. The run's `trigger.attachments` holds their metadata. The first user message then carries the rendered envelope as text followed by one file part per attachment, so a model that reads images or PDFs gets them directly. Attachment ids are derived from the run id and the position (`<runId>.0000`, `<runId>.0001`, ...), so the run's artifacts list in the order they were given. A crash between storing the files and creating the run leaves orphan artifacts; nothing purges them yet. Two dispatches that race to create the run of the same reserved idempotency key (its first run was never created) write to the same ids, so the second write of each file is a no-op and the run names exactly the files that were stored; only a racing dispatch with more files than the winner leaves its extra files listed among the run's artifacts.
 
 Over HTTP, `POST /agents/:name/runs` takes the same list with `data` as base64 (see [HTTP API](/guide/http#files)).
 
@@ -45,6 +47,8 @@ Over HTTP, `POST /agents/:name/runs` takes the same list with `data` as base64 (
 <<< @/snippets/triggers.ts#dispatch
 
 With an `idempotencyKey`, `dispatch()` claims the key in the store under the scope `<agent>:<source>` (for example `triage:webhook`) for 7 days. The first dispatch creates the run. Every later dispatch with the same agent, source and key returns the existing run id with `deduplicated: true`, and no new run is created.
+
+A dispatch with an [invoker](#the-envelope) claims the key under `<agent>:<source>:<kind>:<id>` instead (`kind` and `id` URI-encoded). Keys are then per invoker: the same invoker's retry is deduplicated, while another invoker sending the same key gets a run of its own and never learns about the first.
 
 Use a key that is stable across redeliveries: a GitHub delivery id, a cron job plus its scheduled time, or a key your client sends.
 

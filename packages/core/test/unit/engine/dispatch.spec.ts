@@ -259,15 +259,17 @@ describe('RunEngine.dispatch', () => {
 
     it('same-key runs on two replicas sharing a store never overlap', async () => {
         const store = new SlowStartStore();
+        // real timers: the lease must outlive a renewal delayed by a loaded machine,
+        // or the other replica recovers the running run and executes it again
         const a = make({
             store,
             owner: 'a',
-            claimTtlMs: 30,
+            claimTtlMs: 600,
         });
         const b = make({
             store,
             owner: 'b',
-            claimTtlMs: 30,
+            claimTtlMs: 600,
         });
         b.engine.tracker = a.engine.tracker;
         const [ra, rb] = await Promise.all([

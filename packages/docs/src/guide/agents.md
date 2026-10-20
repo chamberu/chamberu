@@ -24,6 +24,7 @@ The engine checks the rest when you construct it: agent names must be unique wit
 | `instructions` | `string` | required | System instructions |
 | `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()`. See [Triggers](/guide/triggers) |
 | `tools` | `(ctx) => ToolSet` | none | Tool factory, called for each execution |
+| `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()`. See [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker) |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections. See [Agent State](/guide/state) |
 | `budget` | `Partial<Budget>` | `{ maxSteps: 20, timeoutMs: 900_000 }` | See [Budgets & Timeouts](/guide/budgets) |
 | `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval. See [Approvals](/guide/approvals) |
@@ -42,8 +43,8 @@ The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` ke
 | `state` | `AgentState` | The agent's [state](/guide/state), typed by its `state` schema |
 | `run.runId` | `string` | Id of the run being executed |
 | `run.agent` | `string` | Agent name |
-| `run.trigger` | `TriggerEnvelope` | The envelope that started the run |
-| `run.signal` | `AbortSignal` | Aborts on cancel, drain, a lost lease or the run timeout |
+| `run.trigger` | `TriggerEnvelope` | The envelope that started the run; `run.trigger.invoker` is who started it, if an authenticator knew |
+| `run.signal` | `AbortSignal` | Aborts on cancel, drain, a lost lease or the run timeout, and once the execution has ended |
 | `artifacts` | `IRunArtifacts` | The run's files: `put()`, `get(id)`, `list()`. See [Files](#files) |
 
 A factory lets tools close over per-run data, such as the run id in an [effect key](/guide/effect-tools) or the repository named in the payload. Pass `run.signal` on to `fetch` and other cancellable work.
@@ -52,15 +53,17 @@ The returned tools are plain AI SDK tools. When the agent declares `state`, the 
 
 ## Structured output
 
-By default a completed run's `output` is the text of the model's last answer. With `output`, an AI SDK `Output` passed to the `ToolLoopAgent` as it is, `output` is the parsed value instead:
+By default a completed run's `output` is the text of the model's last answer. With `output`, an AI SDK `Output`, `output` is the parsed value instead:
 
 <<< @/snippets/agents.ts#output
 
-The model may call tools first; only the final answer is parsed. A final answer that is no valid JSON or fails the schema fails the run with `ValidationError` (`run.error.code` `validation_error`, the message from the AI SDK's cause). A run whose step budget an earlier execution used up parses the last answer in its checkpoint the same way.
+The model may call tools first; only the final answer is parsed. A final answer that is no valid JSON or fails the schema fails the run with `ValidationError` (`run.error.code` `validation_error`, the message from the AI SDK's cause, its quoted text cut to 500 characters; the whole answer stays in the `llm` step). Two loop ends have no answer to parse and fail the run with `IncompleteResponseError` (`incomplete_response`) instead: an answer cut off at the output token limit (finish reason `length`), and a loop that ended on a tool call nothing executed (a tool without `execute`, outside a budget stop). A run whose step budget an earlier execution used up parses the last answer in its checkpoint the same way. An agent without `output` keeps completing with the text it got in both cases.
+
+The `ToolLoopAgent` gets your `Output` with one change: its `parsePartialOutput` is not called while the answer streams (chamberu reads no partial output, and re-parsing the growing answer on every delta costs time). `run.delta` events arrive per model delta, as without `output`.
 
 ## Files
 
-A run can start with files ([attachments](/guide/triggers#attachments)) and tools can store files of their own. Both are artifacts of the run: metadata (`id`, `runId`, `agent`, `mediaType`, `filename?`, `size`, `createdAt`) plus the bytes, kept in the store's `IArtifactStore`. The `artifacts` the tool factory gets is scoped to the run: `put({ mediaType, filename?, data })` stores a `Uint8Array` and returns the `Artifact`, `get(id)` returns `{ artifact, data }` (or `undefined`, also for another run's artifact) and `list()` returns the run's artifacts by `createdAt`.
+A run can start with files ([attachments](/guide/triggers#attachments)) and tools can store files of their own. Both are artifacts of the run: metadata (`id`, `runId`, `agent`, `mediaType`, `filename?`, `size`, `createdAt`) plus the bytes, kept in the store's `IArtifactStore`. The `artifacts` the tool factory gets is scoped to the run: `put({ mediaType, filename?, data })` stores a `Uint8Array` and returns the `Artifact`, `get(id)` returns `{ artifact, data }` (or `undefined`, also for another run's artifact) and `list()` returns the run's artifacts by `createdAt` (attachments in the order they were given, ids `<runId>.0000`, ...; tool files get random UUIDs).
 
 <<< @/snippets/agents.ts#artifacts
 

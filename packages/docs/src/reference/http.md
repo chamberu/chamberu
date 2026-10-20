@@ -44,10 +44,9 @@ const Permission: {
 };
 
 function agentPermission(agent: string, action: 'run' | 'approve'): string; // agent:<agent>:<action>
-function hasPermission(principal: Principal, permission: string): boolean;
 ```
 
-`hasPermission` is true for a granted `*`, or for a grant with the same number of `:` segments whose every segment is equal or `*`.
+Matching uses core's [`hasPermission(principal.permissions, permission)`](/reference/#permissions): true for a granted `*`, or for a grant with the same number of `:` segments whose every segment is equal or `*`.
 
 ## createShutdown
 
@@ -63,7 +62,10 @@ const DEFAULT_SHUTDOWN_CLOSE_TIMEOUT_MS: 5_000;
 ## Wire types
 
 ```ts
-type RunView = Omit<Run, 'claim'>;
+type InvokerView = Omit<Invoker, 'permissions'>;
+type RunView = Omit<Run, 'claim' | 'trigger'> & {
+    trigger: Omit<TriggerEnvelope, 'invoker'> & { invoker?: InvokerView };
+};
 type RunSummary = Pick<Run, 'id' | 'agent' | 'status' | 'createdAt' | 'finishedAt' | 'error'>;
 type RunToolResult = {
     runId: string;

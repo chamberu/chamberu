@@ -20,6 +20,24 @@ export type TriggerDefinition<P = unknown> = {
     idempotencyKey?(payload: P): string | undefined;
 };
 
+/**
+ * Who started a run (or answered an approval), as an authenticator resolved
+ * it: a snapshot of identity and grants taken at dispatch, never a token.
+ * Revoking a grant later does not reach a run that already holds it.
+ */
+export type Invoker = {
+    id: string;
+    /**
+     * The authenticator's label: `@chamberu/http`'s staticTokens() sets
+     * 'token' and authup() sets 'authup'; oidc() keeps the kind its
+     * `principal` mapper returns (the docs use 'oidc'); a custom authenticator
+     * or a direct dispatch may use its own (e.g. 'user').
+     */
+    kind: string;
+    name?: string;
+    permissions: readonly string[];
+};
+
 export type TriggerEnvelope<P = unknown> = {
     id: string;
     agent: string;
@@ -31,5 +49,12 @@ export type TriggerEnvelope<P = unknown> = {
     thread?: string;
     /** Files the run was started with, stored as artifacts of the run; the model gets them as file parts. */
     attachments?: Artifact[];
+    /**
+     * Who started the run; only ever set from an authenticator (never from a
+     * payload). Absent for cron and webhook runs. With an invoker the
+     * idempotency key is scoped to it, so only the same invoker's dispatch
+     * is deduplicated (and gets its own first run).
+     */
+    invoker?: Invoker;
     receivedAt: Date;
 };

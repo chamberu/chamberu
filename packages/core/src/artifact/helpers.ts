@@ -10,15 +10,13 @@ import { isObject } from 'smob';
 import { ArtifactNotFoundError, ValidationError } from '../errors/index.ts';
 import type { IArtifactStore } from '../store/types.ts';
 import { ARTIFACT_URI_PREFIX } from './constants.ts';
+import { isArtifactMediaType } from './media-type.ts';
 import type { Artifact, ArtifactInput } from './types.ts';
-
-// RFC 6838 restricted names, no parameters
-const MEDIA_TYPE = /^[a-z0-9][\w!#$&^.+-]{0,126}\/[a-z0-9][\w!#$&^.+-]{0,126}$/i;
 
 /** Throws ValidationError unless `input` is an ArtifactInput (`what` names it in the message). */
 export function assertArtifactInput(input: unknown, what = 'artifact'): asserts input is ArtifactInput {
     if (!isObject(input)) throw new ValidationError(`The ${what} must be an object.`);
-    if (typeof input.mediaType !== 'string' || !MEDIA_TYPE.test(input.mediaType)) {
+    if (!isArtifactMediaType(input.mediaType)) {
         throw new ValidationError(`The ${what} needs a mediaType of the form type/subtype.`);
     }
     if (input.filename !== undefined && typeof input.filename !== 'string') {

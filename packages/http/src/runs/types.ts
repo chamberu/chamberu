@@ -5,10 +5,24 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { ArtifactInput, Run, RunStatusLiteral } from '@chamberu/core';
+import type {
+    ArtifactInput,
+    Invoker,
+    Run,
+    RunStatusLiteral,
+    TriggerEnvelope,
+} from '@chamberu/core';
 
-/** A run as it leaves the package (REST, SSE, MCP): without the internal `claim`. */
-export type RunView = Omit<Run, 'claim'>;
+/** An invoker or approver as it leaves the package: identity only, never the grants. */
+export type InvokerView = Omit<Invoker, 'permissions'>;
+
+/**
+ * A run as it leaves the package (REST, SSE, MCP): without the internal
+ * `claim`, and the invoker without its `permissions`.
+ */
+export type RunView = Omit<Run, 'claim' | 'trigger'> & {
+    trigger: Omit<TriggerEnvelope, 'invoker'> & { invoker?: InvokerView };
+};
 
 /** `GET /runs` query after decoding. */
 export type RunListQuery = {

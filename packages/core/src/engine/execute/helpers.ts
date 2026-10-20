@@ -10,20 +10,29 @@ import type {
     LanguageModelResponseMetadata,
     LanguageModelUsage,
     ModelMessage,
+    OutputInterface,
+    StepResult,
     ToolApprovalStatus,
     ToolLoopAgentSettings,
     ToolSet,
 } from 'ai';
+import { NoSuchToolError } from 'ai';
 import { isObject } from 'smob';
 import type { ApprovalPolicy } from '../../agent/types.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
-import { BudgetExceededError, ValidationError } from '../../errors/index.ts';
+import {
+    BudgetExceededError,
+    IncompleteResponseError,
+    ToolNotAllowedError,
+    ValidationError,
+} from '../../errors/index.ts';
 import type { Budget, Checkpoint, RunContext } from '../../run/types.ts';
 import { createAgentState } from '../../state/module.ts';
 import { createStateTools } from '../../state/tools.ts';
 import type { TriggerEnvelope } from '../../trigger/types.ts';
+import { MAX_ERROR_CAUSE_LENGTH } from './constants.ts';
 import type { ApprovalRequest, ExecuteContext } from './types.ts';
 
 export function renderTrigger(envelope: TriggerEnvelope): string {
@@ -59,12 +68,22 @@ export function toRunError(error: unknown): { code: string; message: string } {
 
 /**
  * The tools handed to the agent: generated state tools (when the agent declares
- * `state`) merged with the user's tools, which win on a name clash. Seam for
- * effect memoization (wrapToolsForRun).
+ * `state`) merged with the user's tools, which win on a name clash. Every tool
+ * stays executable, so an approved call from an older history still gets an
+ * answer; `activeTools` (the names the agent's toolPolicy allows, undefined
+ * without a policy) is what the model is offered. wrapToolsForRun memoizes
+ * effects and re-checks the policy per call, so a refused call is a tool error.
  */
-export function assembleTools(ctx: ExecuteContext, runContext: RunContext): ToolSet {
-    const { tools: factory, state: schema } = ctx.agent.definition;
-    if (!factory && !schema) return {};
+export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
+    tools: ToolSet;
+    activeTools?: string[];
+} {
+    const {
+        tools: factory,
+        state: schema,
+        toolPolicy,
+    } = ctx.agent.definition;
+    if (!factory && !schema) return { tools: {} };
     const state = createAgentState(ctx.agent.name, schema, ctx.store);
     const tools: ToolSet = {
         ...(schema ? createStateTools(state, schema) : {}),
@@ -74,7 +93,31 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): Tool
             artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
         }),
     };
-    return wrapToolsForRun(tools, runContext, ctx.store);
+    if (!toolPolicy) return { tools: wrapToolsForRun(tools, runContext, ctx.store) };
+    const allow = (name: string) => toolPolicy(name, { run: runContext });
+    return {
+        tools: wrapToolsForRun(tools, runContext, ctx.store, allow),
+        activeTools: Object.keys(tools).filter(allow),
+    };
+}
+
+/**
+ * The error to record for a model's call to a tool the toolPolicy refused: the
+ * AI SDK never offered it (not in `activeTools`) and answered the call with a
+ * NoSuchToolError; the step records ToolNotAllowedError instead. Undefined for
+ * any other tool error, a genuinely unknown tool included.
+ */
+export function refusedCallError(
+    step: StepResult<ToolSet>,
+    part: { toolCallId: string; toolName: string },
+    tools: ToolSet,
+    activeTools: string[] | undefined,
+): ToolNotAllowedError | undefined {
+    if (!activeTools || !Object.hasOwn(tools, part.toolName) || activeTools.includes(part.toolName)) return undefined;
+    // an invalid (unparsable) call carries the parse error
+    const call = step.toolCalls.find((c) => c.toolCallId === part.toolCallId);
+    const error = call && 'error' in call ? call.error : undefined;
+    return NoSuchToolError.isInstance(error) ? new ToolNotAllowedError(part.toolName) : undefined;
 }
 
 export function toApprovalStatus(decision: 'user' | 'allow' | 'deny'): ToolApprovalStatus {
@@ -196,12 +239,45 @@ export function budgetExceeded(budget: Budget, kind: 'steps' | 'tokens'): Budget
 
 /**
  * A structured output that failed to parse or validate, as a core ValidationError;
- * the cause (JSON parse or schema error) names the offending text or field.
+ * the cause (JSON parse or schema error) names the offending text or field, cut
+ * to MAX_ERROR_CAUSE_LENGTH characters (the whole answer stays in the llm step).
  */
 export function toValidationError(error: unknown): ValidationError {
     const message = error instanceof Error ? error.message : String(error);
-    const cause = isObject(error) && error.cause instanceof Error ? error.cause.message : undefined;
+    let cause = isObject(error) && error.cause instanceof Error ? error.cause.message : undefined;
+    if (cause && cause.length > MAX_ERROR_CAUSE_LENGTH) cause = `${cause.slice(0, MAX_ERROR_CAUSE_LENGTH)}…`;
     return new ValidationError(cause ? `${message} ${cause}` : message);
+}
+
+/** Names of the step's tool calls that got neither a result nor an error. */
+export function unansweredToolNames(step: StepResult<ToolSet> | undefined): string[] {
+    if (!step) return [];
+    const answered = new Set<string>();
+    for (const part of step.content) {
+        if (part.type === 'tool-result' || part.type === 'tool-error') answered.add(part.toolCallId);
+    }
+    return step.toolCalls.filter((call) => !answered.has(call.toolCallId)).map((call) => call.toolName);
+}
+
+/**
+ * Why a structured output has no complete answer to parse, for a loop that
+ * ended on `finishReason`: the answer was cut off ('length'), or the loop ended
+ * on tool calls nothing executed ('tool-calls' without a budget stop, e.g. a
+ * tool without `execute`). Undefined when the answer can be parsed.
+ */
+export function incompleteOutput(finishReason: string | undefined, toolNames: string[] = []): IncompleteResponseError | undefined {
+    if (finishReason === 'length') {
+        return new IncompleteResponseError(
+            'The model answer was cut off at its output token limit (finish reason length), so there is no complete output to parse.',
+        );
+    }
+    if (finishReason === 'tool-calls') {
+        const names = toolNames.length > 0 ? toolNames.map((name) => `"${name}"`).join(', ') : 'a tool';
+        return new IncompleteResponseError(
+            `The model ended on a call to ${names} that nothing executed (a tool without execute), so there is no final answer to parse.`,
+        );
+    }
+    return undefined;
 }
 
 /**
@@ -235,4 +311,17 @@ export function outputContext(checkpoint: Checkpoint, now: Date): {
         },
         finishReason: (checkpoint.finishReason ?? 'other') as FinishReason,
     };
+}
+
+/**
+ * `output` for the stream: parsePartialOutput hands back the accumulated text
+ * instead of parsing it, so the AI SDK does not re-parse the whole answer on
+ * every delta (nobody reads the partial output) and still publishes each delta
+ * (a returned undefined would hold the deltas back until the text ends).
+ * parseCompleteOutput and responseFormat are the agent's own.
+ */
+export function withoutPartialOutput(output: OutputInterface): OutputInterface {
+    const copy: OutputInterface = Object.create(output);
+    copy.parsePartialOutput = async ({ text }: { text: string }) => ({ partial: text });
+    return copy;
 }

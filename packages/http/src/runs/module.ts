@@ -11,7 +11,7 @@ import { defineCoreHandler } from 'routup';
 import type { App, IAppEvent } from 'routup';
 import { requireAgent } from '../agents/helpers.ts';
 import type { HttpContext } from '../app/types.ts';
-import { authenticate, authorize } from '../auth/helpers.ts';
+import { authenticate, authorize, toInvoker } from '../auth/helpers.ts';
 import { Permission } from '../auth/constants.ts';
 import { agentPermission } from '../auth/module.ts';
 import {
@@ -31,6 +31,7 @@ import {
     requireHttpTrigger,
     resolveResumeTarget,
     serializeRun,
+    serializeStep,
     toBody,
 } from './helpers.ts';
 import { streamRun } from './stream/module.ts';
@@ -54,7 +55,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
 
     app.post('/agents/:name/runs', defineCoreHandler(async (event) => {
         const name = param(event, 'name');
-        await authorize(event, ctx, agentPermission(name, 'run'));
+        const principal = await authorize(event, ctx, agentPermission(name, 'run'));
         const trigger = requireHttpTrigger(requireAgent(ctx.agents, name));
 
         const body = await validateBody(startContainer, await readJsonBody(event, ctx.bodyLimit));
@@ -69,6 +70,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
             ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
             ...(body.thread !== undefined ? { thread: body.thread } : {}),
             ...(body.attachments?.length ? { attachments: body.attachments } : {}),
+            invoker: toInvoker(principal),
         });
         event.response.status = 202;
         return result;
@@ -92,7 +94,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
 
     app.get('/runs/:id', defineCoreHandler(async (event) => {
         const run = await readableRun(event, ctx, param(event, 'id'));
-        return { ...serializeRun(run), steps: await ctx.store.listSteps(run.id) };
+        return { ...serializeRun(run), steps: (await ctx.store.listSteps(run.id)).map(serializeStep) };
     }));
 
     app.get('/runs/:id/stream', defineCoreHandler(async (event) => {
@@ -136,6 +138,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
         await ctx.engine.resume(body.token, {
             approved: body.approved,
             ...(body.reason !== undefined ? { reason: body.reason } : {}),
+            approver: toInvoker(principal),
         });
         event.response.status = 202;
         return { runId: run.id, status: 'queued' };

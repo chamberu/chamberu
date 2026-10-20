@@ -16,7 +16,7 @@ import type {
     ToolSet,
 } from 'ai';
 import { hydrateMessages } from '../../artifact/helpers.ts';
-import { ArtifactNotFoundError, FatalToolError } from '../../errors/index.ts';
+import { ArtifactNotFoundError, FatalToolError, IncompleteResponseError } from '../../errors/index.ts';
 import { RunStatus } from '../../run/constants.ts';
 import type { RunContext, Step, Usage } from '../../run/types.ts';
 import {
@@ -29,14 +29,18 @@ import {
     assembleTools,
     budgetExceeded,
     endsOnApprovalResponse,
+    incompleteOutput,
     initialMessage,
     lastAssistantText,
     outputContext,
     pendingApproval,
+    refusedCallError,
     toRunError,
     toToolApproval,
     toValidationError,
+    unansweredToolNames,
     untilAborted,
+    withoutPartialOutput,
     withoutToolCalls,
 } from './helpers.ts';
 import type { ApprovalRequest, ExecuteContext } from './types.ts';
@@ -81,6 +85,11 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                 await ctx.finish({ status: RunStatus.COMPLETED, output: text });
                 return;
             }
+            const incomplete = incompleteOutput(checkpoint.finishReason);
+            if (incomplete) {
+                await ctx.finish({ status: RunStatus.FAILED, error: toRunError(incomplete) });
+                return;
+            }
             try {
                 const parsed: unknown = await output.parseCompleteOutput({ text }, outputContext(checkpoint, clock.now()));
                 await ctx.finish({ status: RunStatus.COMPLETED, output: parsed });
@@ -103,13 +112,17 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     }
 
     const timeout = budget.timeoutMs === undefined ? undefined : timeoutSignal(clock, budget.timeoutMs);
-    const signal = timeout ? AbortSignal.any([ctx.signal, timeout.signal]) : ctx.signal;
+    // aborted on every exit, so a stream left unread (e.g. a throw while consuming it) is cancelled
+    const local = new AbortController();
+    const signal = AbortSignal.any([ctx.signal, local.signal, ...(timeout ? [timeout.signal] : [])]);
     const runContext: RunContext = {
         runId: run.id,
         agent: run.agent,
         trigger: run.trigger,
         signal,
     };
+
+    const { tools, activeTools } = assembleTools(ctx, runContext);
 
     const responseMessages: ModelMessage[] = [];
     // AI SDK swallows onStepEnd errors; a fatal one is kept here and stops the loop
@@ -123,6 +136,9 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     // errors of approved calls the AI SDK executes before the first model call, by toolCallId
     const preStepErrors = new Map<string, unknown>();
     let beforeFirstStep = true;
+    // set when the provider's finish part arrived for the current step; without
+    // it the AI SDK synthesizes a finish ('other') and never runs the step's tools
+    let modelCallEnded = false;
 
     /**
      * Runs a store write unless the execution was abandoned meanwhile or lost
@@ -152,6 +168,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     };
 
     const handleStepEnd = async (step: StepResult<ToolSet>) => {
+        const complete = modelCallEnded;
+        modelCallEnded = false;
         try {
             const finishedAt = clock.now();
             const tokens = stepTokens(step);
@@ -186,7 +204,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                         kind: 'tool',
                         name: part.toolName,
                         input: part.input,
-                        error: toRunError(part.error),
+                        error: toRunError(refusedCallError(step, part, tools, activeTools) ?? part.error),
                         startedAt: stepStartedAt,
                         finishedAt,
                     });
@@ -223,6 +241,10 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                 await ctx.update({ usage: { ...usage }, updatedAt: clock.now() });
             }, { checkOwner: false });
             stepStartedAt = clock.now();
+            // an error part ends the step with 'error' and fails the run with that error
+            if (!complete && step.finishReason === 'other') {
+                fatal ??= { error: new IncompleteResponseError('The model stream ended without a finish part.') };
+            }
         } catch (error) {
             fatal ??= { error };
         }
@@ -284,13 +306,17 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const loop = new ToolLoopAgent({
         model: agent.definition.model,
         instructions: agent.definition.instructions,
-        tools: assembleTools(ctx, runContext),
+        tools,
+        activeTools,
         toolApproval: toToolApproval(agent.definition.approvals, runContext),
         experimental_toolApprovalSecret: ctx.toolApprovalSecret,
         stopWhen,
         prepareStep,
+        onLanguageModelCallEnd: () => {
+            modelCallEnded = true;
+        },
         onStepEnd,
-        output: agent.definition.output,
+        output: agent.definition.output ? withoutPartialOutput(agent.definition.output) : undefined,
     });
 
     // stream steps seen so far; a step's deltas belong to the checkpoint index it is saved under
@@ -341,6 +367,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         work.catch(() => {});
         result = await untilAborted(work, signal);
     } catch (error) {
+        // stop the model work right away; the cause is read from ctx.signal, timeout and fatal
+        local.abort();
         // the step-end writes in flight land completely before the run settles, never after
         let settled: Promise<void>;
         do {
@@ -365,6 +393,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         }
         return;
     } finally {
+        local.abort();
         timeout?.clear();
     }
 
@@ -397,11 +426,21 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         return;
     }
 
+    // a plain agent keeps the text it got (cut, or before a call nothing executed)
     if (!agent.definition.output) {
         await ctx.finish({
             status: RunStatus.COMPLETED,
             usage,
             output: result.text,
+        });
+        return;
+    }
+    const incomplete = incompleteOutput(result.finishReason, unansweredToolNames(result.steps.at(-1)));
+    if (incomplete) {
+        await ctx.finish({
+            status: RunStatus.FAILED,
+            usage,
+            error: toRunError(incomplete),
         });
         return;
     }

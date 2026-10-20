@@ -96,7 +96,7 @@ export async function createAgentServer(model: LanguageModel) {
 }
 ```
 
-Every route answers JSON. Errors are always `{ status, code, message, issues? }` (for unmatched routes too); a 5xx body says `Internal Server Error` and the cause goes to `onError`. Every 401 carries `WWW-Authenticate: Bearer`.
+Every route answers JSON. Errors are always `{ status, code, message, issues? }` (for unmatched routes too); a 5xx body says `Internal Server Error` and the cause goes to `onError`. An issue keeps its `received` value only when that is at most 256 characters as JSON, so a 400 never echoes a large body (an oversized `attachments` list, a long `thread` or media type) back. Every 401 carries `WWW-Authenticate: Bearer`.
 
 ## Endpoints
 
@@ -131,6 +131,8 @@ Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413
 
 `GET /runs/:id` answers 404 before 403, so any authenticated principal can tell whether a run id exists; run ids are random UUIDs. Runs on the wire never carry the internal `claim` (owner and lease).
 
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`: `id`, `kind`, `permissions`, and a `name` from the `name` or `preferred_username` claim, never `email`, since every reader of the run sees it; static tokens have none), so tool code and a core `toolPolicy` can tell who started the run. `POST /resume` and MCP `resume_run` record the approver on the `wait` step (`output.approver`). Both come only from the authenticator, never from a body. Webhook runs have no invoker. The invoker and approver leave the package (REST, SSE, MCP) without their `permissions`, so a `run:read` holder never learns another principal's grants.
+
 The SSE stream follows the run through `engine.on` and polls the store every `stream.pollMs` (default 2 s), so it also sees a run executing on another replica. `delta` events (`data: { step, kind: 'text' | 'reasoning', text }`) forward the engine's `run.delta` while the model writes (`step` is the checkpoint step index of the `llm` step being generated (one per model call), not the `step.appended` `id`, which also counts `tool` and `wait` rows); they have no `id` (`Last-Event-ID` stays a step index), are never replayed and come only from the replica executing the run. `Last-Event-ID` resumes after a step index; the query `?after=<step index>` does the same for clients that cannot set the header (a non-negative integer, given once, else 400). When both are present a valid `Last-Event-ID` wins, since it carries the client's progress on a reconnect while the URL stays the one of the first connect; a malformed `Last-Event-ID` reads as absent and `?after` applies.
 
 The stream takes bearer tokens only. Browser `EventSource` cannot send an `Authorization` header, so a browser reads the stream with a fetch-based SSE reader (`fetch` plus an SSE parser over the response body) that sends `Authorization` and, when it reconnects, `Last-Event-ID` with the last `id` it saw (or `?after=`).
@@ -148,13 +150,13 @@ Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`
 | `state:read`, `state:write` | Read and write agent state |
 | `*` | Everything |
 
-A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:run` but not `agent:triage:approve`, and `agent:*` grants neither. Matching is case-sensitive. `hasPermission(principal, permission)` and `agentPermission(agent, action)` are exported.
+A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:run` but not `agent:triage:approve`, and `agent:*` grants neither. Matching is case-sensitive. `agentPermission(agent, action)` is exported; to check a principal yourself, use `hasPermission(principal.permissions, permission)` from `@chamberu/core`, the matcher the routes use.
 
 `POST /resume` needs authentication **and** the approve permission: the resume token alone is not enough. The token's signature and expiry are checked before any store lookup (a forged or expired token answers 400 without touching the store).
 
 ## Authenticators
 
-`auth` takes one authenticator or a chain; the first principal wins. An authenticator resolves `undefined` for a request it does not recognize (the chain continues) and throws a 401 for credentials it rejects.
+`auth` takes one authenticator or a chain; the first principal wins. An authenticator resolves `undefined` for a request it does not recognize (the chain continues) and throws a 401 for credentials it rejects. A resolved principal needs a non-empty `id` and `kind` and a `permissions` array of strings; anything else is a server misconfiguration (500, reported to `onError`) and ends the chain.
 
 ```ts
 const ciToken = process.env.CI_TOKEN;
@@ -188,7 +190,7 @@ auth: [
 | `resume_run` | `{ token, approved, reason? }` | `{ runId, status: 'queued' }` |
 
 - `run_<agent>` is listed for each agent with an `http()` trigger the principal may run; its `payload` carries the trigger schema's JSON Schema (local `$ref`s re-rooted under `payload`). Tool definitions are built once in `createHttpApp`, which throws `InvalidAgentDefinitionError` for a payload schema the MCP validator cannot compile or a tool name above the 64 characters MCP allows (an agent name above 60; set `mcp: false` to keep it). `waitSeconds` (default 0) waits for `completed`, `failed`, `cancelled` or `waiting`, at most `mcp.maxWaitSeconds` (default 60; larger values are clamped). A wait holds one of the app's `stream.maxOpen` slots; with all taken the call answers at once with `{ runId, status, deduplicated }`, like `waitSeconds: 0`, and the run proceeds. The wait polls the store every second, so it sees a run executing on another replica, and stops when the client goes away. A `waiting` answer names the tool and input, never the resume token.
-- Idempotency keys are scoped per agent and source: an MCP start dedupes under `<agent>:mcp`, a REST start under `<agent>:http`, so one key used over both creates two runs.
+- Idempotency keys are scoped per agent, source and principal: an MCP start dedupes under `<agent>:mcp:<kind>:<id>`, a REST start under `<agent>:http:<kind>:<id>` (the principal's `kind` and `id`, URI-encoded), so one key used over both transports, or by two principals, creates two runs. Webhook starts carry no invoker and dedupe under `<agent>:webhook`.
 - `get_run` and `list_runs` follow the REST read rule; denied permissions and unknown runs come back as tool errors (`isError`).
 
 ## Operations
@@ -266,11 +268,11 @@ process.once('SIGTERM', () => {
 | `createHttpApp` | function | Builds the routup App |
 | `createShutdown` | function | The graceful shutdown helper |
 | `staticTokens`, `authup`, `oidc` | function | Authenticators |
-| `hasPermission`, `agentPermission` | function | Permission matching |
+| `agentPermission` | function | `agent:<agent>:<action>` (matching is core's `hasPermission`) |
 | `Permission` | constant | `ALL`, `RUN_READ`, `RUN_CANCEL`, `STATE_READ`, `STATE_WRITE` |
 | `DEFAULT_SHUTDOWN_DRAIN_TIMEOUT_MS`, `DEFAULT_SHUTDOWN_CLOSE_TIMEOUT_MS` | constant | `30_000`, `5_000` |
 
-Types: `HttpAppOptions`, `McpOptions`, `CorsOptions`, `RateLimitOptions`, `PrometheusOptions`, `TrustProxyInput`, `Principal`, `Authenticator`, `PermissionName`, `AgentAction`, `StaticTokensOptions`, `AuthupOptions`, `OidcOptions`, `IShutdown`, `ShutdownOptions`, `RunView`, `RunListQuery`, `RunSummary`, `RunToolResult`, `AgentSummary`, `ScheduleSummary`.
+Types: `HttpAppOptions`, `McpOptions`, `CorsOptions`, `RateLimitOptions`, `PrometheusOptions`, `TrustProxyInput`, `Principal`, `Authenticator`, `PermissionName`, `AgentAction`, `StaticTokensOptions`, `AuthupOptions`, `OidcOptions`, `IShutdown`, `ShutdownOptions`, `RunView`, `InvokerView`, `RunListQuery`, `RunSummary`, `RunToolResult`, `AgentSummary`, `ScheduleSummary`.
 
 ## License
 
