@@ -7,6 +7,7 @@
         "packages/core": {"component": "core"},
         "packages/github": {"component": "github"},
         "packages/http": {"component": "http"},
+        "packages/sandbox": {"component": "sandbox"},
         "packages/scheduler": {"component": "scheduler"},
         "packages/store-typeorm": {"component": "store-typeorm"},
         "packages/test-kit": {"component": "test-kit"}

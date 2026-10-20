@@ -1,0 +1,34 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import type { SandboxLimits } from './types.ts';
+
+export const DEFAULT_LIMITS: Readonly<Required<SandboxLimits>> = Object.freeze({
+    cpu: '1',
+    memory: '2Gi',
+    storage: '4Gi',
+    pids: 512,
+    timeoutMs: 1_800_000,
+});
+
+export const DEFAULT_SANDBOX_IMAGE = 'ghcr.io/chamberu/sandbox-node:24';
+
+/** Size of the `/tmp` tmpfs of a container or pod workspace. */
+export const TMP_SIZE = '512Mi';
+
+/** Labels every container or pod workspace carries. */
+export const SANDBOX_LABELS: Readonly<Record<string, string>> = Object.freeze({
+    'app.kubernetes.io/managed-by': 'chamberu',
+    'app.kubernetes.io/component': 'sandbox',
+});
+
+export const RUN_LABEL = 'chamberu.dev/run';
+
+export const WORKSPACE_LABEL = 'chamberu.dev/workspace';
+
+/** Expiry in epoch milliseconds: a Docker label, a Kubernetes annotation. */
+export const EXPIRES_AT_KEY = 'chamberu.dev/expires-at';

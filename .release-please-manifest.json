@@ -4,5 +4,6 @@
     "packages/scheduler": "0.1.0",
     "packages/store-typeorm": "0.1.0",
     "packages/http": "0.1.0",
-    "packages/github": "0.1.0"
+    "packages/github": "0.1.0",
+    "packages/sandbox": "0.1.0"
 }
