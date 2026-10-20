@@ -36,7 +36,7 @@
 npm install @chamberu/sandbox-docker @chamberu/sandbox @chamberu/core ai --save
 ```
 
-ESM only, Node.js `>=22`. `@chamberu/core` and `@chamberu/sandbox` are peer dependencies. The Docker API is reached through [dockerode](https://www.npmjs.com/package/dockerode) 5 (with `@types/dockerode`, since the options take a `Dockerode` client); it pulls in `docker-modem`, `tar-fs`, `@balena/dockerignore` and the gRPC packages `@grpc/grpc-js`, `@grpc/proto-loader` and `protobufjs` as its own dependencies.
+ESM only, Node.js `>=22`. `@chamberu/core` and `@chamberu/sandbox` are peer dependencies. The Docker API is reached through [dockerode](https://www.npmjs.com/package/dockerode) 5 (with `@types/dockerode`, since the options take a `Dockerode` client); it pulls in `docker-modem`, `tar-fs`, `@balena/dockerignore` and the gRPC packages `@grpc/grpc-js`, `@grpc/proto-loader` and `protobufjs` as its own dependencies. [smob](https://www.npmjs.com/package/smob) is the only other runtime dependency.
 
 ## Usage
 
