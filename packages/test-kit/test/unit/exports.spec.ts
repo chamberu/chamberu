@@ -11,7 +11,9 @@ import * as kit from '@chamberu/test-kit';
 describe('public api', () => {
     it.each([
         'ControllableClock',
+        'createGitFixture',
         'describeStoreContract',
+        'describeWorkspaceContract',
     ])('exports %s', (name) => {
         expect(kit).toHaveProperty(name);
         expect(kit[name as keyof typeof kit]).toBeTypeOf('function');

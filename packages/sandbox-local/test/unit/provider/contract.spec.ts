@@ -1,0 +1,25 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll } from 'vitest';
+import { createLocalSandbox } from '@chamberu/sandbox-local';
+import { describeWorkspaceContract } from '@chamberu/test-kit';
+
+let root: string;
+
+beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), 'chamberu-local-contract-'));
+});
+
+afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+});
+
+describeWorkspaceContract('local', () => createLocalSandbox({ root }).create({ runId: 'r1' }));

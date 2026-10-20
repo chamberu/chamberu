@@ -8,6 +8,7 @@
         "packages/github": {"component": "github"},
         "packages/http": {"component": "http"},
         "packages/sandbox": {"component": "sandbox"},
+        "packages/sandbox-local": {"component": "sandbox-local"},
         "packages/scheduler": {"component": "scheduler"},
         "packages/store-typeorm": {"component": "store-typeorm"},
         "packages/test-kit": {"component": "test-kit"}
