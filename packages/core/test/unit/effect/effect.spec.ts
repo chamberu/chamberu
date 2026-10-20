@@ -91,6 +91,29 @@ describe('effect tools', () => {
         expect(seen.every((c) => c === ctx)).toBe(true);
     });
 
+    it('hands the call options to effectKey', async () => {
+        const seen: unknown[] = [];
+        const post = defineEffectTool({
+            inputSchema: schema,
+            effectKey: (_input, c, options) => {
+                seen.push(options.toolCallId, options.messages.length);
+                return `${c.run.runId}:k`;
+            },
+            execute: async () => 'ok',
+        });
+        const tools = wrapToolsForRun({ post }, ctx, new MemoryStore());
+        await (tools.post?.execute as (i: unknown, o: unknown) => Promise<unknown>)(
+            { body: 'x' },
+            {
+                ...callOpts,
+                toolCallId: 'call-1',
+                messages: [{ role: 'user', content: 'x' }],
+                context: ctx,
+            },
+        );
+        expect(seen).toEqual(['call-1', 1]);
+    });
+
     it('keeps contextSchema and forwards options.context through the wrapper', async () => {
         const plain = defineTool({ inputSchema: schema, execute: async (_i, { context }) => context });
         const wrapped = wrapToolsForRun({ plain }, ctx, new MemoryStore(), () => true);

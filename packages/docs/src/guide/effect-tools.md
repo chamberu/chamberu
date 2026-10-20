@@ -20,6 +20,8 @@ The default key is `<ctx.run.runId>:<toolName>:<sha256 of the canonical JSON inp
 
 With the default key, the same call with the same input in the same run is applied once. Pass `effectKey(input, ctx)` when "the same effect" means something else, for example one comment per run and issue whatever the body says. `effectKey` and `alreadyApplied(key, input, ctx)` get the same `ToolContext` as `execute` (`ctx.run.runId`, `ctx.run.trigger`, `ctx.state`, `ctx.artifacts`).
 
+The third argument of `effectKey(input, ctx, options)` is the AI SDK's call options (`options.toolCallId`, `options.messages`). Key by model step when a redone step may produce different input: after a crash the model regenerates the step, so a comment body differs, but the number of assistant messages in `options.messages` stays the same. A key such as `${ctx.run.runId}:comment:${issue}:${step}` (with `step` counted from `options.messages`) finds the earlier marker even though the text changed.
+
 ## The crash window
 
 The result is recorded after `execute` returns. A crash between the side effect and the store write leaves no record, so the retry would apply the effect again. `alreadyApplied` closes that window: it checks the remote system before acting.

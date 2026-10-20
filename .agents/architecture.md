@@ -92,7 +92,7 @@ Rules every implementation must keep: a TTL created at T with `ttlMs` is expired
 
 1. Trigger dedupe at intake via `IIdempotencyStore`.
 2. Completed steps are never repeated: execution resumes from the latest checkpoint.
-3. Side-effecting tools use `defineEffectTool()`. Per call the wrapper (`wrapToolsForRun`) returns the recorded result for the effect key, else asks `alreadyApplied(effectKey, input, ctx)`, else executes and records the result; both hooks get the `ToolContext` (`ctx.run`, `ctx.state`, `ctx.artifacts`). The default key is `${ctx.run.runId}:${toolName}:${sha256(canonical JSON of input)}`. A throwing execute records nothing; a crash between the effect and the record repeats it unless `alreadyApplied` finds it (`effectMarker(key)` is the hidden marker to embed). Parallel identical calls in one step share one application.
+3. Side-effecting tools use `defineEffectTool()`. Per call the wrapper (`wrapToolsForRun`) returns the recorded result for the effect key, else asks `alreadyApplied(effectKey, input, ctx)`, else executes and records the result; both hooks get the `ToolContext` (`ctx.run`, `ctx.state`, `ctx.artifacts`), and a custom `effectKey(input, ctx, options)` also gets the AI SDK call options (`toolCallId`, `messages`, e.g. to key by model step). The default key is `${ctx.run.runId}:${toolName}:${sha256(canonical JSON of input)}`. A throwing execute records nothing; a crash between the effect and the record repeats it unless `alreadyApplied` finds it (`effectMarker(key)` is the hidden marker to embed). Parallel identical calls in one step share one application.
 
 ## Agent State
 

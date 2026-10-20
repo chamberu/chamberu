@@ -5,13 +5,13 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Tool } from 'ai';
+import type { Tool, ToolExecutionOptions } from 'ai';
 import type { StateSchema } from '../state/types.ts';
 import type { ToolContext } from '../tool/types.ts';
 import type { EFFECT, EFFECT_HOOKS } from './constants.ts';
 
 export type EffectHooks = {
-    effectKey?: (input: any, ctx: ToolContext) => string;
+    effectKey?: (input: any, ctx: ToolContext, options: ToolExecutionOptions<any>) => string;
     alreadyApplied?: (effectKey: string, input: any, ctx: ToolContext) => Promise<any>;
 };
 

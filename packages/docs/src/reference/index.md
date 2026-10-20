@@ -161,7 +161,7 @@ See [Tools and their context](/guide/agents#tools-and-their-context).
 function defineEffectTool<I, O, S extends StateSchema = StateSchema>(def: Tool<I, O, ToolContext<S>> & {
     execute: ToolExecuteFunction<I, O, ToolContext<S>>;
     contextSchema?: never;
-    effectKey?: (input: I, ctx: ToolContext<S>) => string;
+    effectKey?: (input: I, ctx: ToolContext<S>, options: ToolExecutionOptions<ToolContext<S>>) => string;
     alreadyApplied?: (effectKey: string, input: I, ctx: ToolContext<S>) => Promise<O | undefined>;
 }): EffectTool<I, O, S>;
 
