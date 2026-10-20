@@ -28,9 +28,10 @@ export type TriggerDefinition<P = unknown> = {
 export type Invoker = {
     id: string;
     /**
-     * The authenticator's label: `@chamberu/http`'s built-ins produce 'token'
-     * (staticTokens), 'authup' and 'oidc'; a custom authenticator or a direct
-     * dispatch may use its own (e.g. 'user').
+     * The authenticator's label: `@chamberu/http`'s staticTokens() sets
+     * 'token' and authup() sets 'authup'; oidc() keeps the kind its
+     * `principal` mapper returns (the docs use 'oidc'); a custom authenticator
+     * or a direct dispatch may use its own (e.g. 'user').
      */
     kind: string;
     name?: string;
