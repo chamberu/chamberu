@@ -6,6 +6,7 @@
  */
 
 import {
+    mkdir,
     mkdtemp,
     readFile,
     readdir,
@@ -22,7 +23,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import { InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
+import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamberu/core';
 import { createLocalSandbox } from '@chamberu/sandbox-local';
 import { ControllableClock, createGitFixture } from '@chamberu/test-kit';
 import { KILL_GRACE_MS, LINGER_CHECK_MS } from '../../../src/provider/constants.ts';
@@ -228,6 +229,40 @@ describe('local sandbox', () => {
             await workspace.dispose();
         }
     }, 40_000);
+
+    it('refuses symbolic links that lead out of the workspace', async () => {
+        const outside = join(tmp, 'outside');
+        await mkdir(outside);
+        await writeFile(join(outside, 'secret.txt'), 's3cret');
+        const workspace = await createLocalSandbox({ root }).create({ runId: 'r1' });
+        try {
+            await workspace.writeFile('real.txt', 'inside');
+            const linked = await workspace.exec(['sh', '-c', [
+                'ln -s "$1/secret.txt" leak',
+                'ln -s "$1" outdir',
+                'ln -s "$1/missing.txt" dangling',
+                'ln -s real.txt inner',
+            ].join(' && '), 'sh', outside]);
+            expect(linked.exitCode).toBe(0);
+
+            await expect(workspace.readFile('leak')).rejects.toBeInstanceOf(ValidationError);
+            await expect(workspace.readFile('outdir/secret.txt')).rejects.toBeInstanceOf(ValidationError);
+            await expect(workspace.writeFile('leak', 'x')).rejects.toBeInstanceOf(ValidationError);
+            await expect(workspace.writeFile('outdir/new.txt', 'x')).rejects.toBeInstanceOf(ValidationError);
+            await expect(workspace.writeFile('outdir/a/b/new.txt', 'x')).rejects.toBeInstanceOf(ValidationError);
+            await expect(workspace.writeFile('dangling', 'x')).rejects.toBeInstanceOf(ValidationError);
+            await expect(workspace.exec(['pwd'], { cwd: 'outdir' })).rejects.toBeInstanceOf(ValidationError);
+            expect(await readdir(outside)).toEqual(['secret.txt']);
+            expect(await readFile(join(outside, 'secret.txt'), 'utf8')).toBe('s3cret');
+
+            // a link that stays inside works
+            expect(await workspace.readFile('inner')).toBe('inside');
+            await workspace.writeFile('inner', 'changed');
+            expect(await workspace.readFile('real.txt')).toBe('changed');
+        } finally {
+            await workspace.dispose();
+        }
+    });
 
     it('clears the kill timer when the child exits', async () => {
         const clock = new ControllableClock();

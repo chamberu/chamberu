@@ -51,7 +51,7 @@ Each workspace is a folder `<root>/<id>/` (`root` defaults to `<os tmpdir>/chamb
 
 ## What it does and does not do
 
-**No isolation.** A command runs as the host user with the host's filesystem, network and processes in reach. `/workspace` paths in tool input are confined to the folder, but `bash` can `cd /` and read your SSH keys. Use it on your machine with models and repositories you trust, and in tests.
+**No isolation.** A command runs as the host user with the host's filesystem, network and processes in reach. `/workspace` paths in tool input are confined to the folder, symbolic links included (a path whose real path leaves the folder, say through a link the repository brings, is a `ValidationError`; checked before each call, so a command running at the same time can still swap a link in), but `bash` can `cd /` and read your SSH keys. Use it on your machine with models and repositories you trust, and in tests.
 
 What it does enforce:
 

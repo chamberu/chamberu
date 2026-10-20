@@ -9,13 +9,20 @@ import { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import {
+    lstat,
     mkdir,
     open,
+    realpath,
     rm,
     stat,
     writeFile,
 } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import {
+    basename,
+    dirname,
+    join,
+    sep,
+} from 'node:path';
 import type { IClock } from '@chamberu/core';
 import { SandboxError, ValidationError } from '@chamberu/core';
 import {
@@ -110,7 +117,7 @@ export class LocalWorkspace implements IWorkspace {
             throw new SandboxError('exec aborted');
         }
 
-        const directory = join(this.root, cwd);
+        const directory = await this.realPath(cwd);
         const stats = await stat(directory).catch(() => undefined);
         if (!stats?.isDirectory()) {
             await this.assertRoot();
@@ -129,7 +136,7 @@ export class LocalWorkspace implements IWorkspace {
         this.assertUsable();
         const relative = resolveWorkspacePath(path);
         const shown = displayPath(relative);
-        const file = join(this.root, relative);
+        const file = await this.realPath(relative);
 
         let size: number;
         try {
@@ -187,9 +194,9 @@ export class LocalWorkspace implements IWorkspace {
             throw new ValidationError(`content has ${size} bytes, more than the ${FILE_MAX_BYTES} a file may have.`);
         }
 
-        const file = join(this.root, relative);
         // mkdir would bring a removed workspace directory back
         await this.assertRoot();
+        const file = await this.realPath(relative);
         try {
             await mkdir(dirname(file), { recursive: true });
             await writeFile(file, content, 'utf8');
@@ -235,6 +242,48 @@ export class LocalWorkspace implements IWorkspace {
         if (this.clock.now().getTime() >= this.info.expiresAt.getTime()) {
             throw new SandboxError('workspace expired');
         }
+    }
+
+    /**
+     * The real path of the workspace path `relative`, symbolic links
+     * resolved (for a missing path: its deepest existing ancestor's, plus
+     * the rest); ValidationError when it leads out of the workspace root or
+     * through a link whose target is missing. Checked before every call; a
+     * command running at the same time can still swap a link in (local has
+     * no isolation).
+     */
+    protected async realPath(relative: string): Promise<string> {
+        const shown = displayPath(relative);
+        let root: string;
+        try {
+            root = await realpath(this.root);
+        } catch (error) {
+            await this.assertRoot();
+            throw new SandboxError(`cannot resolve ${shown} (${errnoCode(error) ?? 'unknown error'}).`, { cause: error });
+        }
+
+        let current = join(this.root, relative);
+        const rest: string[] = [];
+        let real: string | undefined;
+        while (real === undefined) {
+            try {
+                real = await realpath(current);
+            } catch (error) {
+                const code = errnoCode(error);
+                if ((code !== 'ENOENT' && code !== 'ENOTDIR') || current === this.root) {
+                    throw new SandboxError(`cannot resolve ${shown} (${code ?? 'unknown error'}).`, { cause: error });
+                }
+                if (await lstat(current).then((stats) => stats.isSymbolicLink(), () => false)) {
+                    throw new ValidationError(`${shown} goes through a symbolic link whose target is missing.`);
+                }
+                rest.unshift(basename(current));
+                current = dirname(current);
+            }
+        }
+        if (real !== root && !real.startsWith(`${root}${sep}`)) {
+            throw new ValidationError(`${shown} leads out of the workspace through a symbolic link.`);
+        }
+        return join(real, ...rest);
     }
 
     /** Marks the workspace gone and throws when its directory no longer exists. */
