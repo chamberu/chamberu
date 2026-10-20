@@ -10,7 +10,7 @@ import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import {
     mkdir,
-    readFile,
+    open,
     rm,
     stat,
     writeFile,
@@ -123,11 +123,28 @@ export class LocalWorkspace implements IWorkspace {
             throw new SandboxError(`${shown} has ${size} bytes, more than the ${FILE_MAX_BYTES} a file may have.`);
         }
 
+        // read at most one byte past the limit: the file may grow after the stat
+        const buffer = Buffer.alloc(FILE_MAX_BYTES + 1);
+        let length = 0;
         try {
-            return await readFile(file, 'utf8');
+            const handle = await open(file, 'r');
+            try {
+                while (length < buffer.length) {
+                    const { bytesRead } = await handle.read(buffer, length, buffer.length - length, length);
+                    if (bytesRead === 0) break;
+                    length += bytesRead;
+                }
+            } finally {
+                await handle.close();
+            }
         } catch (error) {
             throw new SandboxError(`cannot read ${shown} (${errnoCode(error) ?? 'unknown error'}).`, { cause: error });
         }
+        if (length > FILE_MAX_BYTES) {
+            throw new SandboxError(`${shown} has more than the ${FILE_MAX_BYTES} bytes a file may have.`);
+        }
+
+        return buffer.toString('utf8', 0, length);
     }
 
     async writeFile(path: string, content: string): Promise<void> {
