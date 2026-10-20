@@ -318,6 +318,47 @@ describe('workspace manager: run lifecycle', () => {
         expect((errors[0] as Error).message).toMatch(/a workspace of run r1 still being created/);
     });
 
+    it('close() reports a create in flight after another create of the same run finished', async () => {
+        const clock = new ControllableClock(new Date(1_000_000));
+        const provider = createFakeProvider({ clock });
+        const errors: unknown[] = [];
+        const manager = createWorkspaceManager({
+            provider,
+            clock,
+            gcIntervalMs: 0,
+            onError: (error) => { errors.push(error); },
+        });
+        const engine = fakeEngine();
+        manager.attach(engine);
+
+        // two creates of one run, each behind its own gate
+        const first = Promise.withResolvers<void>();
+        provider.gate = first.promise;
+        void manager.acquire('r1', {}).catch(() => undefined);
+        await flush();
+        provider.gate = new Promise<void>(() => {});
+        void manager.acquire('r1', { repo: 'octo/demo' }).catch(() => undefined);
+        await flush();
+        expect(provider.created).toHaveLength(2);
+        engine.emit({ id: 'r1', status: RunStatus.COMPLETED });
+
+        let closed = false;
+        const closing = manager.close({ timeoutMs: 1000 }).then(() => { closed = true; });
+        await flush();
+        // the first create opens; the second is still running
+        first.resolve();
+        await flush();
+        await flush();
+        expect(provider.disposed).toHaveLength(1);
+        expect(closed).toBe(false);
+
+        clock.advance(1000);
+        await closing;
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toBeInstanceOf(SandboxError);
+        expect((errors[0] as Error).message).toMatch(/still disposing: a workspace of run r1 still being created$/);
+    });
+
     it('subscribes nothing when attached after close()', async () => {
         const { manager } = await run({ script: [text('done')] });
         await manager.close();

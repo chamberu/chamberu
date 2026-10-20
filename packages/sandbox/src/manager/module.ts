@@ -324,28 +324,32 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
             closed = true;
             for (const unsubscribe of [...subscriptions]) unsubscribe();
 
-            // what is still being disposed or created, for the timeout report
-            const left = new Set<string>();
+            // what is still being disposed or created, for the timeout report:
+            // one key per item, as several items of a run share a label
+            const left = new Map<object, string>();
+            const track = (labels: string[], promise: Promise<unknown>): Promise<unknown> => {
+                const keys = labels.map((label) => {
+                    const key = {};
+                    left.set(key, label);
+                    return key;
+                });
+                return promise.finally(() => {
+                    for (const key of keys) left.delete(key);
+                });
+            };
             // disposals started before (a settled run, an expired or gone
             // workspace): their runs are no longer held, but their containers
             // must not outlive the close
-            const started = disposals.entries().toArray().map(([disposal, id]) => {
-                left.add(id);
-                return disposal.catch(() => undefined).finally(() => left.delete(id));
-            });
+            const started = disposals.entries().toArray()
+                .map(([disposal, id]) => track([id], disposal.catch(() => undefined)));
             // creates in flight of runs released before (attach): their
             // abort cleanup or the dispose of what they got anyway
-            const creating = releasedCreates.entries().toArray().map(([pending, label]) => {
-                left.add(label);
-                return pending.finally(() => left.delete(label));
-            });
+            const creating = releasedCreates.entries().toArray()
+                .map(([pending, label]) => track([label], pending));
             const work = runs.entries().toArray().map(([runId, entries]) => {
                 const labels = entries.values().toArray()
                     .map((entry) => entry.workspace?.id ?? `a workspace of run ${runId} still being created`);
-                for (const label of labels) left.add(label);
-                return release(runId).catch(onError).finally(() => {
-                    for (const label of labels) left.delete(label);
-                });
+                return track(labels, release(runId).catch(onError));
             });
 
             let timer: { clear(): void } | undefined;
@@ -357,7 +361,7 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
             ]);
             timer?.clear();
             if (timedOut && left.size > 0) {
-                onError(new SandboxError(`workspace manager close() gave up after ${timeoutMs} ms; still disposing: ${[...left].join(', ')}`));
+                onError(new SandboxError(`workspace manager close() gave up after ${timeoutMs} ms; still disposing: ${left.values().toArray().join(', ')}`));
             }
         },
     };
