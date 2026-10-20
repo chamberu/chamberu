@@ -200,6 +200,17 @@ describe('webhook route', () => {
         expect((await store.listRuns({})).total).toBe(0);
     });
 
+    it('dispatches an event name with digits (projects_v2_item)', async () => {
+        const { app } = createGithubTestApp({ agents: [agent('board', { events: ['projects_v2_item.created'] })] });
+        const response = await deliver(app, {
+            event: 'projects_v2_item',
+            delivery: 'd-1',
+            body: JSON.stringify({ action: 'created', sender: { login: 'octocat', type: 'User' } }),
+        });
+        expect(response.status).toBe(202);
+        expect((await response.json() as Answer).runs.map((r) => r.agent)).toEqual(['board']);
+    });
+
     it('ignores events the App sent itself', async () => {
         const { app, fake } = createGithubTestApp({ agents: [agent('chat', { events: ['issue_comment'] })] });
         const first = await deliver(app, {

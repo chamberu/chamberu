@@ -124,7 +124,7 @@ export async function createTriageServer(
 | Check | Answer |
 |---|---|
 | `X-Hub-Signature-256` missing | `401` |
-| `X-GitHub-Event` not `^[a-z_]+$`, `X-GitHub-Delivery` not 1 to 255 characters | `400` |
+| `X-GitHub-Event` not `^[a-z0-9_]+$`, `X-GitHub-Delivery` not 1 to 255 characters | `400` |
 | Body above the app's `bodyLimit` | `413` |
 | Non-JSON content type (e.g. `application/x-www-form-urlencoded`) | `415` |
 | `sha256=` HMAC of the raw body bytes under none of the webhook secrets | `401` |

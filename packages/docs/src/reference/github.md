@@ -27,7 +27,7 @@ Throws `InvalidAgentDefinitionError` for an empty `appId`, a key that is no RSA 
 function githubWebhook(options: GithubWebhookTriggerOptions): TriggerDefinition<GithubEvent>;
 ```
 
-Throws `InvalidAgentDefinitionError` without events or for an event that is not `name` or `name.action` (lower case and underscores).
+Throws `InvalidAgentDefinitionError` without events or for an event that is not `name` or `name.action` (lower case letters, digits and underscores, e.g. `projects_v2_item.created`).
 
 <<< ../../../github/src/trigger/types.ts{ts}
 

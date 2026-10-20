@@ -6,4 +6,4 @@
  */
 
 /** `name` or `name.action`, as GitHub spells event names and actions. */
-export const GITHUB_EVENT_PATTERN = /^[a-z_]+(?:\.[a-z_]+)?$/;
+export const GITHUB_EVENT_PATTERN = /^[a-z0-9_]+(?:\.[a-z0-9_]+)?$/;

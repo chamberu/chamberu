@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-/** `X-GitHub-Event`: GitHub's event names are lower case with underscores. */
-export const EVENT_HEADER_PATTERN = /^[a-z_]+$/;
+/** `X-GitHub-Event`: GitHub's event names are lower case, digits (`projects_v2_item`) and underscores. */
+export const EVENT_HEADER_PATTERN = /^[a-z0-9_]+$/;
 
 /** Longest delivery id and derived key; the store's key columns are varchar(255). */
 export const KEY_MAX_LENGTH = 255;

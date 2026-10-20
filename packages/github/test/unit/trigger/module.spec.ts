@@ -48,6 +48,11 @@ describe('githubWebhook', () => {
         expect(trigger.options.events).toEqual(['issues']);
     });
 
+    it('accepts event names with digits (Projects v2)', () => {
+        const trigger = githubWebhook({ events: ['projects_v2_item.created', 'projects_v2'] });
+        expect(trigger.options.events).toEqual(['projects_v2_item.created', 'projects_v2']);
+    });
+
     it.each([
         [[]],
         [['Issues']],
