@@ -11,6 +11,6 @@ import * as notify from '@chamvi/notify-github';
 describe('package entry', () => {
     it('resolves', () => {
         expect(notify).toBeDefined();
-        expect(notify.COMMENT_BODY_MAX_LENGTH).toBeTypeOf('number');
+        expect(notify.githubNotifier).toBeTypeOf('function');
     });
 });

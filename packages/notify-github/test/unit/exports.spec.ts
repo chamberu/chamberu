@@ -9,6 +9,10 @@ import { describe, expect, it } from 'vitest';
 import * as pkg from '@chamvi/notify-github';
 
 describe('public api', () => {
+    it('exports githubNotifier', () => {
+        expect(pkg.githubNotifier).toBeTypeOf('function');
+    });
+
     it('exports the constants', () => {
         expect(pkg.GITHUB_NOTIFIER_TIMEOUT_MS).toBe(30_000);
         expect(pkg.COMMENT_BODY_MAX_LENGTH).toBe(60_000);
