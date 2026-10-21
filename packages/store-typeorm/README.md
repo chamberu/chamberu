@@ -148,7 +148,7 @@ Types: `TypeormStoreOptions`, `PurgeResult`.
 - **NUL characters and lone surrogates become U+FFFD** in opaque values (keys and strings alike), because `jsonb` cannot hold them. A literal backslash sequence such as the text `\u0000` is kept.
 - **`null` in an optional property reads back as absent:** a run `output` of `null` and a step `input`, `output` or `error` of `null` are stored as SQL `NULL`. `putEffect(key, undefined)` reads back `{ result: null }` and `docUpsert(..., undefined)` reads back `doc: null`. `kvSet(agent, key, undefined)` deletes the key.
 - **`docList` `where` uses `jsonb` containment (`@>`).** For primitive values that is top-level equality; a nested object or array matches by containment (`MemoryStore` never matches those). A key whose value is `undefined` matches documents that lack the key. Documents are returned ordered by `id` (`MemoryStore`: insertion order).
-- **`listRuns` and `listArtifacts` break `createdAt` ties by byte order of `id`** (`COLLATE "C"`, so `'B' < 'a'`); `MemoryStore` compares with `localeCompare`. Both agree for lowercase ids and UUIDs.
+- **`listRuns` and `listArtifacts` break `createdAt` ties by byte order of `id`** (`COLLATE "C"`, so `'B' < 'a'`, in both directions of `listRuns`' `order`); `MemoryStore` compares with `localeCompare`. Both agree for lowercase ids and UUIDs.
 - **The schema may still change before 1.0.** New versions ship new migrations; run `migrateStore()` on every boot.
 
 ## License

@@ -178,6 +178,7 @@ export class TypeormStore implements IStore {
         concurrencyKey?: string;
         limit?: number;
         offset?: number;
+        order?: 'asc' | 'desc';
     }): Promise<{ data: Run[]; total: number }> {
         const where: FindOptionsWhere<RunEntity> = {};
         if (q.agent !== undefined) {
@@ -195,9 +196,10 @@ export class TypeormStore implements IStore {
             return { data: [], total: await this.runs.countBy(where) };
         }
 
+        const direction = q.order === 'desc' ? 'DESC' : 'ASC';
         const [entities, total] = await this.runs.findAndCount({
             where,
-            order: { createdAt: 'ASC', id: 'ASC' },
+            order: { createdAt: direction, id: direction },
             skip: q.offset,
             take: q.limit,
         });

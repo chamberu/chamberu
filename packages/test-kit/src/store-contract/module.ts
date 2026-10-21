@@ -347,6 +347,22 @@ export function describeStoreContract(
             expect((await store.listRuns({})).data.map((r) => r.id)).toEqual(['a', 'b', 'c']);
         });
 
+        it('listRuns order desc returns newest first, ties by id descending, and pages from the newest', async () => {
+            const { store } = await setup();
+            await store.createRun(makeRun('b'));
+            await store.createRun(makeRun('a'));
+            await store.createRun(makeRun('c', { createdAt: new Date(2_000) }));
+            expect((await store.listRuns({ order: 'desc' })).data.map((r) => r.id)).toEqual(['c', 'b', 'a']);
+            expect((await store.listRuns({ order: 'asc' })).data.map((r) => r.id)).toEqual(['a', 'b', 'c']);
+            const page = await store.listRuns({
+                order: 'desc',
+                limit: 1,
+                offset: 1,
+            });
+            expect(page.data.map((r) => r.id)).toEqual(['b']);
+            expect(page.total).toBe(3);
+        });
+
         it('createRun inserts only when the id is absent, also under concurrency', async () => {
             const { store } = await setup();
             const results = await Promise.all(

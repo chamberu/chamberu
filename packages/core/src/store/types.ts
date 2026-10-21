@@ -35,9 +35,10 @@ export interface IRunStore {
      */
     updateRun(id: string, patch: Partial<Run>, opts?: { expectStatus?: RunStatusLiteral[]; expectOwner?: string }): Promise<Run>;
     /**
-     * Ordered by createdAt ascending, ties broken by id ascending. `total`
-     * ignores limit/offset. Without `limit`, every matching run (from `offset`)
-     * is returned: there is no default page size.
+     * Ordered by createdAt, ties broken by id, both ascending (`order` `asc`,
+     * the default) or both descending (`desc`). `total` ignores limit/offset.
+     * Without `limit`, every matching run (from `offset`) is returned: there is
+     * no default page size.
      */
     listRuns(q: {
         agent?: string;
@@ -45,6 +46,7 @@ export interface IRunStore {
         concurrencyKey?: string;
         limit?: number;
         offset?: number;
+        order?: 'asc' | 'desc';
     }): Promise<{ data: Run[]; total: number }>;
     /** Atomic: only succeeds when unleased or the lease expired. */
     claimRun(id: string, owner: string, ttlMs: number): Promise<boolean>;

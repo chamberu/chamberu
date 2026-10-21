@@ -94,12 +94,14 @@ export class MemoryStore implements IStore {
         concurrencyKey?: string;
         limit?: number;
         offset?: number;
+        order?: 'asc' | 'desc';
     }): Promise<{ data: Run[]; total: number }> {
+        const direction = q.order === 'desc' ? -1 : 1;
         const matched = this.runs.values().toArray()
             .filter((r) => (q.agent === undefined || r.agent === q.agent) &&
                 (q.status === undefined || q.status.includes(r.status)) &&
                 (q.concurrencyKey === undefined || r.concurrencyKey === q.concurrencyKey))
-            .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id, 'en'));
+            .sort((a, b) => direction * (a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id, 'en')));
         const offset = q.offset ?? 0;
         const end = q.limit === undefined ? undefined : offset + q.limit;
         return { data: matched.slice(offset, end).map((r) => copy(r)), total: matched.length };

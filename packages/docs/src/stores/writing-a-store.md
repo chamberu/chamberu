@@ -22,7 +22,7 @@ The suite covers:
 - `claimRun` and `renewClaim` on a missing run resolve `false`,
 - checkpoints: the highest `stepIndex` wins, an equal index replaces,
 - locks: exclusive, released by their owner only, taken over after expiry,
-- `listRuns` filters (`agent`, `status`, `concurrencyKey`), `total`, and the `createdAt`/`id` order,
+- `listRuns` filters (`agent`, `status`, `concurrencyKey`), `total`, and the `createdAt`/`id` order in both directions (`order: 'asc' | 'desc'`),
 - effect and state round trips, including `where` filters,
 - artifacts: insert-if-absent, metadata and bytes round trips, copies, the `createdAt`/`id` order, unknown ids,
 - no aliasing of values passed in or returned.
