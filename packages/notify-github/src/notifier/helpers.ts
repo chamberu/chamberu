@@ -181,7 +181,11 @@ export function renderComment(
     n: Notification,
     input: {
         mentions: readonly string[]; 
-        approvalUrl?: (ref: { runId: string; approvalId: string; agent: string }) => string; 
+        approvalUrl?: (ref: {
+            runId: string; 
+            approvalId: string; 
+            agent: string 
+        }) => string; 
         marker: string 
     },
 ): string {

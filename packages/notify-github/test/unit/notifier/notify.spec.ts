@@ -94,7 +94,11 @@ describe('githubNotifier notify', () => {
             }));
             return forward!(request);
         };
-        const { notifier, posts, fake } = setup(patch, { fetch: record });
+        const {
+            notifier, 
+            posts, 
+            fake, 
+        } = setup(patch, { fetch: record });
         forward = fake.fetch;
         await notifier.notify(approval, { idempotencyKey: 'r1:a1', trigger: githubTrigger() });
         expect(posts()).toHaveLength(1);

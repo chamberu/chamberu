@@ -32,7 +32,11 @@ export type GithubNotifierOptions = {
      * `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`, where the
      * signed-in owner answers it; it carries no token.
      */
-    approvalUrl?: (ref: { runId: string; approvalId: string; agent: string }) => string;
+    approvalUrl?: (ref: {
+        runId: string; 
+        approvalId: string; 
+        agent: string 
+    }) => string;
     /** Default `GITHUB_NOTIFIER_TIMEOUT_MS` (30 s). */
     timeoutMs?: number;
     clock?: IClock;
@@ -51,7 +55,11 @@ export type ResolvedGithubNotifierOptions = {
     name: string;
     mentions: string[];
     target?: CommentTarget;
-    approvalUrl?: (ref: { runId: string; approvalId: string; agent: string }) => string;
+    approvalUrl?: (ref: {
+        runId: string; 
+        approvalId: string; 
+        agent: string 
+    }) => string;
     timeoutMs: number;
     clock: IClock;
 };

@@ -69,7 +69,8 @@ describe('renderComment', () => {
     });
 
     it('renders the hint instead of a link for an approval without an approvalId', () => {
-        const { approvalId: _approvalId, ...withoutId } = approval;
+        const withoutId: Notification = { ...approval };
+        delete withoutId.approvalId;
         const urls: unknown[] = [];
         const comment = renderComment(withoutId, {
             mentions: [],

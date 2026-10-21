@@ -223,7 +223,8 @@ describe('openclaw notify', () => {
                 return approvalUrl(ref);
             },
         });
-        const { approvalId: _approvalId, ...withoutId } = approval;
+        const withoutId: Notification = { ...approval };
+        delete withoutId.approvalId;
         await notifier.notify(withoutId, opts);
         expect(refs).toEqual([]);
         const message = messageOf(fake.requests[0]!.body);

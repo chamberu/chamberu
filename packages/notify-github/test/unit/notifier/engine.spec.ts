@@ -110,7 +110,12 @@ describe('githubNotifier with the engine', () => {
         const waiting = (await ctx.engine.getRun(runId))!.waiting!;
         const body = String(ctx.comments()[0]!.body);
         expect(body).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${waiting.approvalId}&agent=triage`);
-        const token = createResumeToken('resume-secret', waiting);
+        const token = createResumeToken('resume-secret', {
+            runId,
+            approvalId: waiting.approvalId,
+            tokenId: waiting.tokenId,
+            expiresAt: waiting.expiresAt,
+        });
         const posted = JSON.stringify(ctx.fake.requests.filter((r) => r.method === 'POST' && r.path.endsWith('/comments')));
         expect(posted).not.toContain(token);
         expect(posted).not.toContain(token.split('.')[1]);

@@ -159,7 +159,12 @@ describe('openclaw with the engine', () => {
         const waiting = (await ctx.engine.getRun(runId))!.waiting!;
         const [request] = ctx.fake.requests;
         expect((request!.body as { message: string }).message).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${waiting.approvalId}&agent=deployer`);
-        const token = createResumeToken('resume-secret', waiting);
+        const token = createResumeToken('resume-secret', {
+            runId,
+            approvalId: waiting.approvalId,
+            tokenId: waiting.tokenId,
+            expiresAt: waiting.expiresAt,
+        });
         const sent = JSON.stringify({
             url: request!.url,
             headers: request!.headers,
