@@ -12,6 +12,11 @@ A notifier delivers messages from the engine to the owner: today approval reques
 | `resumeToken` | The signed token for [`engine.resume()`](/guide/approvals) (approvals only) |
 | `expiresAt` | When the approval times out (approvals only) |
 
+| `NotifyOptions` field | Description |
+|---|---|
+| `idempotencyKey` | Stable per logical notification (`<runId>:<approvalId>` for approvals) |
+| `trigger` | The run's trigger envelope as stored (source, payload, receivedAt), e.g. to find the run's issue. Read it, never write it |
+
 ## Registering notifiers
 
 Register notifiers by name on the engine and reference one from an agent with `notify`:
@@ -19,6 +24,18 @@ Register notifiers by name on the engine and reference one from an agent with `n
 <<< @/snippets/engine.ts#many
 
 The engine rejects an agent whose `notify` names no registered notifier.
+
+## Built-in
+
+`consoleNotifier()` from `@chamvi/core` logs each notification and an approval's resume token, for development:
+
+```ts
+import { Engine, consoleNotifier } from '@chamvi/core';
+
+const engine = new Engine({ store, agents, resumeSecret, notifiers: { owner: consoleNotifier() } });
+```
+
+It takes `name` (default `console`) and `write(line)` (default `console.log`) and never throws.
 
 ## Writing a notifier
 

@@ -214,7 +214,8 @@ const engine = new Engine({
 await engine.resume(token, { approved: true });
 ```
 
-- A call that needs approval puts the run in `waiting` and frees its slot. The notifier receives the request once, with a resume token signed with `resumeSecret`; a failed send is retried on every poll until it is delivered.
+- A call that needs approval puts the run in `waiting` and frees its slot. The notifier receives the request once, with a resume token signed with `resumeSecret` and the run's trigger envelope (`NotifyOptions.trigger`); a failed send is retried on every poll until it is delivered.
+- For development, `notifiers: { owner: consoleNotifier() }` logs every notification and its resume token; `@chamvi/notify-openclaw` and `@chamvi/notify-github` deliver to an OpenClaw chat or the run's issue.
 - A policy can also be a function that returns `'user'`, `'allow'` or `'deny'` per call.
 - A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
 - An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied, and the model sees the denial.
@@ -342,6 +343,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `createAgentState`, `createStateTools` | function | State API over a store, and `createStateTools(schema)`, the generated state tools (they read `context.state`) |
 | `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
 | `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
+| `consoleNotifier` | function | `consoleNotifier({ name?, write? })`: a development `INotifier` that logs each notification (default name `console`, default `write` `console.log`) |
 | `isArtifactMediaType` | function | The media type rule for attachments and artifacts (`type/subtype`, no parameters) |
 | `ChamviError` | class | Base class of every error below |
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
@@ -351,7 +353,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `ToolContext`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `NotifyOptions`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
+Types: `Agent`, `AgentDefinition`, `ToolContext`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `NotifyOptions`, `ConsoleNotifierOptions`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
 
 Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamvi/test-kit`](../test-kit).
 

@@ -39,3 +39,10 @@ export interface INotifier {
      */
     notify(n: Notification, opts: NotifyOptions): Promise<void>;
 }
+
+export type ConsoleNotifierOptions = {
+    /** Default `'console'`. */
+    name?: string;
+    /** Receives each line; default `console.log`. */
+    write?: (line: string) => void;
+};
