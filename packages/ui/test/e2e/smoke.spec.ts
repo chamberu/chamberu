@@ -57,6 +57,8 @@ test('dispatch, live run, approve, completed', async ({ page, request }) => {
     await signIn(page);
     // a full page load would drop this marker: every later step is a client-side navigation
     await page.evaluate(() => { (window as unknown as { marker: boolean }).marker = true; });
+    await page.getByRole('link', { name: 'Runs' }).first().click();
+    await expect(page).toHaveURL(/\/ui\/runs$/);
 
     const runId = await dispatch(request);
     const row = page.getByTestId('runs').locator('tr', { hasText: runId.slice(0, 8) });
@@ -85,6 +87,72 @@ test('dispatch, live run, approve, completed', async ({ page, request }) => {
 
     expect((await readRun(request, runId)).status).toBe('completed');
     expect(errors.filter((e) => /Content Security Policy/i.test(e))).toEqual([]);
+    expect(errors).toEqual([]);
+});
+
+test('open an agent and start a run from its page', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto('');
+    await signIn(page);
+
+    // signing in lands on the agents overview
+    await expect(page).toHaveURL(/\/ui\/agents$/);
+    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible();
+    const card = page.locator('[data-testid="agent-card"][data-agent="deploy"]');
+    await expect(card).toContainText('http');
+    await expect(page.locator('[data-testid="agent-card"][data-agent="digest"]')).toContainText('0 8 * * 1-5');
+    await card.click();
+
+    await expect(page).toHaveURL(/\/ui\/agents\/deploy$/);
+    await expect(page.getByRole('heading', { name: 'deploy', level: 1 })).toBeVisible();
+    await page.getByRole('button', { name: 'Start run' }).first().click();
+    const form = page.getByTestId('start-run');
+    await form.locator('textarea[name="payload"]').fill('{ "env": "staging" }');
+    await form.getByRole('button', { name: 'Start run' }).click();
+    await expect(form).toBeHidden();
+
+    // the new run shows on the overview, newest first, and opens its page
+    const recent = page.getByTestId('recent-runs').locator('a').first();
+    await expect(recent).toBeVisible();
+    await recent.click();
+    await expect(page).toHaveURL(/\/ui\/runs\/[0-9a-f-]+$/);
+    await page.getByTestId('timeline').getByText('Envelope (first user message)').click();
+    await expect(page.getByTestId('timeline')).toContainText('"staging"');
+    await expect(page.getByTestId('status').first()).toHaveText('waiting', { timeout: 15_000 });
+
+    // the agent name leads back to the agent page
+    await page.getByTestId('run-agent').getByRole('link', { name: 'deploy' }).click();
+    await expect(page).toHaveURL(/\/ui\/agents\/deploy$/);
+    await page.getByRole('tab', { name: /Runs/ }).click();
+    await expect(page.getByTestId('runs').locator('tbody tr').first()).toBeVisible();
+
+    await page.goto('agents/digest');
+    await expect(page.getByRole('heading', { name: 'digest', level: 1 })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start run' })).toHaveCount(0);
+    await page.getByRole('tab', { name: /State/ }).click();
+    await expect(page.getByTestId('kv')).toContainText('last_digest_at');
+    expect(errors).toEqual([]);
+});
+
+test('fonts are self-hosted, dark mode applies and phones get no sideways scroll', async ({ page }) => {
+    const errors = watchErrors(page);
+    const fonts: string[] = [];
+    page.on('request', (r) => { if (r.resourceType() === 'font') fonts.push(r.url()); });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('');
+    await signIn(page);
+    for (const path of ['agents', 'agents/deploy', 'runs', 'approvals', 'schedules']) {
+        await page.goto(path);
+        await page.evaluate(() => document.fonts.ready);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBeLessThanOrEqual(390);
+    }
+    expect(await page.evaluate(() => document.fonts.check('700 16px "Bricolage Grotesque"'))).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(true);
+    // the dark page ground of the Crimson tokens
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(15, 14, 16)');
+    expect(fonts.length).toBeGreaterThan(0);
+    expect(fonts.every((url) => url.startsWith(E2E_ORIGIN))).toBe(true);
     expect(errors).toEqual([]);
 });
 
