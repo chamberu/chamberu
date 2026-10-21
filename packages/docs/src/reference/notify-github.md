@@ -19,7 +19,7 @@ const COMMENT_BODY_MAX_LENGTH: 60_000;
 
 <<< ../../../notify-github/src/notifier/types.ts#public{ts}
 
-Throws `InvalidAgentDefinitionError` for a missing `app`, an empty `name`, a `mention` that is no GitHub login (without `@`), a `target.repo` that is not `owner/name` (`REPO_PATTERN` of `@chamvi/github`), a `target.number`, `target.installationId` or `timeoutMs` that is no positive integer and a `resumeUrl` that is no function.
+Throws `InvalidAgentDefinitionError` for a missing `app`, an empty `name`, a `mention` that is no GitHub login (without `@`), a `target.repo` that is not `owner/name` (`REPO_PATTERN` of `@chamvi/github`), a `target.number`, `target.installationId` or `timeoutMs` that is no positive integer and an `approvalUrl` that is no function.
 
 <<< @/snippets/notify-github.ts#notifier
 
@@ -46,13 +46,13 @@ Without an issue and without `target`, or without an installation, `notify()` th
 <body, cut to COMMENT_BODY_MAX_LENGTH characters>
 <fence>
 
-Waiting for approval until <expiresAt ISO>. Approve or deny: <resumeUrl(token)>
+Waiting for approval until <expiresAt ISO>. Approve or deny: <approvalUrl({ runId, approvalId, agent })>
 Run `<runId>` of agent `<agent>`.
 
 <!-- chamvi:effect=<idempotencyKey> -->
 ```
 
-The fence is one backtick longer than the longest backtick run in the body (at least three; runs over 31 backticks are broken with U+200B zero-width spaces, so such a body is not byte-identical to the tool input; without it a body of backticks would need a fence as long as itself and push the comment over GitHub's 65 536 limit), so mentions and issue references inside notify nobody and no input closes it. The title has every run of whitespace (line breaks included) collapsed to one space and is trimmed, so it stays one heading line. Without `resumeUrl` the approval line ends `Answer it in the chamvi UI, the REST API or the MCP tool resume_run.`; the bare resume token never appears. A key that is not `^[\w:.-]{1,255}$` or contains `--` goes into the marker as `sha256:<hex>`.
+The fence is one backtick longer than the longest backtick run in the body (at least three; runs over 31 backticks are broken with U+200B zero-width spaces, so such a body is not byte-identical to the tool input; without it a body of backticks would need a fence as long as itself and push the comment over GitHub's 65 536 limit), so mentions and issue references inside notify nobody and no input closes it. The title has every run of whitespace (line breaks included) collapsed to one space and is trimmed, so it stays one heading line. Without `approvalUrl` (or for a notification without an `approvalId`) the approval line ends `Answer it in the chamvi UI, the REST API or the MCP tool resume_run.`. `approvalUrl` gets the run id, the approval id and the agent, never the token: the resume token never appears in a comment or a request, and the owner answers in the UI, signed in, through `POST /runs/:id/approve`. A key that is not `^[\w:.-]{1,255}$` or contains `--` goes into the marker as `sha256:<hex>`.
 
 ### Dedupe and failures
 

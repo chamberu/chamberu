@@ -33,6 +33,8 @@ export function createTriage(model: LanguageModel) {
                 mention: 'octocat',
                 // for runs not started by an issue or pull request event
                 target: { repo: 'octo/ops', number: 1 },
+                // optional: a link to the approval in the UI, without the token
+                approvalUrl: ({ runId, approvalId }) => `https://chamvi.example/ui/approvals?run=${encodeURIComponent(runId)}&approval=${encodeURIComponent(approvalId)}`,
             }),
         },
         resumeSecret: process.env.RESUME_SECRET ?? '',

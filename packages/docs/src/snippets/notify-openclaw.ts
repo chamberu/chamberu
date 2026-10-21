@@ -11,9 +11,9 @@ export function createEngine(agents: Agent[]) {
         hooksToken: process.env.OPENCLAW_HOOKS_TOKEN ?? '',
         // placeholders: the channel and recipient of your OpenClaw setup
         deliver: { channel: '<channel>', to: '<recipient>' },
-        // optional: a link into the UI's approvals inbox; the message carries the
-        // token only inside it (resumeTool: true also adds a resume_run call)
-        resumeUrl: (token) => `https://chamvi.example/ui/approvals?token=${encodeURIComponent(token)}`,
+        // optional: a link to the approval in the UI, without the token
+        // (only resumeTool: true puts the token and a resume_run call into the message)
+        approvalUrl: ({ runId, approvalId }) => `https://chamvi.example/ui/approvals?run=${encodeURIComponent(runId)}&approval=${encodeURIComponent(approvalId)}`,
     });
 
     const engine = new Engine({

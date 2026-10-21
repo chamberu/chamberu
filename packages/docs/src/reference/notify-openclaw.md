@@ -21,7 +21,7 @@ const MESSAGE_BODY_MAX_LENGTH: 8_000;
 
 <<< ../../../notify-openclaw/src/notifier/types.ts#public{ts}
 
-Throws `InvalidAgentDefinitionError` for an empty `name`, `hooksToken`, `agentId`, `deliver.to` or `deliver.accountId`, a `deliver.channel` that is empty or `last`, a `baseUrl` that is no absolute `http:`/`https:` URL or carries credentials, a query or a hash, a `hooksToken` that `fetch` could not send as a header (a control character, a character above U+00FF, surrounding whitespace), a `hooksPath` that does not start with `/` or is `/` (trailing slashes are dropped, so `/hooks/` posts to `/hooks/agent`), a `resumeUrl` that is no function, a `resumeTool` that is no boolean and a `timeoutMs` that is no positive integer.
+Throws `InvalidAgentDefinitionError` for an empty `name`, `hooksToken`, `agentId`, `deliver.to` or `deliver.accountId`, a `deliver.channel` that is empty or `last`, a `baseUrl` that is no absolute `http:`/`https:` URL or carries credentials, a query or a hash, a `hooksToken` that `fetch` could not send as a header (a control character, a character above U+00FF, surrounding whitespace), a `hooksPath` that does not start with `/` or is `/` (trailing slashes are dropped, so `/hooks/` posts to `/hooks/agent`), an `approvalUrl` that is no function, a `resumeTool` that is no boolean and a `timeoutMs` that is no positive integer.
 
 <<< @/snippets/notify-openclaw.ts#notifier
 
@@ -48,12 +48,12 @@ Agent: <agent>
 Run: <runId>
 
 Expires: <expiresAt ISO>
-Approve or deny: <resumeUrl(token)>
+Approve or deny: <approvalUrl({ runId, approvalId, agent })>
 Or call the chamvi MCP tool resume_run with {"token":"<token>","approved":true} to approve, or "approved":false to deny.
 ```
 
-For an approval with `resumeTool: true` the first line reads `keep every link, id and token exactly as written.` instead. The last block is sent for approvals only; `Approve or deny` only with `resumeUrl`, the `resume_run` line only with `resumeTool: true`. With neither, the block ends with `Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.` instead. By default (`resumeTool: false`) the token is therefore in the request only inside the `resumeUrl` link (verbatim), and without `resumeUrl` nowhere (body or headers). An OpenClaw agent that reads the link and holds `agent:<agent>:approve` on the chamvi MCP server can still approve through `resume_run`; see [Deployment: OpenClaw](/deployment/openclaw#hooks-out). A cut body ends with `… (cut, <n> more characters)` and never splits a surrogate pair.
+For an approval with `resumeTool: true` the first line reads `keep every link, id and token exactly as written.` instead. The last block is sent for approvals only; `Approve or deny` only with `approvalUrl` (and a notification that carries an `approvalId`, as every engine approval does), the `resume_run` line only with `resumeTool: true`. With neither, the block ends with `Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.` instead. `approvalUrl` gets the run id, the approval id and the agent, never the token, so by default (`resumeTool: false`) the token is nowhere in the request (URL, headers or body); see [Deployment: OpenClaw](/deployment/openclaw#hooks-out). A cut body ends with `… (cut, <n> more characters)` and never splits a surrogate pair.
 
 ### Failures
 
-Any 2xx resolves. Every other status throws a `ChamviError` with `code` `openclaw_request` and the message `OpenClaw <status>: <response text>` (plus `(retry after <value>)` for a `Retry-After` header); a network failure throws `OpenClaw request failed: <message> (<cause message>)` (undici keeps the detail, such as `ECONNREFUSED` or `ENOTFOUND`, in `cause`), a send that takes longer than `timeoutMs` `OpenClaw did not answer within <ms>ms.` (the timer runs on the `clock` and aborts the `fetch`). The response text and the network failure message are cut to 500 characters after the hooks token and the resume token were replaced by `[redacted]`, so an endpoint that echoes the request never puts either into `onError`.
+Any 2xx resolves. Every other status throws a `ChamviError` with `code` `openclaw_request` and the message `OpenClaw <status>: <response text>` (plus `(retry after <value>)` for a `Retry-After` header); a network failure throws `OpenClaw request failed: <message> (<cause message>)` (undici keeps the detail, such as `ECONNREFUSED` or `ENOTFOUND`, in `cause`), a send that takes longer than `timeoutMs` `OpenClaw did not answer within <ms>ms.` (the timer runs on the `clock` and aborts the `fetch`). The response text and the network failure message are cut to 500 characters after the hooks token and the resume token (sent with `resumeTool` only) were replaced by `[redacted]`, so an endpoint that echoes the request never puts either into `onError`.
