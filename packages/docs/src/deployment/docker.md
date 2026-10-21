@@ -1,12 +1,18 @@
 # Docker Image <Badge type="warning" text="Planned" />
 
 ::: warning Planned
-Neither the base image nor the CLI build command exists yet. The [sandbox image](#sandbox-image) does.
+The CLI build command and the template repository do not exist yet. The [base image](#base-image) and the [sandbox image](#sandbox-image) do.
 :::
 
 ## Base image
 
-A base runtime image, planned as `ghcr.io/chamvi/node`: Node 24, slim or distroless, running as a non-root user. It is built for several architectures and referenced by digest from the template repository.
+Agent images build their runtime stage on `ghcr.io/chamvi/node`, built from [`images/node`](https://github.com/chamvi/chamvi/tree/master/images/node).
+
+- **Contents:** `node:24-trixie-slim` (Node.js 24, npm, corepack), ca-certificates, `tini` as the entrypoint (signals reach Node, orphaned processes are reaped), `NODE_ENV=production`, `WORKDIR /app` owned by root (the app reads its code, never writes it), `USER 1000:1000` (numeric, so Kubernetes `runAsNonRoot` can verify it); the default command is `node`. The shell stays for `kubectl exec`. No git and no compiler: build native addons in a `node:24-trixie-slim` build stage (same Debian 13 glibc).
+- **Platforms:** `linux/amd64` and `linux/arm64`.
+- **Tags:** `24`, rebuilt on every change under `images/` on `master`, weekly for base image security updates and on manual runs, and `24-<short sha>`, pushed once per such commit on `master` (the weekly and manual rebuilds move only `24`). Pull requests that touch the image build and smoke-test it without pushing.
+- **Pinning:** reference a digest in production (`FROM ghcr.io/chamvi/node:24@sha256:...`).
+- **Workspaces:** without git the image cannot host `@chamvi/sandbox-local` workspaces; in a cluster, run them with `@chamvi/sandbox-k8s` and the [sandbox image](#sandbox-image).
 
 ## Agent images
 
