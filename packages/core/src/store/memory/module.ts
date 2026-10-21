@@ -195,7 +195,25 @@ export class MemoryStore implements IStore {
     }
 
     async kvSet(agent: string, key: string, value: unknown): Promise<void> {
+        if (value === undefined) {
+            this.kv.delete(`${agent}\u0000${key}`);
+            return;
+        }
         this.kv.set(`${agent}\u0000${key}`, copy(value));
+    }
+
+    async kvList(agent: string, q: { limit?: number; offset?: number } = {}): Promise<Array<{ key: string; value: unknown }>> {
+        const prefix = `${agent}\u0000`;
+        const entries = this.kv.entries().toArray()
+            .filter(([id]) => id.startsWith(prefix))
+            .map(([id, value]) => ({ key: id.slice(prefix.length), value }))
+            .sort((a, b) => {
+                if (a.key < b.key) return -1;
+                return a.key > b.key ? 1 : 0;
+            });
+        const offset = q.offset ?? 0;
+        const end = q.limit === undefined ? undefined : offset + q.limit;
+        return entries.slice(offset, end).map((entry) => ({ key: entry.key, value: copy(entry.value) }));
     }
 
     async docList(

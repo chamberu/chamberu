@@ -82,7 +82,13 @@ export interface IEffectStore {
 
 export interface IStateStore {
     kvGet(agent: string, key: string): Promise<unknown>;
+    /** `undefined` removes the key. */
     kvSet(agent: string, key: string, value: unknown): Promise<void>;
+    /**
+     * One agent's entries ordered by key in code-point order (`COLLATE "C"`),
+     * values copied out; every entry (from `offset`) without `limit`.
+     */
+    kvList(agent: string, q?: { limit?: number; offset?: number }): Promise<Array<{ key: string; value: unknown }>>;
     /** `where` matches by top-level equality. */
     docList(
         agent: string,

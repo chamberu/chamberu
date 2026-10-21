@@ -37,7 +37,7 @@ On shutdown, drain the engine before destroying the data source:
 | `chamvi_idempotency_keys` | Intake keys | PK `(scope, key)`; `expires_at` |
 | `chamvi_locks` | Keyed leases | PK `key`; `expires_at` |
 | `chamvi_effects` | Recorded effect results | PK `key` |
-| `chamvi_kv` | Agent key-value state | PK `(agent, key)` |
+| `chamvi_kv` | Agent key-value state | PK `(agent, key)`, `key` `COLLATE "C"` (migration `1792540800000-kv-key-collation.ts`) |
 | `chamvi_docs` | Agent document collections | PK `(agent, collection, id)`; GIN index on `doc` |
 | `chamvi_artifacts` | Artifact metadata and bytes (`data` `bytea`) | PK `id`; `run_id` |
 

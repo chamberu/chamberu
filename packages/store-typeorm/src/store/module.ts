@@ -362,6 +362,21 @@ export class TypeormStore implements IStore {
         }), ['agent', 'key']);
     }
 
+    async kvList(agent: string, q: { limit?: number; offset?: number } = {}): Promise<Array<{ key: string; value: unknown }>> {
+        if (q.limit === 0) {
+            // take: 0 means no limit to TypeORM
+            return [];
+        }
+
+        const entities = await this.kv.find({
+            where: { agent },
+            order: { key: 'ASC' },
+            skip: q.offset,
+            take: q.limit,
+        });
+        return entities.map((entity) => ({ key: entity.key, value: entity.value }));
+    }
+
     async docList(
         agent: string,
         coll: string,

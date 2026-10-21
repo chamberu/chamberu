@@ -10,7 +10,7 @@ Everything the engine persists goes through one interface, `IStore`. It is a set
 | `IIdempotencyStore` | Intake keys | `claimKey(scope, key, runId, ttlMs)`: the first caller wins |
 | `ILockStore` | Keyed leases | `acquire(key, owner, ttlMs)`, `release(key, owner)` |
 | `IEffectStore` | Recorded effect results | `getEffect`, `putEffect` |
-| `IStateStore` | Per-agent state | `kvGet`/`kvSet`, `docList`/`docUpsert`/`docDelete` |
+| `IStateStore` | Per-agent state | `kvGet`/`kvSet` (`undefined` removes the key), `kvList` (key code-point order, `limit`/`offset`), `docList`/`docUpsert`/`docDelete` |
 | `IArtifactStore` | Files of a run (attachments, files tools stored) | `putArtifact(artifact, data)` (insert-if-absent), `getArtifact` (metadata), `readArtifact` (bytes), `listArtifacts(runId)` |
 
 `IStore` extends all eight.

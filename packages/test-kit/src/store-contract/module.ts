@@ -154,6 +154,39 @@ export function describeStoreContract(
             expect(await store.getEffect('e2')).toEqual({ result: null });
         });
 
+        it('kvList lists one agent\'s keys in code-point order with limit and offset', async () => {
+            const { store } = await setup();
+            await store.kvSet('triage', 'b', 2);
+            await store.kvSet('triage', 'a-1', { n: 1 });
+            await store.kvSet('triage', 'B', 'upper');
+            await store.kvSet('triage', 'a', [1]);
+            await store.kvSet('other', 'x', true);
+            await store.kvSet('triage', 'gone', 1);
+            await store.kvSet('triage', 'gone', undefined);
+
+            expect(await store.kvList('triage')).toEqual([
+                { key: 'B', value: 'upper' },
+                { key: 'a', value: [1] },
+                { key: 'a-1', value: { n: 1 } },
+                { key: 'b', value: 2 },
+            ]);
+            expect((await store.kvList('triage', { limit: 2, offset: 1 })).map((e) => e.key)).toEqual(['a', 'a-1']);
+            expect(await store.kvList('triage', { limit: 0 })).toEqual([]);
+            expect(await store.kvList('nobody')).toEqual([]);
+
+            const [, first] = await store.kvList('triage');
+            (first!.value as number[]).push(2);
+            expect((await store.kvList('triage'))[1]!.value).toEqual([1]);
+        });
+
+        it('kvSet with undefined removes the key', async () => {
+            const { store } = await setup();
+            await store.kvSet('a', 'k', 1);
+            await store.kvSet('a', 'k', undefined);
+            expect(await store.kvGet('a', 'k')).toBeUndefined();
+            expect(await store.kvList('a')).toEqual([]);
+        });
+
         it('state kv and docs roundtrip, docList where filters by top-level equality', async () => {
             const { store } = await setup();
             expect(await store.kvGet('a', 'k')).toBeUndefined();
