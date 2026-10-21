@@ -29,6 +29,18 @@
         "./sandbox": {
             "types": "./dist/sandbox.d.mts",
             "import": "./dist/sandbox.mjs"
+        },
+        "./openclaw": {
+            "types": "./dist/openclaw.d.mts",
+            "import": "./dist/openclaw.mjs"
+        },
+        "./ui": {
+            "types": "./dist/ui.d.mts",
+            "import": "./dist/ui.mjs"
+        },
+        "./authup": {
+            "types": "./dist/authup.d.mts",
+            "import": "./dist/authup.mjs"
         }
     },
     "files": [
