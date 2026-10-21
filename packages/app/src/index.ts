@@ -8,4 +8,5 @@
 export * from './config/index.ts';
 export * from './env/index.ts';
 export * from './logger/index.ts';
+export * from './models/index.ts';
 export * from './module/index.ts';

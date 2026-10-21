@@ -18,12 +18,12 @@ import type {
     IShutdown,
 } from '@chamvi/http';
 import type { IScheduler } from '@chamvi/scheduler';
-import type { createProviderRegistry } from 'ai';
 import type { serve } from 'routup/node';
 import type { DataSource } from 'typeorm';
 import type { AppConfig } from '../config/types.ts';
 import type { Env } from '../env/types.ts';
 import type { ILogger } from '../logger/types.ts';
+import type { ModelProviders } from '../models/types.ts';
 
 export type AppMode = 'start' | 'job' | 'migrate';
 
@@ -36,7 +36,7 @@ export type AppContext = {
     /** Logs through the app logger; during stop() also counts as a stop failure. */
     report(error: unknown, context?: Record<string, unknown>): void;
     /** createApp's `models`. */
-    models?: Parameters<typeof createProviderRegistry>[0];
+    models?: ModelProviders;
     agents: readonly Agent[];
 };
 
