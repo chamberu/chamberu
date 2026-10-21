@@ -27,6 +27,10 @@ chamvi/
 │   │   └── test/global-setup.ts     # dockerode ping() gate, builds images/sandbox-node as chamvi/sandbox-node:test
 │   ├── sandbox-k8s/                 # @chamvi/sandbox-k8s (same aliases; tests drive a fake IPodClient, test/utils/client.ts)
 │   ├── coding/                      # @chamvi/coding (aliases core, sandbox, sandbox-local, test-kit and itself)
+│   ├── ui/                          # @chamvi/ui (aliases core, http, test-kit and itself to src)
+│   │   ├── src/                     # Node entry (tsdown -> dist/index.mjs): uiRoutes()
+│   │   ├── app/                     # The SPA (Vite root -> dist/app), own tsconfig for vue-tsc
+│   │   └── test/{unit,e2e}/         # Vitest (routes, app modules), Playwright smoke spec + demo server
 │   ├── store-typeorm/               # @chamvi/store-typeorm (same layout)
 │   │   ├── src/{entities,migrations,schema,store}/
 │   │   └── test/global-setup.ts     # Starts postgres:18-alpine via testcontainers for the suite
@@ -68,10 +72,10 @@ chamvi/
 | `@chamvi/sandbox-docker` | Exists (0.1.0) | `createDockerSandbox()`: one hardened container per workspace; depends on `dockerode` + `@types/dockerode`, `smob`, peer on core and sandbox |
 | `@chamvi/sandbox-k8s` | Exists (0.1.0) | `createKubernetesSandbox()`, `createPodClient()`: one hardened pod per workspace; depends on `@kubernetes/client-node`, `smob`, peer on core and sandbox |
 | `@chamvi/coding` | Exists (0.1.0) | `codingTools()` (read_file, write_file, edit_file, grep, list_files, bash, git_diff), the `ICodingBackend` contract; depends on `smob`, peer on core, sandbox and `ai` |
+| `@chamvi/ui` | Exists (0.1.0) | `uiRoutes()`: serves the prebuilt Vue 3 + vuecs dashboard (runs, run detail, approvals, agent state, schedules) as one extra route of `createHttpApp({ routes })`; peer on core and http (types only), every SPA library a bundled devDependency |
 | `@chamvi/coding-claude-code` | Planned | Claude Code coding backend |
 | `@chamvi/github` | Exists (0.1.0) | `createGithubApp()` (App JWT, `IClock` installation-token cache, Octokit per installation), `githubWebhook()` trigger, the signed webhook route for `createHttpApp({ routes })`, read tools and effect write tools; depends on `@octokit/core` + `plugin-paginate-rest`, peer on core, http (types only) and `ai` |
 | `@chamvi/notify-openclaw`, `@chamvi/notify-github` | Planned | Notifiers |
-| `@chamvi/ui` | Planned | Vue 3 dashboard |
 | `chamvi` | Planned | Umbrella package and CLI |
 
 The memory store lives inside `@chamvi/core` (no separate `store-memory` package), because every test needs it.
