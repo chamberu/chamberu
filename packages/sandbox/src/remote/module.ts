@@ -17,7 +17,7 @@ import {
     OUTPUT_MAX_BYTES,
     WORKSPACE_ROOT,
 } from '../workspace/constants.ts';
-import { assertArgv } from '../workspace/module.ts';
+import { assertArgv, decodeUtf8File } from '../workspace/module.ts';
 import type { ExecOptions, ExecResult, IWorkspace } from '../workspace/types.ts';
 import {
     ALIVE_PROBE_TIMEOUT_MS,
@@ -305,7 +305,7 @@ export function createRemoteWorkspace(input: RemoteWorkspaceInput): IWorkspace {
             if (result.stdoutTruncated || result.stdout.length > FILE_MAX_BYTES) {
                 throw new SandboxError(`${file} is larger than the ${FILE_MAX_BYTES} bytes a file may have.`);
             }
-            return new TextDecoder().decode(result.stdout);
+            return decodeUtf8File(result.stdout, file);
         },
 
         async writeFile(path: string, content: string): Promise<void> {

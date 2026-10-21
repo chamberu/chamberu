@@ -149,6 +149,12 @@ export function describeWorkspaceContract(name: string, factory: WorkspaceContra
             expect(await workspace.readFile('/workspace/a/b/ü.txt')).toBe(content);
         }, TEST_TIMEOUT_MS);
 
+        it('refuses a file that is not UTF-8 text', async () => {
+            const created = await workspace.exec(['sh', '-c', "printf 'a\\377b' > latin1.txt"]);
+            expect(created.exitCode).toBe(0);
+            await expect(workspace.readFile('latin1.txt')).rejects.toBeInstanceOf(SandboxError);
+        }, TEST_TIMEOUT_MS);
+
         it('writes a file whole, also with a concurrent write, and keeps its mode', async () => {
             const long = 'a'.repeat(1_000_000);
             const short = 'b'.repeat(10);

@@ -6,5 +6,5 @@
  */
 
 export * from './constants.ts';
-export { assertArgv } from './module.ts';
+export { assertArgv, decodeUtf8File } from './module.ts';
 export type * from './types.ts';

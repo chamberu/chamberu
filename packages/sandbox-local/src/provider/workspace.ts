@@ -36,6 +36,7 @@ import {
     absoluteWorkspacePath,
     assertArgv,
     createOutputCollector,
+    decodeUtf8File,
     resolveWorkspacePath,
 } from '@chamberu/sandbox';
 import type {
@@ -180,7 +181,7 @@ export class LocalWorkspace implements IWorkspace {
             throw new SandboxError(`${shown} has more than the ${FILE_MAX_BYTES} bytes a file may have.`);
         }
 
-        return buffer.toString('utf8', 0, length);
+        return decodeUtf8File(buffer.subarray(0, length), shown);
     }
 
     async writeFile(path: string, content: string): Promise<void> {

@@ -23,6 +23,7 @@ describe('public api', () => {
         'createRemoteWorkspace',
         'absoluteWorkspacePath',
         'assertArgv',
+        'decodeUtf8File',
         'assertCreateInput',
         'abortedCreate',
         'assertImageOption',
