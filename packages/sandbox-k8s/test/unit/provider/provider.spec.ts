@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
+import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamberu/core';
 import { DEFAULT_SANDBOX_IMAGE } from '@chamberu/sandbox';
 import { POLL_MS, START_TIMEOUT_MS, createKubernetesSandbox } from '@chamberu/sandbox-k8s';
 import type { KubernetesSandboxOptions } from '@chamberu/sandbox-k8s';
@@ -97,6 +97,14 @@ describe('kubernetes sandbox', () => {
             expiresAt: new Date(START + 1_800_000),
         });
         expect(client.deleted).toEqual([]);
+    });
+
+    it('refuses a runId that is no valid label value before creating a pod', async () => {
+        const { client, provider } = setup();
+        for (const runId of ['a:b', 'a/b', '-a', 'a'.repeat(64)]) {
+            await expect(provider.create({ runId })).rejects.toBeInstanceOf(ValidationError);
+        }
+        expect(client.created).toHaveLength(0);
     });
 
     it('runs commands in the pod', async () => {

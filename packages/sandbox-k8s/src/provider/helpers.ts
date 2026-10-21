@@ -59,7 +59,7 @@ function isLabelKey(key: string): boolean {
 }
 
 /** True for a Kubernetes label value: empty or a label name. */
-function isLabelValue(value: unknown): boolean {
+export function isLabelValue(value: unknown): boolean {
     return typeof value === 'string' && (value === '' || LABEL_NAME.test(value));
 }
 

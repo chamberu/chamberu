@@ -6,7 +6,12 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { ChamberuError, SandboxError, systemClock } from '@chamberu/core';
+import {
+    ChamberuError,
+    SandboxError,
+    ValidationError,
+    systemClock,
+} from '@chamberu/core';
 import {
     DEFAULT_SANDBOX_IMAGE,
     SANDBOX_LABEL_SELECTORS,
@@ -33,6 +38,7 @@ import {
     buildPod,
     guard,
     isExpired,
+    isLabelValue,
     loadDefaultKubeConfig,
     podState,
 } from './helpers.ts';
@@ -86,6 +92,9 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
 
         async create(input) {
             assertCreateInput(input, { image: true });
+            if (!isLabelValue(input.runId)) {
+                throw new ValidationError('runId must be a Kubernetes label value (at most 63 alphanumerics, `-`, `_` or `.`, starting and ending alphanumeric).');
+            }
             if (input.signal?.aborted) {
                 throw abortedCreate();
             }

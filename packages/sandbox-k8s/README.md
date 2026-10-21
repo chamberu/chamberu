@@ -89,7 +89,7 @@ Each workspace is a bare pod `chamberu-ws-<id>` with one container `sandbox`:
 | `/workspace` | an emptyDir with `sizeLimit` from `storage` |
 | `/tmp` | a memory-backed emptyDir of 512 MiB |
 | Environment | `SANDBOX_ENV` plus `env`, nothing from chamberu's pod |
-| Labels | `podLabels`, then `app.kubernetes.io/managed-by=chamberu`, `app.kubernetes.io/component=sandbox`, `chamberu.dev/run=<runId>`, `chamberu.dev/workspace=<id>` (the managed labels win; `podLabels` naming one throws) |
+| Labels | `podLabels`, then `app.kubernetes.io/managed-by=chamberu`, `app.kubernetes.io/component=sandbox`, `chamberu.dev/run=<runId>`, `chamberu.dev/workspace=<id>` (the managed labels win; `podLabels` naming one throws; a `runId` that is no label value is a `ValidationError`, engine run ids are UUIDs) |
 | Annotation | `chamberu.dev/expires-at=<epoch ms>` |
 
 A pod is used rather than a Job: exec needs a pod name known at create time, and a Job's controller, retries and generated names add nothing the pod spec does not already enforce.
