@@ -8,9 +8,8 @@
 import { describe, expect, it } from 'vitest';
 import { createGithubApp } from '@chamvi/github';
 import type { GithubAppOptions } from '@chamvi/github';
-import { ControllableClock } from '@chamvi/test-kit';
+import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
 import { APP_REQUEST_TIMEOUT_MS } from '../../../src/auth/constants.ts';
-import { createFakeGithub } from '../../utils/github.ts';
 
 const START = new Date('2026-10-20T10:00:00Z');
 

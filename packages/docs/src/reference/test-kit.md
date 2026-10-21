@@ -1,6 +1,6 @@
 # @chamvi/test-kit
 
-Test helpers for chamvi: a controllable clock, the store contract suite and the workspace contract suite.
+Test helpers for chamvi: a controllable clock, the store and workspace contract suites, a git fixture and an in-process fake GitHub.
 
 ```bash
 npm install --save-dev @chamvi/test-kit @chamvi/core vitest
@@ -45,6 +45,27 @@ function createGitFixture(files: Record<string, string>): Promise<GitFixture>;
 <<< ../../../test-kit/src/git-fixture/types.ts{ts}
 
 A temporary repository with one commit of `files` on branch `main`, tagged `v1`, ignoring the machine's git config. Pass `url` to a workspace manager with `allowFileRepos: true`.
+
+## createFakeGithub
+
+```ts
+function createFakeGithub(options: FakeGithubOptions): FakeGithub;
+
+type FakeGithubOptions = { appId: string; slug?: string; clock: IClock };
+```
+
+An in-process GitHub for `createGithubApp({ fetch: fake.fetch, privateKey: fake.privateKey })` from [`@chamvi/github`](/reference/github). It generates an RSA key pair, verifies App JWTs (RS256, `iss`, at most 600 s) on `/app*` and installation tokens (valid one hour on `clock`) on every other route, and answers 404 for unknown routes. Issues, comments, labels, pull requests, contents and releases live in mutable maps (`issues`, `comments`, `labels`, `pulls`, `files`, `releases`, keyed `owner/repo#number` or `owner/repo`); the comment list honours `since` (by `updated_at`) and paginates with a `link` header.
+
+| Member | Purpose |
+|---|---|
+| `fetch` | The fake `fetch` to hand to `createGithubApp` |
+| `privateKey`, `publicKey` | The App's key pair (PKCS#1 PEM, `KeyObject`) |
+| `requests` | Every request (`method`, `path`, `query`, `body`, `authorization`), in order |
+| `jwtClaims`, `tokensIssued`, `tokenInstallations` | The accepted JWTs and the issued installation tokens |
+| `route(method, path, handler)` | Adds or overrides a route (`:name` one segment, `*name` the rest) |
+| `failNext(method, path, status)` | The next matching request answers `status`, once |
+
+A request whose `signal` aborts, also while a route handler is pending, rejects with the signal's reason, as Node's `fetch` does. It never touches the network.
 
 ## ControllableClock
 

@@ -28,7 +28,7 @@
 
 ---
 
-> chamvi is at an early stage. The engine, HTTP, scheduler, TypeORM store, GitHub, sandbox, coding and dashboard packages exist; the notifiers and the CLI are planned.
+> chamvi is at an early stage. The engine, HTTP, scheduler, TypeORM store, GitHub, sandbox, coding, notifier and dashboard packages exist; the CLI is planned.
 
 ## Why chamvi?
 

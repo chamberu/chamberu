@@ -215,9 +215,15 @@ See [Agent State](/guide/state).
 
 ## Notifiers
 
-`INotifier` and `Notification`:
+`INotifier`, `Notification`, `NotifyOptions` and `ConsoleNotifierOptions`:
 
 <<< ../../../core/src/notify/types.ts{ts}
+
+```ts
+function consoleNotifier(options?: ConsoleNotifierOptions): INotifier;
+```
+
+A development notifier: writes `[chamvi] <kind>: <title> (agent <agent>, run <runId>, key <idempotencyKey>)`, the body and, for an approval, `resume token: <token> (expires <ISO>)`, one `write` call per line. It never throws; an empty `name` throws `InvalidAgentDefinitionError`.
 
 See [Notifiers](/guide/notifiers).
 

@@ -5,7 +5,7 @@
 <h1 align="center">@chamvi/test-kit</h1>
 
 <p align="center">
-    <b>Test helpers for chamvi: a controllable clock, the store contract suite and the workspace contract suite.</b>
+    <b>Test helpers for chamvi: a controllable clock, the store and workspace contract suites, a git fixture and an in-process fake GitHub.</b>
 </p>
 
 <p align="center">
@@ -66,6 +66,31 @@ describeWorkspaceContract('local', () => provider.create({ runId: 'contract' }))
 
 `createGitFixture(files)` creates a temporary git repository with one commit of `files` on branch `main`, tagged `v1`, and returns `{ path, url, commit, cleanup }`; `url` is a `file://` URL for a manager with `allowFileRepos: true`.
 
+### Fake GitHub
+
+`createFakeGithub({ appId, slug?, clock })` is an in-process GitHub for `createGithubApp({ fetch })` from `@chamvi/github`: it generates an RSA key pair, checks App JWTs and installation tokens on `clock`, serves issues, comments, labels, pull requests, contents and releases from mutable maps, and never touches the network:
+
+```ts
+import { createGithubApp } from '@chamvi/github';
+import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
+
+const clock = new ControllableClock(new Date('2026-10-21T09:00:00Z'));
+const fake = createFakeGithub({ appId: '123', slug: 'my-app', clock });
+const gh = createGithubApp({
+    appId: '123',
+    privateKey: fake.privateKey,
+    webhookSecret: 'webhook-secret',
+    slug: 'my-app',
+    clock,
+    fetch: fake.fetch,
+});
+
+fake.issues.set('octo/demo#7', { number: 7, title: 'Bug', state: 'open' });
+fake.failNext('POST', '/repos/octo/demo/issues/7/comments', 502); // one injected failure
+```
+
+`route(method, path, handler)` adds or overrides a route (`:name` is one segment, `*name` the rest), `requests` records every request, `tokenInstallations` the installation of every issued token. A request whose `signal` aborts, also while a route handler is pending, rejects with the signal's reason, as Node's `fetch` does.
+
 ## API
 
 | Export | Kind | Purpose |
@@ -74,8 +99,9 @@ describeWorkspaceContract('local', () => provider.create({ runId: 'contract' }))
 | `describeStoreContract` | function | Vitest suite every `IStore` implementation must pass |
 | `describeWorkspaceContract` | function | Vitest suite every sandbox provider's `IWorkspace` must pass |
 | `createGitFixture` | function | A temporary git repository with one commit (branch `main`, tag `v1`) |
+| `createFakeGithub` | function | An in-process GitHub (App JWTs, installation tokens, repository routes) for `createGithubApp({ fetch })` |
 
-Types: `WorkspaceContractFactory`, `GitFixture`.
+Types: `WorkspaceContractFactory`, `GitFixture`, `FakeGithub`, `FakeGithubOptions`, `FakeRequest`, `FakeRouteInput`, `FakeRouteResult`, `FakeRouteHandler`, `JwtClaims`.
 
 ## License
 

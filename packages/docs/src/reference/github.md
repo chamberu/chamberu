@@ -21,6 +21,13 @@ Throws `InvalidAgentDefinitionError` for an empty `appId`, a key that is no RSA 
 
 <<< ../../../github/src/app/types.ts{ts}
 
+```ts
+const GITHUB_REQUEST_ERROR_CODE: 'github_request';
+const REPO_PATTERN: string; // '^([\\w.-]*[\\w-][\\w.-]*)/([\\w.-]*[\\w-][\\w.-]*)$'
+```
+
+`GITHUB_REQUEST_ERROR_CODE` is the `code` of every failed GitHub request (the tools' errors and `@chamvi/notify-github`'s); `REPO_PATTERN` is the `owner/name` rule the tools apply (GitHub's name characters, each segment with one that is not a dot, so `.` and `..` never fold the URL into another API path). Build a `RegExp` from it.
+
 ## githubWebhook
 
 ```ts

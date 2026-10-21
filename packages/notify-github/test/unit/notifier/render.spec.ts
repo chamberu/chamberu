@@ -1,0 +1,157 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { describe, expect, it } from 'vitest';
+import type { Notification } from '@chamvi/core';
+import { COMMENT_BODY_MAX_LENGTH } from '@chamvi/notify-github';
+import {
+    fenceFor,
+    markerKey,
+    renderComment,
+} from '../../../src/notifier/helpers.ts';
+
+const approval: Notification = {
+    kind: 'approval',
+    agent: 'release',
+    runId: 'r1',
+    title: 'Approval required: deploy',
+    body: 'Agent "release" wants to call "deploy" with:\n{\n  "env": "prod"\n}',
+    approvalId: 'a1',
+    resumeToken: 'secret-token',
+    expiresAt: new Date('2026-10-21T10:00:00Z'),
+};
+
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+describe('renderComment', () => {
+    it('renders an approval', () => {
+        const comment = renderComment(approval, {
+            mentions: ['owner'],
+            approvalUrl: (ref) => `https://app.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}&agent=${ref.agent}`,
+            marker: '<!-- chamvi:effect=r1:a1 -->',
+        });
+        expect(comment).toBe([
+            '@owner',
+            '',
+            '### Approval required: deploy',
+            '',
+            '```',
+            approval.body,
+            '```',
+            '',
+            'Waiting for approval until 2026-10-21T10:00:00.000Z. Approve or deny: https://app.example/ui/approvals?run=r1&approval=a1&agent=release',
+            'Run `r1` of agent `release`.',
+            '',
+            '<!-- chamvi:effect=r1:a1 -->',
+        ].join('\n'));
+    });
+
+    it('puts a title with line breaks on one heading line', () => {
+        const comment = renderComment({ ...approval, title: '  Approval\nrequired:\t\tdeploy ' }, { mentions: [], marker: '<!-- m -->' });
+        expect(comment.split('\n')[0]).toBe('### Approval required: deploy');
+    });
+
+    it('never includes the token', () => {
+        const comment = renderComment(approval, { mentions: [], marker: '<!-- chamvi:effect=r1:a1 -->' });
+        expect(comment).not.toContain('secret-token');
+        expect(comment).toContain('Answer it in the chamvi UI or through POST /runs/:id/approve.');
+        expect(comment.startsWith('### ')).toBe(true);
+        // the comment holds no token, so it names no path that needs one
+        expect(comment).not.toMatch(/MCP|resume_run|REST API/);
+        const linked = renderComment(approval, {
+            mentions: [],
+            approvalUrl: (ref) => `https://app.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}`,
+            marker: '<!-- chamvi:effect=r1:a1 -->',
+        });
+        expect(linked).not.toContain('secret-token');
+    });
+
+    it('renders the hint instead of a link for an approval without an approvalId', () => {
+        const withoutId: Notification = { ...approval };
+        delete withoutId.approvalId;
+        const urls: unknown[] = [];
+        const comment = renderComment(withoutId, {
+            mentions: [],
+            approvalUrl: (ref) => {
+                urls.push(ref);
+                return 'https://app.example/ui/approvals';
+            },
+            marker: '<!-- m -->',
+        });
+        expect(urls).toEqual([]);
+        expect(comment).not.toContain('Approve or deny');
+        expect(comment).toContain('Answer it in the chamvi UI or through POST /runs/:id/approve.');
+    });
+
+    it('renders other kinds without the approval line', () => {
+        const comment = renderComment({
+            kind: 'stuck',
+            agent: 'release',
+            runId: 'r1',
+            title: 'Stuck',
+            body: 'No progress.',
+        }, { mentions: ['a', 'b'], marker: '<!-- m -->' });
+        expect(comment.split('\n')[0]).toBe('@a @b');
+        expect(comment).not.toContain('Waiting for approval');
+        expect(comment).toContain('Run `r1` of agent `release`.\n\n<!-- m -->');
+    });
+
+    it('fences the body', () => {
+        const body = 'see\n```\n@mallory\n```\ncloses #12 for @octo/core';
+        const comment = renderComment({ ...approval, body }, { mentions: ['owner'], marker: '<!-- chamvi:effect=r1:a1 -->' });
+        const lines = comment.split('\n');
+        const fences = lines.map((line, i) => [line, i] as const).filter(([line]) => line === '````');
+        expect(fences).toHaveLength(2);
+        const [[, open], [, close]] = fences as [[string, number], [string, number]];
+        expect(lines.slice(open + 1, close).join('\n')).toBe(body);
+        // outside the fence only the configured mention notifies
+        const outside = [...lines.slice(0, open), ...lines.slice(close + 1)];
+        expect(outside.filter((line) => line.includes('@'))).toEqual(['@owner']);
+        expect(outside.join('\n')).not.toContain('#12');
+        expect(lines.indexOf('<!-- chamvi:effect=r1:a1 -->')).toBeGreaterThan(close);
+    });
+
+    it('cuts a huge body', () => {
+        const comment = renderComment({ ...approval, body: 'x'.repeat(1024 * 1024) }, { mentions: ['owner'], marker: '<!-- m -->' });
+        expect(comment.length).toBeLessThan(65_536);
+        expect(comment).toContain(`(cut, ${1024 * 1024 - COMMENT_BODY_MAX_LENGTH} more characters)`);
+
+        const pair = renderComment({ ...approval, body: `${'x'.repeat(COMMENT_BODY_MAX_LENGTH - 1)}😀yyy` }, { mentions: [], marker: '<!-- m -->' });
+        expect(pair).not.toMatch(LONE_SURROGATE);
+    });
+
+    it('stays bounded for a body of backticks', () => {
+        const comment = renderComment({ ...approval, body: '`'.repeat(1024 * 1024) }, { mentions: [], marker: '<!-- m -->' });
+        expect(comment.length).toBeLessThan(65_536);
+    });
+});
+
+describe('fenceFor', () => {
+    it('is one backtick longer than the longest run, at least three', () => {
+        expect(fenceFor('plain')).toBe('```');
+        expect(fenceFor('a `b` c')).toBe('```');
+        expect(fenceFor('```')).toBe('````');
+        expect(fenceFor('x `````` y ``')).toBe('```````');
+    });
+});
+
+describe('markerKey', () => {
+    it('keeps a safe key', () => {
+        expect(markerKey('r1:a1')).toBe('r1:a1');
+        expect(markerKey('6f0c-1:b2.c_3')).toBe('6f0c-1:b2.c_3');
+    });
+
+    it('hashes an unsafe key into the marker', () => {
+        const key = markerKey('a-->b');
+        expect(key).toMatch(/^sha256:[0-9a-f]{64}$/);
+        expect(markerKey('a-->b')).toBe(key);
+        expect(markerKey('a--b')).toMatch(/^sha256:/);
+        expect(markerKey('a b')).toMatch(/^sha256:/);
+        expect(markerKey('k'.repeat(256))).toMatch(/^sha256:/);
+        expect(markerKey('k'.repeat(255))).toBe('k'.repeat(255));
+    });
+});

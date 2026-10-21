@@ -6,6 +6,8 @@
             "@chamvi/core": ["./packages/core/src/index.ts"],
             "@chamvi/github": ["./packages/github/src/index.ts"],
             "@chamvi/http": ["./packages/http/src/index.ts"],
+            "@chamvi/notify-github": ["./packages/notify-github/src/index.ts"],
+            "@chamvi/notify-openclaw": ["./packages/notify-openclaw/src/index.ts"],
             "@chamvi/sandbox": ["./packages/sandbox/src/index.ts"],
             "@chamvi/sandbox-docker": ["./packages/sandbox-docker/src/index.ts"],
             "@chamvi/sandbox-k8s": ["./packages/sandbox-k8s/src/index.ts"],
