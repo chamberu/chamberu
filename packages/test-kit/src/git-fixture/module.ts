@@ -13,9 +13,15 @@ import {
     writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import {
+    dirname,
+    isAbsolute,
+    join,
+    normalize,
+} from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { ValidationError } from '@chamberu/core';
 import type { GitFixture } from './types.ts';
 
 const run = promisify(execFile);
@@ -27,6 +33,12 @@ const run = promisify(execFile);
  * configured on the machine never get in the way.
  */
 export async function createGitFixture(files: Record<string, string>): Promise<GitFixture> {
+    for (const name of Object.keys(files)) {
+        const normalized = normalize(name);
+        if (name === '' || isAbsolute(name) || normalized === '.' || normalized === '..' || normalized.startsWith('../')) {
+            throw new ValidationError(`fixture file ${JSON.stringify(name)} must be a path inside the repository.`);
+        }
+    }
     const path = await mkdtemp(join(tmpdir(), 'chamberu-git-fixture-'));
     const env = {
         PATH: process.env.PATH ?? '',
