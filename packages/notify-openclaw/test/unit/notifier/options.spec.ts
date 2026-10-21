@@ -53,7 +53,7 @@ describe('openclaw options', () => {
         ['an empty name', { name: '' }],
         ['a zero timeoutMs', { timeoutMs: 0 }],
         ['a fractional timeoutMs', { timeoutMs: 1.5 }],
-        ['a non-function resumeUrl', { resumeUrl: 'x' as unknown as OpenclawNotifierOptions['resumeUrl'] }],
+        ['a non-function approvalUrl', { approvalUrl: 'https://app.example/ui/approvals' as unknown as OpenclawNotifierOptions['approvalUrl'] }],
         ['a non-boolean resumeTool', { resumeTool: 'yes' as unknown as boolean }],
         ['a resumeTool of 1', { resumeTool: 1 as unknown as boolean }],
     ])('rejects %s', (_label, patch) => {

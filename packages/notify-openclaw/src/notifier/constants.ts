@@ -28,5 +28,5 @@ export const IDEMPOTENCY_KEY_MAX_LENGTH = 256;
 /** Response text in a thrown error is cut to this many characters. */
 export const ERROR_TEXT_MAX_LENGTH = 500;
 
-/** An approval line without `resumeUrl` and `resumeTool`: how to answer, without the token. */
+/** An approval line without `approvalUrl` and `resumeTool`: how to answer, without the token. */
 export const NO_TOKEN_HINT = 'Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.';

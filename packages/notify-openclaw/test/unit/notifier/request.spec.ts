@@ -35,11 +35,14 @@ const approval: Notification = {
     runId: 'r1',
     title: 'Approval required: deploy',
     body: 'Agent "release" wants to call "deploy" with:\n{\n  "env": "prod"\n}',
+    approvalId: 'a1',
     resumeToken: 'tok',
     expiresAt: new Date('2026-10-21T10:00:00Z'),
 };
 
 const opts: NotifyOptions = { idempotencyKey: 'r1:a1', trigger };
+
+const approvalUrl: OpenclawNotifierOptions['approvalUrl'] = (ref) => `https://app.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}`;
 
 function setup(patch: Partial<OpenclawNotifierOptions> = {}) {
     const clock = new ControllableClock(new Date('2026-10-21T09:00:00Z'));
@@ -155,8 +158,11 @@ describe('openclaw notify', () => {
         ].join('\n'));
     });
 
-    it('never sends the token by default', async () => {
-        const { fake, notifier } = setup();
+    it.each<[string, Partial<OpenclawNotifierOptions>]>([
+        ['without options', {}],
+        ['with approvalUrl', { approvalUrl }],
+    ])('never sends the token %s', async (_label, patch) => {
+        const { fake, notifier } = setup(patch);
         const secret = 'resume-token-c8f1e2d4';
         await notifier.notify({ ...approval, resumeToken: secret }, opts);
         const [request] = fake.requests;
@@ -180,7 +186,7 @@ describe('openclaw notify', () => {
             title: 'Done',
             body: 'Deployed.',
         }, opts);
-        const linked = setup({ resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}` });
+        const linked = setup({ approvalUrl });
         await linked.notifier.notify(approval, opts);
         for (const request of [...fake.requests, ...linked.fake.requests]) {
             const [relay] = messageOf(request.body).split('\n');
@@ -188,14 +194,41 @@ describe('openclaw notify', () => {
         }
     });
 
-    it('renders only the resume link when configured', async () => {
-        const { fake, notifier } = setup({ resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}` });
+    it('renders only the approval link when configured', async () => {
+        const refs: unknown[] = [];
+        const { fake, notifier } = setup({
+            approvalUrl: (ref) => {
+                refs.push(ref);
+                return approvalUrl(ref);
+            },
+        });
         await notifier.notify(approval, opts);
+        expect(refs).toEqual([{
+            runId: 'r1',
+            approvalId: 'a1',
+            agent: 'release',
+        }]);
         const message = messageOf(fake.requests[0]!.body);
-        expect(message.endsWith('Expires: 2026-10-21T10:00:00.000Z\nApprove or deny: https://app.example/ui/approvals?token=tok')).toBe(true);
-        expect(message).not.toContain('"token"');
+        expect(message.endsWith('Expires: 2026-10-21T10:00:00.000Z\nApprove or deny: https://app.example/ui/approvals?run=r1&approval=a1')).toBe(true);
+        expect(message).not.toContain('tok');
         expect(message).not.toContain('resume_run');
         expect(message).not.toContain('carries no resume token');
+    });
+
+    it('renders the hint instead of a link for an approval without an approvalId', async () => {
+        const refs: unknown[] = [];
+        const { fake, notifier } = setup({
+            approvalUrl: (ref) => {
+                refs.push(ref);
+                return approvalUrl(ref);
+            },
+        });
+        const { approvalId: _approvalId, ...withoutId } = approval;
+        await notifier.notify(withoutId, opts);
+        expect(refs).toEqual([]);
+        const message = messageOf(fake.requests[0]!.body);
+        expect(message).not.toContain('Approve or deny');
+        expect(message).toContain('carries no resume token');
     });
 
     it('renders the token and the resume_run call with resumeTool', async () => {
@@ -216,14 +249,14 @@ describe('openclaw notify', () => {
         ].join('\n'));
     });
 
-    it('renders the link and the resume_run call with resumeTool and resumeUrl', async () => {
+    it('renders the link and the resume_run call with resumeTool and approvalUrl', async () => {
         const { fake, notifier } = setup({
             resumeTool: true,
-            resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}`,
+            approvalUrl,
         });
         await notifier.notify(approval, opts);
         const message = messageOf(fake.requests[0]!.body);
-        expect(message).toContain('Approve or deny: https://app.example/ui/approvals?token=tok\nOr call the chamvi MCP tool resume_run with {"token":"tok","approved":true}');
+        expect(message).toContain('Approve or deny: https://app.example/ui/approvals?run=r1&approval=a1\nOr call the chamvi MCP tool resume_run with {"token":"tok","approved":true}');
     });
 
     it('renders other kinds without approval lines', async () => {
@@ -245,7 +278,7 @@ describe('openclaw notify', () => {
             fake, 
             notifier, 
             clock, 
-        } = setup({ resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}` });
+        } = setup({ approvalUrl });
         await notifier.notify(approval, opts);
         clock.advance(60_000);
         await notifier.notify(approval, opts);

@@ -18,6 +18,7 @@ import type { ChamviError } from '@chamvi/core';
 import {
     Engine,
     MemoryStore,
+    createResumeToken,
     defineAgent,
     http,
 } from '@chamvi/core';
@@ -150,6 +151,23 @@ describe('openclaw with the engine', () => {
         // one admitted OpenClaw run per approval across engine retries
         expect(ctx.fake.dispatched).toHaveLength(1);
         expect((await ctx.engine.getRun(runId))?.waiting?.notifiedAt).toBeInstanceOf(Date);
+    });
+
+    it('links to the approval without the token', async () => {
+        const ctx = setup(undefined, { approvalUrl: (ref) => `https://chamvi.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}&agent=${ref.agent}` });
+        const runId = await dispatchToWaiting(ctx);
+        const waiting = (await ctx.engine.getRun(runId))!.waiting!;
+        const [request] = ctx.fake.requests;
+        expect((request!.body as { message: string }).message).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${waiting.approvalId}&agent=deployer`);
+        const token = createResumeToken('resume-secret', waiting);
+        const sent = JSON.stringify({
+            url: request!.url,
+            headers: request!.headers,
+            body: request!.body,
+        });
+        expect(sent).not.toContain(token);
+        expect(sent).not.toContain(token.split('.')[1]);
+        expect(sent).not.toContain('resume_run');
     });
 
     it('answers through the token in the message with resumeTool', async () => {

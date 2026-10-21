@@ -59,9 +59,10 @@ describe('README example', () => {
             expect((await engine.getRun(runId))?.status).toBe('waiting');
             expect(fake.dispatched).toHaveLength(1);
             const { message } = fake.dispatched[0]!;
-            expect(message).toContain('https://chamvi.example/ui/approvals?token=');
+            const { approvalId } = (await engine.getRun(runId))!.waiting!;
+            expect(message).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${approvalId}`);
             expect(message).not.toContain('resume_run');
-            expect(message).not.toContain('"token"');
+            expect(message).not.toContain('token=');
         } finally {
             await engine.stop();
         }

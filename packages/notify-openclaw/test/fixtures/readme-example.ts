@@ -52,8 +52,8 @@ export function createApprovalEngine(
                 // OpenClaw's hooks.token, not the gateway token
                 hooksToken: OPENCLAW_HOOKS_TOKEN,
                 deliver: { channel: OPENCLAW_CHANNEL, to: OPENCLAW_TO },
-                // the message carries only this link; resumeTool: true would add the token itself
-                resumeUrl: (token) => `${APP_URL}/ui/approvals?token=${encodeURIComponent(token)}`,
+                // a link to the approval in the chamvi UI, without the token
+                approvalUrl: ({ runId, approvalId }) => `${APP_URL}/ui/approvals?run=${encodeURIComponent(runId)}&approval=${encodeURIComponent(approvalId)}`,
                 ...options,
             }),
         },

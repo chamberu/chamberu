@@ -84,8 +84,8 @@ export function resolveOptions(options: OpenclawNotifierOptions): ResolvedOpencl
     }
     if (!isNonEmpty(deliver.to)) throw invalid('deliver.to must be a non-empty string.');
     const accountId = optionalNonEmpty(deliver.accountId, 'deliver.accountId');
-    if (options.resumeUrl !== undefined && typeof options.resumeUrl !== 'function') {
-        throw invalid('resumeUrl must be a function.');
+    if (options.approvalUrl !== undefined && typeof options.approvalUrl !== 'function') {
+        throw invalid('approvalUrl must be a function.');
     }
     const resumeTool = options.resumeTool ?? false;
     if (typeof resumeTool !== 'boolean') throw invalid('resumeTool must be a boolean.');
@@ -101,7 +101,7 @@ export function resolveOptions(options: OpenclawNotifierOptions): ResolvedOpencl
             to: deliver.to,
             ...(accountId === undefined ? {} : { accountId }),
         },
-        ...(options.resumeUrl ? { resumeUrl: options.resumeUrl } : {}),
+        ...(options.approvalUrl ? { approvalUrl: options.approvalUrl } : {}),
         resumeTool,
         timeoutMs,
         clock: options.clock ?? systemClock,
@@ -125,30 +125,39 @@ export function cutText(text: string, max: number): string {
 /**
  * The text OpenClaw's agent turn relays: deterministic for one notification
  * (no clock value, no random id), so a resend replays instead of starting a
- * second run. An approval carries the token only inside the `resumeUrl` link,
- * and as a `resume_run` call only with `resumeTool`; the relay line names the
- * token only then, so a message without one never asks to keep one.
+ * second run. An approval links to the UI with `approvalUrl` (run and
+ * approval id, no token) and carries the token, as a `resume_run` call, only
+ * with `resumeTool`; the relay line names the token only then, so a message
+ * without one never asks to keep one.
  */
 export function renderMessage(
     n: Notification,
-    options: Pick<ResolvedOpenclawOptions, 'resumeUrl' | 'resumeTool'>,
+    options: Pick<ResolvedOpenclawOptions, 'approvalUrl' | 'resumeTool'>,
 ): string {
-    const { resumeUrl, resumeTool } = options;
-    const approval = n.kind === 'approval' && !!n.resumeToken;
-    const kept = approval && resumeTool ? 'every link, id and token' : 'every link and id';
+    const { approvalUrl, resumeTool } = options;
+    const approval = n.kind === 'approval';
+    const token = approval && resumeTool ? n.resumeToken : undefined;
+    const kept = token ? 'every link, id and token' : 'every link and id';
     const sections = [
         `chamvi notification. Relay it to the user; keep ${kept} exactly as written.`,
         n.title,
         cutText(n.body, MESSAGE_BODY_MAX_LENGTH),
         `Agent: ${n.agent}\nRun: ${n.runId}`,
     ];
-    if (approval && n.resumeToken) {
+    if (approval) {
         const lines: string[] = [];
         if (n.expiresAt) lines.push(`Expires: ${n.expiresAt.toISOString()}`);
-        if (resumeUrl) lines.push(`Approve or deny: ${resumeUrl(n.resumeToken)}`);
-        if (resumeTool) {
-            lines.push(`Or call the chamvi MCP tool resume_run with ${JSON.stringify({ token: n.resumeToken, approved: true })} to approve, or "approved":false to deny.`);
-        } else if (!resumeUrl) {
+        const link = approvalUrl && n.approvalId ?
+            approvalUrl({
+                runId: n.runId,
+                approvalId: n.approvalId,
+                agent: n.agent,
+            }) :
+            undefined;
+        if (link) lines.push(`Approve or deny: ${link}`);
+        if (token) {
+            lines.push(`Or call the chamvi MCP tool resume_run with ${JSON.stringify({ token, approved: true })} to approve, or "approved":false to deny.`);
+        } else if (!link) {
             lines.push(NO_TOKEN_HINT);
         }
         sections.push(lines.join('\n'));

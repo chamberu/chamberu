@@ -45,7 +45,7 @@ In the OpenClaw gateway configuration:
 1. Enable hooks (`hooks.enabled: true`; they are off by default) and set a **dedicated `hooks.token`**. It is not the gateway token; the notifier sends it as `Authorization: Bearer <token>`.
 2. Keep `hooks.path` at `/hooks` or pass the same value as `hooksPath`.
 3. When you pass `agentId`, list it in `hooks.allowedAgentIds`.
-4. Add the chamvi app's MCP endpoint (`http://<service>/mcp`) to OpenClaw's `mcp.servers`, with a bearer token of a principal holding `agent:<name>:run` to start runs. Add `agent:<name>:approve` only when you set `resumeTool: true` so the owner can answer from the chat, and accept that the OpenClaw agent can then approve on its own (see [Answering approvals](#answering-approvals)); an OpenClaw agent that relays hooks with a `resumeUrl` link must not hold it either.
+4. Add the chamvi app's MCP endpoint (`http://<service>/mcp`) to OpenClaw's `mcp.servers`, with a bearer token of a principal holding `agent:<name>:run` to start runs. The owner answers through the `approvalUrl` link, signed in to the chamvi UI as a principal of their own. Add `agent:<name>:approve` only alongside `resumeTool: true`, so the owner can answer from the chat, and accept that the OpenClaw agent can then approve on its own (see [Answering approvals](#answering-approvals)).
 
 ## Usage
 
@@ -106,8 +106,8 @@ export function createApprovalEngine(
                 // OpenClaw's hooks.token, not the gateway token
                 hooksToken: OPENCLAW_HOOKS_TOKEN,
                 deliver: { channel: OPENCLAW_CHANNEL, to: OPENCLAW_TO },
-                // the message carries only this link; resumeTool: true would add the token itself
-                resumeUrl: (token) => `${APP_URL}/ui/approvals?token=${encodeURIComponent(token)}`,
+                // a link to the approval in the chamvi UI, without the token
+                approvalUrl: ({ runId, approvalId }) => `${APP_URL}/ui/approvals?run=${encodeURIComponent(runId)}&approval=${encodeURIComponent(approvalId)}`,
                 ...options,
             }),
         },
@@ -117,20 +117,22 @@ export function createApprovalEngine(
 }
 ```
 
-Each approval becomes one `POST <baseUrl><hooksPath>/agent` with the body `{ message, name: 'chamvi', agentId?, deliver: true, channel, to, accountId? }`, the hooks token as bearer token and the engine's idempotency key (`<runId>:<approvalId>`) as `Idempotency-Key`. The message holds the notification's title, its body (cut to 8 000 characters), the agent and the run id; for an approval also the expiry and the `resumeUrl` link when configured (without it, a line saying to answer in the chamvi UI or through its MCP server). The token is never outside the `resumeUrl` link (where it sits verbatim), unless `resumeTool: true` adds it with a ready-made `resume_run` call.
+Each approval becomes one `POST <baseUrl><hooksPath>/agent` with the body `{ message, name: 'chamvi', agentId?, deliver: true, channel, to, accountId? }`, the hooks token as bearer token and the engine's idempotency key (`<runId>:<approvalId>`) as `Idempotency-Key`. The message holds the notification's title, its body (cut to 8 000 characters), the agent and the run id; for an approval also the expiry and the `approvalUrl` link when configured (without it, a line saying to answer in the chamvi UI or through its MCP server). The resume token is never in the request (neither the URL, the headers nor the body), unless `resumeTool: true` adds it with a ready-made `resume_run` call.
 
 Any 2xx response counts as sent (OpenClaw answers `200 { ok: true, runId }` once it admitted the hook). Every other answer throws a `ChamviError` with code `openclaw_request` (`OpenClaw <status>: <response text>`, with `retry after <s>` for a `Retry-After`), as does a network failure (`OpenClaw request failed: <message> (<cause>)`, the cause naming e.g. `ECONNREFUSED` or `ENOTFOUND`) and a gateway that does not answer within `timeoutMs` (30 s). The engine reports it to `onError` and sends again on the next poll, with the same key and a byte-identical body, until one send succeeds.
 
 ## Answering approvals
 
-By default the message never carries a `resume_run` call, and the resume token only inside the `resumeUrl` link:
+By default the message carries no resume token and no `resume_run` call:
 
-- **A link** (`resumeUrl(token)`), when configured, e.g. into the chamvi UI's approvals inbox. The link holds the token verbatim; `POST /resume` and MCP `resume_run` still require `agent:<agent>:approve`.
-- Without `resumeUrl`, the message says to answer in the chamvi UI or through its MCP server, and carries no token (neither in the body nor in a header).
+- **A link** (`approvalUrl({ runId, approvalId, agent })`), when configured, to the run's approval in the chamvi UI, e.g. `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`. The link holds ids only; the owner opens it, signs in and answers through the token-less `POST /runs/:id/approve`, which requires `agent:<agent>:approve` of the signed-in principal.
+- Without `approvalUrl`, the message says to answer in the chamvi UI or through its MCP server.
 
 With **`resumeTool: true`** the message also carries the MCP call `resume_run` with `{"token":"<token>","approved":true}` (or `"approved":false`), so OpenClaw's agent can answer through its MCP connection to the app. The message then asks the OpenClaw agent to keep every link, id and token exactly as written (else every link and id).
 
-**The OpenClaw agent holds the token whenever `resumeTool` is on or `resumeUrl` is set** (the link carries it verbatim). The notification body is the tool input as the model wrote it, which may repeat untrusted text (an issue body, a mail); an injected instruction there reaches the OpenClaw agent next to the token. The chamvi MCP server always offers `resume_run`, so when the OpenClaw agent's MCP principal holds `agent:<name>:approve`, an agent turn that follows such an instruction can approve the tool call without the owner in either case: `resumeTool` only adds the ready-made call, the link alone is enough to lift the token from. The run then records the OpenClaw principal as approver. The safe setup is `resumeUrl` with a hook-relay OpenClaw agent (`agentId`) whose principal lacks `agent:<name>:approve` (or that has no chamvi MCP server at all); the owner answers through the link, signed in as a principal of their own. Grant `agent:<name>:approve` to the relay agent (and turn `resumeTool` on) only when you accept that it can approve on its own.
+**By default the OpenClaw agent cannot approve.** The notification body is the tool input as the model wrote it, which may repeat untrusted text (an issue body, a mail), so an injected instruction reaches the OpenClaw agent. Without `resumeTool` the message carries no token, and a relay agent whose MCP principal holds only `agent:<name>:run` has neither a token nor the right to answer: whatever the body says, only the owner, signed in to the UI, approves.
+
+**With `resumeTool: true` the OpenClaw agent holds the token.** Its principal then needs `agent:<name>:approve` for `resume_run` to work, and an agent turn that follows an injected instruction can approve the tool call without the owner; the run then records the OpenClaw principal as approver. Turn `resumeTool` on only when you accept that.
 
 ## Caveats
 
@@ -138,7 +140,7 @@ With **`resumeTool: true`** the message also carries the MCP call `resume_run` w
 - OpenClaw's idempotency replay lives in memory and lasts 5 minutes after the run completed; a restart clears it. chamvi's `waiting.notifiedAt` (and its per-approval lock) is the primary dedupe; the key only covers a response lost within those minutes.
 - A misconfigured hook (400, 401, 404) fails on every poll and reaches `onError` each time, until it is fixed or the approval times out.
 - OpenClaw ignores an `Idempotency-Key` over 256 characters; such keys (and keys with whitespace or non-ASCII characters) are sent as `sha256:<hex>`.
-- Errors never carry the hooks token or the resume token: both are replaced by `[redacted]` in the response text and the network failure message, each cut to 500 characters. A `hooksToken` that `fetch` could not send as a header (control characters, characters above U+00FF, surrounding whitespace) is refused when `openclaw()` is called.
+- Errors never carry the hooks token or the resume token (sent with `resumeTool` only): both are replaced by `[redacted]` in the response text and the network failure message, each cut to 500 characters. A `hooksToken` that `fetch` could not send as a header (control characters, characters above U+00FF, surrounding whitespace) is refused when `openclaw()` is called.
 
 ## Options
 
@@ -150,7 +152,7 @@ With **`resumeTool: true`** the message also carries the MCP call `resume_run` w
 | `name` | `string` | `'openclaw'` | The notifier name an agent's `notify` references |
 | `hooksPath` | `string` | `'/hooks'` | OpenClaw's `hooks.path`; starts with `/`, not `/` itself; trailing slashes are dropped |
 | `agentId` | `string` | none | The OpenClaw agent that phrases the message |
-| `resumeUrl` | `(token) => string` | none | A link answering an approval, added to approval messages; it carries the token verbatim (see [Answering approvals](#answering-approvals)) |
+| `approvalUrl` | `({ runId, approvalId, agent }) => string` | none | A link to the approval in the chamvi UI, added to approval messages; it carries no token (see [Answering approvals](#answering-approvals)) |
 | `resumeTool` | `boolean` | `false` | Also put the resume token and a `resume_run` MCP call into approval messages (see [Answering approvals](#answering-approvals)) |
 | `timeoutMs` | `number` | `30_000` | Bound of one send, on the `clock` |
 | `clock` | `IClock` | `systemClock` | Time source of the timeout |

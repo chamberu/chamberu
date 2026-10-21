@@ -30,8 +30,12 @@ export type OpenclawNotifierOptions = {
     /** The OpenClaw agent that phrases the message (must be in `hooks.allowedAgentIds` when set). */
     agentId?: string;
     deliver: OpenclawDelivery;
-    /** A link that answers an approval (the chamvi UI); holds the token. */
-    resumeUrl?: (token: string) => string;
+    /**
+     * A link to the approval in the chamvi UI, e.g.
+     * `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`, where the
+     * signed-in owner answers it; it carries no token.
+     */
+    approvalUrl?: (ref: { runId: string; approvalId: string; agent: string }) => string;
     /**
      * Also put the resume token and a ready-made `resume_run` MCP call into
      * the message, default `false`: the OpenClaw agent then holds the token,
@@ -63,7 +67,7 @@ export type ResolvedOpenclawOptions = {
     hooksToken: string;
     agentId?: string;
     deliver: OpenclawDelivery;
-    resumeUrl?: (token: string) => string;
+    approvalUrl?: (ref: { runId: string; approvalId: string; agent: string }) => string;
     resumeTool: boolean;
     timeoutMs: number;
     clock: IClock;
