@@ -98,10 +98,10 @@ const filtered = computed(() => !!filter.value.agent || !!filter.value.status?.l
     <template v-else>
         <div class="stats">
             <div class="card stat stat-run">
-                <small>Running</small><b>{{ counts.running ?? '–' }}</b><span>right now</span>
+                <small>Running</small><b>{{ counts.running ?? '—' }}</b><span>right now</span>
             </div>
             <div class="card stat stat-wait">
-                <small>Waiting</small><b>{{ counts.waiting ?? '–' }}</b>
+                <small>Waiting</small><b>{{ counts.waiting ?? '—' }}</b>
                 <span v-if="oldest">oldest asked <VCTimeago :datetime="oldest.updatedAt" /></span>
                 <span v-else>for an approval</span>
             </div>

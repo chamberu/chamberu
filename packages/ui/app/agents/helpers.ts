@@ -5,10 +5,16 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { AgentWire, RunWire, ScheduleWire } from '../api/types.ts';
+import type {
+    AgentWire,
+    RunPage,
+    RunWire,
+    ScheduleWire,
+} from '../api/types.ts';
 import { ACTIVITY_WINDOW_MS } from './constants.ts';
 import type {
     Activity,
+    AgentRollup,
     PayloadResult,
     TriggerChip,
 } from './types.ts';
@@ -65,13 +71,55 @@ export function summarizeActivity(runs: readonly RunWire[], now: number, limit: 
     return activity;
 }
 
+/**
+ * The overview's rollups from two app-wide pages, so a pass costs the same
+ * requests whatever the agent count: `recent` (the newest runs of every agent)
+ * gives the last run and the 24 h activity, `active` (running and waiting runs)
+ * the counters. A full `recent` page inside the window marks every activity a floor.
+ */
+export function buildRollups(
+    agents: readonly AgentWire[],
+    schedules: readonly ScheduleWire[],
+    recent: RunPage,
+    active: RunPage,
+    now: number,
+): Record<string, AgentRollup> {
+    const { saturated } = summarizeActivity(recent.data, now, recent.data.length > 0 ? recent.meta.limit : Infinity);
+    const older = recent.meta.total > recent.data.length;
+    return Object.fromEntries(agents.map((agent): [string, AgentRollup] => {
+        const runs = recent.data.filter((run) => run.agent === agent.name);
+        const mine = active.data.filter((run) => run.agent === agent.name);
+        const activity = summarizeActivity(runs, now, Infinity);
+        activity.saturated = saturated;
+        const rollup: AgentRollup = {
+            running: mine.filter((run) => run.status === 'running').length,
+            waiting: mine.filter((run) => run.status === 'waiting').length,
+            lastBeyond: !runs[0] && older,
+            activity,
+        };
+        if (runs[0]) rollup.last = runs[0];
+        const next = nextFireOf(agent.name, schedules);
+        if (next) rollup.nextFire = next;
+        return [agent.name, rollup];
+    }));
+}
+
+/** The activity strip's accessible name: "12 runs in the last 24 h: 10 completed, 2 failed". */
+export function activityLabel(activity: Activity): string {
+    if (activity.count === 0) return 'No runs in the last 24 h';
+    const counts = new Map<string, number>();
+    for (const mark of activity.marks) counts.set(mark.status, (counts.get(mark.status) ?? 0) + 1);
+    const parts = Array.from(counts, ([status, n]) => `${n} ${status}`).join(', ');
+    return `${activity.count}${activity.saturated ? '+' : ''} runs in the last 24 h: ${parts}`;
+}
+
 /** "triage 71% · digest 29%": the two largest token shares by agent. */
 export function tokenShares(runs: readonly RunWire[]): string {
     const total = runs.reduce((sum, run) => sum + tokensOf(run), 0);
     if (total === 0) return '';
     const byAgent = new Map<string, number>();
     for (const run of runs) byAgent.set(run.agent, (byAgent.get(run.agent) ?? 0) + tokensOf(run));
-    return byAgent.entries().toArray()
+    return Array.from(byAgent)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 2)
         .map(([name, tokens]) => `${name} ${Math.round(tokens / total * 100)}%`)
@@ -123,4 +171,27 @@ export function formatBudgetTime(ms: number | undefined): string {
 export function failedSummary(activity: Activity): string {
     const run = activity.lastFailed;
     return run ? `${run.id.slice(0, 8)} · ${run.error?.code ?? 'failed'}` : 'no failures';
+}
+
+/** 32 random hex characters; `crypto.getRandomValues` works outside a secure context too, unlike `randomUUID`. */
+export function newIdempotencyKey(): string {
+    return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * The idempotency keys of one start-run form: a retry of the same payload text
+ * after a failure keeps its key (so a start whose answer was lost dedupes to
+ * that run), a changed payload or a start after a success gets a fresh one.
+ */
+export function createStartKeys(mint: () => string = newIdempotencyKey) {
+    let attempt: { text: string; key: string } | undefined;
+    return {
+        keyFor(text: string): string {
+            if (!attempt || attempt.text !== text) attempt = { text, key: mint() };
+            return attempt.key;
+        },
+        succeeded(): void {
+            attempt = undefined;
+        },
+    };
 }

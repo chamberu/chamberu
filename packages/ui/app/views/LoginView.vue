@@ -11,6 +11,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ApiError } from '../api/error.ts';
 import { safeReturnPath } from '../auth/helpers.ts';
 import BrandLogo from '../components/brand-logo/BrandLogo.vue';
+import { UI_VERSION } from '../config/constants.ts';
 import { useAppContext } from '../context/module.ts';
 
 const { config, session } = useAppContext();
@@ -126,7 +127,7 @@ async function useAuthup(): Promise<void> {
                 </p>
             </div>
             <p class="login-foot">
-                chamvi · self-hosted at {{ host }}
+                chamvi {{ UI_VERSION }} · self-hosted at {{ host }}
             </p>
         </div>
     </div>

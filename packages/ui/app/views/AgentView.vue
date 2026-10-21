@@ -28,6 +28,8 @@ import NavIcon from '../components/nav-icon/NavIcon.vue';
 import ScheduleCard from '../components/schedule-card/ScheduleCard.vue';
 import StartRunModal from '../components/start-run/StartRunModal.vue';
 import StatusChip from '../components/status-chip/StatusChip.vue';
+import { panelId, tabId } from '../components/tab-list/helpers.ts';
+import TabList from '../components/tab-list/TabList.vue';
 import TriggerChip from '../components/trigger-chip/TriggerChip.vue';
 import { useAppContext } from '../context/module.ts';
 import { RouteName } from '../router/constants.ts';
@@ -117,10 +119,13 @@ function scheduleOf(trigger: string) {
         />
     </div>
     <p
-        v-else-if="error && !agent"
+        v-else-if="error"
         class="err-line"
+        data-testid="agent-error"
     >
-        {{ error.code }} · {{ error.message }}
+        <template v-if="agent">
+            Not updating, showing the last data:
+        </template>{{ error.code }} · {{ error.message }}
     </p>
 
     <template v-if="agent">
@@ -197,239 +202,228 @@ function scheduleOf(trigger: string) {
             </p>
         </section>
 
-        <div
-            class="tabs"
-            role="tablist"
-            aria-label="Agent sections"
+        <TabList
+            v-model="tab"
+            :tabs="TABS"
+            prefix="agent"
+            label="Agent sections"
         >
-            <button
-                type="button"
-                role="tab"
-                :aria-selected="tab === 'overview'"
-                @click="tab = 'overview'"
-            >
-                Overview
-            </button>
-            <button
-                type="button"
-                role="tab"
-                :aria-selected="tab === 'runs'"
-                @click="tab = 'runs'"
-            >
-                Runs <span class="count">{{ detail.totalRuns.value }}</span>
-            </button>
-            <button
-                type="button"
-                role="tab"
-                :aria-selected="tab === 'state'"
-                @click="tab = 'state'"
-            >
-                State <span
-                    v-if="stateCount !== undefined"
-                    class="count"
-                >{{ stateCount }}</span>
-            </button>
-            <button
-                type="button"
-                role="tab"
-                :aria-selected="tab === 'schedules'"
-                @click="tab = 'schedules'"
-            >
-                Schedules <span class="count">{{ schedules.length }}</span>
-            </button>
-        </div>
+            <template #tab="{ tab: id }">
+                <template v-if="id === 'overview'">
+                    Overview
+                </template>
+                <template v-else-if="id === 'runs'">
+                    Runs <span class="count">{{ detail.totalRuns.value }}</span>
+                </template>
+                <template v-else-if="id === 'state'">
+                    State <span
+                        v-if="stateCount !== undefined"
+                        class="count"
+                    >{{ stateCount }}</span>
+                </template>
+                <template v-else>
+                    Schedules <span class="count">{{ schedules.length }}</span>
+                </template>
+            </template>
+        </TabList>
 
-        <AgentRuns
-            v-if="tab === 'runs'"
-            :agent="agent"
-        />
-        <AgentStatePanel
-            v-else-if="tab === 'state'"
-            :agent="agent.name"
-            :state="state"
-        />
-        <template v-else-if="tab === 'schedules'">
-            <template v-if="schedules.length">
-                <div class="tab-lede">
-                    <p>Cron triggers of {{ agent.name }}. Times are in each trigger's time zone.</p>
-                </div>
-                <div class="sched-cards">
-                    <ScheduleCard
-                        v-for="schedule in schedules"
-                        :key="schedule.trigger"
-                        :schedule="schedule"
-                        :last="lastRunOf(detail.runs.value, schedule.trigger)"
+        <div
+            :id="panelId('agent')"
+            role="tabpanel"
+            :aria-labelledby="tabId('agent', tab)"
+        >
+            <AgentRuns
+                v-if="tab === 'runs'"
+                :agent="agent"
+            />
+            <AgentStatePanel
+                v-else-if="tab === 'state'"
+                :agent="agent.name"
+                :state="state"
+            />
+            <template v-else-if="tab === 'schedules'">
+                <template v-if="schedules.length">
+                    <div class="tab-lede">
+                        <p>Cron triggers of {{ agent.name }}. Times are in each trigger's time zone.</p>
+                    </div>
+                    <div class="sched-cards">
+                        <ScheduleCard
+                            v-for="schedule in schedules"
+                            :key="schedule.trigger"
+                            :schedule="schedule"
+                            :last="lastRunOf(detail.runs.value, schedule.trigger)"
+                        />
+                    </div>
+                </template>
+                <div
+                    v-else
+                    class="card"
+                >
+                    <EmptyState
+                        icon="schedules"
+                        title="No cron triggers"
+                        :text="`${agent.name} has no cron() trigger, so nothing starts it on a schedule.`"
                     />
                 </div>
             </template>
-            <div
-                v-else
-                class="card"
-            >
-                <EmptyState
-                    icon="schedules"
-                    title="No cron triggers"
-                    :text="`${agent.name} has no cron() trigger, so nothing starts it on a schedule.`"
-                />
-            </div>
-        </template>
-        <template v-else>
-            <div class="stats">
-                <div class="card stat stat-run">
-                    <small>Runs · 24 h</small>
-                    <b data-testid="runs-24h">{{ activity.count }}{{ activity.saturated ? '+' : '' }}</b>
-                    <span>{{ activity.count || detail.running.value ? `${detail.running.value} running now` : 'nothing started yet' }}</span>
+            <template v-else>
+                <div class="stats">
+                    <div class="card stat stat-run">
+                        <small>Runs · 24 h</small>
+                        <b data-testid="runs-24h">{{ activity.count }}{{ activity.saturated ? '+' : '' }}</b>
+                        <span>{{ activity.count || detail.running.value ? `${detail.running.value} running now` : 'nothing started yet' }}</span>
+                    </div>
+                    <div class="card stat stat-fail">
+                        <small>Failed · 24 h</small>
+                        <b>{{ activity.failed }}</b>
+                        <span>{{ failedSummary(activity) }}</span>
+                    </div>
+                    <div class="card stat stat-wait">
+                        <small>Waiting</small>
+                        <b>{{ detail.waitingTotal.value }}</b>
+                        <span v-if="oldest">oldest asked <VCTimeago :datetime="oldest.updatedAt" /></span>
+                        <span v-else>no approvals open</span>
+                    </div>
+                    <div class="card stat">
+                        <small>Tokens · 24 h</small>
+                        <b>{{ formatTokens(activity.tokens) }}{{ activity.saturated ? '+' : '' }}</b>
+                        <span>{{ agent.budget.maxTokens ? `cap ${formatTokens(agent.budget.maxTokens)} per run` : 'no per-run cap' }}</span>
+                    </div>
                 </div>
-                <div class="card stat stat-fail">
-                    <small>Failed · 24 h</small>
-                    <b>{{ activity.failed }}</b>
-                    <span>{{ failedSummary(activity) }}</span>
-                </div>
-                <div class="card stat stat-wait">
-                    <small>Waiting</small>
-                    <b>{{ detail.waitingTotal.value }}</b>
-                    <span v-if="oldest">oldest asked <VCTimeago :datetime="oldest.updatedAt" /></span>
-                    <span v-else>no approvals open</span>
-                </div>
-                <div class="card stat">
-                    <small>Tokens · 24 h</small>
-                    <b>{{ formatTokens(activity.tokens) }}{{ activity.saturated ? '+' : '' }}</b>
-                    <span>{{ agent.budget.maxTokens ? `cap ${formatTokens(agent.budget.maxTokens)} per run` : 'no per-run cap' }}</span>
-                </div>
-            </div>
-            <div class="ov">
-                <div class="ov-col">
-                    <section class="card panel">
-                        <div class="panel-head">
-                            <h3>Recent runs</h3>
-                            <RouterLink
-                                v-if="detail.recent.value.length"
-                                :to="{ query: { tab: 'runs' } }"
-                            >
-                                All runs of {{ agent.name }}
-                            </RouterLink>
-                        </div>
-                        <ul
-                            v-if="detail.recent.value.length"
-                            class="rows"
-                            data-testid="recent-runs"
-                        >
-                            <li
-                                v-for="run in detail.recent.value"
-                                :key="run.id"
-                            >
+                <div class="ov">
+                    <div class="ov-col">
+                        <section class="card panel">
+                            <div class="panel-head">
+                                <h3>Recent runs</h3>
                                 <RouterLink
-                                    class="rrow"
-                                    :to="{ name: RouteName.RUN, params: { id: run.id } }"
+                                    v-if="detail.recent.value.length"
+                                    :to="{ query: { tab: 'runs' } }"
                                 >
-                                    <StatusChip :status="run.status" />
-                                    <span class="rrow-main">
-                                        <span class="id">{{ shortId(run.id) }}</span>
-                                        <span class="sub">{{ runSub(run) }}</span>
-                                    </span>
-                                    <span class="when"><VCTimeago :datetime="run.createdAt" /></span>
+                                    All runs of {{ agent.name }}
                                 </RouterLink>
-                            </li>
-                        </ul>
-                        <EmptyState
-                            v-else
-                            icon="play"
-                            title="No runs yet"
-                            :text="emptyRunsText"
-                        >
-                            <VCButton
-                                v-if="canStart"
-                                class="btn btn-sm btn-primary"
-                                @click="startOpen = true"
+                            </div>
+                            <ul
+                                v-if="detail.recent.value.length"
+                                class="rows"
+                                data-testid="recent-runs"
                             >
-                                <NavIcon name="play" />Start run
-                            </VCButton>
-                        </EmptyState>
-                    </section>
-                </div>
-                <div class="ov-col">
-                    <section class="card panel">
-                        <div class="panel-head">
-                            <h3>
-                                Waiting for approval<span
-                                    v-if="detail.waitingTotal.value"
-                                    class="badge"
-                                >{{ detail.waitingTotal.value }}</span>
-                            </h3>
-                            <RouterLink
-                                v-if="detail.waitingRuns.value.length"
-                                :to="{ name: RouteName.APPROVALS }"
+                                <li
+                                    v-for="run in detail.recent.value"
+                                    :key="run.id"
+                                >
+                                    <RouterLink
+                                        class="rrow"
+                                        :to="{ name: RouteName.RUN, params: { id: run.id } }"
+                                    >
+                                        <StatusChip :status="run.status" />
+                                        <span class="rrow-main">
+                                            <span class="id">{{ shortId(run.id) }}</span>
+                                            <span class="sub">{{ runSub(run) }}</span>
+                                        </span>
+                                        <span class="when"><VCTimeago :datetime="run.createdAt" /></span>
+                                    </RouterLink>
+                                </li>
+                            </ul>
+                            <EmptyState
+                                v-else
+                                icon="play"
+                                title="No runs yet"
+                                :text="emptyRunsText"
                             >
-                                Open approvals
-                            </RouterLink>
-                        </div>
-                        <ul
-                            v-if="detail.waitingRuns.value.length"
-                            class="rows"
-                        >
-                            <li
-                                v-for="run in detail.waitingRuns.value"
-                                :key="run.id"
-                            >
+                                <VCButton
+                                    v-if="canStart"
+                                    class="btn btn-sm btn-primary"
+                                    @click="startOpen = true"
+                                >
+                                    <NavIcon name="play" />Start run
+                                </VCButton>
+                            </EmptyState>
+                        </section>
+                    </div>
+                    <div class="ov-col">
+                        <section class="card panel">
+                            <div class="panel-head">
+                                <h3>
+                                    Waiting for approval<span
+                                        v-if="detail.waitingTotal.value"
+                                        class="badge"
+                                    >{{ detail.waitingTotal.value }}</span>
+                                </h3>
                                 <RouterLink
-                                    class="aprow"
+                                    v-if="detail.waitingRuns.value.length"
                                     :to="{ name: RouteName.APPROVALS }"
                                 >
-                                    <b>{{ run.waiting?.toolName }}</b>
-                                    <span class="aprow-timer"><ExpiryCountdown :until="run.waiting!.expiresAt" /></span>
-                                    <span class="sub">run {{ shortId(run.id) }}{{ run.concurrencyKey ? ` · ${run.concurrencyKey}` : '' }}</span>
+                                    Open approvals
                                 </RouterLink>
-                            </li>
-                        </ul>
-                        <p
-                            v-else
-                            class="panel-empty"
-                        >
-                            Nothing waiting for a person.
-                        </p>
-                    </section>
-                    <section class="card panel">
-                        <div class="panel-head">
-                            <h3>Triggers</h3>
-                            <span>{{ chips.length }}</span>
-                        </div>
-                        <ul class="rows tlist">
-                            <li
-                                v-for="chip in chips"
-                                :key="chip.id"
+                            </div>
+                            <ul
+                                v-if="detail.waitingRuns.value.length"
+                                class="rows"
                             >
-                                <div class="tlist-top">
-                                    <TriggerChip :chip="chip" />
-                                    <code v-if="chip.source !== 'http' && chip.id !== `${chip.source}:${chip.detail}`">{{ chip.id }}</code>
-                                </div>
-                                <div
-                                    v-if="chip.source === 'cron' && scheduleOf(chip.id)"
-                                    class="endpoint"
+                                <li
+                                    v-for="run in detail.waitingRuns.value"
+                                    :key="run.id"
                                 >
-                                    <em>next</em>
-                                    <code><ExpiryCountdown
-                                        :until="scheduleOf(chip.id)!.nextAt"
-                                        :soon-ms="0"
-                                    /> · {{ formatFireTime(scheduleOf(chip.id)!.nextAt, scheduleOf(chip.id)!.timezone) }}</code>
-                                </div>
-                                <div
-                                    v-else-if="chip.hook"
-                                    class="endpoint"
+                                    <RouterLink
+                                        class="aprow"
+                                        :to="{ name: RouteName.APPROVALS }"
+                                    >
+                                        <b>{{ run.waiting?.toolName }}</b>
+                                        <span class="aprow-timer"><ExpiryCountdown :until="run.waiting!.expiresAt" /></span>
+                                        <span class="sub">run {{ shortId(run.id) }}{{ run.concurrencyKey ? ` · ${run.concurrencyKey}` : '' }}</span>
+                                    </RouterLink>
+                                </li>
+                            </ul>
+                            <p
+                                v-else
+                                class="panel-empty"
+                            >
+                                Nothing waiting for a person.
+                            </p>
+                        </section>
+                        <section class="card panel">
+                            <div class="panel-head">
+                                <h3>Triggers</h3>
+                                <span>{{ chips.length }}</span>
+                            </div>
+                            <ul class="rows tlist">
+                                <li
+                                    v-for="chip in chips"
+                                    :key="chip.id"
                                 >
-                                    <em>hook</em><code>POST {{ chip.hook }}</code>
-                                </div>
-                                <div
-                                    v-else-if="chip.source === 'http'"
-                                    class="endpoint"
-                                >
-                                    <em>route</em><code>POST {{ config.apiBase }}/agents/{{ agent.name }}/runs</code>
-                                </div>
-                            </li>
-                        </ul>
-                    </section>
+                                    <div class="tlist-top">
+                                        <TriggerChip :chip="chip" />
+                                        <code v-if="chip.source !== 'http' && chip.id !== `${chip.source}:${chip.detail}`">{{ chip.id }}</code>
+                                    </div>
+                                    <div
+                                        v-if="chip.source === 'cron' && scheduleOf(chip.id)"
+                                        class="endpoint"
+                                    >
+                                        <em>next</em>
+                                        <code><ExpiryCountdown
+                                            :until="scheduleOf(chip.id)!.nextAt"
+                                            :soon-ms="0"
+                                        /> · {{ formatFireTime(scheduleOf(chip.id)!.nextAt, scheduleOf(chip.id)!.timezone) }}</code>
+                                    </div>
+                                    <div
+                                        v-else-if="chip.hook"
+                                        class="endpoint"
+                                    >
+                                        <em>hook</em><code>POST {{ chip.hook }}</code>
+                                    </div>
+                                    <div
+                                        v-else-if="chip.source === 'http'"
+                                        class="endpoint"
+                                    >
+                                        <em>route</em><code>POST {{ config.apiBase }}/agents/{{ agent.name }}/runs</code>
+                                    </div>
+                                </li>
+                            </ul>
+                        </section>
+                    </div>
                 </div>
-            </div>
-        </template>
+            </template>
+        </div>
 
         <StartRunModal
             v-model:open="startOpen"

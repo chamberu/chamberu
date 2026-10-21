@@ -13,7 +13,7 @@ export type ScheduleGroup = { agent: string; schedules: ScheduleWire[] };
 export function groupByAgent(schedules: readonly ScheduleWire[]): ScheduleGroup[] {
     const groups = new Map<string, ScheduleWire[]>();
     for (const schedule of schedules) groups.set(schedule.agent, [...groups.get(schedule.agent) ?? [], schedule]);
-    return groups.entries().toArray()
+    return Array.from(groups)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([agent, list]) => ({ agent, schedules: list.sort((a, b) => Date.parse(a.nextAt) - Date.parse(b.nextAt)) }));
 }

@@ -13,6 +13,8 @@ const API = 'http://127.0.0.1:3000';
 
 const ICONS_ID = 'virtual:chamvi-icons';
 
+const { version } = JSON.parse(readFileSync(new URL('package.json', import.meta.url), 'utf8')) as { version: string };
+
 /**
  * The Lucide icons the vuecs preset names, bundled as one small Iconify
  * collection: Iconify would otherwise fetch them from api.iconify.design,
@@ -43,6 +45,8 @@ export default defineConfig(({ command }) => ({
     root: 'app',
     base: command === 'build' ? './' : '/ui/',
     plugins: [vue(), tailwindcss(), icons()],
+    // the login footer's "chamvi 0.1"
+    define: { __CHAMVI_VERSION__: JSON.stringify(version) },
     build: {
         outDir: '../dist/app',
         emptyOutDir: true,

@@ -17,9 +17,11 @@ import type {
  * at once; a failed run is ignored (the caller keeps its own error state).
  * A tick that comes due while the page is hidden waits until it is shown
  * again (a background tab sends nothing); `refresh()` always runs.
+ * A run that resolves to a number waits that many ms (at least `intervalMs`)
+ * before the next tick, e.g. a 429's `Retry-After`.
  */
 export function createPoller(
-    run: () => Promise<void>,
+    run: () => Promise<number | void>,
     intervalMs: number,
     timers?: PollerTimers,
     visibility: IPageVisibility | undefined = documentVisibility(),
@@ -42,13 +44,15 @@ export function createPoller(
         deferred = false;
         if (inflight) return inflight;
         inflight = (async () => {
+            let delay = intervalMs;
             try {
-                await run();
+                const next = await run();
+                if (typeof next === 'number' && next > delay) delay = next;
             } catch {
                 // the next tick tries again
             } finally {
                 inflight = undefined;
-                if (active) timer = set(due, intervalMs);
+                if (active) timer = set(due, delay);
             }
         })();
         return inflight;

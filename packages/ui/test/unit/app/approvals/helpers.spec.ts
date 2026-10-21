@@ -9,9 +9,10 @@ import { describe, expect, it } from 'vitest';
 import { createMemoryHistory } from 'vue-router';
 import { createResumeToken } from '../../../../../core/src/approval/module.ts';
 import { RESUME_STORAGE_KEY } from '../../../../app/approvals/constants.ts';
-import type { RunWire } from '../../../../app/api/types.ts';
+import type { AgentWire, RunWire } from '../../../../app/api/types.ts';
 import {
     decodeResumeToken,
+    notifiedLine,
     pendingApprovals,
     readResumeToken,
     stripResumeToken,
@@ -22,6 +23,7 @@ import { DEV_CONFIG } from '../../../../app/config/constants.ts';
 import { RouteName } from '../../../../app/router/constants.ts';
 import { createUiRouter } from '../../../../app/router/module.ts';
 import { fakeClient, meFor } from '../../../utils/client.ts';
+import { wireRun } from '../../../utils/runs.ts';
 import { MemoryStorage } from '../../../utils/storage.ts';
 
 describe('decodeResumeToken', () => {
@@ -179,5 +181,37 @@ describe('pendingApprovals', () => {
             result: 'forbidden', 
             approved: true, 
         }], 'r3')).toEqual([run]);
+    });
+});
+
+describe('notifiedLine', () => {
+    const waiting = {
+        kind: 'approval' as const,
+        approvalId: 'a1',
+        toolName: 'deploy',
+        input: {},
+        expiresAt: '2026-10-22T10:00:00.000Z',
+        tokenId: 't1',
+    };
+    const agent = (notify?: string): AgentWire => ({
+        name: 'deploy',
+        triggers: [],
+        budget: { maxSteps: 20 },
+        approvals: ['deploy'],
+        state: [],
+        ...(notify ? { notify } : {}),
+    });
+
+    it('names the notifier once sent', () => {
+        const run = wireRun({ waiting: { ...waiting, notifiedAt: '2026-10-21T10:00:00.000Z' } });
+        expect(notifiedLine(run, agent('capture'))).toEqual({ text: 'capture', warn: false });
+        expect(notifiedLine(run, undefined)).toEqual({ text: 'sent', warn: false });
+    });
+
+    it('says nobody for an agent without a notifier, else that it retries', () => {
+        const run = wireRun({ waiting });
+        expect(notifiedLine(run, agent())).toEqual({ text: 'nobody', warn: false });
+        expect(notifiedLine(run, agent('capture'))).toEqual({ text: 'not sent (retrying)', warn: true });
+        expect(notifiedLine(run, undefined)).toEqual({ text: 'not sent (retrying)', warn: true });
     });
 });

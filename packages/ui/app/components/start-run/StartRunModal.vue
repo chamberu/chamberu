@@ -7,7 +7,7 @@
  */
 
 import { ref, watch } from 'vue';
-import { parsePayload } from '../../agents/helpers.ts';
+import { createStartKeys, parsePayload } from '../../agents/helpers.ts';
 import { ApiError } from '../../api/error.ts';
 import type { StartRunResult } from '../../api/types.ts';
 
@@ -15,7 +15,7 @@ const props = defineProps<{
     agent: string;
     /** Who the run is started as, for the lede. */
     invoker?: string;
-    start: (payload: unknown) => Promise<StartRunResult>;
+    start: (payload: unknown, idempotencyKey: string) => Promise<StartRunResult>;
 }>();
 
 const emit = defineEmits<{ started: [result: StartRunResult] }>();
@@ -24,6 +24,7 @@ const open = defineModel<boolean>('open', { required: true });
 const payload = ref('{}');
 const error = ref<string>();
 const busy = ref(false);
+const keys = createStartKeys();
 
 watch(open, (value) => {
     if (!value) return;
@@ -39,7 +40,8 @@ async function submit(): Promise<void> {
     busy.value = true;
     error.value = undefined;
     try {
-        const result = await props.start(parsed.value);
+        const result = await props.start(parsed.value, keys.keyFor(payload.value));
+        keys.succeeded();
         open.value = false;
         emit('started', result);
     } catch (e) {

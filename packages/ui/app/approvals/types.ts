@@ -14,8 +14,14 @@ export type DecidedApproval = {
     run: RunWire;
     result: AnswerResult;
     approved: boolean;
-    reason?: string
+    reason?: string;
+    /** Who answered (the signed-in principal's name or id) and when (ISO). */
+    by?: string;
+    at?: string;
 };
+
+/** The callout's "notified" line. */
+export type NotifiedLine = { text: string; warn: boolean };
 
 /** The ids a resume token names, for display only: the server verifies the token. */
 export type ResumeClaims = { runId: string; approvalId: string };

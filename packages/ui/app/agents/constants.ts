@@ -16,6 +16,12 @@ export const ACTIVITY_LIMIT = 100;
 
 export const AGENTS_POLL_MS = 15_000;
 
+/**
+ * Running and waiting runs read per overview pass, over all agents: the
+ * per-agent counters are exact up to this many active runs.
+ */
+export const ACTIVE_LIMIT = 100;
+
 export const RECENT_RUNS = 5;
 
 /** Waiting runs read for the agent page's approvals panel. */

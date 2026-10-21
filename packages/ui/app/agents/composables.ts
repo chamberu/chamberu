@@ -13,7 +13,7 @@ import {
 } from 'vue';
 import type { Ref } from 'vue';
 import type { ApiError } from '../api/error.ts';
-import { asApiError } from '../api/helpers.ts';
+import { asApiError, retryDelayOf } from '../api/helpers.ts';
 import type {
     AgentWire,
     IApiClient,
@@ -23,12 +23,13 @@ import type {
 } from '../api/types.ts';
 import { createPoller } from '../polling/module.ts';
 import {
+    ACTIVE_LIMIT,
     ACTIVITY_LIMIT,
     AGENTS_POLL_MS,
     AGENT_WAITING_LIMIT,
     RECENT_RUNS,
 } from './constants.ts';
-import { nextFireOf, summarizeActivity } from './helpers.ts';
+import { buildRollups, summarizeActivity } from './helpers.ts';
 import type { Activity, AgentRollup } from './types.ts';
 
 /** The registered agents (`GET /agents`, needs `run:read`), loaded once per call site. */
@@ -59,9 +60,10 @@ async function totalOf(client: IApiClient, agent: string, status: 'running' | 'w
 }
 
 /**
- * The agents overview: per agent the running and waiting totals, the newest run,
- * the next cron fire and the activity of the last 24 h (from its newest
- * `ACTIVITY_LIMIT` runs, the API has no time filter). Polls every `AGENTS_POLL_MS`.
+ * The agents overview: per agent the running and waiting counts, the newest run,
+ * the next cron fire and the activity of the last 24 h, from four requests per
+ * pass whatever the agent count (`buildRollups`). Polls every `AGENTS_POLL_MS`,
+ * and waits out a 429's or 503's `Retry-After`.
  */
 export function useAgentRollups(client: IApiClient) {
     const agents = shallowRef<AgentWire[]>([]);
@@ -72,34 +74,24 @@ export function useAgentRollups(client: IApiClient) {
 
     const poller = createPoller(async () => {
         try {
-            const [list, crons] = await Promise.all([client.listAgents(), client.listSchedules()]);
-            const now = Date.now();
-            const entries = await Promise.all(list.map(async (agent): Promise<[string, AgentRollup]> => {
-                const [recent, running, waiting] = await Promise.all([
-                    client.listRuns({
-                        agent: agent.name, 
-                        limit: ACTIVITY_LIMIT, 
-                        offset: 0, 
-                    }),
-                    totalOf(client, agent.name, 'running'),
-                    totalOf(client, agent.name, 'waiting'),
-                ]);
-                const rollup: AgentRollup = {
-                    running,
-                    waiting,
-                    activity: summarizeActivity(recent.data, now, ACTIVITY_LIMIT),
-                };
-                if (recent.data[0]) rollup.last = recent.data[0];
-                const next = nextFireOf(agent.name, crons);
-                if (next) rollup.nextFire = next;
-                return [agent.name, rollup];
-            }));
+            const [list, crons, recent, active] = await Promise.all([
+                client.listAgents(),
+                client.listSchedules(),
+                client.listRuns({ limit: ACTIVITY_LIMIT, offset: 0 }),
+                client.listRuns({
+                    status: ['running', 'waiting'],
+                    limit: ACTIVE_LIMIT,
+                    offset: 0,
+                }),
+            ]);
             agents.value = list;
             schedules.value = crons;
-            rollups.value = Object.fromEntries(entries);
+            rollups.value = buildRollups(list, crons, recent, active, Date.now());
             error.value = undefined;
+            return undefined;
         } catch (e) {
             error.value = asApiError(e);
+            return retryDelayOf(error.value);
         } finally {
             loaded.value = true;
         }
@@ -155,7 +147,7 @@ export function useAgentDetail(client: IApiClient, name: Ref<string>) {
                     offset: 0,
                 }),
             ]);
-            if (current !== generation) return;
+            if (current !== generation) return undefined;
             agent.value = list.find((a) => a.name === agentName);
             schedules.value = crons.filter((s) => s.agent === agentName);
             runs.value = recent.data;
@@ -165,8 +157,11 @@ export function useAgentDetail(client: IApiClient, name: Ref<string>) {
             waitingTotal.value = waiting.meta.total;
             activity.value = summarizeActivity(recent.data, Date.now(), ACTIVITY_LIMIT);
             error.value = undefined;
+            return undefined;
         } catch (e) {
-            if (current === generation) error.value = asApiError(e);
+            if (current !== generation) return undefined;
+            error.value = asApiError(e);
+            return retryDelayOf(error.value);
         } finally {
             if (current === generation) loaded.value = true;
         }
@@ -175,6 +170,14 @@ export function useAgentDetail(client: IApiClient, name: Ref<string>) {
     watch(name, () => {
         generation++;
         agent.value = undefined;
+        schedules.value = [];
+        runs.value = [];
+        totalRuns.value = 0;
+        running.value = 0;
+        waitingRuns.value = [];
+        waitingTotal.value = 0;
+        activity.value = summarizeActivity([], Date.now(), ACTIVITY_LIMIT);
+        error.value = undefined;
         loaded.value = false;
         void poller.refresh();
     });
@@ -195,8 +198,8 @@ export function useAgentDetail(client: IApiClient, name: Ref<string>) {
         loaded,
         notFound: computed(() => loaded.value && !error.value && !agent.value),
         refresh: () => poller.refresh(),
-        async start(payload: unknown): Promise<StartRunResult> {
-            const result = await client.startRun(name.value, { payload });
+        async start(payload: unknown, idempotencyKey?: string): Promise<StartRunResult> {
+            const result = await client.startRun(name.value, idempotencyKey === undefined ? { payload } : { payload, idempotencyKey });
             await poller.refresh();
             return result;
         },

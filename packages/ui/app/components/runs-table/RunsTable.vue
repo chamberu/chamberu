@@ -70,6 +70,16 @@ const range = computed(() => {
 });
 
 const row = (value: unknown) => value as RunWire;
+
+/* the mockup's quiet mono pager (style.css `.pager .vc-pagination`), not the theme's filled buttons */
+const PAGER_CLASSES = {
+    root: 'vc-pagination',
+    item: 'vc-pagination-item',
+    link: 'vc-pagination-link',
+    linkActive: '',
+    ellipsis: 'vc-pagination-ellipsis',
+};
+const PAGER_VARIANT = { variant: 'plain', size: 'plain' };
 </script>
 
 <template>
@@ -155,6 +165,8 @@ const row = (value: unknown) => value as RunWire;
                 :total="page.meta.total"
                 :limit="page.meta.limit"
                 :offset="page.meta.offset"
+                :theme-class="PAGER_CLASSES"
+                :theme-variant="PAGER_VARIANT"
                 @load="(meta: { offset: number }) => emit('page', meta.offset)"
             />
         </div>

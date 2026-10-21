@@ -60,6 +60,22 @@ describe('createPoller', () => {
         poller.stop();
     });
 
+    it('waits a returned delay longer than the interval before the next tick', async () => {
+        const fake = createFakeTimers();
+        const delays = [30_000, 10, undefined];
+        const poller = createPoller(async () => delays.shift(), 1000, fake.timers);
+        poller.start();
+        await flush();
+        expect(fake.pending()).toEqual([30_000]);
+        fake.fire();
+        await flush();
+        expect(fake.pending()).toEqual([1000]); // a shorter delay keeps the interval
+        fake.fire();
+        await flush();
+        expect(fake.pending()).toEqual([1000]);
+        poller.stop();
+    });
+
     it('stop cancels the next tick', async () => {
         const fake = createFakeTimers();
         let calls = 0;

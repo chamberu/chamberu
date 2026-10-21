@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
     plugins: [vue()],
+    define: { __CHAMVI_VERSION__: JSON.stringify('0.0.0') },
     resolve: {
         // the sources, not dist
         alias: [

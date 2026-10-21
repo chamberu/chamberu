@@ -8,11 +8,14 @@
 import { describe, expect, it } from 'vitest';
 import { ACTIVITY_WINDOW_MS } from '../../../../app/agents/constants.ts';
 import {
+    activityLabel,
+    createStartKeys,
     failedSummary,
     formatBudgetTime,
     hasHttpTrigger,
     lastRunOf,
     matchesName,
+    newIdempotencyKey,
     nextFireOf,
     oldestWaiting,
     parsePayload,
@@ -21,6 +24,7 @@ import {
     triggerChips,
 } from '../../../../app/agents/helpers.ts';
 import type { AgentWire, ScheduleWire } from '../../../../app/api/types.ts';
+import { withoutIteratorHelpers } from '../../../utils/iterator.ts';
 import { wireRun } from '../../../utils/runs.ts';
 
 const NOW = Date.parse('2026-10-21T12:00:00.000Z');
@@ -146,6 +150,26 @@ describe('tokenShares', () => {
         expect(tokenShares(runs)).toBe('triage 70% · digest 30%');
         expect(tokenShares([])).toBe('');
     });
+
+    it('needs no iterator helpers (Safari before 18.4)', () => {
+        const runs = [
+            wireRun({ agent: 'triage', usage: { inputTokens: 700, outputTokens: 0 } }),
+            wireRun({ agent: 'digest', usage: { inputTokens: 300, outputTokens: 0 } }),
+        ];
+        expect(withoutIteratorHelpers(() => tokenShares(runs))).toBe('triage 70% · digest 30%');
+    });
+});
+
+describe('activityLabel', () => {
+    it('counts the runs of the window by status, without iterator helpers', () => {
+        const activity = summarizeActivity([
+            wireRun({ status: 'completed', createdAt: ago(1) }),
+            wireRun({ status: 'failed', createdAt: ago(2) }),
+            wireRun({ status: 'completed', createdAt: ago(3) }),
+        ], NOW, 100);
+        expect(withoutIteratorHelpers(() => activityLabel(activity))).toBe('3 runs in the last 24 h: 2 completed, 1 failed');
+        expect(activityLabel(summarizeActivity([], NOW, 100))).toBe('No runs in the last 24 h');
+    });
 });
 
 describe('agent helpers', () => {
@@ -203,5 +227,22 @@ describe('agent helpers', () => {
         const bad = parsePayload('{ a: 1 }');
         expect(bad.ok).toBe(false);
         expect(bad.ok ? '' : bad.message).toMatch(/not valid JSON/);
+    });
+});
+
+describe('createStartKeys', () => {
+    it('keeps the key for a retry of the same payload and mints one otherwise', () => {
+        let n = 0;
+        const keys = createStartKeys(() => `k${++n}`);
+        expect(keys.keyFor('{"a":1}')).toBe('k1');
+        expect(keys.keyFor('{"a":1}')).toBe('k1'); // the retry after a lost answer dedupes
+        expect(keys.keyFor('{"a":2}')).toBe('k2'); // an edited payload is a new start
+        keys.succeeded();
+        expect(keys.keyFor('{"a":2}')).toBe('k3'); // the same payload again after a success starts anew
+    });
+
+    it('mints 32 hex characters', () => {
+        expect(newIdempotencyKey()).toMatch(/^[0-9a-f]{32}$/);
+        expect(newIdempotencyKey()).not.toBe(newIdempotencyKey());
     });
 });

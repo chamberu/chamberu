@@ -18,3 +18,6 @@ declare module 'virtual:chamvi-icons' {
     const icons: IconifyJSON;
     export default icons;
 }
+
+/** The package version, replaced at build time (vite.config.ts `define`). */
+declare const __CHAMVI_VERSION__: string;

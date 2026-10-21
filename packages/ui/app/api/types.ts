@@ -61,6 +61,8 @@ export type ApproveBody = {
 
 export type StartRunBody = {
     payload: unknown;
+    /** Dedupes a retried start (scoped to the agent, the source and the principal). */
+    idempotencyKey?: string;
 };
 
 export type StartRunResult = { runId: string; deduplicated: boolean };

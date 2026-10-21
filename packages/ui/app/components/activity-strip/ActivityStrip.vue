@@ -7,19 +7,14 @@
  */
 
 import { computed } from 'vue';
+import { activityLabel } from '../../agents/helpers.ts';
 import type { Activity } from '../../agents/types.ts';
 
 const props = defineProps<{ activity: Activity }>();
 
 const count = computed(() => `${props.activity.count}${props.activity.saturated ? '+' : ''}`);
 const hint = computed(() => (props.activity.saturated ? 'Counted from the newest runs read; there may be more.' : undefined));
-const label = computed(() => {
-    if (props.activity.count === 0) return 'No runs in the last 24 h';
-    const counts = new Map<string, number>();
-    for (const mark of props.activity.marks) counts.set(mark.status, (counts.get(mark.status) ?? 0) + 1);
-    const parts = counts.entries().toArray().map(([status, n]) => `${n} ${status}`).join(', ');
-    return `${count.value} runs in the last 24 h: ${parts}`;
-});
+const label = computed(() => activityLabel(props.activity));
 </script>
 
 <template>

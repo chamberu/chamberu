@@ -2,7 +2,7 @@
     "name": "@chamvi/ui",
     "version": "0.1.0",
     "type": "module",
-    "description": "The chamvi dashboard: watch runs live, answer approvals, inspect agent state and schedules, served by @chamvi/http.",
+    "description": "The chamvi dashboard: an agents overview, start and watch runs live, answer approvals, inspect agent state and schedules, served by @chamvi/http.",
     "author": {
         "name": "Peter Placzek",
         "email": "contact@tada5hi.net",

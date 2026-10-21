@@ -6,9 +6,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
-import type { RunWire } from '../../api/types.ts';
+import type { AgentWire, RunWire } from '../../api/types.ts';
+import { notifiedLine } from '../../approvals/helpers.ts';
 import { RouteName } from '../../router/constants.ts';
 import { shortId } from '../../runs/helpers.ts';
 import ExpiryCountdown from '../expiry-countdown/ExpiryCountdown.vue';
@@ -21,6 +22,8 @@ const props = defineProps<{
     /** The principal holds `agent:<agent>:approve`. */
     canAnswer: boolean;
     busy?: boolean;
+    /** The run's agent (`GET /agents`), for its notifier; `undefined` while unknown. */
+    summary?: AgentWire;
 }>();
 
 const emit = defineEmits<{ answer: [approved: boolean, reason: string] }>();
@@ -31,6 +34,7 @@ function send(approved: boolean): void {
 }
 
 const id = `reason-${props.run.id}`;
+const notified = computed(() => notifiedLine(props.run, props.summary));
 </script>
 
 <template>
@@ -79,8 +83,11 @@ const id = `reason-${props.run.id}`;
                     <dt>requested</dt>
                     <dd><VCTimeago :datetime="run.updatedAt" /></dd>
                     <dt>notified</dt>
-                    <dd :class="{ warn: !run.waiting.notifiedAt }">
-                        {{ run.waiting.notifiedAt ? 'yes' : 'not sent yet' }}
+                    <dd
+                        :class="{ warn: notified.warn }"
+                        data-testid="notified"
+                    >
+                        {{ notified.text }}
                     </dd>
                 </dl>
                 <label

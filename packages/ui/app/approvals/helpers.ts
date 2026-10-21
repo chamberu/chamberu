@@ -8,8 +8,12 @@
 import { isObject } from 'smob';
 import type { LocationQueryRaw } from 'vue-router';
 import { RESUME_STORAGE_KEY } from './constants.ts';
-import type { RunWire } from '../api/types.ts';
-import type { DecidedApproval, ResumeClaims } from './types.ts';
+import type { AgentWire, RunWire } from '../api/types.ts';
+import type {
+    DecidedApproval,
+    NotifiedLine,
+    ResumeClaims,
+} from './types.ts';
 
 /** `runId` and `approvalId` of a resume token (base64url JSON before the `.`), never verified here. */
 export function decodeResumeToken(token: string): ResumeClaims | undefined {
@@ -103,4 +107,15 @@ export function pendingApprovals(
         d.run.id === run.id &&
         d.run.waiting?.approvalId === run.waiting?.approvalId
     )));
+}
+
+/**
+ * The callout's "notified" line: the notifier's name once the approval was sent,
+ * `nobody` for an agent without a notifier, else "not sent (retrying)" (the
+ * engine re-sends on every poll). `agent` is `undefined` while unknown (no `run:read`).
+ */
+export function notifiedLine(run: RunWire, agent: AgentWire | undefined): NotifiedLine {
+    if (run.waiting?.notifiedAt) return { text: agent?.notify ?? 'sent', warn: false };
+    if (agent && !agent.notify) return { text: 'nobody', warn: false };
+    return { text: 'not sent (retrying)', warn: true };
 }

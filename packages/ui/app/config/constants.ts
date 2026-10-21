@@ -13,3 +13,6 @@ export const DEV_CONFIG: UiConfig = {
     uiBase: '/ui',
     auth: { tokens: true },
 };
+
+/** The package's major.minor (`chamvi 0.1` on the login page), from vite.config.ts `define`. */
+export const UI_VERSION = __CHAMVI_VERSION__.split('.').slice(0, 2).join('.');

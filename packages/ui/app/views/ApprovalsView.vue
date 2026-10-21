@@ -9,6 +9,7 @@
 import { useToast } from '@vuecs/overlays';
 import { computed, inject, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import { useAgents } from '../agents/composables.ts';
 import type { RunWire } from '../api/types.ts';
 import { useApprovals, useDeepLinkApproval } from '../approvals/composables.ts';
 import { INBOX, INBOX_POLL_MS  } from '../approvals/constants.ts';
@@ -35,6 +36,10 @@ const inbox = inject(INBOX, undefined) ?? useApprovals(client);
 const token = ref(readResumeToken(storage));
 const deepLink = useDeepLinkApproval(client, token, storage);
 
+const { agents } = useAgents(client);
+const summaryOf = (agent: string) => agents.value.find((a) => a.name === agent);
+const principalName = computed(() => session.principal.value?.name ?? session.principal.value?.id);
+
 const permissions = computed(() => session.principal.value?.permissions ?? []);
 const canAnswer = (agent: string) => hasPermission(permissions.value, `agent:${agent}:approve`);
 
@@ -58,6 +63,8 @@ async function answer(run: RunWire, approved: boolean, reason: string): Promise<
             result,
             approved,
             reason: reason.trim() || undefined,
+            by: principalName.value,
+            at: new Date().toISOString(),
         }, ...decided.value.filter((d) => d.run.id !== run.id)];
         toast.add({ title: `${MESSAGES[result](approved)} · run ${shortId(run.id)}`, color: result === 'answered' ? 'success' : 'warning' });
     } catch (e) {
@@ -106,6 +113,7 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
                 v-if="deepLink.run.value?.waiting && deepLink.run.value.waiting.approvalId === deepLink.claims.value.approvalId"
                 :run="deepLink.run.value"
                 :can-answer="true"
+                :summary="summaryOf(deepLink.run.value.agent)"
                 :busy="busy === 'link'"
                 data-testid="deep-link"
                 @answer="answerLink"
@@ -210,7 +218,13 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
                     </p>
                 </div>
                 <span class="decision">
-                    <b>{{ MESSAGES[entry.result](entry.approved) }}</b><template v-if="entry.reason">: “{{ entry.reason }}”</template>
+                    <b>{{ MESSAGES[entry.result](entry.approved) }}</b>
+                    <template v-if="entry.result === 'answered' && entry.by"> by {{ entry.by }}</template>
+                    <template v-if="entry.reason">: “{{ entry.reason }}”</template>
+                    <template v-if="entry.at">
+                        <span> · </span>
+                        <VCTimeago :datetime="entry.at" />
+                    </template>
                 </span>
             </div>
         </div>
@@ -220,6 +234,7 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
             :key="`${run.id}-${run.waiting?.approvalId}`"
             :run="run"
             :can-answer="canAnswer(run.agent)"
+            :summary="summaryOf(run.agent)"
             :busy="busy === run.id"
             @answer="(approved, reason) => answer(run, approved, reason)"
         />

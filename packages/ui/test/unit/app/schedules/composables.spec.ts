@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { effectScope } from 'vue';
 import type { ScheduleWire } from '../../../../app/api/types.ts';
 import { groupByAgent } from '../../../../app/schedules/helpers.ts';
+import { withoutIteratorHelpers } from '../../../utils/iterator.ts';
 import { useSchedules } from '../../../../app/schedules/composables.ts';
 import { apiError, fakeClient } from '../../../utils/client.ts';
 import { flush } from '../../../utils/timers.ts';
@@ -53,5 +54,10 @@ describe('groupByAgent', () => {
             ['digest', ['cron:a', 'cron:b']],
             ['triage', ['cron:x']],
         ]);
+    });
+
+    it('needs no iterator helpers (Safari before 18.4)', () => {
+        const groups = withoutIteratorHelpers(() => groupByAgent([schedule('triage', 'cron:x', '2026-10-22T09:00:00.000Z')]));
+        expect(groups.map((g) => g.agent)).toEqual(['triage']);
     });
 });

@@ -6,6 +6,7 @@
  */
 
 import { isObject } from 'smob';
+import { RATE_LIMIT_BACKOFF_MS } from './constants.ts';
 import { ApiError } from './error.ts';
 import type { PageQuery, RunListFilter } from './types.ts';
 
@@ -53,6 +54,12 @@ export async function toApiError(response: Response): Promise<ApiError> {
         return new ApiError(response.status, body.code, typeof body.message === 'string' ? body.message : response.statusText, retryAfter);
     }
     return new ApiError(response.status, `http_${response.status}`, response.statusText || `HTTP ${response.status}`, retryAfter);
+}
+
+/** The wait in ms a 429 or 503 asks for (`Retry-After`; a bare 429 a minute), else `undefined`. */
+export function retryDelayOf(error: ApiError): number | undefined {
+    if (error.retryAfter !== undefined && (error.status === 429 || error.status === 503)) return error.retryAfter * 1000;
+    return error.status === 429 ? RATE_LIMIT_BACKOFF_MS : undefined;
 }
 
 /** `error` when it is an `ApiError`, else a `network_error` (status 0) carrying its message. */

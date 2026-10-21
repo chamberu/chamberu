@@ -73,10 +73,11 @@ test('dispatch, live run, approve, completed', async ({ page, request }) => {
     const approval = page.locator(`[data-testid="approval"][data-run="${runId}"]`);
     await expect(approval).toBeVisible();
     await expect(approval.locator('pre.code')).toContainText('"env": "prod"');
+    await expect(approval.getByTestId('notified')).toHaveText('capture');
     await approval.getByRole('button', { name: 'Approve' }).click();
 
     const decided = page.getByTestId('decided').filter({ hasText: runId.slice(0, 8) });
-    await expect(decided).toContainText('Approved');
+    await expect(decided).toContainText('Approved by e2e');
     await decided.getByRole('link', { name: runId.slice(0, 8) }).click();
 
     await expect(page).toHaveURL(new RegExp(`/ui/runs/${runId}$`));
@@ -101,7 +102,7 @@ test('open an agent and start a run from its page', async ({ page }) => {
     const card = page.locator('[data-testid="agent-card"][data-agent="deploy"]');
     await expect(card).toContainText('http');
     await expect(page.locator('[data-testid="agent-card"][data-agent="digest"]')).toContainText('0 8 * * 1-5');
-    await card.click();
+    await card.getByRole('link', { name: 'deploy', exact: true }).click();
 
     await expect(page).toHaveURL(/\/ui\/agents\/deploy$/);
     await expect(page.getByRole('heading', { name: 'deploy', level: 1 })).toBeVisible();

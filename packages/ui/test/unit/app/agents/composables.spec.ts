@@ -5,10 +5,16 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { describe, expect, it } from 'vitest';
-import { effectScope, ref } from 'vue';
-import { ACTIVITY_LIMIT } from '../../../../app/agents/constants.ts';
+import {
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
+import { effectScope, nextTick, ref } from 'vue';
+import { ACTIVITY_LIMIT, AGENTS_POLL_MS } from '../../../../app/agents/constants.ts';
 import { useAgentDetail, useAgentRollups } from '../../../../app/agents/composables.ts';
+import { ApiError } from '../../../../app/api/error.ts';
 import type {
     AgentWire,
     RunListFilter,
@@ -102,14 +108,76 @@ describe('useAgentRollups', () => {
         expect(state.rollups.value.digest).toMatchObject({ running: 0, waiting: 0 });
         expect(state.rollups.value.digest!.last).toBeUndefined();
         expect(state.rollups.value.digest!.nextFire?.trigger).toBe('cron:0 8 * * *');
-        expect(seen.filter((f) => f.agent === 'deploy' && !f.status)[0]!.limit).toBe(ACTIVITY_LIMIT);
+        expect(seen.every((f) => f.agent === undefined)).toBe(true);
+        expect(seen.find((f) => !f.status)!.limit).toBe(ACTIVITY_LIMIT);
         scope.stop();
+    });
+
+    it('sends four requests per pass whatever the agent count', async () => {
+        const many: AgentWire[] = Array.from({ length: 40 }, (_, i) => ({ ...AGENTS[0]!, name: `agent-${i}` }));
+        let requests = 0;
+        const client = fakeClient({
+            listAgents: async () => { requests++; return many; },
+            listSchedules: async () => { requests++; return []; },
+            listRuns: async (filter) => { requests++; return listRunsOver([])(filter); },
+        });
+        const scope = effectScope();
+        const state = scope.run(() => useAgentRollups(client))!;
+        await flush();
+        expect(Object.keys(state.rollups.value)).toHaveLength(40);
+        expect(requests).toBe(4);
+        scope.stop();
+    });
+
+    it('tells an agent without a run among the newest read from one that has none', async () => {
+        const runs = Array.from({ length: ACTIVITY_LIMIT + 1 }, (_, i) => wireRun({
+            id: `d${i}`,
+            agent: i < ACTIVITY_LIMIT ? 'deploy' : 'digest',
+            status: 'completed',
+            createdAt: now,
+        }));
+        const client = fakeClient({
+            listAgents: async () => AGENTS,
+            listSchedules: async () => [],
+            listRuns: listRunsOver(runs),
+        });
+        const scope = effectScope();
+        const state = scope.run(() => useAgentRollups(client))!;
+        await flush();
+        expect(state.rollups.value.digest).toMatchObject({ lastBeyond: true });
+        expect(state.rollups.value.deploy!.activity).toMatchObject({ count: ACTIVITY_LIMIT, saturated: true });
+        expect(state.rollups.value.deploy!.lastBeyond).toBe(false);
+        scope.stop();
+    });
+
+    it('waits out a 429 before the next pass', async () => {
+        vi.useFakeTimers();
+        try {
+            let calls = 0;
+            const client = fakeClient({
+                listAgents: async () => { calls++; throw new ApiError(429, 'too_many_requests', 'slow down', 45); },
+                listSchedules: async () => [],
+                listRuns: listRunsOver([]),
+            });
+            const scope = effectScope();
+            const state = scope.run(() => useAgentRollups(client))!;
+            await vi.advanceTimersByTimeAsync(0);
+            expect(state.error.value?.status).toBe(429);
+            await vi.advanceTimersByTimeAsync(AGENTS_POLL_MS);
+            expect(calls).toBe(1);
+            await vi.advanceTimersByTimeAsync(45_000 - AGENTS_POLL_MS);
+            expect(calls).toBe(2);
+            scope.stop();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('a 403 sets error without throwing', async () => {
         const client = fakeClient({
             listAgents: async () => { throw apiError(403, 'forbidden'); },
             listSchedules: async () => [],
+            listRuns: listRunsOver([]),
         });
         const scope = effectScope();
         const state = scope.run(() => useAgentRollups(client))!;
@@ -166,6 +234,40 @@ describe('useAgentDetail', () => {
         scope.stop();
     });
 
+    it('drops the previous agent\'s error and data on a switch', async () => {
+        let fail = true;
+        const runs = [wireRun({
+            id: 'c1',
+            agent: 'deploy',
+            status: 'completed',
+            createdAt: now,
+        })];
+        const gate = Promise.withResolvers<void>();
+        const client = fakeClient({
+            listAgents: async () => {
+                if (fail) throw apiError(0, 'network_error');
+                await gate.promise;
+                return AGENTS;
+            },
+            listSchedules: async () => [],
+            listRuns: listRunsOver(runs),
+        });
+        const name = ref('digest');
+        const scope = effectScope();
+        const detail = scope.run(() => useAgentDetail(client, name))!;
+        await flush();
+        expect(detail.error.value?.code).toBe('network_error');
+        fail = false;
+        name.value = 'deploy';
+        await nextTick();
+        expect(detail.error.value).toBeUndefined(); // the pass for deploy is still in flight
+        expect(detail.runs.value).toEqual([]);
+        gate.resolve();
+        await flush();
+        expect(detail.agent.value?.name).toBe('deploy');
+        scope.stop();
+    });
+
     it('reports an unknown agent', async () => {
         const client = fakeClient({
             listAgents: async () => AGENTS,
@@ -181,13 +283,13 @@ describe('useAgentDetail', () => {
 
     it('starts a run and refreshes', async () => {
         const runs: RunWire[] = [];
-        const started: Array<[string, unknown]> = [];
+        const started: Array<[string, unknown, string | undefined]> = [];
         const client = fakeClient({
             listAgents: async () => AGENTS,
             listSchedules: async () => [],
             listRuns: listRunsOver(runs),
             startRun: async (name, body) => {
-                started.push([name, body.payload]);
+                started.push([name, body.payload, body.idempotencyKey]);
                 runs.unshift(wireRun({
                     id: 'new', 
                     agent: name, 
@@ -200,9 +302,9 @@ describe('useAgentDetail', () => {
         const scope = effectScope();
         const detail = scope.run(() => useAgentDetail(client, ref('deploy')))!;
         await flush();
-        expect(await detail.start({ env: 'prod' })).toEqual({ runId: 'new', deduplicated: false });
+        expect(await detail.start({ env: 'prod' }, 'key-1')).toEqual({ runId: 'new', deduplicated: false });
         await flush();
-        expect(started).toEqual([['deploy', { env: 'prod' }]]);
+        expect(started).toEqual([['deploy', { env: 'prod' }, 'key-1']]);
         expect(detail.recent.value.map((r) => r.id)).toEqual(['new']);
         scope.stop();
     });

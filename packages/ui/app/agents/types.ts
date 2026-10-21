@@ -39,6 +39,8 @@ export type AgentRollup = {
     running: number;
     waiting: number;
     last?: RunWire;
+    /** No run of the agent among the newest runs read, while the app has older ones. */
+    lastBeyond: boolean;
     nextFire?: ScheduleWire;
     activity: Activity;
 };

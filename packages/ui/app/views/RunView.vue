@@ -271,6 +271,7 @@ async function onCancel(): Promise<void> {
                     <div class="step-sum static">
                         <span class="step-idx">#{{ nextIndex + i }}</span>
                         <span class="kind kind-llm">llm</span>
+                        <span class="title">Model turn</span>
                         <span class="streaming-tag">streaming</span>
                         <span class="meta">run.delta · {{ entry.reasoning ? 'reasoning, text' : 'text' }}</span>
                     </div>

@@ -6,7 +6,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { useRouter } from 'vue-router';
+import { ACTIVITY_LIMIT } from '../../agents/constants.ts';
 import type { AgentRollup, TriggerChip as Chip } from '../../agents/types.ts';
 import type { AgentWire } from '../../api/types.ts';
 import { RouteName } from '../../router/constants.ts';
@@ -17,33 +17,29 @@ import NavIcon from '../nav-icon/NavIcon.vue';
 import StatusChip from '../status-chip/StatusChip.vue';
 import TriggerChip from '../trigger-chip/TriggerChip.vue';
 
-const props = defineProps<{
+defineProps<{
     agent: AgentWire;
     chips: Chip[];
     rollup?: AgentRollup;
 }>();
 
-const router = useRouter();
-
-function open(): void {
-    void router.push({ name: RouteName.AGENT, params: { name: props.agent.name } });
-}
 </script>
 
 <template>
     <article
         class="card agent-card"
-        tabindex="0"
-        role="link"
-        :aria-label="`Open agent ${agent.name}`"
         data-testid="agent-card"
         :data-agent="agent.name"
-        @click="open"
-        @keydown.enter="open"
     >
         <div class="agent-top">
             <h2 class="display">
-                {{ agent.name }}
+                <!-- the one link of the card, stretched over it (::after); the last-run link sits above -->
+                <RouterLink
+                    class="card-link"
+                    :to="{ name: RouteName.AGENT, params: { name: agent.name } }"
+                >
+                    {{ agent.name }}
+                </RouterLink>
             </h2>
             <NavIcon name="go" />
         </div>
@@ -72,7 +68,7 @@ function open(): void {
                     <b
                         v-else
                         class="mono"
-                    >–</b>
+                    >—</b>
                 </div>
             </div>
             <ActivityStrip :activity="rollup.activity" />
@@ -86,12 +82,14 @@ function open(): void {
                     <RouterLink
                         class="id"
                         :to="{ name: RouteName.RUN, params: { id: rollup.last.id } }"
-                        @click.stop
                     >
                         {{ shortId(rollup.last.id) }}
                     </RouterLink>
                     <span class="when"><VCTimeago :datetime="rollup.last.createdAt" /></span>
                 </div>
+                <p v-else-if="rollup.lastBeyond">
+                    None among the newest {{ ACTIVITY_LIMIT }} runs.
+                </p>
                 <p v-else>
                     No runs yet.<template v-if="chips.some((c) => c.source === 'http')">
                         Start one from its page.
