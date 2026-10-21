@@ -28,7 +28,7 @@ Packages live in `packages/*`. `@chamvi/coding`, `@chamvi/core`, `@chamvi/github
 - **[Project Structure](.agents/structure.md)**: Workspace layout, existing and planned packages, core module map
 - **[Architecture](.agents/architecture.md)**: Run lifecycle and statuses, trigger envelope, store contract, idempotency and effects
 - **[Testing](.agents/testing.md)**: Vitest setup, source aliasing, in-memory store, store contract suite
-- **[Conventions](.agents/conventions.md)**: Tooling, naming rules, commits, release flow
+- **[Conventions](.agents/conventions.md)**: Tooling, naming rules, commits, release flow, external references (`.agents/references/`)
 - **[Design](.agents/design.md)**: Brand direction, colour tokens, type, logo and docs landing page rules
 
 ## Plans

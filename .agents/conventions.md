@@ -93,3 +93,15 @@ Conventional Commits: `<type>(scope): <description>`, e.g. `feat(core): add run 
 - `ci.yml`: on push and PR to `master`, install, lint, build, typecheck, test on Node 22 and 24.
 - `release.yml`: release-please on `master` opens a release PR per package (`node-workspace` plugin, tags like `core-v0.1.0`); when merged, build and publish via `tada5hi/monoship@v2` with npm provenance.
 - Both reuse the composite actions in `.github/actions/{install,build}`; change Node setup or caching there.
+
+## References
+
+External project references live in `.agents/references/`: one Markdown file per external project this codebase cross-references, building a cumulative mapping so later work finds the corresponding code without searching again. When you look up source code or docs in a referenced project, update its file with:
+
+- The source file path / function name (or doc anchor) in the external project
+- The corresponding file path / function name in chamvi
+- Any behavioral differences between the implementations (pin claims to a version or commit)
+
+Current references:
+
+- [eve.md](references/eve.md): Vercel's eve agent framework (and `@vercel/agent-runs`), the closest competitor; concept map for durability, approvals, channels, sandboxes, coding tools, tracing, evals and compaction.
