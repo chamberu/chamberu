@@ -16,6 +16,7 @@ import {
     createKvContainer,
     listSchedules,
     parseCollectionQuery,
+    parseKvListQuery,
     requireAgent,
     serializeDoc,
     summarizeAgent,
@@ -26,7 +27,7 @@ function param(event: IAppEvent, name: string): string {
 }
 
 /**
- * `GET /agents`, `GET /schedules`, `GET/PATCH /agents/:name/state/kv/:key`
+ * `GET /agents`, `GET /schedules`, `GET /agents/:name/state/kv`, `GET/PATCH /agents/:name/state/kv/:key`
  * and `GET /agents/:name/state/collections/:collection`.
  */
 export function registerAgentRoutes(app: App, ctx: HttpContext): void {
@@ -40,6 +41,12 @@ export function registerAgentRoutes(app: App, ctx: HttpContext): void {
     app.get('/schedules', defineCoreHandler(async (event) => {
         await authorize(event, ctx, Permission.RUN_READ);
         return { data: listSchedules(ctx.agents.values(), ctx.clock.now()) };
+    }));
+
+    app.get('/agents/:name/state/kv', defineCoreHandler(async (event) => {
+        await authorize(event, ctx, Permission.STATE_READ);
+        const agent = requireAgent(ctx.agents, param(event, 'name'));
+        return { data: await ctx.store.kvList(agent.name, parseKvListQuery(event.searchParams)) };
     }));
 
     app.get('/agents/:name/state/kv/:key', defineCoreHandler(async (event) => {

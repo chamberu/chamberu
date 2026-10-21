@@ -11,6 +11,7 @@ import { registerAgentRoutes } from '../agents/module.ts';
 import { registerHealthRoutes } from '../health/module.ts';
 import { registerHookRoutes } from '../hooks/module.ts';
 import { registerMcpRoutes } from '../mcp/module.ts';
+import { registerMeRoutes } from '../me/module.ts';
 import { installPlugins } from '../plugins/module.ts';
 import { assertNoNul } from '../request/helpers.ts';
 import { registerRoutes } from '../routes/module.ts';
@@ -35,6 +36,7 @@ export function createHttpApp(options: HttpAppOptions): App {
         return event.next();
     }));
     registerHealthRoutes(app, ctx);
+    registerMeRoutes(app, ctx);
     registerAgentRoutes(app, ctx);
     registerRunRoutes(app, ctx);
     registerHookRoutes(app, ctx);

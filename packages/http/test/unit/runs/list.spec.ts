@@ -63,6 +63,16 @@ describe('GET /runs', () => {
         });
     });
 
+    it('GET /runs?sort=-createdAt lists newest first', async () => {
+        const { app, ids } = await setup();
+        const body = await (await call(app, 'GET', '/runs?sort=-createdAt', { token: READER_TOKEN })).json() as ListBody;
+        expect(body.data.map((run) => run.id)).toEqual([ids[2], ids[1], ids[0]]);
+
+        const page = await (await call(app, 'GET', '/runs?sort=-createdAt&page[limit]=1&page[offset]=1', { token: READER_TOKEN })).json() as ListBody;
+        expect(page.data.map((run) => run.id)).toEqual([ids[1]]);
+        expect(page.meta.total).toBe(3);
+    });
+
     it('accepts percent-encoded brackets', async () => {
         const { app } = await setup();
         const body = await (await call(app, 'GET', '/runs?filter%5Bagent%5D=echo', { token: READER_TOKEN })).json() as ListBody;

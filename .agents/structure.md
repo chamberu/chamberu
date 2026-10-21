@@ -122,7 +122,8 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | `runs/` | Run and artifact routes (`module.ts`), `serializeRun()`, `serializeStep()`, `canReadRun()`, `loadReadableRun()`, `loadRunArtifact()`, `contentDisposition()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `MAX_ATTACHMENTS` (`constants.ts`, internal), `RunView`, `InvokerView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE, incl. `delta`) |
 | `hooks/` | No barrel: `POST /hooks/:agent<path>` |
 | `routes/` | No barrel: `registerRoutes()` serves `HttpAppOptions.routes` (extra routes of other packages) |
-| `agents/` | `/agents`, `/schedules` and state routes (`module.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
+| `agents/` | `/agents`, `/schedules` and state routes (`module.ts`, incl. the KV listing via `parseKvListQuery()` in `helpers.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
+| `me/` | `GET /me` (`registerMeRoutes()`, `module.ts`), `MeView` (`types.ts`, the only export) |
 | `mcp/` | `createMcpEndpoint()`, `registerMcpRoutes()` (`module.ts`), the tools (`tools.ts`), `waitForRun()`, `toJsonSchema()` (`helpers.ts`), `RunSummary`, `RunToolResult` (`types.ts`) |
 | `plugins/` | No barrel: `installPlugins()` (CORS, Prometheus, rate limit) |
 | `shutdown/` | `createShutdown()`, `IShutdown`, `ShutdownOptions`, the timeout defaults |

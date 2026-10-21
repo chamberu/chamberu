@@ -41,7 +41,7 @@ export function isUnlimitedRoute(event: IAppEvent, basePath: string, routes: rea
 
 /** The routes of the app as metric labels, matched against the path without `basePath`; keep in step with the route modules. */
 const ROUTE_TEMPLATES: Array<[RegExp, string]> = [
-    [/^\/(?:healthz|readyz|agents|schedules|runs|resume|mcp)$/, ''],
+    [/^\/(?:healthz|readyz|agents|schedules|runs|resume|mcp|me)$/, ''],
     [/^\/runs\/[^/]+$/, '/runs/:id'],
     [/^\/runs\/[^/]+\/stream$/, '/runs/:id/stream'],
     [/^\/runs\/[^/]+\/cancel$/, '/runs/:id/cancel'],
@@ -49,6 +49,7 @@ const ROUTE_TEMPLATES: Array<[RegExp, string]> = [
     [/^\/runs\/[^/]+\/artifacts$/, '/runs/:id/artifacts'],
     [/^\/runs\/[^/]+\/artifacts\/[^/]+$/, '/runs/:id/artifacts/:artifactId'],
     [/^\/agents\/[^/]+\/runs$/, '/agents/:name/runs'],
+    [/^\/agents\/[^/]+\/state\/kv$/, '/agents/:name/state/kv'],
     [/^\/agents\/[^/]+\/state\/kv\/[^/]+$/, '/agents/:name/state/kv/:key'],
     [/^\/agents\/[^/]+\/state\/collections\/[^/]+$/, '/agents/:name/state/collections/:collection'],
     [/^\/hooks\/[^/]+(?:\/.*)?$/, '/hooks/:agent/*'],

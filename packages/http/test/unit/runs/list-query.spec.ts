@@ -12,7 +12,19 @@ const parse = (query: string) => parseRunListQuery(new URLSearchParams(query));
 
 describe('parseRunListQuery', () => {
     it('defaults the page', () => {
-        expect(parse('')).toEqual({ limit: 50, offset: 0 });
+        expect(parse('')).toEqual({
+            limit: 50, 
+            offset: 0, 
+            order: 'asc', 
+        });
+    });
+
+    it('defaults order to asc', () => {
+        expect(parse('sort=createdAt').order).toBe('asc');
+    });
+
+    it('reads sort=-createdAt as order desc', () => {
+        expect(parse('sort=-createdAt').order).toBe('desc');
     });
 
     it('reads agent, status and the page', () => {
@@ -21,6 +33,7 @@ describe('parseRunListQuery', () => {
             status: ['queued', 'running'],
             limit: 5,
             offset: 2,
+            order: 'asc',
         });
         expect(parse('filter[status]=queued').status).toEqual(['queued']);
     });
@@ -59,7 +72,6 @@ describe('parseRunListQuery', () => {
         ['filter[agent]=a&filter[agent]=b', 'filter[agent] takes one agent name.'],
         ['filter[agent]=~a', 'filter[agent] takes one agent name.'],
         ['filter=and(eq(agent,\'a\'),eq(agent,\'b\'))', 'filter[agent] may be given once.'],
-        ['sort=-createdAt', 'Only sort=createdAt is supported.'],
     ])('rejects %s', (query, message) => {
         expect(() => parse(query)).toThrow(message);
     });
@@ -70,6 +82,7 @@ describe('parseRunListQuery', () => {
         'page[limit]=abc',
         'filter[nope]=1',
         'sort=id',
+        'sort=-id',
     ])('rejects %s', (query) => {
         expect(() => parse(query)).toThrow();
     });

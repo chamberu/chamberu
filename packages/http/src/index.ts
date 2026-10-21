@@ -9,5 +9,6 @@ export * from './agents/index.ts';
 export * from './app/index.ts';
 export * from './auth/index.ts';
 export * from './mcp/index.ts';
+export * from './me/index.ts';
 export * from './runs/index.ts';
 export * from './shutdown/index.ts';

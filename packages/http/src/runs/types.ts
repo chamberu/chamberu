@@ -30,6 +30,8 @@ export type RunListQuery = {
     status?: RunStatusLiteral[];
     limit: number;
     offset: number;
+    /** `sort=createdAt` (default) or `sort=-createdAt`. */
+    order: 'asc' | 'desc';
 };
 
 /** Body of `POST /agents/:name/runs`; internal. */

@@ -214,6 +214,7 @@ export function parseRunListQuery(searchParams: URLSearchParams, agentNames: Ite
     const query: RunListQuery = {
         limit: decoded.limit ?? DEFAULT_PAGE_LIMIT,
         offset: decoded.offset ?? 0,
+        order: 'asc',
     };
     for (const filter of decoded.filters) {
         if (seen.has(filter.field)) {
@@ -225,9 +226,10 @@ export function parseRunListQuery(searchParams: URLSearchParams, agentNames: Ite
     }
 
     const [sort, ...others] = decoded.sorts;
-    if (others.length > 0 || (sort && (sort.name !== 'createdAt' || sort.operator !== 'ASC'))) {
-        throw new BadRequestError({ message: 'Only sort=createdAt is supported.' });
+    if (others.length > 0 || (sort && sort.name !== 'createdAt')) {
+        throw new BadRequestError({ message: 'Only sort=createdAt or sort=-createdAt is supported.' });
     }
+    if (sort?.operator === 'DESC') query.order = 'desc';
 
     return query;
 }
