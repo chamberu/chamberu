@@ -154,7 +154,7 @@ export function createFakeOpenclaw(input: {
             });
         }
         const response = admit(recorded, text);
-        if (next?.kind === 'lose') throw new TypeError('fetch failed');
+        if (next?.kind === 'lose') throw new TypeError('fetch failed', { cause: new Error('other side closed') });
         return response;
     };
 

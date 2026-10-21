@@ -10,7 +10,7 @@ Each chamvi app serves an MCP endpoint at `/mcp` (Streamable HTTP, from [`@chamv
 - `get_run` and `list_runs` for status,
 - `resume_run` to answer an approval with its token and a decision.
 
-The endpoint uses the same bearer-token authentication as the REST API; give OpenClaw a principal with `agent:<name>:run` (and `agent:<name>:approve` where it may answer approvals), which also lets it read the runs it starts. This is how the owner says "what's relevant in my mail today?" in a chat and gets a run started.
+The endpoint uses the same bearer-token authentication as the REST API; give OpenClaw a principal with `agent:<name>:run` (and `agent:<name>:approve` where it may answer approvals), which also lets it read the runs it starts. With `agent:<name>:approve` the OpenClaw agent can approve on its own; see the warning under [Hooks out](#hooks-out). This is how the owner says "what's relevant in my mail today?" in a chat and gets a run started.
 
 ## Hooks out
 
@@ -32,12 +32,16 @@ In the OpenClaw configuration:
 
 For approvals the message includes how to answer: the `resumeUrl` link when configured (a link into the UI's approvals inbox), and the `resume_run` MCP tool call with the token, so the owner can approve from the chat.
 
+::: warning The relay agent holds the token
+The notification body is the tool input as the model wrote it and may repeat untrusted text (an issue body, a mail). OpenClaw wraps hook content as external, but that does not take tools away: an injected instruction reaches the OpenClaw agent next to the token and the `resume_run` call. If that agent's MCP principal holds `agent:<name>:approve`, a turn that follows the instruction approves without the owner. Grant it only when you accept that, or relay hooks through a separate, restricted OpenClaw agent (`agentId`, without the chamvi MCP server) and answer through the `resumeUrl` link.
+:::
+
 ### Caveats
 
 - OpenClaw runs an agent turn on the message (it does not post raw text) and treats it as external content; the message asks that agent to keep every link, id and token verbatim.
 - OpenClaw's idempotency replay is in memory and lasts 5 minutes after completion; a restart clears it. chamvi's `waiting.notifiedAt` and its per-approval lock are the primary dedupe, the key covers a response lost within those minutes.
 - A misconfigured hook (400, 401, 404) fails on every poll and reaches `onError` each time.
-- Keys over 256 characters (which OpenClaw ignores) are sent as `sha256:<hex>`.
+- Keys over 256 characters (which OpenClaw ignores) or with characters outside visible ASCII are sent as `sha256:<hex>`.
 
 ## In the cluster
 

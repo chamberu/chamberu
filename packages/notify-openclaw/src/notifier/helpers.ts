@@ -33,6 +33,12 @@ function optionalNonEmpty(value: unknown, label: string): string | undefined {
     return value;
 }
 
+/** A value `fetch` sends as a header as is: Latin-1, no control character, no surrounding whitespace. */
+function isHeaderSafe(value: string): boolean {
+    // eslint-disable-next-line no-control-regex
+    return !/[\x00-\x1F\x7F]|[^\x00-\xFF]/.test(value) && value.trim() === value;
+}
+
 function assertBaseUrl(value: unknown): string {
     if (!isNonEmpty(value)) throw invalid('baseUrl must be an absolute http(s) URL.');
     let url: URL;
@@ -58,11 +64,18 @@ export function resolveOptions(options: OpenclawNotifierOptions): ResolvedOpencl
     const name = options.name ?? DEFAULT_NOTIFIER_NAME;
     if (!isNonEmpty(name)) throw invalid('name must be a non-empty string.');
     if (!isNonEmpty(options.hooksToken)) throw invalid('hooksToken must be a non-empty string.');
+    if (!isHeaderSafe(options.hooksToken)) {
+        // fetch would refuse it on every send, with the token in its message
+        throw invalid('hooksToken must not hold control characters, characters above U+00FF or surrounding whitespace.');
+    }
     const baseUrl = assertBaseUrl(options.baseUrl);
-    const hooksPath = options.hooksPath ?? DEFAULT_HOOKS_PATH;
-    if (typeof hooksPath !== 'string' || !hooksPath.startsWith('/') || hooksPath === '/') {
+    const rawHooksPath = options.hooksPath ?? DEFAULT_HOOKS_PATH;
+    if (typeof rawHooksPath !== 'string' || !rawHooksPath.startsWith('/')) {
         throw invalid('hooksPath must start with "/" and must not be "/".');
     }
+    // `/hooks/` would build `/hooks//agent`
+    const hooksPath = rawHooksPath.replace(/\/+$/, '');
+    if (hooksPath === '') throw invalid('hooksPath must start with "/" and must not be "/".');
     const agentId = optionalNonEmpty(options.agentId, 'agentId');
     const deliver = options.deliver as Partial<OpenclawNotifierOptions['deliver']> | undefined;
     if (!isNonEmpty(deliver?.channel) || deliver.channel === 'last') {
@@ -144,6 +157,15 @@ export function redact(text: string, secrets: readonly (string | undefined)[]): 
         if (secret) out = out.split(secret).join('[redacted]');
     }
     return out;
+}
+
+/** The message of a failed `fetch`, with its cause (undici keeps ECONNREFUSED, ENOTFOUND, TLS errors there), redacted. */
+export function fetchErrorMessage(error: unknown, secrets: readonly (string | undefined)[]): string {
+    let message = error instanceof Error ? error.message : String(error);
+    if (error instanceof Error && error.cause instanceof Error && error.cause.message) {
+        message += ` (${error.cause.message})`;
+    }
+    return cutText(redact(message, secrets), ERROR_TEXT_MAX_LENGTH);
 }
 
 export function requestError(message: string): ChamviError {

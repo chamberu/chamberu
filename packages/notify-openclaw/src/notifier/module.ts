@@ -8,6 +8,7 @@
 import type { INotifier } from '@chamvi/core';
 import { HOOK_NAME } from './constants.ts';
 import {
+    fetchErrorMessage,
     renderMessage,
     requestError,
     resolveOptions,
@@ -56,8 +57,7 @@ export function openclaw(options: OpenclawNotifierOptions): INotifier {
                     });
                 } catch (error) {
                     if (controller.signal.aborted) throw timeout;
-                    const message = error instanceof Error ? error.message : String(error);
-                    throw requestError(`OpenClaw request failed: ${message}`);
+                    throw requestError(`OpenClaw request failed: ${fetchErrorMessage(error, secrets)}`);
                 }
                 if (response.ok) {
                     // admitted; the answer (`{ ok, runId }`) is not needed

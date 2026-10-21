@@ -123,6 +123,20 @@ describe('openclaw notify', () => {
         expect(fake.requests[0]!.url).toBe('https://gw.example/base/oc-hooks/agent');
     });
 
+    it('drops a trailing slash of the hooks path', async () => {
+        const fake = createFakeOpenclaw({ token: TOKEN });
+        const notifier = openclaw({
+            baseUrl: 'http://openclaw:18789',
+            hooksToken: TOKEN,
+            hooksPath: '/hooks/',
+            deliver: { channel: 'telegram', to: '12345' },
+            clock: new ControllableClock(),
+            fetch: fake.fetch,
+        });
+        await notifier.notify(approval, opts);
+        expect(fake.requests[0]!.url).toBe('http://openclaw:18789/hooks/agent');
+    });
+
     it('renders an approval', async () => {
         const { fake, notifier } = setup();
         await notifier.notify(approval, opts);
@@ -260,7 +274,18 @@ describe('openclaw notify', () => {
         fake.loseNextResponse();
         const error = await rejection(notifier.notify(approval, opts));
         expect(error.code).toBe('openclaw_request');
-        expect(error.message).toBe('OpenClaw request failed: fetch failed');
+        expect(error.message).toBe('OpenClaw request failed: fetch failed (other side closed)');
+    });
+
+    it('redacts the tokens in a fetch failure and its cause', async () => {
+        const { notifier } = setup({
+            fetch: async () => {
+                throw new TypeError(`Headers.append: "Bearer ${TOKEN}" is an invalid header value.`, { cause: new Error('tok-secret seen') });
+            },
+        });
+        const error = await rejection(notifier.notify({ ...approval, resumeToken: 'tok-secret' }, opts));
+        expect(error.code).toBe('openclaw_request');
+        expect(error.message).toBe('OpenClaw request failed: Headers.append: "Bearer [redacted]" is an invalid header value. ([redacted] seen)');
     });
 
     it('times out', async () => {
