@@ -1,0 +1,163 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { createHash } from 'node:crypto';
+import { ChamviError, InvalidAgentDefinitionError, systemClock } from '@chamvi/core';
+import type { Notification } from '@chamvi/core';
+import {
+    DEFAULT_HOOKS_PATH,
+    DEFAULT_NOTIFIER_NAME,
+    ERROR_TEXT_MAX_LENGTH,
+    IDEMPOTENCY_KEY_MAX_LENGTH,
+    MESSAGE_BODY_MAX_LENGTH,
+    OPENCLAW_REQUEST_ERROR_CODE,
+    OPENCLAW_TIMEOUT_MS,
+} from './constants.ts';
+import type { OpenclawNotifierOptions, ResolvedOpenclawOptions } from './types.ts';
+
+function invalid(message: string): InvalidAgentDefinitionError {
+    return new InvalidAgentDefinitionError(`openclaw: ${message}`);
+}
+
+function isNonEmpty(value: unknown): value is string {
+    return typeof value === 'string' && value.length > 0;
+}
+
+function optionalNonEmpty(value: unknown, label: string): string | undefined {
+    if (value === undefined) return undefined;
+    if (!isNonEmpty(value)) throw invalid(`${label} must be a non-empty string.`);
+    return value;
+}
+
+function assertBaseUrl(value: unknown): string {
+    if (!isNonEmpty(value)) throw invalid('baseUrl must be an absolute http(s) URL.');
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        throw invalid('baseUrl must be an absolute http(s) URL.');
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw invalid('baseUrl must be an absolute http(s) URL.');
+    if (url.username || url.password) throw invalid('baseUrl must not carry credentials; pass hooksToken.');
+    if (url.search || url.hash || value.includes('?') || value.includes('#')) {
+        throw invalid('baseUrl must not have a query or hash.');
+    }
+    return url.href;
+}
+
+/** `<baseUrl><hooksPath>/agent`, a base path of `baseUrl` kept. */
+export function hookUrl(baseUrl: string, hooksPath: string): string {
+    return `${baseUrl.replace(/\/+$/, '')}${hooksPath}/agent`;
+}
+
+export function resolveOptions(options: OpenclawNotifierOptions): ResolvedOpenclawOptions {
+    const name = options.name ?? DEFAULT_NOTIFIER_NAME;
+    if (!isNonEmpty(name)) throw invalid('name must be a non-empty string.');
+    if (!isNonEmpty(options.hooksToken)) throw invalid('hooksToken must be a non-empty string.');
+    const baseUrl = assertBaseUrl(options.baseUrl);
+    const hooksPath = options.hooksPath ?? DEFAULT_HOOKS_PATH;
+    if (typeof hooksPath !== 'string' || !hooksPath.startsWith('/') || hooksPath === '/') {
+        throw invalid('hooksPath must start with "/" and must not be "/".');
+    }
+    const agentId = optionalNonEmpty(options.agentId, 'agentId');
+    const deliver = options.deliver as Partial<OpenclawNotifierOptions['deliver']> | undefined;
+    if (!isNonEmpty(deliver?.channel) || deliver.channel === 'last') {
+        throw invalid('deliver.channel must name a channel ("last" is refused by OpenClaw hooks).');
+    }
+    if (!isNonEmpty(deliver.to)) throw invalid('deliver.to must be a non-empty string.');
+    const accountId = optionalNonEmpty(deliver.accountId, 'deliver.accountId');
+    if (options.resumeUrl !== undefined && typeof options.resumeUrl !== 'function') {
+        throw invalid('resumeUrl must be a function.');
+    }
+    const timeoutMs = options.timeoutMs ?? OPENCLAW_TIMEOUT_MS;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw invalid('timeoutMs must be a positive integer.');
+    return {
+        name,
+        url: hookUrl(baseUrl, hooksPath),
+        hooksToken: options.hooksToken,
+        ...(agentId === undefined ? {} : { agentId }),
+        deliver: {
+            channel: deliver.channel,
+            to: deliver.to,
+            ...(accountId === undefined ? {} : { accountId }),
+        },
+        ...(options.resumeUrl ? { resumeUrl: options.resumeUrl } : {}),
+        timeoutMs,
+        clock: options.clock ?? systemClock,
+        fetch: options.fetch ?? globalThis.fetch,
+    };
+}
+
+/**
+ * `text` when it has at most `max` characters, else its first `max`
+ * characters (one less when that would end on a high surrogate) and a note
+ * of how many were cut.
+ */
+export function cutText(text: string, max: number): string {
+    if (text.length <= max) return text;
+    let end = max;
+    const last = text.charCodeAt(end - 1);
+    if (last >= 0xD800 && last <= 0xDBFF) end--;
+    return `${text.slice(0, end)}\n… (cut, ${text.length - end} more characters)`;
+}
+
+/**
+ * The text OpenClaw's agent turn relays: deterministic for one notification
+ * (no clock value, no random id), so a resend replays instead of starting a
+ * second run.
+ */
+export function renderMessage(n: Notification, resumeUrl?: (token: string) => string): string {
+    const sections = [
+        'chamvi notification. Relay it to the user; keep every link, id and token exactly as written.',
+        n.title,
+        cutText(n.body, MESSAGE_BODY_MAX_LENGTH),
+        `Agent: ${n.agent}\nRun: ${n.runId}`,
+    ];
+    if (n.kind === 'approval' && n.resumeToken) {
+        const lines: string[] = [];
+        if (n.expiresAt) lines.push(`Expires: ${n.expiresAt.toISOString()}`);
+        if (resumeUrl) lines.push(`Approve or deny: ${resumeUrl(n.resumeToken)}`);
+        lines.push(`Or call the chamvi MCP tool resume_run with ${JSON.stringify({ token: n.resumeToken, approved: true })} to approve, or "approved":false to deny.`);
+        sections.push(lines.join('\n'));
+    }
+    return sections.join('\n\n');
+}
+
+/**
+ * The key as OpenClaw uses it (visible ASCII, at most 256 characters), else a
+ * stable `sha256:<hex>` stand-in: OpenClaw trims a key and ignores a longer
+ * one, which would turn off its replay.
+ */
+export function transportKey(key: string): string {
+    if (key.length <= IDEMPOTENCY_KEY_MAX_LENGTH && /^[\x21-\x7E]+$/.test(key)) return key;
+    return `sha256:${createHash('sha256').update(key).digest('hex')}`;
+}
+
+/** Every occurrence of a non-empty secret replaced by `[redacted]`. */
+export function redact(text: string, secrets: readonly (string | undefined)[]): string {
+    let out = text;
+    for (const secret of secrets) {
+        if (secret) out = out.split(secret).join('[redacted]');
+    }
+    return out;
+}
+
+export function requestError(message: string): ChamviError {
+    return new ChamviError({ message, code: OPENCLAW_REQUEST_ERROR_CODE });
+}
+
+/** `OpenClaw <status>: <text>`, redacted, then cut. */
+export function responseError(
+    status: number,
+    text: string,
+    retryAfter: string | null,
+    secrets: readonly (string | undefined)[],
+): ChamviError {
+    const detail = cutText(redact(text.trim(), secrets), ERROR_TEXT_MAX_LENGTH) || 'no response body';
+    const retry = retryAfter ? ` (retry after ${cutText(redact(retryAfter, secrets), 64)})` : '';
+    return requestError(`OpenClaw ${status}: ${detail}${retry}`);
+}
