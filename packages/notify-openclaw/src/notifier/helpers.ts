@@ -126,20 +126,23 @@ export function cutText(text: string, max: number): string {
  * The text OpenClaw's agent turn relays: deterministic for one notification
  * (no clock value, no random id), so a resend replays instead of starting a
  * second run. An approval carries the token only inside the `resumeUrl` link,
- * and as a `resume_run` call only with `resumeTool`.
+ * and as a `resume_run` call only with `resumeTool`; the relay line names the
+ * token only then, so a message without one never asks to keep one.
  */
 export function renderMessage(
     n: Notification,
     options: Pick<ResolvedOpenclawOptions, 'resumeUrl' | 'resumeTool'>,
 ): string {
     const { resumeUrl, resumeTool } = options;
+    const approval = n.kind === 'approval' && !!n.resumeToken;
+    const kept = approval && resumeTool ? 'every link, id and token' : 'every link and id';
     const sections = [
-        'chamvi notification. Relay it to the user; keep every link, id and token exactly as written.',
+        `chamvi notification. Relay it to the user; keep ${kept} exactly as written.`,
         n.title,
         cutText(n.body, MESSAGE_BODY_MAX_LENGTH),
         `Agent: ${n.agent}\nRun: ${n.runId}`,
     ];
-    if (n.kind === 'approval' && n.resumeToken) {
+    if (approval && n.resumeToken) {
         const lines: string[] = [];
         if (n.expiresAt) lines.push(`Expires: ${n.expiresAt.toISOString()}`);
         if (resumeUrl) lines.push(`Approve or deny: ${resumeUrl(n.resumeToken)}`);

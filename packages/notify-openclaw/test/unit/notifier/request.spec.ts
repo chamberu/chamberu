@@ -141,7 +141,7 @@ describe('openclaw notify', () => {
         const { fake, notifier } = setup();
         await notifier.notify(approval, opts);
         expect(messageOf(fake.requests[0]!.body)).toBe([
-            'chamvi notification. Relay it to the user; keep every link, id and token exactly as written.',
+            'chamvi notification. Relay it to the user; keep every link and id exactly as written.',
             '',
             'Approval required: deploy',
             '',
@@ -168,6 +168,24 @@ describe('openclaw notify', () => {
         expect(sent).not.toContain(secret);
         expect(sent).not.toContain(encodeURIComponent(secret));
         expect(sent).not.toContain('resume_run');
+    });
+
+    it('asks to keep a token only when the message carries the resume_run call', async () => {
+        const { fake, notifier } = setup();
+        await notifier.notify(approval, opts);
+        await notifier.notify({
+            kind: 'result',
+            agent: 'release',
+            runId: 'r1',
+            title: 'Done',
+            body: 'Deployed.',
+        }, opts);
+        const linked = setup({ resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}` });
+        await linked.notifier.notify(approval, opts);
+        for (const request of [...fake.requests, ...linked.fake.requests]) {
+            const [relay] = messageOf(request.body).split('\n');
+            expect(relay).toBe('chamvi notification. Relay it to the user; keep every link and id exactly as written.');
+        }
     });
 
     it('renders only the resume link when configured', async () => {

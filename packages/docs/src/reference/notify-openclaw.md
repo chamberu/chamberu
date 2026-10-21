@@ -38,7 +38,7 @@ Throws `InvalidAgentDefinitionError` for an empty `name`, `hooksToken`, `agentId
 The message is deterministic for one notification (no clock value, no random id), so a resend after a lost response is byte-identical and OpenClaw replays it:
 
 ```
-chamvi notification. Relay it to the user; keep every link, id and token exactly as written.
+chamvi notification. Relay it to the user; keep every link and id exactly as written.
 
 <title>
 
@@ -52,7 +52,7 @@ Approve or deny: <resumeUrl(token)>
 Or call the chamvi MCP tool resume_run with {"token":"<token>","approved":true} to approve, or "approved":false to deny.
 ```
 
-The last block is sent for approvals only; `Approve or deny` only with `resumeUrl`, the `resume_run` line only with `resumeTool: true`. With neither, the block ends with `Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.` instead. By default (`resumeTool: false`) the token is therefore in the request only inside the `resumeUrl` link, and without `resumeUrl` nowhere (body or headers). A cut body ends with `… (cut, <n> more characters)` and never splits a surrogate pair.
+For an approval with `resumeTool: true` the first line reads `keep every link, id and token exactly as written.` instead. The last block is sent for approvals only; `Approve or deny` only with `resumeUrl`, the `resume_run` line only with `resumeTool: true`. With neither, the block ends with `Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.` instead. By default (`resumeTool: false`) the token is therefore in the request only inside the `resumeUrl` link (verbatim), and without `resumeUrl` nowhere (body or headers). An OpenClaw agent that reads the link and holds `agent:<agent>:approve` on the chamvi MCP server can still approve through `resume_run`; see [Deployment: OpenClaw](/deployment/openclaw#hooks-out). A cut body ends with `… (cut, <n> more characters)` and never splits a surrogate pair.
 
 ### Failures
 
