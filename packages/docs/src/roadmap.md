@@ -12,6 +12,9 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 | `@chamberu/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |
 | `@chamberu/http` | REST control API, server-sent events, webhook intake, `/healthz`, `/readyz`, `/metrics`, the MCP endpoint, static-token, authup and OIDC authentication, graceful shutdown. See [HTTP API & MCP](/guide/http) |
 | `@chamberu/github` | GitHub App auth with an installation-token cache, the signed webhook route, `githubWebhook()` triggers deduplicated by delivery id, read tools and effect write tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
+| `@chamberu/sandbox` | Sandbox contracts, path, repository and limit rules, the run-scoped workspace manager with `create_workspace` and `dispose_workspace`. See [Workspaces & Coding](/guide/workspaces) |
+| `@chamberu/sandbox-local`, `@chamberu/sandbox-docker`, `@chamberu/sandbox-k8s` | Workspace providers: a temporary directory (development), a hardened container per workspace, a hardened pod per workspace; the `ghcr.io/chamberu/sandbox-node` image |
+| `@chamberu/coding` | Coding tools (`read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash`, `git_diff`) over a run's workspaces and the `ICodingBackend` contract |
 
 ## Milestones
 
@@ -19,7 +22,7 @@ chamberu is built milestone by milestone, each defined by one real agent that ha
 
 On every new issue in the owner's repositories, a triage agent labels it, checks for duplicates, tries to reproduce the bug against the latest release in a sandbox and posts a first reply asking for missing details. A periodic sweep catches issues missed while the agent was down.
 
-M1 is done only when everything it needs ships: the TypeORM store, the scheduler, the HTTP and MCP API with authentication, the GitHub connector, local and Kubernetes sandboxes with coding tools, the OpenClaw and GitHub notifiers, the UI, the CLI, the base image, the Helm chart, the template repository, and the triage agent itself, deployed with Flux.
+M1 is done only when everything it needs ships: the TypeORM store, the scheduler, the HTTP and MCP API with authentication, the GitHub connector, sandboxes with coding tools, the OpenClaw and GitHub notifiers, the UI, the CLI, the base image, the Helm chart (with the sandbox RBAC and an egress NetworkPolicy), the template repository, and the triage agent itself, deployed with Flux.
 
 ### M2: mail digest <Badge type="warning" text="Planned" />
 
@@ -33,8 +36,8 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 
 | Package | Status | Purpose |
 |---|---|---|
-| `@chamberu/sandbox-local`, `@chamberu/sandbox-k8s` | Planned (M1) | Disposable workspaces: a temp directory for development, a locked-down pod per workspace in production |
-| `@chamberu/coding` | Planned (M1) | Coding tools (read, edit, grep, bash, git diff) over a workspace |
+| Coding backend on the own tools | Planned (M1) | An `ICodingBackend` that runs the coding tools in a nested tool loop |
+| Workspace re-attach | Planned | A run resumed on another replica or after a restart finds its container or pod by label instead of a fresh workspace |
 | `@chamberu/coding-claude-code` | Planned (M3) | A coding backend that runs Claude Code inside the sandbox |
 | `@chamberu/notify-openclaw` | Planned (M1) | Notifications into OpenClaw chats. See [OpenClaw](/deployment/openclaw) |
 | `@chamberu/notify-github` | Planned (M1) | Notifications as issue or pull request comments |

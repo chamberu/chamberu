@@ -1,0 +1,62 @@
+name: Images
+
+on:
+    pull_request:
+        branches: [master]
+        paths:
+            - 'images/**'
+            - '.github/workflows/images.yml'
+    push:
+        branches: [master]
+        paths:
+            - 'images/**'
+            - '.github/workflows/images.yml'
+    schedule:
+        # weekly rebuild for base image security updates
+        - cron: '0 4 * * 1'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    packages: write
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    # never cancel a publish
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    sandbox-node:
+        name: sandbox-node
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Smoke test
+              run: |
+                  docker build -t sandbox-node:smoke images/sandbox-node
+                  output="$(docker run --rm sandbox-node:smoke sh -c 'node --version && git --version && id -u')"
+                  echo "$output"
+                  test "$(echo "$output" | tail -n 1)" = "1000"
+
+            # 24-<short sha> only for the push of a commit: a scheduled or
+            # manual rebuild of the same commit would move it to a new digest
+            - name: Tags
+              id: tags
+              run: |
+                  {
+                      echo 'list<<TAGS'
+                      echo '24'
+                      if [ "$GITHUB_EVENT_NAME" = 'push' ]; then echo "24-$(git rev-parse --short HEAD)"; fi
+                      echo 'TAGS'
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Publish
+              if: github.event_name != 'pull_request'
+              uses: tada5hi/craneship@v4
+              with:
+                  dockerFilePath: images/sandbox-node
+                  registryRepository: chamberu/sandbox-node
+                  registryTag: ${{ steps.tags.outputs.list }}
+                  platforms: linux/amd64,linux/arm64

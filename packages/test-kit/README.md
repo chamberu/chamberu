@@ -5,7 +5,7 @@
 <h1 align="center">@chamberu/test-kit</h1>
 
 <p align="center">
-    <b>Test helpers for chamberu: a controllable clock and the store contract suite.</b>
+    <b>Test helpers for chamberu: a controllable clock, the store contract suite and the workspace contract suite.</b>
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 npm install --save-dev @chamberu/test-kit @chamberu/core vitest
 ```
 
-`@chamberu/core` and `vitest` are peer dependencies.
+`@chamberu/core` and `vitest` are peer dependencies. `@chamberu/sandbox` is an optional peer, needed only for the workspace contract.
 
 ## Usage
 
@@ -52,12 +52,30 @@ const engine = new Engine({ store, agents: [], resumeSecret: 'secret', clock });
 clock.advance(60_000); // fires every timer due within the next minute, in order
 ```
 
+### Workspace contract
+
+Every sandbox provider proves its workspaces with the shared Vitest suite: argv exec and exit codes, stdin, `cwd` and path escapes, the 64 KiB output caps under a flood, process-group kills on timeout (a backgrounded grandchild included), abort, UTF-8 files and their size cap, and dispose during an exec. It runs real processes with short real timeouts, so the factory returns a fresh, repo-less workspace per test (the suite disposes it):
+
+```ts
+import { createLocalSandbox } from '@chamberu/sandbox-local';
+import { describeWorkspaceContract } from '@chamberu/test-kit';
+
+const provider = createLocalSandbox();
+describeWorkspaceContract('local', () => provider.create({ runId: 'contract' }));
+```
+
+`createGitFixture(files)` creates a temporary git repository with one commit of `files` on branch `main`, tagged `v1`, and returns `{ path, url, commit, cleanup }`; `url` is a `file://` URL for a manager with `allowFileRepos: true`.
+
 ## API
 
 | Export | Kind | Purpose |
 |---|---|---|
 | `ControllableClock` | class | `IClock` that advances only via `advance(ms)`; starts at `new Date(0)` unless given a date |
 | `describeStoreContract` | function | Vitest suite every `IStore` implementation must pass |
+| `describeWorkspaceContract` | function | Vitest suite every sandbox provider's `IWorkspace` must pass |
+| `createGitFixture` | function | A temporary git repository with one commit (branch `main`, tag `v1`) |
+
+Types: `WorkspaceContractFactory`, `GitFixture`.
 
 ## License
 

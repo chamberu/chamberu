@@ -27,6 +27,7 @@ describe('public api', () => {
         'ArtifactNotFoundError',
         'ToolNotAllowedError',
         'IncompleteResponseError',
+        'SandboxError',
         'hasPermission',
         'matchesPermission',
         'toolPermission',
@@ -48,6 +49,10 @@ describe('public api', () => {
 
     it('exports the trigger key bound', () => {
         expect(core.TRIGGER_KEY_MAX_LENGTH).toBe(255);
+    });
+
+    it('exports the sandbox error code', () => {
+        expect(core.ErrorCode.SANDBOX).toBe('sandbox_error');
     });
 
     it('exports the RunStatus enum', () => {

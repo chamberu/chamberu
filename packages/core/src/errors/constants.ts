@@ -15,6 +15,7 @@ export const ErrorCode = {
     INVALID_RUN_STATE: 'invalid_run_state',
     LEASE_LOST: 'lease_lost',
     RUN_NOT_FOUND: 'run_not_found',
+    SANDBOX: 'sandbox_error',
     TIMEOUT: 'Timeout',
     TOOL_NOT_ALLOWED: 'tool_not_allowed',
     VALIDATION: 'validation_error',

@@ -2,7 +2,7 @@
     "name": "@chamberu/test-kit",
     "version": "0.1.0",
     "type": "module",
-    "description": "Test helpers for chamberu: a controllable clock and the store contract suite.",
+    "description": "Test helpers for chamberu: a controllable clock, the store and workspace contract suites and a git fixture.",
     "author": {
         "name": "Peter Placzek",
         "email": "contact@tada5hi.net",
@@ -49,10 +49,17 @@
     },
     "license": "Apache-2.0",
     "devDependencies": {
-        "@chamberu/core": "^0.1.0"
+        "@chamberu/core": "^0.1.0",
+        "@chamberu/sandbox": "^0.1.0"
     },
     "peerDependencies": {
         "@chamberu/core": "^0.1.0",
+        "@chamberu/sandbox": "^0.1.0",
         "vitest": "^5"
+    },
+    "peerDependenciesMeta": {
+        "@chamberu/sandbox": {
+            "optional": true
+        }
     }
 }

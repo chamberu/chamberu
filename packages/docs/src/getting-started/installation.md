@@ -32,6 +32,18 @@ npm install --save-dev @chamberu/test-kit vitest
 
 See [Writing a Store](/stores/writing-a-store) and the [test-kit reference](/reference/test-kit).
 
+## Workspaces and coding tools
+
+Agents that run commands or edit code add the sandbox manager, the coding tools and one provider:
+
+```bash
+npm install @chamberu/sandbox @chamberu/coding @chamberu/sandbox-docker   # one container per workspace
+npm install @chamberu/sandbox @chamberu/coding @chamberu/sandbox-k8s      # one pod per workspace
+npm install @chamberu/sandbox @chamberu/coding @chamberu/sandbox-local    # development only, no isolation
+```
+
+`@chamberu/core` and `ai` are peer dependencies of all of them. See [Workspaces & Coding](/guide/workspaces).
+
 ## Packages
 
 | Package | Status |
@@ -41,6 +53,9 @@ See [Writing a Store](/stores/writing-a-store) and the [test-kit reference](/ref
 | `@chamberu/scheduler` | Shipped (0.x), cron triggers across replicas |
 | `@chamberu/store-typeorm` | Shipped (0.x), TypeORM store (PostgreSQL) |
 | `@chamberu/http` | Shipped (0.x), REST, SSE, webhooks and MCP |
-| `@chamberu/github`, notifiers, sandboxes, `@chamberu/ui`, `chamberu` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
+| `@chamberu/github` | Shipped (0.x), GitHub App webhooks and tools |
+| `@chamberu/sandbox`, `@chamberu/sandbox-local`, `@chamberu/sandbox-docker`, `@chamberu/sandbox-k8s` | Shipped (0.x), disposable workspaces |
+| `@chamberu/coding` | Shipped (0.x), coding tools over a workspace |
+| notifiers, `@chamberu/ui`, `chamberu` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
 
 chamberu is pre-1.0: a minor version may contain breaking changes, including changes to the store schema.

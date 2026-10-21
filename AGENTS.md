@@ -21,7 +21,7 @@ npm run lint
 - **Package manager**: npm (workspaces)
 - **Build orchestration**: nx (`nx run-many`), packages built with tsdown (ESM only)
 
-Packages live in `packages/*`. `@chamberu/core`, `@chamberu/github`, `@chamberu/http`, `@chamberu/scheduler`, `@chamberu/store-typeorm` and `@chamberu/test-kit` exist today; the others are planned (see [Project Structure](.agents/structure.md)).
+Packages live in `packages/*`. `@chamberu/coding`, `@chamberu/core`, `@chamberu/github`, `@chamberu/http`, `@chamberu/sandbox`, `@chamberu/sandbox-docker`, `@chamberu/sandbox-k8s`, `@chamberu/sandbox-local`, `@chamberu/scheduler`, `@chamberu/store-typeorm` and `@chamberu/test-kit` exist today (container images in `images/*`); the others are planned (see [Project Structure](.agents/structure.md)).
 
 ## Detailed Guides
 

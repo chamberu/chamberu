@@ -28,7 +28,7 @@
 
 ---
 
-> chamberu is at an early stage. `@chamberu/core`, `@chamberu/http`, `@chamberu/scheduler`, `@chamberu/store-typeorm` and `@chamberu/test-kit` exist; the sandbox, GitHub and dashboard packages are planned.
+> chamberu is at an early stage. The engine, HTTP, scheduler, TypeORM store, GitHub, sandbox and coding packages exist; the notifiers, the dashboard and the CLI are planned.
 
 ## Why chamberu?
 
@@ -45,6 +45,7 @@ chamberu is that layer as a library, with no orchestrator server and no Redis:
 | **Approvals** | You build the pause, the storage and the callback | The run waits in `waiting` with a signed resume token; `resume(token, decision)` continues it |
 | **Limits** | `stopWhen` per call | `maxSteps`, `maxTokens` and `timeoutMs` per run, settled as `completed` or `failed` |
 | **Shutdown** | Runs die with the process | `drain()` waits for in-flight runs, then marks the rest `interrupted` for another replica |
+| **Running code** | Model-written commands run wherever your process runs | `create_workspace` gives the run a disposable container or pod with the repository checked out; the coding tools work inside it, and it is removed when the run settles |
 
 Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageModel` and plain AI SDK tools (`tool()`, or `defineTool()` for tools that read the run context), and nothing is wrapped in a chamberu type.
 
@@ -71,7 +72,7 @@ Other tools also make agent runs durable. They differ in where the runs live and
 | **Tools restricted per caller** | `requireToolPermission()` reads the run's invoker | No | Tool-level checks are Enterprise | No | No |
 | **License** | Apache-2.0 | Apache-2.0 | Apache-2.0, `ee/` source-available | Server SSPL (delayed Apache-2.0) | Apache-2.0 |
 
-Pick one of the others when you want what chamberu does not have yet: a hosted service, a run dashboard (chamberu's is planned), container isolation per task, or Mastra's memory, RAG and evals. Pick chamberu when the agent lives next to your app and its database, and when a webhook that fires twice must not post twice.
+Pick one of the others when you want what chamberu does not have yet: a hosted service, a run dashboard (chamberu's is planned), or Mastra's memory, RAG and evals. Pick chamberu when the agent lives next to your app and its database, and when a webhook that fires twice must not post twice.
 
 [wf]: https://workflow-sdk.dev/docs/ai/human-in-the-loop
 [mastra]: https://mastra.ai/docs/long-running-agents/durable-agents
@@ -85,8 +86,14 @@ Pick one of the others when you want what chamberu does not have yet: a hosted s
 | [`@chamberu/core`](./packages/core) | [![npm](https://img.shields.io/npm/v/@chamberu/core)](https://www.npmjs.com/package/@chamberu/core) | Agents, triggers, the run engine, checkpoints, effect tools, approvals, agent state and the in-memory store |
 | [`@chamberu/http`](./packages/http) | [![npm](https://img.shields.io/npm/v/@chamberu/http)](https://www.npmjs.com/package/@chamberu/http) | REST, server-sent events, webhooks and an MCP endpoint over the run engine, with bearer, authup and OIDC authentication |
 | [`@chamberu/scheduler`](./packages/scheduler) | [![npm](https://img.shields.io/npm/v/@chamberu/scheduler)](https://www.npmjs.com/package/@chamberu/scheduler) | Fires `cron()` triggers once per tick across replicas, with overlap policies, timezones and one-shot jobs |
-| [`@chamberu/test-kit`](./packages/test-kit) | [![npm](https://img.shields.io/npm/v/@chamberu/test-kit)](https://www.npmjs.com/package/@chamberu/test-kit) | `ControllableClock` and the store contract suite every `IStore` implementation must pass |
 | [`@chamberu/store-typeorm`](./packages/store-typeorm) | [![npm](https://img.shields.io/npm/v/@chamberu/store-typeorm)](https://www.npmjs.com/package/@chamberu/store-typeorm) | TypeORM store (PostgreSQL): durable runs, leases and agent state across replicas |
+| [`@chamberu/github`](./packages/github) | [![npm](https://img.shields.io/npm/v/@chamberu/github)](https://www.npmjs.com/package/@chamberu/github) | GitHub App authentication, verified webhook triggers deduplicated by delivery id, and issue, label, comment and search tools |
+| [`@chamberu/sandbox`](./packages/sandbox) | [![npm](https://img.shields.io/npm/v/@chamberu/sandbox)](https://www.npmjs.com/package/@chamberu/sandbox) | Sandbox contracts and the workspace manager: one workspace per run and repository, `create_workspace` / `dispose_workspace` tools, cleanup when the run settles |
+| [`@chamberu/sandbox-local`](./packages/sandbox-local) | [![npm](https://img.shields.io/npm/v/@chamberu/sandbox-local)](https://www.npmjs.com/package/@chamberu/sandbox-local) | Workspaces in a temporary directory, for development and tests (no isolation) |
+| [`@chamberu/sandbox-docker`](./packages/sandbox-docker) | [![npm](https://img.shields.io/npm/v/@chamberu/sandbox-docker)](https://www.npmjs.com/package/@chamberu/sandbox-docker) | One hardened container per workspace: non-root, read-only root, no capabilities, resource limits |
+| [`@chamberu/sandbox-k8s`](./packages/sandbox-k8s) | [![npm](https://img.shields.io/npm/v/@chamberu/sandbox-k8s)](https://www.npmjs.com/package/@chamberu/sandbox-k8s) | One hardened pod per workspace, without a service account token |
+| [`@chamberu/coding`](./packages/coding) | [![npm](https://img.shields.io/npm/v/@chamberu/coding)](https://www.npmjs.com/package/@chamberu/coding) | `read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash` and `git_diff` inside a workspace |
+| [`@chamberu/test-kit`](./packages/test-kit) | [![npm](https://img.shields.io/npm/v/@chamberu/test-kit)](https://www.npmjs.com/package/@chamberu/test-kit) | `ControllableClock`, the store and workspace contract suites, and a git fixture |
 
 ## Quick start
 
@@ -143,6 +150,43 @@ await engine.drain();
 ```
 
 `MemoryStore` keeps everything in process memory; it is for development and tests. Effect tools, approvals, agent state, budgets and the full option reference are in the [`@chamberu/core` README](./packages/core#readme).
+
+### Give the agent a workspace
+
+```bash
+npm install @chamberu/sandbox @chamberu/sandbox-docker @chamberu/coding --save
+```
+
+```typescript
+import { codingTools } from '@chamberu/coding';
+import { createWorkspaceManager } from '@chamberu/sandbox';
+import { createDockerSandbox } from '@chamberu/sandbox-docker';
+
+const workspaces = createWorkspaceManager({
+    // one container per workspace from ghcr.io/chamberu/sandbox-node:24
+    provider: createDockerSandbox(),
+    // the model can only clone your own repositories
+    allowRepo: (url) => url.startsWith('https://github.com/acme/'),
+});
+
+const repro = defineAgent({
+    name: 'repro',
+    model: anthropic('claude-sonnet-5-5'),
+    instructions: 'Check out the repository from the payload, write a failing test for the reported bug ' +
+        'and answer with the output and the diff.',
+    triggers: [http()],
+    tools: { ...workspaces.tools(), ...codingTools(workspaces) },
+    // every shell command waits for a human
+    approvals: { bash: 'user' },
+});
+
+// add repro to the Engine's agents, then: a run's workspaces go once it settled
+workspaces.attach(engine);
+// on shutdown, after engine.drain()
+await workspaces.close();
+```
+
+`createLocalSandbox()` from `@chamberu/sandbox-local` runs workspaces in a temporary directory for development; `createKubernetesSandbox({ namespace })` from `@chamberu/sandbox-k8s` runs one pod per workspace. Limits, the image and the hardening are in the [`@chamberu/sandbox` README](./packages/sandbox#readme).
 
 ## Development
 

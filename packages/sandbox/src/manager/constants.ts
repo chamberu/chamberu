@@ -1,0 +1,15 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+/** Default cap of workspaces one run may hold at once (pending creates included). */
+export const MAX_WORKSPACES_PER_RUN = 3;
+
+/** Default minimum interval between the garbage collections `acquire` starts. */
+export const GC_INTERVAL_MS = 600_000;
+
+/** Default bound of `close()`: how long it waits for disposals and creates in flight. */
+export const CLOSE_TIMEOUT_MS = 30_000;

@@ -4,9 +4,14 @@
     "bump-patch-for-minor-pre-major": true,
     "initial-version": "0.1.0",
     "packages": {
+        "packages/coding": {"component": "coding"},
         "packages/core": {"component": "core"},
         "packages/github": {"component": "github"},
         "packages/http": {"component": "http"},
+        "packages/sandbox": {"component": "sandbox"},
+        "packages/sandbox-docker": {"component": "sandbox-docker"},
+        "packages/sandbox-k8s": {"component": "sandbox-k8s"},
+        "packages/sandbox-local": {"component": "sandbox-local"},
         "packages/scheduler": {"component": "scheduler"},
         "packages/store-typeorm": {"component": "store-typeorm"},
         "packages/test-kit": {"component": "test-kit"}

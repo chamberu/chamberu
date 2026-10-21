@@ -6,6 +6,7 @@ export default defineConfig({
         // the sources, not dist
         alias: [
             { find: /^@chamberu\/core$/, replacement: fileURLToPath(new URL('../../core/src/index.ts', import.meta.url)) },
+            { find: /^@chamberu\/sandbox$/, replacement: fileURLToPath(new URL('../../sandbox/src/index.ts', import.meta.url)) },
             { find: /^@chamberu\/test-kit$/, replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)) },
         ],
     },
