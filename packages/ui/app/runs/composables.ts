@@ -14,7 +14,7 @@ import {
 import type { Ref } from 'vue';
 import type { RunStatusLiteral } from '@chamvi/core';
 import type { ApiError } from '../api/error.ts';
-import { asApiError } from '../api/helpers.ts';
+import { asApiError, retryDelayOf } from '../api/helpers.ts';
 import type {
     IApiClient,
     RunListFilter,
@@ -41,8 +41,10 @@ export function useRunList(client: IApiClient, filter: Ref<RunListFilter>) {
         try {
             page.value = await client.listRuns(filter.value);
             error.value = undefined;
+            return undefined;
         } catch (e) {
             error.value = asApiError(e);
+            return retryDelayOf(error.value);
         } finally {
             loading.value = false;
         }
@@ -74,8 +76,10 @@ export function useRunCounts(client: IApiClient, statuses: readonly RunStatusLit
             const pages = await Promise.all(statuses.map((status) => client.listRuns({ status: [status], limit: 1 })));
             counts.value = Object.fromEntries(statuses.map((status, i) => [status, pages[i]!.meta.total]));
             error.value = undefined;
+            return undefined;
         } catch (e) {
             error.value = asApiError(e);
+            return retryDelayOf(error.value);
         }
     }, RUN_COUNTS_POLL_MS);
     poller.start();
@@ -93,8 +97,10 @@ export function useRunActivity(client: IApiClient) {
             const page = await client.listRuns({ limit: ACTIVITY_LIMIT, offset: 0 });
             activity.value = summarizeActivity(page.data, Date.now(), ACTIVITY_LIMIT);
             error.value = undefined;
+            return undefined;
         } catch (e) {
             error.value = asApiError(e);
+            return retryDelayOf(error.value);
         }
     }, RUN_COUNTS_POLL_MS);
     poller.start();

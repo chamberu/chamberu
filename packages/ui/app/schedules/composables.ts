@@ -9,7 +9,7 @@ import { onScopeDispose, shallowRef } from 'vue';
 import type { ApiError } from '../api/error.ts';
 import type { IApiClient, ScheduleWire } from '../api/types.ts';
 import { createPoller } from '../polling/module.ts';
-import { asApiError } from '../api/helpers.ts';
+import { asApiError, retryDelayOf } from '../api/helpers.ts';
 import { SCHEDULES_POLL_MS } from './constants.ts';
 
 /** `GET /schedules`, refreshed every `SCHEDULES_POLL_MS` while the scope lives. */
@@ -20,8 +20,10 @@ export function useSchedules(client: IApiClient) {
         try {
             schedules.value = await client.listSchedules();
             error.value = undefined;
+            return undefined;
         } catch (e) {
             error.value = asApiError(e);
+            return retryDelayOf(error.value);
         }
     }, SCHEDULES_POLL_MS);
     poller.start();

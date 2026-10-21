@@ -15,7 +15,7 @@ import type { Ref } from 'vue';
 import { ApiError } from '../api/error.ts';
 import type { IApiClient, RunDetail, RunWire } from '../api/types.ts';
 import { createPoller } from '../polling/module.ts';
-import { asApiError } from '../api/helpers.ts';
+import { asApiError, retryDelayOf } from '../api/helpers.ts';
 import { INBOX_PAGE_SIZE, INBOX_POLL_MS } from './constants.ts';
 import { clearResumeToken, decodeResumeToken } from './helpers.ts';
 import type { AnswerResult, ApprovalLink } from './types.ts';
@@ -44,8 +44,10 @@ export function useApprovals(client: IApiClient) {
             });
             runs.value = page.data.filter((run) => run.waiting);
             error.value = undefined;
+            return undefined;
         } catch (e) {
             error.value = asApiError(e);
+            return retryDelayOf(error.value);
         }
     }, INBOX_POLL_MS);
     poller.start();
