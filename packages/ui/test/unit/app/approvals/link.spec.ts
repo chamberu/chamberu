@@ -16,6 +16,7 @@ import {
     linkNotice,
     linkedApprovalState,
     readApprovalLink,
+    shadowedApprovalLink,
     stripResumeToken,
 } from '../../../../app/approvals/helpers.ts';
 import type { ApprovalLink, DecidedApproval } from '../../../../app/approvals/types.ts';
@@ -90,6 +91,26 @@ describe('readApprovalLink', () => {
         expect(readApprovalLink({ run: '' })).toBeUndefined();
         expect(readApprovalLink({ approval: 'a1' })).toBeUndefined();
         expect(readApprovalLink({ run: null })).toBeUndefined();
+    });
+});
+
+describe('shadowedApprovalLink', () => {
+    const claims = { runId: 'run-a', approvalId: 'appr-a' };
+
+    it('names a link to another run while a resume token is pending', () => {
+        expect(shadowedApprovalLink(claims, { runId: 'run-b', approvalId: 'appr-b' })).toEqual({ runId: 'run-b', approvalId: 'appr-b' });
+        expect(shadowedApprovalLink(claims, { runId: 'run-b' })).toEqual({ runId: 'run-b' });
+    });
+
+    it('names a link to another approval of the token\'s run', () => {
+        expect(shadowedApprovalLink(claims, { runId: 'run-a', approvalId: 'appr-x' })).toEqual({ runId: 'run-a', approvalId: 'appr-x' });
+    });
+
+    it('is undefined for the token\'s own approval, without a link or without a token', () => {
+        expect(shadowedApprovalLink(claims, { runId: 'run-a', approvalId: 'appr-a' })).toBeUndefined();
+        expect(shadowedApprovalLink(claims, { runId: 'run-a' })).toBeUndefined();
+        expect(shadowedApprovalLink(claims, undefined)).toBeUndefined();
+        expect(shadowedApprovalLink(undefined, { runId: 'run-b' })).toBeUndefined();
     });
 });
 

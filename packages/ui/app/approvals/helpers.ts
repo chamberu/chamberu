@@ -138,6 +138,22 @@ export function readApprovalLink(query: Record<string, unknown>): ApprovalLink |
     return approvalId ? { runId, approvalId } : { runId };
 }
 
+/**
+ * The token-less link a pending resume token hides: the token's approval
+ * takes the page, so a link to another run (or to another approval of
+ * the same run) is not opened until the token is answered or discarded.
+ * `undefined` without a decodable token, without a link, or when the
+ * link names the token's own approval (the token's card shows it).
+ */
+export function shadowedApprovalLink(
+    claims: ResumeClaims | undefined,
+    link: ApprovalLink | undefined,
+): ApprovalLink | undefined {
+    if (!claims || !link) return undefined;
+    if (link.runId !== claims.runId) return link;
+    return link.approvalId && link.approvalId !== claims.approvalId ? link : undefined;
+}
+
 /** The query of a run's approval link, for in-app links to the inbox. */
 export function approvalLinkQuery(run: RunWire): Record<string, string> {
     return run.waiting ? { run: run.id, approval: run.waiting.approvalId } : { run: run.id };

@@ -14,11 +14,13 @@ import type { RunWire } from '../api/types.ts';
 import { useApprovals, useDeepLinkApproval, useLinkedApproval } from '../approvals/composables.ts';
 import { INBOX, INBOX_POLL_MS  } from '../approvals/constants.ts';
 import {
+    clearResumeToken,
     linkNotice,
     linkedApprovalState,
     pendingApprovals,
     readApprovalLink,
     readResumeToken,
+    shadowedApprovalLink,
 } from '../approvals/helpers.ts';
 import type { AnswerResult, DecidedApproval } from '../approvals/types.ts';
 import { hasPermission } from '../auth/helpers.ts';
@@ -52,9 +54,12 @@ const canAnswer = (agent: string) => hasPermission(permissions.value, `agent:${a
 const decided = ref<DecidedApproval[]>([]);
 const busy = ref<string>();
 
-// the token-less link `?run=&approval=`; a pending resume token (#token=) takes the page
+// the token-less link `?run=&approval=`; a pending resume token (#token=) takes the page,
+// and a link it hides gets a notice offering to discard the token
 const route = useRoute();
-const approvalLink = computed(() => (token.value ? undefined : readApprovalLink(route.query)));
+const queryLink = computed(() => readApprovalLink(route.query));
+const approvalLink = computed(() => (deepLink.claims.value ? undefined : queryLink.value));
+const shadowedLink = computed(() => shadowedApprovalLink(deepLink.claims.value, queryLink.value));
 const linked = useLinkedApproval(client, approvalLink, inbox.runs);
 const linkedState = computed(() => (linked.link.value ?
     linkedApprovalState({
@@ -72,7 +77,7 @@ const linkedRun = computed(() => {
 });
 const notice = computed(() => (linkedState.value && linked.link.value ? linkNotice(linkedState.value, linked.link.value) : undefined));
 
-const linkRunId = computed(() => (token.value ? deepLink.claims.value?.runId : linkedRun.value?.id));
+const linkRunId = computed(() => deepLink.claims.value?.runId ?? linkedRun.value?.id);
 const pending = computed(() => pendingApprovals(inbox.runs.value, decided.value, linkRunId.value));
 
 const MESSAGES: Record<AnswerResult, (approved: boolean) => string> = {
@@ -107,6 +112,13 @@ async function answer(run: RunWire, approved: boolean, reason: string): Promise<
 }
 
 const linkResult = ref<{ result: AnswerResult; approved: boolean }>();
+
+/** Drops the pending resume token, so the token-less link of the address bar opens. */
+function discardToken(): void {
+    clearResumeToken(storage);
+    token.value = undefined;
+    linkResult.value = undefined;
+}
 async function answerLink(approved: boolean, reason: string): Promise<void> {
     busy.value = 'link';
     try {
@@ -136,6 +148,26 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
     </PageHead>
 
     <div class="callouts">
+        <div
+            v-if="shadowedLink && deepLink.claims.value"
+            class="card notice link-notice"
+            role="status"
+            data-testid="shadowed-link"
+        >
+            <span>
+                An earlier approval link (run <span class="mono">{{ shortId(deepLink.claims.value.runId) }}</span>, with a resume token)
+                is still pending in this tab and takes the page;
+                the link to run <span class="mono">{{ shortId(shadowedLink.runId) }}</span> opens once it is discarded.
+            </span>
+            <VCButton
+                class="btn"
+                data-testid="discard-token"
+                @click="discardToken"
+            >
+                Discard the earlier link
+            </VCButton>
+        </div>
+
         <template v-if="token && deepLink.claims.value">
             <ApprovalCallout
                 v-if="deepLink.run.value?.waiting && deepLink.run.value.waiting.approvalId === deepLink.claims.value.approvalId"
@@ -244,7 +276,13 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
             v-if="inbox.error.value?.status === 403"
             class="card notice"
         >
-            Listing waiting runs needs <b class="mono">run:read</b>. An approval link from a notification still works.
+            Listing waiting runs needs <b class="mono">run:read</b>.
+            <template v-if="deepLink.claims.value">
+                The approval link's resume token still answers its approval.
+            </template>
+            <template v-else>
+                An approval link still opens a run of an agent you may run (<b class="mono">agent:&lt;name&gt;:run</b>).
+            </template>
         </div>
 
         <div

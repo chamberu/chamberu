@@ -247,3 +247,40 @@ test('an approval link by run signs in, highlights the card and approves', async
     await expect(page).toHaveURL(new RegExp(`/ui/runs/${runId}$`));
     expect(errors).toEqual([]);
 });
+
+test('a pending resume token names the approval link it hides and can be discarded', async ({ page, request }) => {
+    const errors = watchErrors(page);
+    const tokenRun = await dispatch(request);
+    const token = await tokenFor(request, tokenRun);
+    const linkRun = await dispatch(request);
+    let approvalId = '';
+    await expect.poll(async () => {
+        const run = await readRun(request, linkRun) as { status: string; waiting?: { approvalId: string } };
+        approvalId = run.waiting?.approvalId ?? '';
+        return run.status;
+    }, { timeout: 15_000 }).toBe('waiting');
+
+    await page.goto(`approvals#token=${encodeURIComponent(token)}`);
+    await signIn(page);
+    await expect(page.getByTestId('deep-link')).toContainText('deploy');
+
+    // a token-less link opened in the same tab while the token is pending
+    await page.goto(`approvals?run=${linkRun}&approval=${approvalId}`);
+    const shadowed = page.getByTestId('shadowed-link');
+    await expect(shadowed).toContainText(linkRun.slice(0, 8));
+    await shadowed.getByTestId('discard-token').click();
+
+    await expect(shadowed).toHaveCount(0);
+    await expect(page.getByTestId('deep-link')).toHaveCount(0);
+    const card = page.locator(`[data-testid="approval"][data-run="${linkRun}"]`);
+    await expect(card).toHaveAttribute('data-linked', 'true');
+    expect(await page.evaluate(() => sessionStorage.getItem('chamvi.resume'))).toBeNull();
+    await card.getByRole('button', { name: 'Approve' }).click();
+    await expect.poll(async () => (await readRun(request, linkRun)).status, { timeout: 20_000 }).toBe('completed');
+
+    // answer the token's run too, so later tests start from an empty inbox
+    const other = page.locator(`[data-testid="approval"][data-run="${tokenRun}"]`);
+    await other.getByRole('button', { name: 'Deny' }).click();
+    await expect.poll(async () => (await readRun(request, tokenRun)).status, { timeout: 20_000 }).toBe('completed');
+    expect(errors).toEqual([]);
+});
