@@ -22,6 +22,14 @@ describe('public api', () => {
         expect(github.DEFAULT_GITHUB_API_URL).toBe('https://api.github.com');
     });
 
+    it('exports the request error code and the repository pattern', () => {
+        expect(github.GITHUB_REQUEST_ERROR_CODE).toBe('github_request');
+        const repo = new RegExp(github.REPO_PATTERN);
+        expect(repo.test('octo/demo')).toBe(true);
+        expect(repo.test('a/../b')).toBe(false);
+        expect(repo.test('../x')).toBe(false);
+    });
+
     it.each([
         'verifySignature',
         'createAppJwt',

@@ -212,6 +212,8 @@ Approvals live on the agent: `approvals: { github_close_issue: 'user' }` pauses 
 | `createGithubApp` | function | The App: `octokit(installationId)`, `botLogin()`, `verifySignature()`, `webhookRoute()`, `readTools()`, `writeTools()` |
 | `githubWebhook` | function | The trigger factory |
 | `DEFAULT_WEBHOOK_PATH`, `DEFAULT_GITHUB_API_URL` | constant | `/webhooks/github`, `https://api.github.com` |
+| `GITHUB_REQUEST_ERROR_CODE` | constant | `'github_request'`, the `code` of a failed GitHub request |
+| `REPO_PATTERN` | constant | The `owner/name` pattern the tools accept (a regular expression source; `.` and `..` segments never match) |
 
 Types: `GithubAppOptions`, `IGithubApp`, `GithubOctokit`, `GithubEvent`, `GithubPayload`, `GithubWebhookTriggerOptions`, `GithubWebhookRouteOptions`, `GithubWebhookResult`, `GithubIssue`, `GithubIssueSearch`, `GithubLabel`, `GithubPullRequest`, `GithubFile`, `GithubDirectory`, `GithubRelease`, `GithubComment`, `GithubIssueLabels`, `GithubClosedIssue`.
 
