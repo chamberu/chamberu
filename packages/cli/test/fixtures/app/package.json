@@ -1,0 +1,8 @@
+{
+    "name": "fixture-app",
+    "type": "module",
+    "private": true,
+    "dependencies": {
+        "@chamvi/app": "*"
+    }
+}

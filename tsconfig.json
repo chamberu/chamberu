@@ -8,6 +8,7 @@
             "@chamvi/app/openclaw": ["./packages/app/src/openclaw/index.ts"],
             "@chamvi/app/sandbox": ["./packages/app/src/sandbox/index.ts"],
             "@chamvi/app/ui": ["./packages/app/src/ui/index.ts"],
+            "@chamvi/cli": ["./packages/cli/src/index.ts"],
             "@chamvi/coding": ["./packages/coding/src/index.ts"],
             "@chamvi/core": ["./packages/core/src/index.ts"],
             "@chamvi/github": ["./packages/github/src/index.ts"],
