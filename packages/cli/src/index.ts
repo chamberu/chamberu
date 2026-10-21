@@ -6,3 +6,4 @@
  */
 
 export * from './run/index.ts';
+export type { ISignalTarget } from './signals/types.ts';

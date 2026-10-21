@@ -7,12 +7,15 @@
 
 import type { spawn } from 'node:child_process';
 import type { Env, IClock } from '@chamvi/app';
+import type { ISignalTarget } from '../signals/types.ts';
 
 /** Everything a command touches of the process, injectable for tests. */
 export type CliContext = {
     cwd: string;
     env: Env;
     clock: IClock;
+    /** Where SIGTERM and SIGINT arrive (`process`). */
+    signals: ISignalTarget;
     /** Sets the exit code the process ends with (`process.exitCode`). */
     setExitCode(code: number): void;
     /** Ends the process at once; only for the forced exit. */

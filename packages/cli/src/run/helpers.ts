@@ -5,7 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamviError } from '@chamvi/app';
+import { spawn } from 'node:child_process';
+import { ChamviError, systemClock } from '@chamvi/app';
 import type { ArgsDef } from 'citty';
 import {
     APP_STOPPED_ERROR_CODE,
@@ -14,6 +15,7 @@ import {
     EXIT_CODE,
     USAGE_ERROR_CODES,
 } from './constants.ts';
+import type { CliContext } from './types.ts';
 
 /**
  * A plain object (not an array). Local, since the CLI depends on citty only
@@ -97,4 +99,31 @@ export function assertKnownArgs(args: Record<string, unknown>, def: ArgsDef): vo
     if (rest.length > positionals) {
         throw createUsageError(`Unexpected argument ${String(rest[positionals])}.`);
     }
+}
+
+export function messageOf(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
+/** The CliContext bound to this process. */
+export function processContext(): CliContext {
+    return {
+        cwd: process.cwd(),
+        env: process.env,
+        clock: systemClock,
+        signals: {
+            on: (signal, fn) => process.on(signal, fn),
+            off: (signal, fn) => process.off(signal, fn),
+        },
+        setExitCode: (code) => {
+            process.exitCode = code;
+        },
+        exit: (code) => process.exit(code),
+        stdout: (text) => process.stdout.write(text),
+        stderr: (text) => process.stderr.write(text),
+        importModule: (specifier) => import(specifier),
+        spawn,
+        execPath: process.execPath,
+        cliPath: process.argv[1] ?? '',
+    };
 }

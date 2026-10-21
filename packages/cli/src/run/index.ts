@@ -6,4 +6,5 @@
  */
 
 export { CLI_USAGE_ERROR_CODE, EXIT_CODE } from './constants.ts';
+export { runCli } from './module.ts';
 export * from './types.ts';
