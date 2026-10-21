@@ -90,13 +90,22 @@ export type HttpRouteRequest = {
      * Memoized: every call answers the same bytes (or the same error).
      */
     readBody(): Promise<Uint8Array>;
+    /**
+     * The path below the route's `path`: `''` for `path` itself, else the raw
+     * (still percent-encoded, case kept) rest starting with `/`, e.g.
+     * `/assets/app-1a2b.js`; never the query. Only a `prefix` route sees more than `''`.
+     */
+    subpath: string;
 };
 
 export type HttpRouteResult = {
     status: number;
+    /** Set on the response; a `content-type` here wins over the body's default. */
+    headers?: Record<string, string>;
     /**
-     * Objects, arrays, numbers and booleans are sent as JSON, a string as
-     * `text/plain`; `undefined` or `null` answer an empty body.
+     * A `Uint8Array` is sent as is (`application/octet-stream` unless
+     * `headers` names a `content-type`); objects, arrays, numbers and booleans
+     * as JSON, a string as `text/plain`; `undefined` or `null` answer an empty body.
      */
     body?: unknown;
 };
@@ -106,6 +115,8 @@ export type HttpRouteContext = {
     agents: readonly Agent[];
     clock: IClock;
     onError: (error: unknown) => void;
+    /** The app's `basePath` (`''` by default), e.g. to build absolute links. */
+    basePath: string;
 };
 
 export type HttpRoute = {
@@ -114,6 +125,11 @@ export type HttpRoute = {
     path: string;
     /** false: skipped by the app's rate limiter (callers that never retry, e.g. webhook senders). Default: limited. */
     rateLimit?: false;
+    /**
+     * true: the route also serves every path below `path/` (same method),
+     * handing the rest as `request.subpath`; labelled `<path>/*` in metrics.
+     */
+    prefix?: true;
     /**
      * Not authenticated by the app's authenticators: the route checks its own
      * credentials. Thrown @ebec/http and core errors render like any route's.

@@ -34,7 +34,6 @@ import {
 export function installPlugins(app: App, options: HttpAppOptions): void {
     const basePath = options.basePath ?? '';
     const routes = options.routes ?? [];
-    const routePaths = routes.map((route) => route.path);
 
     if (options.cors) app.use(cors(options.cors));
 
@@ -65,7 +64,7 @@ export function installPlugins(app: App, options: HttpAppOptions): void {
             // the global default registry throws on a second app in one process
             registry: new Registry(),
             skip: (event) => isStreamRequest(event, basePath),
-            normalizePath: (_path, event) => routeLabel(event, basePath, metricsPath ?? DEFAULT_METRICS_PATH, routePaths),
+            normalizePath: (_path, event) => routeLabel(event, basePath, metricsPath ?? DEFAULT_METRICS_PATH, routes),
             ...options.metrics,
         }));
     }

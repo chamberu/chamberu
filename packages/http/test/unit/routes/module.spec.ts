@@ -254,3 +254,203 @@ describe('extra routes', () => {
         expect(() => createTestApp({ routes: [route(), route({ method: 'GET' })] })).not.toThrow();
     });
 });
+
+describe('prefix routes, headers and byte bodies', () => {
+    const get = (app: App, path: string, headers: Record<string, string> = {}) => app.fetch(new Request(`http://test${path}`, { headers }));
+
+    it('a prefix route serves its path and everything below it', async () => {
+        const seen: string[] = [];
+        const { app } = createTestApp({
+            routes: [route({
+                method: 'GET',
+                path: '/ui',
+                prefix: true,
+                handler: async ({ subpath }) => {
+                    seen.push(subpath);
+                    return { status: 200, body: 'ok' };
+                },
+            })],
+        });
+        for (const path of ['/ui', '/ui/', '/ui/a/b.js?x=1', '/ui/%252e%252e/x']) {
+            expect((await get(app, path)).status).toBe(200);
+        }
+        expect(seen).toEqual(['', '/', '/a/b.js', '/%252e%252e/x']);
+        expect((await get(app, '/uix')).status).toBe(404);
+        expect((await app.fetch(new Request('http://test/ui/a', { method: 'POST' }))).status).toBe(404);
+    });
+
+    it('keeps the subpath case and strips basePath', async () => {
+        let seen: string | undefined;
+        const { app } = createTestApp({
+            basePath: '/api',
+            routes: [route({
+                method: 'GET',
+                path: '/ui',
+                prefix: true,
+                handler: async ({ subpath }) => {
+                    seen = subpath;
+                    return { status: 204 };
+                },
+            })],
+        });
+        expect((await get(app, '/api/UI/Assets/App.JS')).status).toBe(204);
+        expect(seen).toBe('/Assets/App.JS');
+    });
+
+    it('a plain route has an empty subpath', async () => {
+        let seen: string | undefined;
+        const { app } = createTestApp({
+            routes: [route({
+                handler: async ({ subpath }) => {
+                    seen = subpath;
+                    return { status: 204 };
+                },
+            })],
+        });
+        await send(app, '/extra');
+        expect(seen).toBe('');
+    });
+
+    it('sends route headers and byte bodies', async () => {
+        const { app } = createTestApp({
+            routes: [route({
+                method: 'GET',
+                handler: async () => ({
+                    status: 200,
+                    headers: { 'content-type': 'image/png', 'cache-control': 'no-cache' },
+                    body: new Uint8Array([0, 255, 1]),
+                }),
+            })],
+        });
+        const response = await get(app, '/extra');
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toBe('image/png');
+        expect(response.headers.get('cache-control')).toBe('no-cache');
+        expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([0, 255, 1]);
+    });
+
+    it('a byte body without content-type is application/octet-stream', async () => {
+        const { app } = createTestApp({ routes: [route({ method: 'GET', handler: async () => ({ status: 200, body: new Uint8Array([1, 2]) }) })] });
+        const response = await get(app, '/extra');
+        expect(response.headers.get('content-type')).toBe('application/octet-stream');
+        expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([1, 2]);
+    });
+
+    it('a content-type header wins over the default of a string or JSON body', async () => {
+        const { app } = createTestApp({
+            routes: [
+                route({
+                    method: 'GET',
+                    handler: async () => ({
+                        status: 200, 
+                        headers: { 'content-type': 'text/html; charset=utf-8' }, 
+                        body: '<p>hi</p>', 
+                    }),
+                }),
+                route({
+                    method: 'GET',
+                    path: '/json',
+                    handler: async () => ({
+                        status: 200, 
+                        headers: { 'x-extra': '1' }, 
+                        body: { a: 1 }, 
+                    }),
+                }),
+            ],
+        });
+        const html = await get(app, '/extra');
+        expect(html.headers.get('content-type')).toBe('text/html; charset=utf-8');
+        expect(await html.text()).toBe('<p>hi</p>');
+        const json = await get(app, '/json');
+        expect(json.headers.get('x-extra')).toBe('1');
+        expect(await json.json()).toEqual({ a: 1 });
+    });
+
+    it('keeps CORS headers on a byte body', async () => {
+        const { app } = createTestApp({
+            cors: { origin: '*' },
+            routes: [route({ method: 'GET', handler: async () => ({ status: 200, body: new Uint8Array([7]) }) })],
+        });
+        const response = await get(app, '/extra', { origin: 'http://elsewhere' });
+        expect(response.headers.get('access-control-allow-origin')).toBe('*');
+        expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([7]);
+    });
+
+    it('hands the app basePath in the route context', async () => {
+        const bases: string[] = [];
+        const handler: HttpRoute['handler'] = async (_request, ctx) => {
+            bases.push(ctx.basePath);
+            return { status: 204 };
+        };
+        await send(createTestApp({ basePath: '/api', routes: [route({ handler })] }).app, '/api/extra');
+        await send(createTestApp({ routes: [route({ handler })] }).app, '/extra');
+        expect(bases).toEqual(['/api', '']);
+    });
+
+    it.each([
+        ['a route under a prefix route of the same method', [route({
+            method: 'GET', 
+            path: '/ui', 
+            prefix: true, 
+        }), route({ method: 'GET', path: '/ui/x' })]],
+        ['a route at the path of a prefix route', [route({ method: 'GET', path: '/ui' }), route({
+            method: 'GET', 
+            path: '/ui', 
+            prefix: true, 
+        })]],
+        ['two nested prefix routes', [route({
+            method: 'GET', 
+            path: '/ui/a', 
+            prefix: true, 
+        }), route({
+            method: 'GET', 
+            path: '/UI', 
+            prefix: true, 
+        })]],
+        ['a prefix route at the metrics path', [route({
+            method: 'GET', 
+            path: '/ops/metrics', 
+            prefix: true, 
+        })]],
+        ['a prefix route above the metrics path', [route({
+            method: 'GET', 
+            path: '/ops', 
+            prefix: true, 
+        })]],
+    ])('refuses %s', (_name, routes) => {
+        expect(() => createTestApp({ metrics: { metricsPath: '/ops/metrics' }, routes: [...routes] }))
+            .toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('refuses a prefix route at the default metrics path', () => {
+        expect(() => createTestApp({
+            metrics: undefined,
+            routes: [route({
+                method: 'GET', 
+                path: '/metrics', 
+                prefix: true, 
+            })], 
+        }))
+            .toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('allows a route under a prefix route for another method', () => {
+        expect(() => createTestApp({
+            routes: [route({
+                method: 'GET', 
+                path: '/ui', 
+                prefix: true, 
+            }), route({ method: 'POST', path: '/ui/x' })], 
+        })).not.toThrow();
+    });
+
+    it('allows a sibling path that only shares the prefix text', () => {
+        expect(() => createTestApp({
+            routes: [route({
+                method: 'GET', 
+                path: '/ui', 
+                prefix: true, 
+            }), route({ method: 'GET', path: '/uix' })], 
+        })).not.toThrow();
+    });
+});

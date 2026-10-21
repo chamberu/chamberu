@@ -259,7 +259,7 @@ process.once('SIGTERM', () => {
 | `metrics` | `false \| Partial<PrometheusOptions>` | `/metrics` | `@routup/prometheus` options |
 | `readyTimeoutMs` | `number` | `2_000` | How long `/readyz` waits for the store |
 | `onError` | `(error) => void` | `console.error` | 5xx causes and background failures |
-| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamvi/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter |
+| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamvi/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter; `prefix: true` also serves every path below `path/` (the rest as `request.subpath`, raw and case kept; metrics label `<path>/*`; no other route of that method at or under it, never at or above the metrics path); a result may carry `headers` and a `Uint8Array` body (sent as is, `application/octet-stream` by default); the route context has `basePath` |
 
 `createShutdown(options)`:
 

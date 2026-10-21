@@ -33,10 +33,16 @@ export function isOperationalPath(event: IAppEvent, basePath: string, metricsPat
     return path === '/healthz' || path === '/readyz' || path === metricsPath.toLowerCase();
 }
 
+/** The route's path, or with `prefix` also anything below `path/` (both lower-cased). */
+function matchesRoute(route: HttpRoute, path: string): boolean {
+    const own = route.path.toLowerCase();
+    return path === own || (route.prefix === true && path.startsWith(`${own}/`));
+}
+
 /** A request to one of the extra routes declared `rateLimit: false` (method and path, under `basePath`). */
 export function isUnlimitedRoute(event: IAppEvent, basePath: string, routes: readonly HttpRoute[]): boolean {
     const path = routePath(event, basePath);
-    return routes.some((route) => route.rateLimit === false && route.method === event.method && route.path.toLowerCase() === path);
+    return routes.some((route) => route.rateLimit === false && route.method === event.method && matchesRoute(route, path));
 }
 
 /** The routes of the app as metric labels, matched against the path without `basePath`; keep in step with the route modules. */
@@ -66,12 +72,12 @@ export function routeLabel(
     event: IAppEvent,
     basePath: string,
     metricsPath: string,
-    extraPaths: readonly string[] = [],
+    extraRoutes: readonly HttpRoute[] = [],
 ): string {
     const path = routePath(event, basePath);
     if (path === metricsPath.toLowerCase()) return metricsPath;
-    const extra = extraPaths.find((extraPath) => extraPath.toLowerCase() === path);
-    if (extra !== undefined) return extra;
+    const extra = extraRoutes.find((route) => matchesRoute(route, path));
+    if (extra !== undefined) return extra.prefix ? `${extra.path}/*` : extra.path;
     for (const [pattern, template] of ROUTE_TEMPLATES) {
         if (pattern.test(path)) return template || path;
     }

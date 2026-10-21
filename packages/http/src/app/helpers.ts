@@ -73,8 +73,26 @@ function validateRoutes(options: HttpAppOptions): HttpRoute[] {
             throw new InvalidAgentDefinitionError(`Route "${route.method} ${route.path}" is registered twice.`);
         }
         seen.add(key);
+        if (route.prefix && metricsPath !== undefined && isAtOrUnder(metricsPath.toLowerCase(), path)) {
+            throw new InvalidAgentDefinitionError(`Prefix route "${route.path}" covers the metrics path.`);
+        }
+    }
+    for (const prefixRoute of routes) {
+        if (!prefixRoute.prefix) continue;
+        const prefix = prefixRoute.path.toLowerCase();
+        const covered = routes.find((other) => other !== prefixRoute &&
+            other.method === prefixRoute.method &&
+            isAtOrUnder(other.path.toLowerCase(), prefix));
+        if (covered) {
+            throw new InvalidAgentDefinitionError(`Route "${covered.method} ${covered.path}" lies under the prefix route "${prefixRoute.path}".`);
+        }
     }
     return routes;
+}
+
+/** `path` equals `prefix` or lies below `prefix/`. */
+function isAtOrUnder(path: string, prefix: string): boolean {
+    return path === prefix || path.startsWith(`${prefix}/`);
 }
 
 /**
