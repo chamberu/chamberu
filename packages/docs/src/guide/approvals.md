@@ -58,5 +58,5 @@ base64url(JSON { runId, approvalId, tokenId, exp }) + "." + base64url(HMAC-SHA25
 The signature is compared in constant time, and a token expires at the wait point's `expiresAt`. `createResumeToken(secret, claims)` and `verifyResumeToken(secret, token, now)` are exported for transports that carry tokens themselves.
 
 ::: tip Where tokens are answered
-In core you call `engine.resume()` yourself. [`@chamvi/http`](/guide/http) adds the authenticated `POST /resume` endpoint and the MCP `resume_run` tool (both need `agent:<name>:approve` besides the token), and the planned UI an approvals inbox.
+In core you call `engine.resume()` (with the token) or `engine.approve()` (by approval id) yourself. [`@chamvi/http`](/guide/http) adds the token-less `POST /runs/:id/approve` (needs `agent:<name>:approve`; the [`@chamvi/ui`](/guide/ui) inbox and its token-less approval links answer through it), and the authenticated `POST /resume` endpoint and MCP `resume_run` tool (both need `agent:<name>:approve` besides the token).
 :::
