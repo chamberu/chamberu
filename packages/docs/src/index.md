@@ -63,7 +63,7 @@ packages:
             body: REST, server-sent events, webhooks and an MCP endpoint, with bearer, authup and OIDC authentication.
             link: /guide/http
         -   name: '@chamvi/ui'
-            body: A dashboard with live steps, an approvals inbox, agent state and schedules, served by uiRoutes().
+            body: A dashboard with an agents overview, runs started from the agent page, live steps, an approvals inbox, agent state and schedules, served by uiRoutes().
             link: /guide/ui
     planned:
         -   name: '@chamvi/notify-openclaw'

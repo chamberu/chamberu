@@ -23,7 +23,7 @@ Open `/ui/` and paste a token; the dashboard opens on the agents overview. Nothi
 | Approvals | Each waiting run with the tool, its input, the expiry countdown and a reason field; Approve or Deny (`POST /runs/:id/approve`). The sidebar shows the count. | `run:read` to list, `agent:<name>:approve` to answer |
 | Schedules | The `cron()` triggers per agent with the next fire time in the trigger's time zone. | `run:read` |
 
-Agent names link to the agent page from every other page. The 24 h figures come from the newest 100 runs (per agent, or overall on the runs page), since the API has no time filter: an agent that ran more often than that in a day shows `100+`. Only tools that need an approval are listed, because an agent may build its tool set per run.
+Agent names link to the agent page from every other page. The 24 h figures come from the newest 100 runs (of the agent on its page, of the whole app on the overview and the runs page), since the API has no time filter: more runs than that in a day show `100+`. Only tools that need an approval are listed, because an agent may build its tool set per run.
 
 A principal without the grant a page needs sees a notice naming it; the rest of the dashboard keeps working. An approval link from a notification works with `agent:<name>:approve` alone.
 

@@ -15,7 +15,7 @@ chamvi is built milestone by milestone, each defined by one real agent that has 
 | `@chamvi/sandbox` | Sandbox contracts, path, repository and limit rules, the run-scoped workspace manager with `create_workspace` and `dispose_workspace`. See [Workspaces & Coding](/guide/workspaces) |
 | `@chamvi/sandbox-local`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s` | Workspace providers: a temporary directory (development), a hardened container per workspace, a hardened pod per workspace; the `ghcr.io/chamvi/sandbox-node` image |
 | `@chamvi/coding` | Coding tools (`read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash`, `git_diff`) over a run's workspaces and the `ICodingBackend` contract |
-| `@chamvi/ui` | Vue 3 dashboard served by `uiRoutes()`: runs with live steps, an approvals inbox, agent state, schedules |
+| `@chamvi/ui` | Vue 3 dashboard served by `uiRoutes()`: an agents overview, runs started from the agent page, runs with live steps, an approvals inbox, agent state, schedules |
 
 ## Milestones
 
