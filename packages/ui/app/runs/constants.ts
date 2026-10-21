@@ -16,3 +16,6 @@ export const RUN_STATUSES: readonly RunStatusLiteral[] = ['queued', 'running', '
 export const SETTLED_STATUSES: readonly RunStatusLiteral[] = ['completed', 'failed', 'cancelled'];
 
 export const CANCELABLE_STATUSES: readonly RunStatusLiteral[] = ['queued', 'running', 'waiting', 'interrupted'];
+
+/** The agent filter's "all agents" option (a select option may not be empty). */
+export const ALL_AGENTS = '*';

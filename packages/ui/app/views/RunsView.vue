@@ -16,7 +16,12 @@ import StatusChip from '../components/status-chip/StatusChip.vue';
 import { useAppContext } from '../context/module.ts';
 import { RouteName } from '../router/constants.ts';
 import { useRunList } from '../runs/composables.ts';
-import { RUN_LIST_PAGE_SIZE, RUN_LIST_POLL_MS, RUN_STATUSES } from '../runs/constants.ts';
+import {
+    ALL_AGENTS,
+    RUN_LIST_PAGE_SIZE,
+    RUN_LIST_POLL_MS,
+    RUN_STATUSES,
+} from '../runs/constants.ts';
 import { formatTokens, shortId } from '../runs/helpers.ts';
 import { filterFromQuery, queryFromFilter } from '../runs/query.ts';
 
@@ -41,7 +46,7 @@ const waiting = counts('waiting');
 const failed = counts('failed');
 
 const agentOptions = computed(() => [
-    { value: '', label: 'all agents' },
+    { value: ALL_AGENTS, label: 'all agents' },
     ...agents.value.map((agent) => ({ value: agent.name, label: agent.name })),
 ]);
 
@@ -56,8 +61,8 @@ function update(next: Partial<RunListFilter>): void {
 }
 
 const agent = computed({
-    get: () => filter.value.agent ?? '',
-    set: (value: string) => update({ agent: value || undefined }),
+    get: () => filter.value.agent ?? ALL_AGENTS,
+    set: (value: string) => update({ agent: value === ALL_AGENTS ? undefined : value }),
 });
 
 function toggleStatus(status: RunStatusLiteral): void {

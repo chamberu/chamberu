@@ -43,7 +43,7 @@ chamvi/
 ├── .github/
 │   ├── assets/                      # logo.svg (+ test-kit and organisation variants), run-lifecycle.svg
 │   ├── actions/{install,build}/     # Composite actions
-│   ├── workflows/{ci,release,docs,images}.yml # CI (Node 22, 24), release-please + npm publish, docs to GitHub Pages, sandbox image (craneship, amd64 + arm64)
+│   ├── workflows/{ci,release,docs,images}.yml # CI (Node 22, 24, plus the Chromium e2e job), release-please + npm publish, docs to GitHub Pages, sandbox image (craneship, amd64 + arm64)
 │   ├── ISSUE_TEMPLATE/              # Bug report and feature request templates
 │   ├── FUNDING.yml                  # GitHub Sponsors
 │   └── dependabot.yml               # Daily npm + github-actions updates, docker for images/sandbox-node
@@ -188,3 +188,25 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), `1792368000000-artifacts.ts` (table `chamvi_artifacts`), generated from the entities; `1792454400000-idempotency-scope.ts` (`scope` varchar(1024), hand-written), `1792540800000-kv-key-collation.ts` (`chamvi_kv.key` `COLLATE "C"`, hand-written) |
 | `schema/` | `migrateStore()` (`module.ts`), `STORE_ENTITIES`, `STORE_MIGRATIONS`, `MIGRATION_LOCK_NAME` |
 | `store/` | `TypeormStore` (`module.ts`), entity to domain mapping, value builders and `RETURNING` row hydration (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |
+
+## UI Module Map (`packages/ui`)
+
+| Path | Purpose |
+|------|---------|
+| `src/config/` | `UiConfig`, `UiAuthupConfig` (`types.ts`), `CONFIG_ELEMENT_ID` (public), `CONFIG_MARKER` (`constants.ts`); shared with the SPA as types and constants |
+| `src/routes/` | `uiRoutes()` (`module.ts`), `resolveBuildPath()`, `loadBuild()`, `renderIndex()`, `buildCsp()`, `defaultRoot()`, `isFileLike()` (`helpers.ts`, internal), `DEFAULT_UI_BASE_PATH`, `ASSET_CACHE_CONTROL`, `DOCUMENT_CACHE_CONTROL` (public), `MEDIA_TYPES`, `SECURITY_HEADERS`, `UI_BASE_PATH_PATTERN` (`constants.ts`), `UiRoutesOptions`, `BuildFile` (`types.ts`) |
+| `app/` | The SPA: `main.ts` (install order: icons, authup when configured, vuecs, component plugins, router), `App.vue`, `style.css` (Crimson tokens, mockup A), `index.html` (with `CONFIG_MARKER`), `shims.d.ts`, `tsconfig.json` (vue-tsc, also checks `test/unit/app`) |
+| `app/config/` | `readConfig()`, `DEV_CONFIG` |
+| `app/router/` | `createUiRouter()`, `RouteName` |
+| `app/context/` | `AppContext` (config, client, session, storage), `APP_CONTEXT`, `useAppContext()` |
+| `app/api/` | `createApiClient()`, `ApiError` (`error.ts`), query and error helpers, wire types (`Wire<T>`, `RunWire`, `IApiClient`, ...) |
+| `app/sse/` | `openRunStream()`, `parseEventStream()`, `sleep()`, `RECONNECT_DELAYS_MS` |
+| `app/auth/` | `createSession()`, `createAuthGuard()` (`guard.ts`), `createAuthupAdapter()` (`authup.ts`, lazily imported), `hasPermission()`, `safeReturnPath()`, `clearStorage()`, storage keys |
+| `app/polling/` | `createPoller()` |
+| `app/runs/` | `useRunList()`, `useRunDetail()`, `toApiError()` (`composables.ts`), `mergeRunEvent()`, `canCancel()`, formatters (`helpers.ts`), route-query mapping (`query.ts`), constants |
+| `app/approvals/` | `useApprovals()`, `useDeepLinkApproval()`, `decodeResumeToken()`, `stripResumeToken()`, `readResumeToken()`, `RESUME_STORAGE_KEY`, `INBOX` |
+| `app/agents/`, `app/state/`, `app/schedules/` | `useAgents()`, `useAgentState()`, `useSchedules()` and their helpers |
+| `app/components/` | One folder per component: `app-shell`, `brand-logo`, `nav-icon`, `page-head`, `status-chip`, `json-block`, `step-item`, `usage-meter`, `approval-callout`, `expiry-countdown` |
+| `app/views/` | `LoginView`, `LoginCallbackView`, `RunsView`, `RunView`, `ApprovalsView`, `StateView`, `SchedulesView` |
+| `vite.config.ts` | Root `app`, out `dist/app`, `base: './'` for the build, the dev proxy to port 3000, the `virtual:chamvi-icons` plugin |
+| `test/e2e/` | `smoke.spec.ts` (Playwright), `demo/` (`server.ts`, `model.ts`, `constants.ts`) |

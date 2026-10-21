@@ -11,3 +11,10 @@ declare module '*.vue' {
     const component: DefineComponent<object, object, unknown>;
     export default component;
 }
+
+declare module 'virtual:chamvi-icons' {
+    import type { IconifyJSON } from '@iconify/types';
+
+    const icons: IconifyJSON;
+    export default icons;
+}

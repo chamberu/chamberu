@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { addCollection } from '@iconify/vue';
 import installButton from '@vuecs/button';
 import vuecs from '@vuecs/core';
 import installCountdown from '@vuecs/countdown';
@@ -30,7 +31,11 @@ import { readConfig } from './config/module.ts';
 import { APP_CONTEXT } from './context/constants.ts';
 import { RouteName } from './router/constants.ts';
 import { createUiRouter } from './router/module.ts';
+import icons from 'virtual:chamvi-icons';
 import './style.css';
+
+// icons from the bundle, never fetched (CSP connect-src 'self')
+addCollection(icons);
 
 const config = readConfig(document);
 const app = createApp(App);
