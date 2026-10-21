@@ -4,6 +4,7 @@
     "bump-patch-for-minor-pre-major": true,
     "initial-version": "0.1.0",
     "packages": {
+        "packages/app": {"component": "app"},
         "packages/coding": {"component": "coding"},
         "packages/core": {"component": "core"},
         "packages/github": {"component": "github"},

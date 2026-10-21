@@ -2,6 +2,12 @@
     "extends": "./tsconfig.build.json",
     "compilerOptions": {
         "paths": {
+            "@chamvi/app": ["./packages/app/src/index.ts"],
+            "@chamvi/app/authup": ["./packages/app/src/authup/index.ts"],
+            "@chamvi/app/github": ["./packages/app/src/github/index.ts"],
+            "@chamvi/app/openclaw": ["./packages/app/src/openclaw/index.ts"],
+            "@chamvi/app/sandbox": ["./packages/app/src/sandbox/index.ts"],
+            "@chamvi/app/ui": ["./packages/app/src/ui/index.ts"],
             "@chamvi/coding": ["./packages/coding/src/index.ts"],
             "@chamvi/core": ["./packages/core/src/index.ts"],
             "@chamvi/github": ["./packages/github/src/index.ts"],

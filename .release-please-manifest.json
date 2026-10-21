@@ -12,5 +12,6 @@
     "packages/coding": "0.1.0",
     "packages/notify-openclaw": "0.1.0",
     "packages/notify-github": "0.1.0",
-    "packages/ui": "0.1.0"
+    "packages/ui": "0.1.0",
+    "packages/app": "0.1.0"
 }
