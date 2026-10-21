@@ -6,11 +6,15 @@
  */
 
 import { MemoryStore } from '@chamvi/core';
-import type { IStore } from '@chamvi/core';
+import type { IClock, IStore } from '@chamvi/core';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
+import type { DataSource } from 'typeorm';
 import { AppToken, ModuleName } from '../../module/constants.ts';
+import { throwIfStopped } from '../../module/helpers.ts';
+import type { AppContext } from '../../module/types.ts';
 import { MEMORY_STORE_WARNING, PURGE_HOOK_NAME } from './constants.ts';
+import { maskPassword } from './helpers.ts';
 import { createPurgeTimer } from './purge.ts';
 import type {
     IPurgeTimer,
@@ -18,13 +22,28 @@ import type {
     StoreModuleOptions,
 } from './types.ts';
 
+async function destroyQuietly(dataSource: DataSource): Promise<void> {
+    if (!dataSource.isInitialized) {
+        return;
+    }
+
+    try {
+        await dataSource.destroy();
+    } catch {
+        // the setup error is the one that matters
+    }
+}
+
 function isPurgingStore(store: IStore): store is IStore & PurgingStore {
     return typeof (store as Partial<PurgingStore>).purgeExpired === 'function';
 }
 
 /**
- * Registers `AppToken.STORE`: the given store, else a MemoryStore without a
- * database URL. A store with `purgeExpired` gets the purge timer in start mode.
+ * Registers `AppToken.STORE`: the given store; else a TypeormStore over the
+ * given data source or `options.url ?? DATABASE_URL` (TypeORM loaded lazily,
+ * migrated in migrate mode or with `CHAMVI_MIGRATE`, `DATA_SOURCE` registered
+ * too); else a MemoryStore. A store with `purgeExpired` gets the purge timer
+ * in start mode.
  */
 export class StoreModule implements IModule {
     readonly name: string = ModuleName.STORE;
@@ -34,6 +53,9 @@ export class StoreModule implements IModule {
     protected options: StoreModuleOptions;
 
     protected purge: IPurgeTimer | undefined;
+
+    /** A data source this module initialized, destroyed in teardown. */
+    protected created: DataSource | undefined;
 
     constructor(options: StoreModuleOptions = {}) {
         this.options = options;
@@ -45,9 +67,17 @@ export class StoreModule implements IModule {
         const clock = container.resolve(AppToken.CLOCK);
         const logger = container.resolve(AppToken.LOGGER);
 
+        const url = this.options.url ?? config.store.url;
+        const migrate = context.mode === 'migrate' || config.store.migrate;
+
         let store: IStore;
         if (this.options.store) {
             ({ store } = this.options);
+        } else if (this.options.dataSource) {
+            container.register(AppToken.DATA_SOURCE, { useValue: this.options.dataSource });
+            store = await this.typeormStore(context, this.options.dataSource, clock, migrate);
+        } else if (typeof url === 'string') {
+            store = await this.connect(container, context, url, clock, migrate);
         } else {
             store = new MemoryStore({ clock });
             if (!config.dev) {
@@ -78,6 +108,61 @@ export class StoreModule implements IModule {
     async teardown(): Promise<void> {
         this.purge?.stop();
         this.purge = undefined;
+
+        const dataSource = this.created;
+        this.created = undefined;
+        if (dataSource?.isInitialized) {
+            await dataSource.destroy();
+        }
+    }
+
+    protected async connect(
+        container: IContainer,
+        context: AppContext,
+        url: string,
+        clock: IClock,
+        migrate: boolean,
+    ): Promise<IStore> {
+        // lazy: a MemoryStore app never loads TypeORM
+        const { DataSource: DataSourceClass } = await import('typeorm');
+        const { STORE_ENTITIES, STORE_MIGRATIONS } = await import('@chamvi/store-typeorm');
+
+        const dataSource = new DataSourceClass({
+            type: 'postgres',
+            url,
+            entities: STORE_ENTITIES,
+            migrations: STORE_MIGRATIONS,
+        });
+
+        throwIfStopped(context);
+        try {
+            await dataSource.initialize();
+        } catch (error) {
+            await destroyQuietly(dataSource);
+            throw maskPassword(error, url);
+        }
+        container.register(AppToken.DATA_SOURCE, { useValue: dataSource });
+
+        // orkos never tears down a module whose setup threw, so close what was opened here
+        try {
+            const store = await this.typeormStore(context, dataSource, clock, migrate);
+            this.created = dataSource;
+            return store;
+        } catch (error) {
+            await destroyQuietly(dataSource);
+            throw maskPassword(error, url);
+        }
+    }
+
+    protected async typeormStore(context: AppContext, dataSource: DataSource, clock: IClock, migrate: boolean): Promise<IStore> {
+        const { TypeormStore, migrateStore } = await import('@chamvi/store-typeorm');
+        if (migrate) {
+            throwIfStopped(context);
+            await migrateStore(dataSource);
+        }
+
+        throwIfStopped(context);
+        return new TypeormStore({ dataSource, clock });
     }
 }
 

@@ -9,3 +9,6 @@
 export const PURGE_HOOK_NAME = 'chamvi:purge';
 
 export const MEMORY_STORE_WARNING = 'DATABASE_URL unset: MemoryStore keeps runs in memory; restarts lose them and replicas share nothing.';
+
+/** The code of a store error rethrown with the database password masked. */
+export const STORE_ERROR_CODE = 'store_error';
