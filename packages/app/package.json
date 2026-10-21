@@ -25,6 +25,10 @@
         "./github": {
             "types": "./dist/github.d.mts",
             "import": "./dist/github.mjs"
+        },
+        "./sandbox": {
+            "types": "./dist/sandbox.d.mts",
+            "import": "./dist/sandbox.mjs"
         }
     },
     "files": [
