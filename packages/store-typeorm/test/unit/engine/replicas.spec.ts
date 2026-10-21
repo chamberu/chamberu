@@ -20,9 +20,9 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { Engine, defineAgent } from '@chamberu/core';
-import type { EngineOptions } from '@chamberu/core';
-import { TypeormStore } from '@chamberu/store-typeorm';
+import { Engine, defineAgent } from '@chamvi/core';
+import type { EngineOptions } from '@chamvi/core';
+import { TypeormStore } from '@chamvi/store-typeorm';
 import { createTestDataSource, describePostgres, truncateStore } from '../../utils/database.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';

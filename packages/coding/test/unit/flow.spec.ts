@@ -15,11 +15,11 @@ import {
     it,
     vi,
 } from 'vitest';
-import { Engine, MemoryStore, defineAgent } from '@chamberu/core';
-import { codingTools } from '@chamberu/coding';
-import { createWorkspaceManager } from '@chamberu/sandbox';
-import type { ExecResult } from '@chamberu/sandbox';
-import { createLocalSandbox } from '@chamberu/sandbox-local';
+import { Engine, MemoryStore, defineAgent } from '@chamvi/core';
+import { codingTools } from '@chamvi/coding';
+import { createWorkspaceManager } from '@chamvi/sandbox';
+import type { ExecResult } from '@chamvi/sandbox';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
 import { mockModel } from '../utils/model.ts';
 import type { MockResponse } from '../utils/model.ts';
 import { createFixture } from '../utils/setup.ts';
@@ -43,7 +43,7 @@ describe('coding flow (local)', () => {
     it('creates a workspace, runs the tests and disposes it with the run', async () => {
         const fixture = await createFixture();
         cleanups.push(() => fixture.cleanup());
-        const root = await mkdtemp(join(tmpdir(), 'chamberu-coding-flow-'));
+        const root = await mkdtemp(join(tmpdir(), 'chamvi-coding-flow-'));
         cleanups.push(() => rm(root, { recursive: true, force: true }));
 
         const manager = createWorkspaceManager({

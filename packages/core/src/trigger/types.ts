@@ -28,7 +28,7 @@ export type TriggerDefinition<P = unknown> = {
 export type Invoker = {
     id: string;
     /**
-     * The authenticator's label: `@chamberu/http`'s staticTokens() sets
+     * The authenticator's label: `@chamvi/http`'s staticTokens() sets
      * 'token' and authup() sets 'authup'; oidc() keeps the kind its
      * `principal` mapper returns (the docs use 'oidc'); a custom authenticator
      * or a direct dispatch may use its own (e.g. 'user').

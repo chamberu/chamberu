@@ -10,7 +10,7 @@ import type { RunContext } from '../run/types.ts';
 import type { IAgentState, StateSchema } from '../state/types.ts';
 
 /**
- * What a chamberu tool (built with `defineTool` or `defineEffectTool`) gets as
+ * What a chamvi tool (built with `defineTool` or `defineEffectTool`) gets as
  * `context` in `execute`: one object per execution, shared by every call of
  * it and by the tools factory. Treat it as immutable.
  */

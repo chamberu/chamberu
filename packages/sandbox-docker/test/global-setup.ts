@@ -10,7 +10,7 @@ import Docker from 'dockerode';
 import type { TestProject } from 'vitest/node';
 import type { DockerContext } from './utils/docker.ts';
 
-const IMAGE = 'chamberu/sandbox-node:test';
+const IMAGE = 'chamvi/sandbox-node:test';
 
 const IMAGE_CONTEXT = fileURLToPath(new URL('../../../images/sandbox-node', import.meta.url));
 
@@ -36,10 +36,10 @@ async function buildImage(docker: Docker): Promise<void> {
 async function removeTestContainers(docker: Docker): Promise<void> {
     const containers = await docker.listContainers({
         all: true,
-        filters: { label: ['app.kubernetes.io/managed-by=chamberu', 'app.kubernetes.io/component=sandbox'] },
+        filters: { label: ['app.kubernetes.io/managed-by=chamvi', 'app.kubernetes.io/component=sandbox'] },
     });
     await Promise.all(containers
-        .filter((container) => (container.Labels['chamberu.dev/run'] || '').startsWith('test-'))
+        .filter((container) => (container.Labels['chamvi.dev/run'] || '').startsWith('test-'))
         .map((container) => docker.getContainer(container.Id).remove({ force: true, v: true }).catch(() => undefined)));
 }
 
@@ -54,7 +54,7 @@ export default async function setup(project: TestProject) {
 
         const message = e instanceof Error ? e.message : String(e);
         // eslint-disable-next-line no-console
-        console.warn(`[@chamberu/sandbox-docker] Docker is not available, skipping the Docker tests: ${message}. Start Docker to run them.`);
+        console.warn(`[@chamvi/sandbox-docker] Docker is not available, skipping the Docker tests: ${message}. Start Docker to run them.`);
         return undefined;
     }
 

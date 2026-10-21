@@ -1,7 +1,7 @@
 FROM node:24-trixie-slim
 
-LABEL org.opencontainers.image.source="https://github.com/chamberu/chamberu" \
-      org.opencontainers.image.description="chamberu sandbox workspace: Node.js 24, git, tini, uid 1000" \
+LABEL org.opencontainers.image.source="https://github.com/chamvi/chamvi" \
+      org.opencontainers.image.description="chamvi sandbox workspace: Node.js 24, git, tini, uid 1000" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apt-get update \
@@ -10,7 +10,7 @@ RUN apt-get update \
 
 RUN mkdir /workspace && chown 1000:1000 /workspace
 
-# SANDBOX_ENV of @chamberu/sandbox, plus npm and corepack state under the
+# SANDBOX_ENV of @chamvi/sandbox, plus npm and corepack state under the
 # writable /tmp (the root filesystem is read-only in a workspace).
 ENV HOME=/tmp \
     GIT_TERMINAL_PROMPT=0 \

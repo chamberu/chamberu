@@ -23,9 +23,9 @@ import {
     it,
     vi,
 } from 'vitest';
-import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamberu/core';
-import { createLocalSandbox } from '@chamberu/sandbox-local';
-import { ControllableClock, createGitFixture } from '@chamberu/test-kit';
+import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamvi/core';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
+import { ControllableClock, createGitFixture } from '@chamvi/test-kit';
 import { KILL_GRACE_MS, LINGER_CHECK_MS } from '../../../src/provider/constants.ts';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => {
@@ -57,7 +57,7 @@ describe('local sandbox', () => {
     let root: string;
 
     beforeEach(async () => {
-        tmp = await mkdtemp(join(tmpdir(), 'chamberu-local-spec-'));
+        tmp = await mkdtemp(join(tmpdir(), 'chamvi-local-spec-'));
         root = join(tmp, 'workspaces');
     });
 
@@ -90,7 +90,7 @@ describe('local sandbox', () => {
     }, 30_000);
 
     it('does not leak the host environment', async () => {
-        process.env.CHAMBERU_SECRET_PROBE = 's3cret';
+        process.env.CHAMVI_SECRET_PROBE = 's3cret';
         try {
             const workspace = await createLocalSandbox({ root, env: { FOO: 'bar' } }).create({ runId: 'r1' });
             try {
@@ -104,7 +104,7 @@ describe('local sandbox', () => {
                 await workspace.dispose();
             }
         } finally {
-            delete process.env.CHAMBERU_SECRET_PROBE;
+            delete process.env.CHAMVI_SECRET_PROBE;
         }
     });
 

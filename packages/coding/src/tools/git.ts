@@ -6,7 +6,7 @@
  */
 
 import type { Tool } from 'ai';
-import { defineTool } from '@chamberu/core';
+import { defineTool } from '@chamvi/core';
 import {
     gitFailure,
     inputObject,

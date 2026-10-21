@@ -6,7 +6,7 @@
  */
 
 import type { Tool } from 'ai';
-import { ValidationError, defineTool } from '@chamberu/core';
+import { ValidationError, defineTool } from '@chamvi/core';
 import {
     LINE_MAX_CHARS,
     LIST_DEFAULT_RESULTS,

@@ -1,14 +1,14 @@
 ---
 layout: page
 pageClass: ch-home
-title: chamberu
+title: chamvi
 titleTemplate: Self-hosted, trigger-driven AI agents
 
 hero:
     eyebrow: Self-hosted agents
     title: Agents that keep the keys.
     highlight: keep the keys
-    lead: You write the agent with the AI SDK. chamberu queues its runs, checkpoints every step, pauses for approvals and resumes interrupted runs, in your own Node process and database.
+    lead: You write the agent with the AI SDK. chamvi queues its runs, checkpoints every step, pauses for approvals and resumes interrupted runs, in your own Node process and database.
     file: agents/triage.ts
     approval: close(#412) waits for the owner, resume token signed
     actions:
@@ -47,32 +47,32 @@ packages:
     title: Small today, planned in the open.
     lead: The engine, the cron scheduler, the HTTP and MCP API, the TypeORM store and the test helpers ship now. The rest is designed milestone by milestone.
     shipped:
-        -   name: '@chamberu/core'
+        -   name: '@chamvi/core'
             body: Agents, triggers, the run engine, checkpoints, budgets, effect tools, approvals, agent state and the in-memory store.
             link: /reference/
-        -   name: '@chamberu/test-kit'
+        -   name: '@chamvi/test-kit'
             body: ControllableClock and the store contract suite every IStore implementation must pass.
             link: /reference/test-kit
-        -   name: '@chamberu/scheduler'
+        -   name: '@chamvi/scheduler'
             body: Fires cron() triggers once per tick across replicas, with overlap policies, timezones and one-shot jobs.
             link: /reference/scheduler
-        -   name: '@chamberu/store-typeorm'
+        -   name: '@chamvi/store-typeorm'
             body: TypeORM store (PostgreSQL) for durable runs across replicas, passing the store contract suite.
             link: /stores/typeorm
-        -   name: '@chamberu/http'
+        -   name: '@chamvi/http'
             body: REST, server-sent events, webhooks and an MCP endpoint, with bearer, authup and OIDC authentication.
             link: /guide/http
     planned:
-        -   name: '@chamberu/notify-openclaw'
+        -   name: '@chamvi/notify-openclaw'
             milestone: M1
             body: Results and approval requests delivered into OpenClaw chats.
-        -   name: '@chamberu/github'
+        -   name: '@chamvi/github'
             milestone: M1
             body: GitHub App auth, webhook triggers and issue tools with reconciliation.
-        -   name: '@chamberu/sandbox-*'
+        -   name: '@chamvi/sandbox-*'
             milestone: M1
             body: Disposable workspaces, local for development and a pod per workspace in production.
-        -   name: '@chamberu/ui'
+        -   name: '@chamvi/ui'
             milestone: M1
             body: A dashboard with live steps, an approvals inbox, agent state and schedules.
     link:
@@ -82,12 +82,12 @@ packages:
 cta:
     title: Start with one agent.
     lead: Define an agent, dispatch a run and watch it settle. MemoryStore needs no database, so the quick start runs in a single file.
-    command: npm install @chamberu/core ai zod
+    command: npm install @chamvi/core ai zod
     actions:
         -   text: Quick start
             link: /getting-started/quick-start
         -   text: GitHub
-            link: https://github.com/chamberu/chamberu
+            link: https://github.com/chamvi/chamvi
             theme: alt
 ---
 

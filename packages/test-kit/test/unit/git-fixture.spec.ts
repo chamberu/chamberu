@@ -9,12 +9,12 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ValidationError } from '@chamberu/core';
-import { createGitFixture } from '@chamberu/test-kit';
+import { ValidationError } from '@chamvi/core';
+import { createGitFixture } from '@chamvi/test-kit';
 
 describe('createGitFixture', () => {
     it('refuses file names that leave the repository', async () => {
-        const outside = `chamberu-git-fixture-escape-${process.pid}`;
+        const outside = `chamvi-git-fixture-escape-${process.pid}`;
         await expect(createGitFixture({ [`../${outside}`]: 'x' })).rejects.toBeInstanceOf(ValidationError);
         await expect(createGitFixture({ [join(tmpdir(), outside)]: 'x' })).rejects.toBeInstanceOf(ValidationError);
         await expect(createGitFixture({ '': 'x' })).rejects.toBeInstanceOf(ValidationError);

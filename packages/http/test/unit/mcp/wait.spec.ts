@@ -12,8 +12,8 @@ import {
     it,
     vi,
 } from 'vitest';
-import { Engine, MemoryStore } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
+import { Engine, MemoryStore } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
 import { buildContext } from '../../../src/app/helpers.ts';
 import { waitForRun } from '../../../src/mcp/helpers.ts';
 import {

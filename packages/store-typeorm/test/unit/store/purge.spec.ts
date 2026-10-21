@@ -12,8 +12,8 @@ import {
     expect,
     it,
 } from 'vitest';
-import { ControllableClock } from '@chamberu/test-kit';
-import { TypeormStore } from '@chamberu/store-typeorm';
+import { ControllableClock } from '@chamvi/test-kit';
+import { TypeormStore } from '@chamvi/store-typeorm';
 import { createTestDataSource, describePostgres } from '../../utils/database.ts';
 
 describePostgres('TypeormStore purgeExpired', () => {

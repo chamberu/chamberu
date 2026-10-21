@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ValidationError } from '@chamberu/core';
-import { assertArgv } from '@chamberu/sandbox';
+import { ValidationError } from '@chamvi/core';
+import { assertArgv } from '@chamvi/sandbox';
 
 describe('assertArgv', () => {
     it('accepts a command with arguments', () => {

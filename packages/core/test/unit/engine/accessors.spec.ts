@@ -7,7 +7,7 @@
 
 import type { LanguageModel } from 'ai';
 import { describe, expect, it } from 'vitest';
-import { Engine, defineAgent, systemClock } from '@chamberu/core';
+import { Engine, defineAgent, systemClock } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 

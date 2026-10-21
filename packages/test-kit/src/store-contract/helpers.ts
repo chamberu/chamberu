@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { RunStatus } from '@chamberu/core';
-import type { Artifact, Run } from '@chamberu/core';
+import { RunStatus } from '@chamvi/core';
+import type { Artifact, Run } from '@chamvi/core';
 
 export function makeRun(id: string, overrides: Partial<Run> = {}): Run {
     const createdAt = new Date(1_000);

@@ -7,8 +7,8 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { defineAgent, http, webhook } from '@chamberu/core';
-import type { Agent } from '@chamberu/core';
+import { defineAgent, http, webhook } from '@chamvi/core';
+import type { Agent } from '@chamvi/core';
 import { textModel } from './model.ts';
 
 /** `echo` (http only) and `intake` (a webhook, an approval, an `issues` collection). */

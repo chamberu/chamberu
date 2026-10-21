@@ -14,8 +14,8 @@ import {
     expect,
     it,
 } from 'vitest';
-import { ValidationError } from '@chamberu/core';
-import type { GitFixture } from '@chamberu/test-kit';
+import { ValidationError } from '@chamvi/core';
+import type { GitFixture } from '@chamvi/test-kit';
 import { createFixture, setupCoding } from '../../utils/setup.ts';
 import type { CodingSetup } from '../../utils/setup.ts';
 

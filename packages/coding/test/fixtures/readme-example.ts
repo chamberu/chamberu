@@ -1,7 +1,7 @@
 import type { LanguageModel } from 'ai';
-import { codingTools } from '@chamberu/coding';
-import { defineAgent, http } from '@chamberu/core';
-import type { IWorkspaceManager } from '@chamberu/sandbox';
+import { codingTools } from '@chamvi/coding';
+import { defineAgent, http } from '@chamvi/core';
+import type { IWorkspaceManager } from '@chamvi/sandbox';
 
 export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceManager) {
     return defineAgent({

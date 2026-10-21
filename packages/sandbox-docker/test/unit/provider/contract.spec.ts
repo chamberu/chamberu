@@ -6,8 +6,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { createDockerSandbox } from '@chamberu/sandbox-docker';
-import { describeWorkspaceContract } from '@chamberu/test-kit';
+import { createDockerSandbox } from '@chamvi/sandbox-docker';
+import { describeWorkspaceContract } from '@chamvi/test-kit';
 import { describeDocker, dockerImage } from '../../utils/docker.ts';
 
 describeDocker('docker sandbox', () => {

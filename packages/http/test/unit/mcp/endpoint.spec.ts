@@ -12,7 +12,7 @@ import {
     vi, 
 } from 'vitest';
 import { App } from 'routup';
-import type { IShutdown } from '@chamberu/http';
+import type { IShutdown } from '@chamvi/http';
 import { buildContext, createErrorHandler } from '../../../src/app/helpers.ts';
 import { registerMcpRoutes } from '../../../src/mcp/module.ts';
 import {

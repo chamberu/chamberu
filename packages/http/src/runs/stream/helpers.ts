@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { RunStatus } from '@chamberu/core';
-import type { Run } from '@chamberu/core';
+import { RunStatus } from '@chamvi/core';
+import type { Run } from '@chamvi/core';
 import { BadRequestError } from '@ebec/http';
 
 /** The step index a `Last-Event-ID` header names; -1 for none or garbage. */

@@ -22,8 +22,8 @@ const COLUMNS = [
         title: 'Project',
         links: [
             { text: 'Roadmap', link: '/roadmap' },
-            { text: 'GitHub', link: 'https://github.com/chamberu/chamberu' },
-            { text: 'npm', link: 'https://www.npmjs.com/package/@chamberu/core' },
+            { text: 'GitHub', link: 'https://github.com/chamvi/chamvi' },
+            { text: 'npm', link: 'https://www.npmjs.com/package/@chamvi/core' },
         ],
     },
 ];
@@ -52,7 +52,7 @@ export default defineComponent({
                         width="32"
                         height="32"
                     >
-                    <span class="ch-display text-xl text-night-fg">chamberu</span>
+                    <span class="ch-display text-xl text-night-fg">chamvi</span>
                 </p>
                 <p class="m-0 mt-4 max-w-[38ch] text-sm leading-relaxed">
                     Self-hosted, trigger-driven AI agents with durable runs, built on the Vercel AI SDK.
@@ -86,7 +86,7 @@ export default defineComponent({
                 <span>&copy; 2026&ndash;present Peter Placzek</span>
                 <VPLink
                     :class="linkClass"
-                    href="https://github.com/chamberu/chamberu/blob/master/LICENSE"
+                    href="https://github.com/chamvi/chamvi/blob/master/LICENSE"
                 >
                     MIT License
                 </VPLink>

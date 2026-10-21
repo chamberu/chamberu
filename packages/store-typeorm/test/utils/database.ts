@@ -49,7 +49,7 @@ export async function createTestDataSource(opts: TestDataSourceOptions = {}): Pr
         throw new Error('Postgres is not available.');
     }
 
-    const database = `chamberu_test_${randomUUID().replaceAll('-', '')}`;
+    const database = `chamvi_test_${randomUUID().replaceAll('-', '')}`;
     await createDatabase({
         options: {
             type: 'postgres',

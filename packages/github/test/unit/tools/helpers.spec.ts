@@ -7,7 +7,7 @@
 
 import type { ModelMessage } from 'ai';
 import { describe, expect, it } from 'vitest';
-import { ValidationError } from '@chamberu/core';
+import { ValidationError } from '@chamvi/core';
 import { REPO_PATTERN } from '../../../src/tools/constants.ts';
 import { parseRepo, stepOf, toolError } from '../../../src/tools/helpers.ts';
 import { assistant } from '../../utils/tools.ts';
@@ -97,7 +97,7 @@ describe('toolError', () => {
         expect('request' in error).toBe(false);
     });
 
-    it('passes chamberu errors through', () => {
+    it('passes chamvi errors through', () => {
         const validation = new ValidationError('bad');
         expect(toolError(validation)).toBe(validation);
     });

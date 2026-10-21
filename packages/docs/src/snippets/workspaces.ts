@@ -1,10 +1,10 @@
 import type { LanguageModel } from 'ai';
-import type { IStore } from '@chamberu/core';
-import { Engine, defineAgent, http } from '@chamberu/core';
-import { codingTools } from '@chamberu/coding';
-import { createWorkspaceManager } from '@chamberu/sandbox';
-import type { ISandboxProvider } from '@chamberu/sandbox';
-import { createLocalSandbox } from '@chamberu/sandbox-local';
+import type { IStore } from '@chamvi/core';
+import { Engine, defineAgent, http } from '@chamvi/core';
+import { codingTools } from '@chamvi/coding';
+import { createWorkspaceManager } from '@chamvi/sandbox';
+import type { ISandboxProvider } from '@chamvi/sandbox';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
 
 export async function serve(store: IStore, model: LanguageModel, provider: ISandboxProvider) {
     // #region setup

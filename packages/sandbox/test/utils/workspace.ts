@@ -5,13 +5,13 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { SandboxError } from '@chamberu/core';
+import { SandboxError } from '@chamvi/core';
 import type {
     ExecOptions,
     ExecResult,
     IWorkspace,
     WorkspaceInfo,
-} from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
 
 export type ScriptedWorkspace = IWorkspace & {
     calls: Array<{ argv: string[]; options: ExecOptions }>;

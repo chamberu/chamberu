@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError } from '@chamberu/core';
-import type { TriggerDefinition } from '@chamberu/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
+import type { TriggerDefinition } from '@chamvi/core';
 import { GITHUB_EVENT_PATTERN } from './constants.ts';
 import { defaultConcurrencyKey } from './helpers.ts';
 import type { GithubEvent, GithubWebhookTriggerOptions } from './types.ts';

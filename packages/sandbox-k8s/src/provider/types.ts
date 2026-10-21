@@ -6,8 +6,8 @@
  */
 
 import type { KubeConfig } from '@kubernetes/client-node';
-import type { IClock } from '@chamberu/core';
-import type { SandboxLimits } from '@chamberu/sandbox';
+import type { IClock } from '@chamvi/core';
+import type { SandboxLimits } from '@chamvi/sandbox';
 import type { IPodClient } from '../client/types.ts';
 
 export type ImagePullPolicy = 'Always' | 'IfNotPresent';

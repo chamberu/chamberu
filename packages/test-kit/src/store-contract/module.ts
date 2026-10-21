@@ -6,13 +6,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { InvalidRunStateError, RunNotFoundError, RunStatus } from '@chamberu/core';
+import { InvalidRunStateError, RunNotFoundError, RunStatus } from '@chamvi/core';
 import type {
     Artifact,
     Checkpoint,
     IStore,
     Step,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { ControllableClock } from '../clock/index.ts';
 import { makeArtifact, makeRun } from './helpers.ts';
 

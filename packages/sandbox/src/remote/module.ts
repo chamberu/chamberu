@@ -6,7 +6,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { SandboxError, ValidationError, systemClock } from '@chamberu/core';
+import { SandboxError, ValidationError, systemClock } from '@chamvi/core';
 import { toSandboxError } from '../manager/helpers.ts';
 import { createOutputCollector } from '../output/module.ts';
 import { absoluteWorkspacePath, resolveWorkspacePath } from '../path/module.ts';

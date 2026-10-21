@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { SandboxError, ValidationError } from '@chamberu/core';
+import { SandboxError, ValidationError } from '@chamvi/core';
 
 /** `argv` is a non-empty list of strings without NUL, the first one non-empty. */
 export function assertArgv(argv: readonly string[]): void {

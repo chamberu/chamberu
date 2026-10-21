@@ -1,5 +1,5 @@
 {
-    "name": "@chamberu/core",
+    "name": "@chamvi/core",
     "version": "0.1.0",
     "type": "module",
     "description": "Core engine for self-hosted, trigger-driven AI agents: agents, triggers and durable runs.",
@@ -8,10 +8,10 @@
         "email": "contact@tada5hi.net",
         "url": "https://github.com/tada5hi"
     },
-    "homepage": "https://chamberu.dev",
+    "homepage": "https://chamvi.dev",
     "repository": {
         "type": "git",
-        "url": "https://github.com/chamberu/chamberu.git",
+        "url": "https://github.com/chamvi/chamvi.git",
         "directory": "packages/core"
     },
     "main": "dist/index.mjs",

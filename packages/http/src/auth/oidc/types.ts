@@ -15,7 +15,7 @@ import type { Principal } from '../types.ts';
 export type OidcIssuer = Issuer & { audience: string | string[] };
 
 export type OidcOptions = {
-    /** The trusted issuers (vouchly), e.g. GitHub Actions with `audience: 'chamberu'`. */
+    /** The trusted issuers (vouchly), e.g. GitHub Actions with `audience: 'chamvi'`. */
     issuers: OidcIssuer[];
     /**
      * Maps a verified token to a principal, or `undefined` to refuse it.

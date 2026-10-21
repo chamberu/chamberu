@@ -11,7 +11,7 @@ import { hasToolContext } from '../tool/helpers.ts';
 
 /**
  * Every own key of `toolsContext` must name a tool of `tools` that is not a
- * chamberu tool (those get the run context instead); anything else is a
+ * chamvi tool (those get the run context instead); anything else is a
  * misconfiguration, never silently dropped.
  */
 export function assertToolsContext(agent: string, tools: ToolSet, toolsContext: Record<string, unknown>): void {
@@ -24,7 +24,7 @@ export function assertToolsContext(agent: string, tools: ToolSet, toolsContext: 
         }
         if (hasToolContext(tool)) {
             throw new InvalidAgentDefinitionError(
-                `Agent "${agent}": toolsContext entry "${name}" names a chamberu tool, which gets the run context instead.`,
+                `Agent "${agent}": toolsContext entry "${name}" names a chamvi tool, which gets the run context instead.`,
             );
         }
     }

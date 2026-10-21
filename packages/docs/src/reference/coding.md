@@ -1,12 +1,12 @@
-# @chamberu/coding
+# @chamvi/coding
 
-Coding tools for chamberu agents and the coding backend contract. The public API of `packages/coding/src/index.ts`.
+Coding tools for chamvi agents and the coding backend contract. The public API of `packages/coding/src/index.ts`.
 
 ```bash
-npm install @chamberu/coding @chamberu/sandbox @chamberu/core ai --save
+npm install @chamvi/coding @chamvi/sandbox @chamvi/core ai --save
 ```
 
-`@chamberu/core`, `@chamberu/sandbox` and `ai` are peer dependencies. See [Workspaces & Coding](/guide/workspaces) for the behaviour.
+`@chamvi/core`, `@chamvi/sandbox` and `ai` are peer dependencies. See [Workspaces & Coding](/guide/workspaces) for the behaviour.
 
 ## codingTools
 
@@ -25,7 +25,7 @@ Throws `InvalidAgentDefinitionError` when `workspaces` has no `get`. Returns `re
 | `edit_file` | `path`, `oldString`, `newString`, `replaceAll?` | `EditFileResult` |
 | `grep` | `pattern` (POSIX ERE), `path?`, `ignoreCase?`, `limit?` (default 100, at most 500) | `GrepResult` |
 | `list_files` | `path?`, `limit?` (default 1000, at most 5000) | `ListFilesResult` |
-| `bash` | `command`, `cwd?`, `timeoutMs?` (default 300 000, at most 1 800 000) | `ExecResult` from `@chamberu/sandbox` |
+| `bash` | `command`, `cwd?`, `timeoutMs?` (default 300 000, at most 1 800 000) | `ExecResult` from `@chamvi/sandbox` |
 | `git_diff` | `staged?`, `path?` | `GitDiffResult` |
 
 Every tool also takes `workspace?`, the id from `create_workspace`. A path is relative to the workspace root or starts with `/workspace/`. Input the model can correct (a bad path, an `oldString` that is missing or ambiguous) is a `ValidationError` tool error; a missing or oversized file and any other sandbox failure a `SandboxError` tool error.

@@ -14,9 +14,9 @@ import {
     expect,
     it,
 } from 'vitest';
-import { SandboxError, ValidationError } from '@chamberu/core';
-import type { ExecResult } from '@chamberu/sandbox';
-import type { GitFixture } from '@chamberu/test-kit';
+import { SandboxError, ValidationError } from '@chamvi/core';
+import type { ExecResult } from '@chamvi/sandbox';
+import type { GitFixture } from '@chamvi/test-kit';
 import { createFixture, setupCoding } from '../../utils/setup.ts';
 import type { CodingSetup } from '../../utils/setup.ts';
 

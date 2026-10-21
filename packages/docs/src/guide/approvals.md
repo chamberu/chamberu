@@ -32,7 +32,7 @@ The engine throws `InvalidAgentDefinitionError` for an empty `resumeSecret` (any
 
 `resume()` verifies the token against the run's current wait point, moves the run `waiting` to `queued`, appends the `tool-approval-response` to the checkpoint and a `wait` step, and clears the wait point. The next execution runs the approved call, or tells the model it was denied (with your `reason`).
 
-- `decision.approver` (an invoker: `{ id, kind, name?, permissions }`) is recorded on the `wait` step as `output.approver`. `@chamberu/http` sets it from the principal that answered.
+- `decision.approver` (an invoker: `{ id, kind, name?, permissions }`) is recorded on the `wait` step as `output.approver`. `@chamvi/http` sets it from the principal that answered.
 - A token answers its wait point once. A second `resume()` throws `InvalidRunStateError`.
 - A forged, malformed, expired or superseded token throws `InvalidResumeTokenError`.
 - If writing the answer fails, the run goes back to `waiting` and the token stays valid.
@@ -54,5 +54,5 @@ base64url(JSON { runId, approvalId, tokenId, exp }) + "." + base64url(HMAC-SHA25
 The signature is compared in constant time, and a token expires at the wait point's `expiresAt`. `createResumeToken(secret, claims)` and `verifyResumeToken(secret, token, now)` are exported for transports that carry tokens themselves.
 
 ::: tip Where tokens are answered
-In core you call `engine.resume()` yourself. [`@chamberu/http`](/guide/http) adds the authenticated `POST /resume` endpoint and the MCP `resume_run` tool (both need `agent:<name>:approve` besides the token), and the planned UI an approvals inbox.
+In core you call `engine.resume()` yourself. [`@chamvi/http`](/guide/http) adds the authenticated `POST /resume` endpoint and the MCP `resume_run` tool (both need `agent:<name>:approve` besides the token), and the planned UI an approvals inbox.
 :::

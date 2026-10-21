@@ -7,10 +7,10 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { defineAgent } from '@chamberu/core';
-import type { INotifier, Notification } from '@chamberu/core';
-import type { IGithubApp } from '@chamberu/github';
-import { githubWebhook } from '@chamberu/github';
+import { defineAgent } from '@chamvi/core';
+import type { INotifier, Notification } from '@chamvi/core';
+import type { IGithubApp } from '@chamvi/github';
+import { githubWebhook } from '@chamvi/github';
 import { createGithubTestApp, deliver } from '../../utils/app.ts';
 import { mockModel } from '../../utils/model.ts';
 import type { MockResponse } from '../../utils/model.ts';
@@ -84,7 +84,7 @@ describe('webhook to comment', () => {
         expect(run?.output).toBe('Triaged.');
         const comments = fake.comments.get('octo/demo#5') ?? [];
         expect(comments).toHaveLength(1);
-        expect(comments[0]?.body).toContain(`<!-- chamberu:effect=${run!.id}:github_create_comment:octo/demo#5:1 -->`);
+        expect(comments[0]?.body).toContain(`<!-- chamvi:effect=${run!.id}:github_create_comment:octo/demo#5:1 -->`);
         expect(fake.issues.get('octo/demo#5')?.labels).toEqual([{ name: 'bug' }]);
 
         const redelivered = await deliver(app, {
@@ -186,7 +186,7 @@ describe('webhook to comment', () => {
         const bodies = (fake.comments.get('octo/demo#5') ?? []).map((c) => String(c.body));
         expect(bodies).toHaveLength(3);
         for (const [step, body] of bodies.entries()) {
-            expect(body).toContain(`<!-- chamberu:effect=${runId}:github_create_comment:octo/demo#5:${step} -->`);
+            expect(body).toContain(`<!-- chamvi:effect=${runId}:github_create_comment:octo/demo#5:${step} -->`);
         }
         await engine.drain();
     });

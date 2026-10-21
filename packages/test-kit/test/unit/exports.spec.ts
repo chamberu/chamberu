@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as kit from '@chamberu/test-kit';
+import * as kit from '@chamvi/test-kit';
 
 describe('public api', () => {
     it.each([

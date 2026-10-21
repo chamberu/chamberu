@@ -32,7 +32,7 @@ describe('README example', () => {
     });
 
     it('starts runs over REST and shuts down', async () => {
-        vi.stubEnv('CHAMBERU_TOKEN', TOKEN);
+        vi.stubEnv('CHAMVI_TOKEN', TOKEN);
         const { app, shutdown } = await createAgentServer(textModel());
         const response = await app.fetch(new Request('http://test/agents/echo/runs', {
             method: 'POST',
@@ -42,8 +42,8 @@ describe('README example', () => {
         await expect(shutdown.shutdown()).resolves.toBeUndefined();
     });
 
-    it('needs CHAMBERU_TOKEN', async () => {
-        vi.stubEnv('CHAMBERU_TOKEN', '');
-        await expect(createAgentServer(textModel())).rejects.toThrow('CHAMBERU_TOKEN');
+    it('needs CHAMVI_TOKEN', async () => {
+        vi.stubEnv('CHAMVI_TOKEN', '');
+        await expect(createAgentServer(textModel())).rejects.toThrow('CHAMVI_TOKEN');
     });
 });

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { SandboxError, ValidationError } from '@chamberu/core';
+import { SandboxError, ValidationError } from '@chamvi/core';
 import { EXEC_TIMEOUT_MS } from '../workspace/constants.ts';
 import type { IWorkspace } from '../workspace/types.ts';
 import {

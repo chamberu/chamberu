@@ -7,21 +7,21 @@
 
 import type { ITokenVerifier } from '@authup/server-adapter-kit';
 import { staticKeys } from 'vouchly';
-import type { OidcIssuer as Issuer, Principal  } from '@chamberu/http';
+import type { OidcIssuer as Issuer, Principal  } from '@chamvi/http';
 import {
     beforeAll,
     describe,
     expect,
     it,
 } from 'vitest';
-import { defineAgent, webhook } from '@chamberu/core';
-import type { Run, Step } from '@chamberu/core';
+import { defineAgent, webhook } from '@chamvi/core';
+import type { Run, Step } from '@chamvi/core';
 import {
     authup,
     createShutdown,
     oidc,
     staticTokens,
-} from '@chamberu/http';
+} from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
@@ -67,7 +67,7 @@ describe('acceptance flows', () => {
         issuer = {
             id: 'local',
             issuer: ISSUER,
-            audience: 'chamberu',
+            audience: 'chamvi',
             keys: staticKeys([signingKey.jwk]),
         };
     });
@@ -186,7 +186,7 @@ describe('acceptance flows', () => {
         await engine.start();
         const token = await signToken(signingKey.privateKey, {
             iss: ISSUER,
-            aud: 'chamberu',
+            aud: 'chamvi',
             sub: 'openclaw',
         });
 

@@ -12,7 +12,7 @@ import type {
     Step,
     TriggerEnvelope,
     WaitPoint,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type {
     DataSource,
     EntityTarget,

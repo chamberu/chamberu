@@ -7,7 +7,7 @@
 
 import type { ITokenVerifier, TokenVerificationData } from '@authup/server-adapter-kit';
 import { describe, expect, it } from 'vitest';
-import { authup } from '@chamberu/http';
+import { authup } from '@chamvi/http';
 
 function verifierFor(data: TokenVerificationData): ITokenVerifier {
     return {

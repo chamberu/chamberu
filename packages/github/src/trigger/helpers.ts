@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { TriggerDefinition } from '@chamberu/core';
+import type { TriggerDefinition } from '@chamvi/core';
 import type { GithubEvent } from './types.ts';
 
 function matchesEvent(spec: string, event: GithubEvent): boolean {

@@ -1,17 +1,17 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo-test-kit.svg" alt="@chamberu/test-kit" width="128" height="128" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/logo-test-kit.svg" alt="@chamvi/test-kit" width="128" height="128" />
 </p>
 
-<h1 align="center">@chamberu/test-kit</h1>
+<h1 align="center">@chamvi/test-kit</h1>
 
 <p align="center">
-    <b>Test helpers for chamberu: a controllable clock, the store contract suite and the workspace contract suite.</b>
+    <b>Test helpers for chamvi: a controllable clock, the store contract suite and the workspace contract suite.</b>
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@chamberu/test-kit"><img src="https://img.shields.io/npm/v/@chamberu/test-kit" alt="npm version" /></a>
-    <a href="https://github.com/chamberu/chamberu/actions/workflows/ci.yml"><img src="https://github.com/chamberu/chamberu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <a href="https://github.com/chamberu/chamberu/blob/master/packages/test-kit/LICENSE"><img src="https://img.shields.io/npm/l/@chamberu/test-kit" alt="License" /></a>
+    <a href="https://www.npmjs.com/package/@chamvi/test-kit"><img src="https://img.shields.io/npm/v/@chamvi/test-kit" alt="npm version" /></a>
+    <a href="https://github.com/chamvi/chamvi/actions/workflows/ci.yml"><img src="https://github.com/chamvi/chamvi/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/chamvi/chamvi/blob/master/packages/test-kit/LICENSE"><img src="https://img.shields.io/npm/l/@chamvi/test-kit" alt="License" /></a>
 </p>
 
 ---
@@ -19,10 +19,10 @@
 ## Installation
 
 ```bash
-npm install --save-dev @chamberu/test-kit @chamberu/core vitest
+npm install --save-dev @chamvi/test-kit @chamvi/core vitest
 ```
 
-`@chamberu/core` and `vitest` are peer dependencies. `@chamberu/sandbox` is an optional peer, needed only for the workspace contract.
+`@chamvi/core` and `vitest` are peer dependencies. `@chamvi/sandbox` is an optional peer, needed only for the workspace contract.
 
 ## Usage
 
@@ -31,8 +31,8 @@ npm install --save-dev @chamberu/test-kit @chamberu/core vitest
 Every `IStore` implementation proves itself with the shared Vitest suite. The factory gets a fresh `ControllableClock` per test and must use it for every expiry decision:
 
 ```typescript
-import { MemoryStore } from '@chamberu/core';
-import { describeStoreContract } from '@chamberu/test-kit';
+import { MemoryStore } from '@chamvi/core';
+import { describeStoreContract } from '@chamvi/test-kit';
 
 describeStoreContract((clock) => new MemoryStore({ clock }));
 ```
@@ -42,8 +42,8 @@ describeStoreContract((clock) => new MemoryStore({ clock }));
 `ControllableClock` implements `IClock` and only moves when told to, so engine timeouts, claim leases and approval expiry are tested without real timers:
 
 ```typescript
-import { MemoryStore, Engine } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
+import { MemoryStore, Engine } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
 
 const clock = new ControllableClock();
 const store = new MemoryStore({ clock });
@@ -57,8 +57,8 @@ clock.advance(60_000); // fires every timer due within the next minute, in order
 Every sandbox provider proves its workspaces with the shared Vitest suite: argv exec and exit codes, stdin, `cwd` and path escapes, the 64 KiB output caps under a flood, process-group kills on timeout (a backgrounded grandchild included), abort, UTF-8 files and their size cap, and dispose during an exec. It runs real processes with short real timeouts, so the factory returns a fresh, repo-less workspace per test (the suite disposes it):
 
 ```ts
-import { createLocalSandbox } from '@chamberu/sandbox-local';
-import { describeWorkspaceContract } from '@chamberu/test-kit';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
+import { describeWorkspaceContract } from '@chamvi/test-kit';
 
 const provider = createLocalSandbox();
 describeWorkspaceContract('local', () => provider.create({ runId: 'contract' }));

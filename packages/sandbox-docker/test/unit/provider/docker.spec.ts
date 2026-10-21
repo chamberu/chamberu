@@ -12,14 +12,14 @@ import {
     expect,
     it,
 } from 'vitest';
-import { SandboxError } from '@chamberu/core';
-import type { IWorkspace } from '@chamberu/sandbox';
-import { CONTAINER_NAME_PREFIX, createDockerSandbox } from '@chamberu/sandbox-docker';
+import { SandboxError } from '@chamvi/core';
+import type { IWorkspace } from '@chamvi/sandbox';
+import { CONTAINER_NAME_PREFIX, createDockerSandbox } from '@chamvi/sandbox-docker';
 import { describeDocker, dockerImage } from '../../utils/docker.ts';
 
-const offline = Boolean(process.env.CHAMBERU_OFFLINE);
+const offline = Boolean(process.env.CHAMVI_OFFLINE);
 
-const MISSING_IMAGE = 'chamberu/does-not-exist:none';
+const MISSING_IMAGE = 'chamvi/does-not-exist:none';
 
 function statusCode(error: unknown): number | undefined {
     return (error as { statusCode?: number } | undefined)?.statusCode;
@@ -37,7 +37,7 @@ describeDocker('docker sandbox', () => {
     }
 
     async function containersOf(runId: string) {
-        return docker.listContainers({ all: true, filters: { label: [`chamberu.dev/run=${runId}`] } });
+        return docker.listContainers({ all: true, filters: { label: [`chamvi.dev/run=${runId}`] } });
     }
 
     afterAll(async () => {
@@ -48,7 +48,7 @@ describeDocker('docker sandbox', () => {
         const { runId, workspace } = await create();
         const containers = await containersOf(runId);
         expect(containers).toHaveLength(1);
-        expect(containers[0]?.Labels['chamberu.dev/workspace']).toBe(workspace.id);
+        expect(containers[0]?.Labels['chamvi.dev/workspace']).toBe(workspace.id);
         expect(containers[0]?.Names).toEqual([`/${CONTAINER_NAME_PREFIX}${workspace.id}`]);
         expect(workspace.info).toMatchObject({ runId, provider: 'docker' });
     });
@@ -130,7 +130,7 @@ describeDocker('docker sandbox', () => {
     });
 
     it('does not pass the host environment', async () => {
-        process.env.CHAMBERU_SECRET_PROBE = 's3cret';
+        process.env.CHAMVI_SECRET_PROBE = 's3cret';
         try {
             const { workspace } = await create({ env: { VISIBLE: 'yes' } });
             const result = await workspace.exec(['env']);
@@ -138,7 +138,7 @@ describeDocker('docker sandbox', () => {
             expect(result.stdout).not.toContain('s3cret');
             expect(result.stdout).toContain('VISIBLE=yes');
         } finally {
-            delete process.env.CHAMBERU_SECRET_PROBE;
+            delete process.env.CHAMVI_SECRET_PROBE;
         }
     });
 

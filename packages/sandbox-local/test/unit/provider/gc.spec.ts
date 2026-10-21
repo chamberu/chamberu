@@ -22,15 +22,15 @@ import {
     expect,
     it,
 } from 'vitest';
-import { SandboxError } from '@chamberu/core';
-import { createLocalSandbox } from '@chamberu/sandbox-local';
-import { ControllableClock } from '@chamberu/test-kit';
+import { SandboxError } from '@chamvi/core';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
+import { ControllableClock } from '@chamvi/test-kit';
 
 describe('local garbage collection', () => {
     let root: string;
 
     beforeEach(async () => {
-        root = await mkdtemp(join(tmpdir(), 'chamberu-local-gc-'));
+        root = await mkdtemp(join(tmpdir(), 'chamvi-local-gc-'));
     });
 
     afterEach(async () => {

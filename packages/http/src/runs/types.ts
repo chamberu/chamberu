@@ -11,7 +11,7 @@ import type {
     Run,
     RunStatusLiteral,
     TriggerEnvelope,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 /** An invoker or approver as it leaves the package: identity only, never the grants. */
 export type InvokerView = Omit<Invoker, 'permissions'>;

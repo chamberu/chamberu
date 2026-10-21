@@ -12,9 +12,9 @@ import {
     it,
     vi,
 } from 'vitest';
-import { Engine, InvalidAgentDefinitionError, MemoryStore } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
-import { createShutdown } from '@chamberu/http';
+import { Engine, InvalidAgentDefinitionError, MemoryStore } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import { createShutdown } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     CapturingNotifier,

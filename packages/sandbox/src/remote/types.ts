@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IClock } from '@chamberu/core';
+import type { IClock } from '@chamvi/core';
 import type { IOutputSink } from '../output/types.ts';
 import type { WorkspaceInfo } from '../workspace/types.ts';
 

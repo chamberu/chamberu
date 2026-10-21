@@ -1,6 +1,6 @@
-import type { Agent, IStore } from '@chamberu/core';
-import { Engine } from '@chamberu/core';
-import { createScheduler, runJob } from '@chamberu/scheduler';
+import type { Agent, IStore } from '@chamvi/core';
+import { Engine } from '@chamvi/core';
+import { createScheduler, runJob } from '@chamvi/scheduler';
 
 export async function serve(store: IStore, agents: Agent[], resumeSecret: string) {
     // #region scheduler

@@ -3,7 +3,7 @@ import {
     Engine,
     MemoryStore,
     defineAgent,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { ConsoleNotifier } from './notifiers.ts';
 
 export function createEngine(model: LanguageModel) {

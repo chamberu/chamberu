@@ -1,5 +1,5 @@
 {
-    "name": "chamberu-root",
+    "name": "chamvi-root",
     "private": true,
     "version": "0.0.0",
     "type": "module",
@@ -9,10 +9,10 @@
         "email": "contact@tada5hi.net",
         "url": "https://github.com/tada5hi"
     },
-    "homepage": "https://chamberu.dev",
+    "homepage": "https://chamvi.dev",
     "repository": {
         "type": "git",
-        "url": "https://github.com/chamberu/chamberu.git"
+        "url": "https://github.com/chamvi/chamvi.git"
     },
     "workspaces": [
         "packages/*"
@@ -27,8 +27,8 @@
         "typecheck": "npx nx run-many -t typecheck",
         "lint": "eslint",
         "lint:fix": "npm run lint -- --fix",
-        "docs:dev": "npm run dev -w @chamberu/docs",
-        "docs:build": "npm run build -w @chamberu/docs",
+        "docs:dev": "npm run dev -w @chamvi/docs",
+        "docs:build": "npm run build -w @chamvi/docs",
         "prepare": "husky"
     },
     "license": "Apache-2.0",

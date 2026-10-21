@@ -6,7 +6,7 @@ import {
     defineAgent,
     defineEffectTool,
     webhook,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 declare const model: LanguageModel;
 declare function addLabel(issue: number, label: string): Promise<void>;

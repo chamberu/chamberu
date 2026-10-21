@@ -5,11 +5,11 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /** The abort reason when a run exceeds its `timeoutMs` budget. */
-export class TimeoutError extends ChamberuError {
+export class TimeoutError extends ChamviError {
     constructor(ms: number) {
         super({ message: `The run exceeded its ${ms}ms timeout.`, code: ErrorCode.TIMEOUT });
     }

@@ -1,9 +1,9 @@
 # MemoryStore
 
-`MemoryStore` implements `IStore` in process memory. It ships with `@chamberu/core` because every test needs it.
+`MemoryStore` implements `IStore` in process memory. It ships with `@chamvi/core` because every test needs it.
 
 ```ts
-import { MemoryStore } from '@chamberu/core';
+import { MemoryStore } from '@chamvi/core';
 
 const store = new MemoryStore();
 ```
@@ -22,7 +22,7 @@ It passes the same contract suite every other store must pass.
 
 ## When to use it
 
-- Tests, with a `ControllableClock` from [`@chamberu/test-kit`](/reference/test-kit) passed to both the store and the engine.
+- Tests, with a `ControllableClock` from [`@chamvi/test-kit`](/reference/test-kit) passed to both the store and the engine.
 - Local development and scripts.
 - A single process where losing queued and waiting runs on restart is acceptable.
 

@@ -6,9 +6,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as core from '@chamberu/core';
+import * as core from '@chamvi/core';
 
-describe('@chamberu/core', () => {
+describe('@chamvi/core', () => {
     it('resolves the package entry', () => {
         expect(typeof core).toBe('object');
     });

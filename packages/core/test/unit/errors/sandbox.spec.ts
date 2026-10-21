@@ -6,14 +6,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ChamberuError, ErrorCode, SandboxError } from '@chamberu/core';
+import { ChamviError, ErrorCode, SandboxError } from '@chamvi/core';
 
 describe('SandboxError', () => {
     it('carries code sandbox_error and the cause', () => {
         const cause = new Error('daemon');
         const e = new SandboxError('create failed', { cause });
 
-        expect(e).toBeInstanceOf(ChamberuError);
+        expect(e).toBeInstanceOf(ChamviError);
         expect(e.code).toBe('sandbox_error');
         expect(e.code).toBe(ErrorCode.SANDBOX);
         expect(e.message).toBe('create failed');

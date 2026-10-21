@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError, RunStatus, hasPermission } from '@chamberu/core';
-import type { Agent, RunStatusLiteral } from '@chamberu/core';
+import { InvalidAgentDefinitionError, RunStatus, hasPermission } from '@chamvi/core';
+import type { Agent, RunStatusLiteral } from '@chamvi/core';
 import { fromJsonSchema } from '@modelcontextprotocol/server';
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { StandardSchemaV1 } from '@standard-schema/spec';

@@ -26,8 +26,8 @@ import {
     join,
     sep,
 } from 'node:path';
-import type { IClock } from '@chamberu/core';
-import { SandboxError, ValidationError } from '@chamberu/core';
+import type { IClock } from '@chamvi/core';
+import { SandboxError, ValidationError } from '@chamvi/core';
 import {
     EXEC_TIMEOUT_MAX_MS,
     EXEC_TIMEOUT_MS,
@@ -38,13 +38,13 @@ import {
     createOutputCollector,
     decodeUtf8File,
     resolveWorkspacePath,
-} from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
 import type {
     ExecOptions,
     ExecResult,
     IWorkspace,
     WorkspaceInfo,
-} from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
 import { KILL_GRACE_MS, LINGER_CHECK_MS, REPO_DIR } from './constants.ts';
 import {
     errnoCode,
@@ -92,7 +92,7 @@ export class LocalWorkspace implements IWorkspace {
 
     protected disposing: Promise<void> | undefined;
 
-    /** Set once the workspace directory was found missing (removed outside chamberu). */
+    /** Set once the workspace directory was found missing (removed outside chamvi). */
     protected gone = false;
 
     constructor(input: LocalWorkspaceInput) {
@@ -203,7 +203,7 @@ export class LocalWorkspace implements IWorkspace {
         const file = await this.realPath(relative);
         // into a temporary file next to it with the old file's mode, then
         // renamed over it: a reader or a second writer never sees a cut file
-        const temporary = join(dirname(file), `.chamberu-write-${randomBytes(8).toString('hex')}`);
+        const temporary = join(dirname(file), `.chamvi-write-${randomBytes(8).toString('hex')}`);
         try {
             await mkdir(dirname(file), { recursive: true });
             const mode = await stat(file).then((stats) => stats.mode & 0o7777, () => undefined);

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IClock } from '@chamberu/core';
+import type { IClock } from '@chamvi/core';
 
 type Timer = {
     at: number;
@@ -14,7 +14,7 @@ type Timer = {
 };
 
 /**
- * Manually advanced clock for core's own tests. `@chamberu/test-kit` ships
+ * Manually advanced clock for core's own tests. `@chamvi/test-kit` ships
  * the public one; core cannot depend on the kit, which depends on core.
  */
 export class ControllableClock implements IClock {

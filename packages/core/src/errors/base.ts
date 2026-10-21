@@ -7,4 +7,4 @@
 
 import { BaseError } from '@ebec/core';
 
-export class ChamberuError extends BaseError {}
+export class ChamviError extends BaseError {}

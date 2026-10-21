@@ -12,8 +12,8 @@ import {
     it,
     vi,
 } from 'vitest';
-import { InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
-import { createDockerSandbox } from '@chamberu/sandbox-docker';
+import { InvalidAgentDefinitionError, SandboxError } from '@chamvi/core';
+import { createDockerSandbox } from '@chamvi/sandbox-docker';
 
 describe('docker sandbox options', () => {
     it('is named docker and connects lazily', () => {
@@ -56,7 +56,7 @@ describe('docker sandbox create without a daemon', () => {
     it('does not pull for a 404 that names no missing image', async () => {
         const docker = fakeDocker(Object.assign(new Error('not found'), {
             statusCode: 404,
-            json: { message: 'network chamberu-missing not found' },
+            json: { message: 'network chamvi-missing not found' },
         }));
         const provider = createDockerSandbox({ docker: docker as never });
 
@@ -153,7 +153,7 @@ describe('docker sandbox create aborted in flight', () => {
         controller.abort();
         await expect(creating).rejects.toThrow('workspace creation aborted');
         // the daemon may have made it before the request was dropped
-        expect(docker.getContainer).toHaveBeenCalledWith(expect.stringMatching(/^chamberu-ws-/));
+        expect(docker.getContainer).toHaveBeenCalledWith(expect.stringMatching(/^chamvi-ws-/));
         expect(remove).toHaveBeenCalledWith({ force: true, v: true });
     });
 });

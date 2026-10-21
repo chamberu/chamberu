@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { ILockStore } from '@chamberu/core';
+import type { ILockStore } from '@chamvi/core';
 import type { IScheduleLock } from 'hubwire';
 
 /**

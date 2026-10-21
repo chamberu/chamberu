@@ -14,7 +14,7 @@ import type { EffectHooks, EffectTool } from './types.ts';
 
 /** Hidden marker tools embed in remote artifacts so `alreadyApplied` can find them again. */
 export function effectMarker(effectKey: string): string {
-    return `<!-- chamberu:effect=${effectKey} -->`;
+    return `<!-- chamvi:effect=${effectKey} -->`;
 }
 
 /**

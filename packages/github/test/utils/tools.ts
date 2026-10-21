@@ -6,13 +6,13 @@
  */
 
 import type { ModelMessage, ToolSet } from 'ai';
-import { MemoryStore, createAgentState } from '@chamberu/core';
+import { MemoryStore, createAgentState } from '@chamvi/core';
 import type {
     IRunArtifacts,
     ToolContext,
     TriggerEnvelope,
     TriggerSource,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { START } from './app.ts';
 
 const NO_ARTIFACTS: IRunArtifacts = {

@@ -10,7 +10,7 @@ import {
     SandboxError,
     ValidationError,
     systemClock,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type { ToolSet } from 'ai';
 import type { WorkspaceCreateOptions } from '../provider/types.ts';
 import { assertGitRef, normalizeRepo } from '../repo/module.ts';
@@ -58,7 +58,7 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions): IWorks
     const maxPerRun = options.maxWorkspacesPerRun ?? MAX_WORKSPACES_PER_RUN;
     const gcIntervalMs = options.gcIntervalMs ?? GC_INTERVAL_MS;
     // eslint-disable-next-line no-console
-    const onError = options.onError ?? ((error: unknown) => console.error('[chamberu]', error));
+    const onError = options.onError ?? ((error: unknown) => console.error('[chamvi]', error));
 
     const runs = new Map<string, Map<string, Entry>>();
     const subscriptions = new Set<() => void>();

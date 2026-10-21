@@ -6,8 +6,8 @@
  */
 
 import type { ToolSet } from 'ai';
-import type { IClock } from '@chamberu/core';
-import type { HttpRoute } from '@chamberu/http';
+import type { IClock } from '@chamvi/core';
+import type { HttpRoute } from '@chamvi/http';
 import type { GithubWebhookRouteOptions } from '../webhook/types.ts';
 import type { PaginatedOctokit } from './helpers.ts';
 

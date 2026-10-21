@@ -8,7 +8,7 @@
 import type { LanguageModelV4StreamPart } from '@ai-sdk/provider';
 import { Output, simulateReadableStream, tool } from 'ai';
 import type { LanguageModel, ToolSet } from 'ai';
-import type { RunDelta } from '@chamberu/core';
+import type { RunDelta } from '@chamvi/core';
 import {
     afterEach,
     describe,
@@ -17,7 +17,7 @@ import {
 } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 import { z } from 'zod';
-import { Engine, defineAgent } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamvi/core';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';

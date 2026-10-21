@@ -7,7 +7,7 @@ import {
     defineEffectTool,
     defineTool,
     http,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 declare const model: LanguageModel;
 declare function renderChart(points: number[]): Promise<Uint8Array>;

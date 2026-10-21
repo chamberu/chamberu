@@ -20,13 +20,13 @@ import {
     ErrorCode,
     ValidationError,
     defineAgent,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type {
     AgentDefinition,
     INotifier,
     IRunArtifacts,
     Notification,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
@@ -295,7 +295,7 @@ describe('attachments in the model prompt', () => {
             type: 'file',
             mediaType: 'image/png',
             filename: 'shot.png',
-            data: `chamberu-artifact:${artifact!.id}`,
+            data: `chamvi-artifact:${artifact!.id}`,
         });
     });
 
@@ -340,7 +340,7 @@ describe('attachments in the model prompt', () => {
         const [part] = filePartsOf(ctx.model, 1);
         expect(bytesOf(part!)).toEqual(Array.from(PNG));
         const checkpoint = (await ctx.store.latestCheckpoint(runId))!;
-        expect(userContentOf(checkpoint.messages)[1]!.data).toMatch(/^chamberu-artifact:/);
+        expect(userContentOf(checkpoint.messages)[1]!.data).toMatch(/^chamvi-artifact:/);
     });
 
     it('fails the run with ARTIFACT_NOT_FOUND when an attachment is gone', async () => {

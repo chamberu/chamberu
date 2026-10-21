@@ -7,7 +7,7 @@ import {
     defineAgent,
     http,
     webhook,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 export async function dispatchExamples(model: LanguageModel) {
     // #region definitions

@@ -6,8 +6,8 @@
  */
 
 import type { ToolExecutionOptions, ToolSet } from 'ai';
-import { ValidationError, defineEffectTool, effectMarker } from '@chamberu/core';
-import type { ToolContext } from '@chamberu/core';
+import { ValidationError, defineEffectTool, effectMarker } from '@chamvi/core';
+import type { ToolContext } from '@chamvi/core';
 import { isObject } from 'smob';
 import { isSameLogin } from '../app/helpers.ts';
 import type { IGithubApp } from '../app/types.ts';

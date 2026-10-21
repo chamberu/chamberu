@@ -5,13 +5,13 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { RunNotFoundError } from '@chamberu/core';
+import { RunNotFoundError } from '@chamvi/core';
 import type {
     Run,
     RunDelta,
     RunEvent,
     Step,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { createEventStream } from 'routup';
 import type { IAppEvent } from 'routup';
 import { acquireStreamSlot, refuseStreamOverCap, refuseWhenClosed } from '../../app/helpers.ts';

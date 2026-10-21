@@ -8,8 +8,8 @@
 /** Network of a workspace container unless configured. */
 export const DEFAULT_NETWORK = 'bridge';
 
-/** A workspace container is named `chamberu-ws-<workspace id>`. */
-export const CONTAINER_NAME_PREFIX = 'chamberu-ws-';
+/** A workspace container is named `chamvi-ws-<workspace id>`. */
+export const CONTAINER_NAME_PREFIX = 'chamvi-ws-';
 
 /** uid and gid of every workspace process (the image's `node` user). */
 export const SANDBOX_USER = '1000:1000';

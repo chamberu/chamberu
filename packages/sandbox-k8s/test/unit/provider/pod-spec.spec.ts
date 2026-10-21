@@ -7,7 +7,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { SANDBOX_ENV } from '@chamberu/sandbox';
+import { SANDBOX_ENV } from '@chamvi/sandbox';
 import { buildPod } from '../../../src/provider/helpers.ts';
 
 type PodInput = Parameters<typeof buildPod>[0];
@@ -33,7 +33,7 @@ const input: PodInput = {
 describe('buildPod', () => {
     it('names the pod after the workspace', () => {
         const pod = buildPod(input);
-        expect(pod.metadata?.name).toBe('chamberu-ws-w1');
+        expect(pod.metadata?.name).toBe('chamvi-ws-w1');
         expect(pod.metadata?.namespace).toBe('agents');
 
         const name = buildPod({ ...input, id: randomUUID() }).metadata!.name!;
@@ -44,13 +44,13 @@ describe('buildPod', () => {
     it('labels and annotates the pod', () => {
         const pod = buildPod(input);
         expect(pod.metadata?.labels).toEqual({
-            'app.kubernetes.io/managed-by': 'chamberu',
+            'app.kubernetes.io/managed-by': 'chamvi',
             'app.kubernetes.io/component': 'sandbox',
-            'chamberu.dev/run': 'r1',
-            'chamberu.dev/workspace': 'w1',
+            'chamvi.dev/run': 'r1',
+            'chamvi.dev/workspace': 'w1',
             team: 'x',
         });
-        expect(pod.metadata?.annotations?.['chamberu.dev/expires-at']).toBe('1767226200000');
+        expect(pod.metadata?.annotations?.['chamvi.dev/expires-at']).toBe('1767226200000');
     });
 
     it('hardens the pod', () => {
@@ -122,11 +122,11 @@ describe('buildPod', () => {
     });
 
     it('does not copy the host environment', () => {
-        process.env.CHAMBERU_SECRET_PROBE = 's3cret';
+        process.env.CHAMVI_SECRET_PROBE = 's3cret';
         try {
             expect(JSON.stringify(buildPod(input))).not.toContain('s3cret');
         } finally {
-            delete process.env.CHAMBERU_SECRET_PROBE;
+            delete process.env.CHAMVI_SECRET_PROBE;
         }
     });
 
@@ -134,13 +134,13 @@ describe('buildPod', () => {
         const pod = buildPod({
             ...input,
             labels: {
-                'chamberu.dev/run': 'x',
-                'chamberu.dev/workspace': 'y',
+                'chamvi.dev/run': 'x',
+                'chamvi.dev/workspace': 'y',
                 'app.kubernetes.io/managed-by': 'z',
             },
         });
-        expect(pod.metadata?.labels?.['chamberu.dev/run']).toBe('r1');
-        expect(pod.metadata?.labels?.['chamberu.dev/workspace']).toBe('w1');
-        expect(pod.metadata?.labels?.['app.kubernetes.io/managed-by']).toBe('chamberu');
+        expect(pod.metadata?.labels?.['chamvi.dev/run']).toBe('r1');
+        expect(pod.metadata?.labels?.['chamvi.dev/workspace']).toBe('w1');
+        expect(pod.metadata?.labels?.['app.kubernetes.io/managed-by']).toBe('chamvi');
     });
 });

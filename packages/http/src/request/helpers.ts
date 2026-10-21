@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { assertTriggerKey } from '@chamberu/core';
+import { assertTriggerKey } from '@chamvi/core';
 import { flattenIssueItems } from '@ebec/core';
 import type { Issue } from '@ebec/core';
 import {

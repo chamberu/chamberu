@@ -7,10 +7,10 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { defineAgent } from '@chamberu/core';
-import type { Agent } from '@chamberu/core';
-import { githubWebhook } from '@chamberu/github';
-import type { GithubEvent, GithubWebhookTriggerOptions } from '@chamberu/github';
+import { defineAgent } from '@chamvi/core';
+import type { Agent } from '@chamvi/core';
+import { githubWebhook } from '@chamvi/github';
+import type { GithubEvent, GithubWebhookTriggerOptions } from '@chamvi/github';
 import { createGithubTestApp, deliver } from '../../utils/app.ts';
 import { textModel } from '../../utils/model.ts';
 
@@ -239,9 +239,9 @@ describe('webhook route', () => {
     });
 
     it('compares the sender with the bot login case-insensitively', async () => {
-        const { app } = createGithubTestApp({ agents: [agent('chat', { events: ['issue_comment'] })], github: { slug: 'chamberu-test' } });
+        const { app } = createGithubTestApp({ agents: [agent('chat', { events: ['issue_comment'] })], github: { slug: 'chamvi-test' } });
         const comment = JSON.parse(BOT_COMMENT) as { sender: { login: string } };
-        comment.sender.login = 'Chamberu-Test[bot]';
+        comment.sender.login = 'Chamvi-Test[bot]';
         const response = await deliver(app, {
             event: 'issue_comment',
             delivery: 'd-1',

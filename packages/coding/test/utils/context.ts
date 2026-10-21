@@ -6,8 +6,8 @@
  */
 
 import type { ToolSet } from 'ai';
-import { MemoryStore, createAgentState } from '@chamberu/core';
-import type { IRunArtifacts, ToolContext } from '@chamberu/core';
+import { MemoryStore, createAgentState } from '@chamvi/core';
+import type { IRunArtifacts, ToolContext } from '@chamvi/core';
 
 const NO_ARTIFACTS: IRunArtifacts = {
     put: async () => { throw new TypeError('artifacts are not used by the coding tools'); },

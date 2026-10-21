@@ -1,9 +1,9 @@
 # GitHub App
 
-`@chamberu/github` connects agents to a GitHub App: a verified webhook delivery becomes one deduplicated run per matching agent, and the GitHub tools act as the App's installation. API: [@chamberu/github](/reference/github).
+`@chamvi/github` connects agents to a GitHub App: a verified webhook delivery becomes one deduplicated run per matching agent, and the GitHub tools act as the App's installation. API: [@chamvi/github](/reference/github).
 
 ```bash
-npm install @chamberu/github @chamberu/http @chamberu/core ai --save
+npm install @chamvi/github @chamvi/http @chamvi/core ai --save
 ```
 
 ## One App per agent repository
@@ -45,7 +45,7 @@ The route is not rate limited and not behind the app's authenticators: the signa
 A failing agent (a throwing `filter` or key function, a key above 255 characters, a failed dispatch) does not stop the others; each failure goes to `onError` and the answer is `500`. GitHub never retries a `4xx` or `5xx` delivery by itself: redeliver it by hand (the App's *Advanced* tab) or through the redelivery API. A redelivery keeps the delivery id, so the agents that already got their run are deduplicated.
 :::
 
-Large `push` or `pull_request` deliveries can exceed the default `bodyLimit` of 1 MiB (GitHub sends up to 25 MB); raise `bodyLimit` on `createHttpApp` when an agent needs them. Two chamberu Apps on one repository see each other as ordinary bots: use a `filter` to break such loops.
+Large `push` or `pull_request` deliveries can exceed the default `bodyLimit` of 1 MiB (GitHub sends up to 25 MB); raise `bodyLimit` on `createHttpApp` when an agent needs them. Two chamvi Apps on one repository see each other as ordinary bots: use a `filter` to break such loops.
 
 ## Tools
 

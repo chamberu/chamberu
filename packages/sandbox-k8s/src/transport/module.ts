@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { createSinkStream } from '@chamberu/sandbox';
-import type { IExecTransport, TransportExecOptions, TransportExecResult } from '@chamberu/sandbox';
+import { createSinkStream } from '@chamvi/sandbox';
+import type { IExecTransport, TransportExecOptions, TransportExecResult } from '@chamvi/sandbox';
 import type { V1Pod } from '@kubernetes/client-node';
 import { isObject } from 'smob';
 import { isApiStatus } from '../client/helpers.ts';

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
+import { InvalidAgentDefinitionError, SandboxError } from '@chamvi/core';
 import {
     EXPIRES_AT_KEY,
     RUN_LABEL,
@@ -21,7 +21,7 @@ import {
     parseCpu,
     parseMemory,
     resolveLimits,
-} from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
 import type Dockerode from 'dockerode';
 import { isObject } from 'smob';
 import { CONTAINER_NAME_PREFIX, SANDBOX_USER } from './constants.ts';

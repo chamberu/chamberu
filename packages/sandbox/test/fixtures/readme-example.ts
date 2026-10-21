@@ -1,6 +1,6 @@
-import type { Engine } from '@chamberu/core';
-import { createWorkspaceManager } from '@chamberu/sandbox';
-import type { ISandboxProvider, IWorkspaceManager } from '@chamberu/sandbox';
+import type { Engine } from '@chamvi/core';
+import { createWorkspaceManager } from '@chamvi/sandbox';
+import type { ISandboxProvider, IWorkspaceManager } from '@chamvi/sandbox';
 
 export function createWorkspaces(
     provider: ISandboxProvider,

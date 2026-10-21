@@ -6,7 +6,7 @@
  */
 
 import type { ToolSet } from 'ai';
-import { defineTool } from '@chamberu/core';
+import { defineTool } from '@chamvi/core';
 import {
     inputObject,
     optionalObjectSchema,
@@ -21,7 +21,7 @@ import type {
 
 /**
  * `create_workspace` and `dispose_workspace` over `manager`, scoped to the
- * calling run (`context.run.runId`). Plain chamberu tools, not effect tools:
+ * calling run (`context.run.runId`). Plain chamvi tools, not effect tools:
  * a workspace dies with its process, so a recorded result would outlive it.
  */
 export function createWorkspaceTools(manager: IWorkspaceManager): ToolSet {

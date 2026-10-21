@@ -1,9 +1,9 @@
 # Cron Scheduling
 
-[`@chamberu/scheduler`](/reference/scheduler) fires the `cron()` triggers declared on your agents. Every replica runs the same scheduler; a lock in the shared store elects one replica per tick, and `engine.dispatch()` deduplicates a second firing of the same tick.
+[`@chamvi/scheduler`](/reference/scheduler) fires the `cron()` triggers declared on your agents. Every replica runs the same scheduler; a lock in the shared store elects one replica per tick, and `engine.dispatch()` deduplicates a second firing of the same tick.
 
 ```bash
-npm install @chamberu/scheduler @chamberu/core --save
+npm install @chamvi/scheduler @chamvi/core --save
 ```
 
 <<< @/snippets/scheduler.ts#scheduler

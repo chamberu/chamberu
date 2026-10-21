@@ -26,14 +26,14 @@ import {
     defineTool,
     requireToolPermission,
     toolContextSchema,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type {
     AgentDefinition,
     INotifier,
     Invoker,
     Notification,
     ToolContext,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
@@ -349,7 +349,7 @@ describe('tool context', () => {
         expect(contexts[1]).toBe(token);
     });
 
-    it('rejects a toolsContext entry naming a chamberu tool', async () => {
+    it('rejects a toolsContext entry naming a chamvi tool', async () => {
         const model = mockModel([text('never')]);
         expect(() => defineAgent({
             name: 'release',
@@ -364,7 +364,7 @@ describe('tool context', () => {
             model,
             tools: { lookup },
             toolsContext: { lookup: {} },
-        })).toThrow(/toolsContext entry "lookup" names a chamberu tool/);
+        })).toThrow(/toolsContext entry "lookup" names a chamvi tool/);
 
         const {
             store,
@@ -378,7 +378,7 @@ describe('tool context', () => {
         expect(run?.status).toBe('failed');
         expect(run?.error).toEqual({
             code: 'invalid_agent_definition',
-            message: 'Agent "release": toolsContext entry "lookup" names a chamberu tool, which gets the run context instead.',
+            message: 'Agent "release": toolsContext entry "lookup" names a chamvi tool, which gets the run context instead.',
         });
         expect(model.doStreamCalls).toHaveLength(0);
         expect(await store.listSteps(runId)).toEqual([]);
@@ -474,7 +474,7 @@ describe('tool context', () => {
         const lookalike: StandardSchemaV1<ToolContext, ToolContext> = {
             '~standard': {
                 version: 1,
-                vendor: 'chamberu',
+                vendor: 'chamvi',
                 validate: toolContextSchema['~standard'].validate,
             },
         };
@@ -490,8 +490,8 @@ describe('tool context', () => {
         expect(run?.status).toBe('failed');
         expect(run?.error).toEqual({
             code: 'validation_error',
-            message: 'Type validation failed for tool context (copy): No chamberu tool context: ' +
-                'the tool was built by another copy of @chamberu/core, or runs outside a chamberu agent.',
+            message: 'Type validation failed for tool context (copy): No chamvi tool context: ' +
+                'the tool was built by another copy of @chamvi/core, or runs outside a chamvi agent.',
         });
         expect(executed).toBe(0);
     });
@@ -560,7 +560,7 @@ describe('tool context', () => {
             toolsContext: { state_notes_list: {} },
         });
         expect(run?.status).toBe('failed');
-        expect(run?.error?.message).toMatch(/toolsContext entry "state_notes_list" names a chamberu tool/);
+        expect(run?.error?.message).toMatch(/toolsContext entry "state_notes_list" names a chamvi tool/);
         expect(model.doStreamCalls).toHaveLength(0);
     });
 

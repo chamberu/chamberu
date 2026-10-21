@@ -8,7 +8,7 @@
 import { tool } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { defineTool, toolContextSchema } from '@chamberu/core';
+import { defineTool, toolContextSchema } from '@chamvi/core';
 import { hasToolContext } from '../../../src/tool/helpers.ts';
 
 describe('toolContextSchema', () => {
@@ -21,14 +21,14 @@ describe('toolContextSchema', () => {
         const result = toolContextSchema['~standard'].validate(ctx);
         expect(result).toEqual({ value: ctx });
         expect((result as { value: unknown }).value).toBe(ctx);
-        expect(toolContextSchema['~standard'].vendor).toBe('chamberu');
+        expect(toolContextSchema['~standard'].vendor).toBe('chamvi');
         expect(toolContextSchema['~standard'].version).toBe(1);
     });
 
     it('validate rejects a missing context with a message naming both causes', () => {
         for (const v of [undefined, null, 'x', []]) {
             const result = toolContextSchema['~standard'].validate(v) as { issues: Array<{ message: string }> };
-            expect(result.issues[0]!.message).toMatch(/another copy of @chamberu\/core, or runs outside a chamberu agent/);
+            expect(result.issues[0]!.message).toMatch(/another copy of @chamvi\/core, or runs outside a chamvi agent/);
         }
     });
 });
@@ -55,7 +55,7 @@ describe('defineTool', () => {
         });
         defineTool({
             inputSchema: z.object({}),
-            // @ts-expect-error a defineTool brings chamberu's context schema
+            // @ts-expect-error a defineTool brings chamvi's context schema
             contextSchema: z.object({}),
             execute: async () => 1,
         });

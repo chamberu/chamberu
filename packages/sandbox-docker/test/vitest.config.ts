@@ -5,10 +5,10 @@ export default defineConfig({
     resolve: {
         // the sources, not dist
         alias: [
-            { find: /^@chamberu\/core$/, replacement: fileURLToPath(new URL('../../core/src/index.ts', import.meta.url)) },
-            { find: /^@chamberu\/sandbox$/, replacement: fileURLToPath(new URL('../../sandbox/src/index.ts', import.meta.url)) },
-            { find: /^@chamberu\/sandbox-docker$/, replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)) },
-            { find: /^@chamberu\/test-kit$/, replacement: fileURLToPath(new URL('../../test-kit/src/index.ts', import.meta.url)) },
+            { find: /^@chamvi\/core$/, replacement: fileURLToPath(new URL('../../core/src/index.ts', import.meta.url)) },
+            { find: /^@chamvi\/sandbox$/, replacement: fileURLToPath(new URL('../../sandbox/src/index.ts', import.meta.url)) },
+            { find: /^@chamvi\/sandbox-docker$/, replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)) },
+            { find: /^@chamvi\/test-kit$/, replacement: fileURLToPath(new URL('../../test-kit/src/index.ts', import.meta.url)) },
         ],
     },
     test: {

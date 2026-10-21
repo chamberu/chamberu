@@ -10,13 +10,13 @@ import {
     InvalidAgentDefinitionError,
     SandboxError,
     ValidationError,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import {
     CLOSE_TIMEOUT_MS,
     GC_INTERVAL_MS,
     createWorkspaceManager,
-} from '@chamberu/sandbox';
-import type { WorkspaceManagerOptions } from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
+import type { WorkspaceManagerOptions } from '@chamvi/sandbox';
 import { ControllableClock } from '../../utils/clock.ts';
 import { createFakeProvider } from '../../utils/provider.ts';
 

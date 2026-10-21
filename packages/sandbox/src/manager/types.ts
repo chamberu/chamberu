@@ -6,7 +6,7 @@
  */
 
 import type { ToolSet } from 'ai';
-import type { Engine, IClock } from '@chamberu/core';
+import type { Engine, IClock } from '@chamvi/core';
 import type { ISandboxProvider, SandboxLimits } from '../provider/types.ts';
 import type { IWorkspace } from '../workspace/types.ts';
 

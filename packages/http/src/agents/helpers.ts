@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { DEFAULT_MAX_STEPS } from '@chamberu/core';
-import type { Agent, OverlapPolicy } from '@chamberu/core';
+import { DEFAULT_MAX_STEPS } from '@chamvi/core';
+import type { Agent, OverlapPolicy } from '@chamvi/core';
 import { BadRequestError, NotFoundError } from '@ebec/http';
 import { defineSchema } from '@rapiq/core';
 import { CronExpressionParser } from 'cron-parser';

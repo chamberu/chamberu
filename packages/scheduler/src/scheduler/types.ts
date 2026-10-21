@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Engine } from '@chamberu/core';
+import type { Engine } from '@chamvi/core';
 
 export type SchedulerErrorContext = {
     agent: string;
@@ -30,7 +30,7 @@ export type SchedulerOptions = {
     /**
      * Receives a failing tick (lock store, overlap check or dispatch). Ticks
      * another replica won are not errors and are not reported.
-     * Default console.error('[chamberu]', error, ctx).
+     * Default console.error('[chamvi]', error, ctx).
      */
     onError?: (error: unknown, ctx: SchedulerErrorContext) => void;
 };

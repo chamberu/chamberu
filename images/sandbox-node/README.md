@@ -1,6 +1,6 @@
 # sandbox-node
 
-The default workspace image of chamberu's container sandboxes (`@chamberu/sandbox-docker`, `@chamberu/sandbox-k8s`): `ghcr.io/chamberu/sandbox-node`.
+The default workspace image of chamvi's container sandboxes (`@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s`): `ghcr.io/chamvi/sandbox-node`.
 
 ## What is inside
 
@@ -15,7 +15,7 @@ The providers run the container with a read-only root filesystem, no capabilitie
 
 ## Environment
 
-The image sets the sandbox environment of `@chamberu/sandbox` (`SANDBOX_ENV`), so a container started without the providers behaves the same:
+The image sets the sandbox environment of `@chamvi/sandbox` (`SANDBOX_ENV`), so a container started without the providers behaves the same:
 
 | Variable | Value | Why |
 |----------|-------|-----|
@@ -38,14 +38,14 @@ Built for `linux/amd64` and `linux/arm64` by `.github/workflows/images.yml`:
 - `24`: the latest build, rebuilt on every change under `images/` on `master` and weekly (base image security updates)
 - `24-<short sha>`: one tag per commit on `master` that changes the image, pushed once with that commit; the weekly and manual rebuilds move only `24`
 
-Pin a digest (`ghcr.io/chamberu/sandbox-node@sha256:...`) in production, or use `pull: 'always'` (Docker) / `imagePullPolicy: 'Always'` (Kubernetes) to follow the mutable `24` tag.
+Pin a digest (`ghcr.io/chamvi/sandbox-node@sha256:...`) in production, or use `pull: 'always'` (Docker) / `imagePullPolicy: 'Always'` (Kubernetes) to follow the mutable `24` tag.
 
 ## Extending it
 
 Build your own image on top and pass it as `image` to the provider. Keep uid 1000, the entrypoint and `/workspace`, and install system packages as root before switching back:
 
 ```dockerfile
-FROM ghcr.io/chamberu/sandbox-node:24
+FROM ghcr.io/chamvi/sandbox-node:24
 
 USER root
 RUN apt-get update \
@@ -59,6 +59,6 @@ The providers need `sh`, `cat`, `head`, `mkdir`, `dirname`, `cp`, `mv`, `rm`, GN
 ## Building locally
 
 ```bash
-docker build -t chamberu/sandbox-node:dev images/sandbox-node
-docker run --rm chamberu/sandbox-node:dev sh -c 'node --version && git --version && id -u'
+docker build -t chamvi/sandbox-node:dev images/sandbox-node
+docker run --rm chamvi/sandbox-node:dev sh -c 'node --version && git --version && id -u'
 ```

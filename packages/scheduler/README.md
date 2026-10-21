@@ -1,19 +1,19 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo.svg" alt="@chamberu/scheduler" width="128" height="128" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/logo.svg" alt="@chamvi/scheduler" width="128" height="128" />
 </p>
 
-<h1 align="center">@chamberu/scheduler</h1>
+<h1 align="center">@chamvi/scheduler</h1>
 
 <p align="center">
-    <b>Fires chamberu cron triggers once per tick across replicas, on hubwire.</b><br>
+    <b>Fires chamvi cron triggers once per tick across replicas, on hubwire.</b><br>
     Every replica runs the same scheduler. A lock in the store elects one per tick,<br>
     and the same package fires a trigger one-shot for a Kubernetes CronJob.
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@chamberu/scheduler"><img src="https://img.shields.io/npm/v/@chamberu/scheduler" alt="npm version" /></a>
-    <a href="https://github.com/chamberu/chamberu/actions/workflows/ci.yml"><img src="https://github.com/chamberu/chamberu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <a href="https://github.com/chamberu/chamberu/blob/master/packages/scheduler/LICENSE"><img src="https://img.shields.io/npm/l/@chamberu/scheduler" alt="License" /></a>
+    <a href="https://www.npmjs.com/package/@chamvi/scheduler"><img src="https://img.shields.io/npm/v/@chamvi/scheduler" alt="npm version" /></a>
+    <a href="https://github.com/chamvi/chamvi/actions/workflows/ci.yml"><img src="https://github.com/chamvi/chamvi/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/chamvi/chamvi/blob/master/packages/scheduler/LICENSE"><img src="https://img.shields.io/npm/l/@chamvi/scheduler" alt="License" /></a>
 </p>
 
 ---
@@ -33,10 +33,10 @@
 ## Installation
 
 ```bash
-npm install @chamberu/scheduler @chamberu/core --save
+npm install @chamvi/scheduler @chamvi/core --save
 ```
 
-ESM only, Node.js `>=22`. `@chamberu/core` is a peer dependency; [`hubwire`](https://www.npmjs.com/package/hubwire) (croner inside) is installed with the package.
+ESM only, Node.js `>=22`. `@chamvi/core` is a peer dependency; [`hubwire`](https://www.npmjs.com/package/hubwire) (croner inside) is installed with the package.
 
 ## Usage
 
@@ -49,8 +49,8 @@ import {
     MemoryStore,
     cron,
     defineAgent,
-} from '@chamberu/core';
-import { createScheduler } from '@chamberu/scheduler';
+} from '@chamvi/core';
+import { createScheduler } from '@chamvi/scheduler';
 
 export async function startScheduling(model: LanguageModel) {
     const sweep = defineAgent({

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { ControllableClock } from '@chamberu/test-kit';
+import type { ControllableClock } from '@chamvi/test-kit';
 
 /** Lets already-queued callbacks settle; not a sleep. */
 export const flush = () => new Promise<void>((resolve) => { setImmediate(resolve); });

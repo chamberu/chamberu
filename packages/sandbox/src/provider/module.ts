@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamberu/core';
+import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamvi/core';
 import { isObject } from 'smob';
 import { assertSandboxEnv } from '../limits/module.ts';
 import type { WorkspaceInfo } from '../workspace/types.ts';

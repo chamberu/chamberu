@@ -17,8 +17,8 @@ import {
     MemoryStore,
     cron,
     defineAgent,
-} from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
+} from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
 import { buildComponentOptions } from '../../../src/scheduler/helpers.ts';
 import { textModel } from '../../utils/model.ts';
 

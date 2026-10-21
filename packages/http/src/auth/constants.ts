@@ -14,4 +14,4 @@ export const Permission = {
 } as const;
 
 /** Where `authenticate` memoizes the principal in `event.store`; internal. */
-export const PRINCIPAL = Symbol('chamberu:principal');
+export const PRINCIPAL = Symbol('chamvi:principal');

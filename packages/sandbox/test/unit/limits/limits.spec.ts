@@ -6,15 +6,15 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import {
     DEFAULT_LIMITS,
     assertSandboxEnv,
     parseCpu,
     parseMemory,
     resolveLimits,
-} from '@chamberu/sandbox';
-import type { SandboxLimits } from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
+import type { SandboxLimits } from '@chamvi/sandbox';
 
 describe('parseCpu', () => {
     it.each([

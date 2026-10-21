@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as sandbox from '@chamberu/sandbox';
+import * as sandbox from '@chamvi/sandbox';
 
 describe('package entry', () => {
     it('resolves', () => {

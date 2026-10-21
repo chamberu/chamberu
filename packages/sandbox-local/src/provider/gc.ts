@@ -7,10 +7,10 @@
 
 import { readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { IClock } from '@chamberu/core';
-import { SandboxError } from '@chamberu/core';
-import { collectionError } from '@chamberu/sandbox';
-import type { IWorkspace } from '@chamberu/sandbox';
+import type { IClock } from '@chamvi/core';
+import { SandboxError } from '@chamvi/core';
+import { collectionError } from '@chamvi/sandbox';
+import type { IWorkspace } from '@chamvi/sandbox';
 import { WORKSPACE_ID_PATTERN, WORKSPACE_RECORD } from './constants.ts';
 import { errnoCode } from './helpers.ts';
 

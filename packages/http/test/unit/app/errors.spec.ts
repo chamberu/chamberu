@@ -18,7 +18,7 @@ import {
     InvalidRunStateError,
     RunNotFoundError,
     ValidationError,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { call, createTestApp } from '../../utils/app.ts';
 
 function appThrowing(error: unknown, onError?: (error: unknown) => void) {

@@ -6,9 +6,9 @@
  */
 
 import type { Tool } from 'ai';
-import { defineTool } from '@chamberu/core';
-import { EXEC_TIMEOUT_MAX_MS, EXEC_TIMEOUT_MS, OUTPUT_MAX_BYTES } from '@chamberu/sandbox';
-import type { ExecResult } from '@chamberu/sandbox';
+import { defineTool } from '@chamvi/core';
+import { EXEC_TIMEOUT_MAX_MS, EXEC_TIMEOUT_MS, OUTPUT_MAX_BYTES } from '@chamvi/sandbox';
+import type { ExecResult } from '@chamvi/sandbox';
 import {
     inputObject,
     objectSchema,

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { RunStatusLiteral } from '@chamberu/core';
+import type { RunStatusLiteral } from '@chamvi/core';
 
 /** Statuses a job returns on: the run finished or waits for a human. */
 export const SETTLING: RunStatusLiteral[] = ['completed', 'failed', 'cancelled', 'waiting'];

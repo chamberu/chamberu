@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as coding from '@chamberu/coding';
+import * as coding from '@chamvi/coding';
 
 describe('package entry', () => {
     it('resolves', () => {

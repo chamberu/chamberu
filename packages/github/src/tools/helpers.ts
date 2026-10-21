@@ -7,8 +7,8 @@
 
 import { jsonSchema } from 'ai';
 import type { JSONSchema7, ModelMessage, ToolExecutionOptions } from 'ai';
-import { ChamberuError, FatalToolError, ValidationError } from '@chamberu/core';
-import type { ToolContext } from '@chamberu/core';
+import { ChamviError, FatalToolError, ValidationError } from '@chamvi/core';
+import type { ToolContext } from '@chamvi/core';
 import { isObject } from 'smob';
 import type { GithubOctokit, IGithubApp } from '../app/types.ts';
 import type { NumberInput, RepoInput } from './types.ts';
@@ -97,13 +97,13 @@ export function statusOf(error: unknown): number | undefined {
 /**
  * What a tool throws for a failed GitHub call: `GitHub <status>: <message>`,
  * never the request (an Octokit RequestError carries its headers).
- * chamberu errors (FatalToolError, ValidationError) pass through.
+ * chamvi errors (FatalToolError, ValidationError) pass through.
  */
 export function toolError(error: unknown): Error {
-    if (error instanceof ChamberuError) return error;
+    if (error instanceof ChamviError) return error;
     const status = statusOf(error);
     const message = error instanceof Error ? error.message : String(error);
-    return new ChamberuError({
+    return new ChamviError({
         message: status !== undefined ? `GitHub ${status}: ${message}` : `GitHub request failed: ${message}`,
         code: GITHUB_REQUEST_ERROR_CODE,
     });

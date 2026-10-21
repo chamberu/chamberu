@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as core from '@chamberu/core';
+import * as core from '@chamvi/core';
 
 describe('public api', () => {
     it.each([
@@ -21,7 +21,7 @@ describe('public api', () => {
         'effectMarker',
         'createResumeToken',
         'verifyResumeToken',
-        'ChamberuError',
+        'ChamviError',
         'InvalidResumeTokenError',
         'BudgetExceededError',
         'ArtifactNotFoundError',
@@ -44,7 +44,7 @@ describe('public api', () => {
     });
 
     it('exports the tool context schema', () => {
-        expect(core.toolContextSchema['~standard'].vendor).toBe('chamberu');
+        expect(core.toolContextSchema['~standard'].vendor).toBe('chamvi');
     });
 
     it('exports the trigger key bound', () => {

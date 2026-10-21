@@ -6,7 +6,7 @@
  */
 
 import type { ToolSet } from 'ai';
-import { defineTool } from '@chamberu/core';
+import { defineTool } from '@chamvi/core';
 import { isObject } from 'smob';
 import type { IGithubApp } from '../app/types.ts';
 import {

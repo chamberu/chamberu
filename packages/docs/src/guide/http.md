@@ -1,9 +1,9 @@
 # HTTP API & MCP
 
-[`@chamberu/http`](/reference/http) turns a chamberu app into one [routup](https://github.com/routup/routup) `App`: humans start and follow runs over REST and server-sent events, machines post webhooks with bearer tokens, and agents (OpenClaw, Claude, any MCP client) start runs as MCP tools. It also serves `/healthz`, `/readyz` and `/metrics`, and ships the graceful shutdown helper.
+[`@chamvi/http`](/reference/http) turns a chamvi app into one [routup](https://github.com/routup/routup) `App`: humans start and follow runs over REST and server-sent events, machines post webhooks with bearer tokens, and agents (OpenClaw, Claude, any MCP client) start runs as MCP tools. It also serves `/healthz`, `/readyz` and `/metrics`, and ships the graceful shutdown helper.
 
 ```bash
-npm install @chamberu/http @chamberu/core --save
+npm install @chamvi/http @chamvi/core --save
 ```
 
 <<< @/snippets/http.ts#app

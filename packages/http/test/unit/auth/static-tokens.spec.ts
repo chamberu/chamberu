@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
-import { staticTokens } from '@chamberu/http';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
+import { staticTokens } from '@chamvi/http';
 
 const TOKEN = 'ci-token-0123456789';
 const ROTATED = 'ci-token-9876543210';

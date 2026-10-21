@@ -5,14 +5,14 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /**
  * Thrown from a tool's execute to fail the whole run. Any other tool error is
  * fed back to the model as a tool-error result.
  */
-export class FatalToolError extends ChamberuError {
+export class FatalToolError extends ChamviError {
     constructor(message: string, code: string = ErrorCode.FATAL_TOOL) {
         super({ message, code });
     }

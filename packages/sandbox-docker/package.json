@@ -1,17 +1,17 @@
 {
-    "name": "@chamberu/sandbox-docker",
+    "name": "@chamvi/sandbox-docker",
     "version": "0.1.0",
     "type": "module",
-    "description": "Docker sandbox provider for chamberu: one hardened container per workspace.",
+    "description": "Docker sandbox provider for chamvi: one hardened container per workspace.",
     "author": {
         "name": "Peter Placzek",
         "email": "contact@tada5hi.net",
         "url": "https://github.com/tada5hi"
     },
-    "homepage": "https://chamberu.dev",
+    "homepage": "https://chamvi.dev",
     "repository": {
         "type": "git",
-        "url": "https://github.com/chamberu/chamberu.git",
+        "url": "https://github.com/chamvi/chamvi.git",
         "directory": "packages/sandbox-docker"
     },
     "main": "dist/index.mjs",
@@ -39,7 +39,7 @@
         "test:coverage": "vitest --config test/vitest.config.ts --run --coverage"
     },
     "keywords": [
-        "chamberu",
+        "chamvi",
         "sandbox",
         "workspace",
         "docker",
@@ -55,12 +55,12 @@
         "smob": "^1.6.2"
     },
     "devDependencies": {
-        "@chamberu/core": "^0.1.0",
-        "@chamberu/sandbox": "^0.1.0",
-        "@chamberu/test-kit": "^0.1.0"
+        "@chamvi/core": "^0.1.0",
+        "@chamvi/sandbox": "^0.1.0",
+        "@chamvi/test-kit": "^0.1.0"
     },
     "peerDependencies": {
-        "@chamberu/core": "^0.1.0",
-        "@chamberu/sandbox": "^0.1.0"
+        "@chamvi/core": "^0.1.0",
+        "@chamvi/sandbox": "^0.1.0"
     }
 }

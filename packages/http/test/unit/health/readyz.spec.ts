@@ -6,10 +6,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { MemoryStore } from '@chamberu/core';
-import type { IStore } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
-import type { IShutdown } from '@chamberu/http';
+import { MemoryStore } from '@chamvi/core';
+import type { IStore } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import type { IShutdown } from '@chamvi/http';
 import { call, createTestApp } from '../../utils/app.ts';
 
 function storeWith(getRun: IStore['getRun'], clock: ControllableClock): IStore {

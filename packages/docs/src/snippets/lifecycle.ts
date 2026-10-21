@@ -3,7 +3,7 @@ import {
     Engine,
     MemoryStore,
     defineAgent,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 export async function watchRuns(model: LanguageModel) {
     const agent = defineAgent({

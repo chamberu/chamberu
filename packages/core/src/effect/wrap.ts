@@ -78,7 +78,7 @@ export function wrapToolsForRun(
                 await store.putEffect(key, result);
             } catch (error) {
                 // eslint-disable-next-line no-console
-                console.error(`chamberu: failed to record effect ${key}`, error);
+                console.error(`chamvi: failed to record effect ${key}`, error);
             }
             return result;
         };

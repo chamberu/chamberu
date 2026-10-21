@@ -7,7 +7,7 @@
 
 import { PassThrough } from 'node:stream';
 import type { V1Status } from '@kubernetes/client-node';
-import { SandboxError } from '@chamberu/core';
+import { SandboxError } from '@chamvi/core';
 import { isObject } from 'smob';
 import { CONTAINER_NAME } from '../provider/constants.ts';
 import { API_MESSAGE_MAX_LENGTH, STDIN_CLOSE_PROTOCOL } from './constants.ts';

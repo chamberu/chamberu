@@ -24,7 +24,7 @@ describe('README example', () => {
     let root: string;
 
     beforeEach(async () => {
-        root = await mkdtemp(join(tmpdir(), 'chamberu-local-readme-'));
+        root = await mkdtemp(join(tmpdir(), 'chamvi-local-readme-'));
     });
 
     afterEach(async () => {

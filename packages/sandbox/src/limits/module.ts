@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError } from '@chamberu/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { isObject } from 'smob';
 import { DEFAULT_LIMITS } from '../provider/constants.ts';
 import type { SandboxLimits } from '../provider/types.ts';

@@ -1,19 +1,19 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo.svg" alt="@chamberu/sandbox" width="128" height="128" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/logo.svg" alt="@chamvi/sandbox" width="128" height="128" />
 </p>
 
-<h1 align="center">@chamberu/sandbox</h1>
+<h1 align="center">@chamvi/sandbox</h1>
 
 <p align="center">
-    <b>Disposable workspaces for chamberu agents.</b><br>
+    <b>Disposable workspaces for chamvi agents.</b><br>
     The sandbox contracts every provider implements, the rules they share (paths, repositories, output caps, limits),<br>
-    and run-scoped workspaces the model creates with a tool call and chamberu disposes when the run settles.
+    and run-scoped workspaces the model creates with a tool call and chamvi disposes when the run settles.
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@chamberu/sandbox"><img src="https://img.shields.io/npm/v/@chamberu/sandbox" alt="npm version" /></a>
-    <a href="https://github.com/chamberu/chamberu/actions/workflows/ci.yml"><img src="https://github.com/chamberu/chamberu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <a href="https://github.com/chamberu/chamberu/blob/master/packages/sandbox/LICENSE"><img src="https://img.shields.io/npm/l/@chamberu/sandbox" alt="License" /></a>
+    <a href="https://www.npmjs.com/package/@chamvi/sandbox"><img src="https://img.shields.io/npm/v/@chamvi/sandbox" alt="npm version" /></a>
+    <a href="https://github.com/chamvi/chamvi/actions/workflows/ci.yml"><img src="https://github.com/chamvi/chamvi/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/chamvi/chamvi/blob/master/packages/sandbox/LICENSE"><img src="https://img.shields.io/npm/l/@chamvi/sandbox" alt="License" /></a>
 </p>
 
 ---
@@ -36,29 +36,29 @@
 ## Installation
 
 ```bash
-npm install @chamberu/sandbox @chamberu/core ai --save
+npm install @chamvi/sandbox @chamvi/core ai --save
 ```
 
-ESM only, Node.js `>=22`. `@chamberu/core` and `ai` are peer dependencies. Install a provider next to it.
+ESM only, Node.js `>=22`. `@chamvi/core` and `ai` are peer dependencies. Install a provider next to it.
 
 ## Providers
 
 | Package | Where commands run | Isolation |
 |---|---|---|
-| [`@chamberu/sandbox-local`](../sandbox-local) | A temporary directory on the host, as the host user | None: development and tests only |
-| [`@chamberu/sandbox-docker`](../sandbox-docker) | One container per workspace | uid 1000, read-only root, no capabilities, `no-new-privileges`, cpu, memory and pid limits |
-| [`@chamberu/sandbox-k8s`](../sandbox-k8s) | One pod per workspace | Non-root, read-only root, no capabilities, no service account token, resource limits, `activeDeadlineSeconds` |
+| [`@chamvi/sandbox-local`](../sandbox-local) | A temporary directory on the host, as the host user | None: development and tests only |
+| [`@chamvi/sandbox-docker`](../sandbox-docker) | One container per workspace | uid 1000, read-only root, no capabilities, `no-new-privileges`, cpu, memory and pid limits |
+| [`@chamvi/sandbox-k8s`](../sandbox-k8s) | One pod per workspace | Non-root, read-only root, no capabilities, no service account token, resource limits, `activeDeadlineSeconds` |
 
-The coding tools (`read_file`, `edit_file`, `bash`, `git_diff`, ...) live in [`@chamberu/coding`](../coding).
+The coding tools (`read_file`, `edit_file`, `bash`, `git_diff`, ...) live in [`@chamvi/coding`](../coding).
 
 ## Usage
 
 `createWorkspaceManager()` holds a run's workspaces; `attach(engine)` disposes them once the run completed, failed or was cancelled:
 
 ```typescript
-import type { Engine } from '@chamberu/core';
-import { createWorkspaceManager } from '@chamberu/sandbox';
-import type { ISandboxProvider, IWorkspaceManager } from '@chamberu/sandbox';
+import type { Engine } from '@chamvi/core';
+import { createWorkspaceManager } from '@chamvi/sandbox';
+import type { ISandboxProvider, IWorkspaceManager } from '@chamvi/sandbox';
 
 export function createWorkspaces(
     provider: ISandboxProvider,
@@ -79,7 +79,7 @@ export function createWorkspaces(
 }
 ```
 
-Give the agent `workspaces.tools()` (and usually `codingTools(workspaces)` from `@chamberu/coding`). At shutdown, close the manager **after** the engine drained, so runs still executing keep their workspaces:
+Give the agent `workspaces.tools()` (and usually `codingTools(workspaces)` from `@chamvi/coding`). At shutdown, close the manager **after** the engine drained, so runs still executing keep their workspaces:
 
 ```ts
 await engine.drain();
@@ -173,11 +173,11 @@ No host environment reaches a workspace. Containers and pods get `SANDBOX_ENV` (
 
 - **Untrusted code**: the model decides what runs, and an issue body or a README it reads can steer it (prompt injection). Run untrusted repositories on Docker or Kubernetes, never local, and put `bash` behind an approval (`approvals: { bash: 'user' }`) where a human should see each command.
 - **No credentials**: repository URLs with credentials are refused, `credential.helper` is reset for the fetch, and no token, service account or host variable enters a workspace. Private repositories are not supported yet.
-- **Not a network boundary**: a container sandbox stops code from touching the host, not from reaching the network. On a Docker `bridge` network a workspace reaches the host gateway (the chamberu API, Postgres), other containers and cloud metadata (`169.254.169.254`); on Kubernetes every cluster service by DNS. Add an egress firewall or a NetworkPolicy (the Helm chart's is planned), and narrow `allowRepo`.
+- **Not a network boundary**: a container sandbox stops code from touching the host, not from reaching the network. On a Docker `bridge` network a workspace reaches the host gateway (the chamvi API, Postgres), other containers and cloud metadata (`169.254.169.254`); on Kubernetes every cluster service by DNS. Add an egress firewall or a NetworkPolicy (the Helm chart's is planned), and narrow `allowRepo`.
 
 ## Writing a provider
 
-A provider implements `ISandboxProvider` (`name`, `create(options)`, `collectGarbage()`). A container-like provider only needs an `IExecTransport` (`exec(argv, { stdin, stdout, stderr, signal })` that streams the output into the given sinks and resolves `{ exitCode }`, `remove()` and optionally `alive(signal)`, asked after a failed exec: `false` marks the workspace gone): `createRemoteWorkspace({ id, info, transport, clock })` adds the rest. It runs argv through `sh -c` with the working directory and the `timeout` wrapper and has the script report the exit status on stderr, so an exec returns 2 s after the command exited even when a background job holds the output; it adds the client-side guard, path checks, output caps, file reads and writes and dispose semantics. After creating, call `prepareWorkspace(workspace, { repo, ref, signal })` and set `info.commit`. `describeWorkspaceContract()` from `@chamberu/test-kit` is the Vitest suite every provider must pass.
+A provider implements `ISandboxProvider` (`name`, `create(options)`, `collectGarbage()`). A container-like provider only needs an `IExecTransport` (`exec(argv, { stdin, stdout, stderr, signal })` that streams the output into the given sinks and resolves `{ exitCode }`, `remove()` and optionally `alive(signal)`, asked after a failed exec: `false` marks the workspace gone): `createRemoteWorkspace({ id, info, transport, clock })` adds the rest. It runs argv through `sh -c` with the working directory and the `timeout` wrapper and has the script report the exit status on stderr, so an exec returns 2 s after the command exited even when a background job holds the output; it adds the client-side guard, path checks, output caps, file reads and writes and dispose semantics. After creating, call `prepareWorkspace(workspace, { repo, ref, signal })` and set `info.commit`. `describeWorkspaceContract()` from `@chamvi/test-kit` is the Vitest suite every provider must pass.
 
 ## Options
 

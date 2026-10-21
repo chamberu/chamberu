@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Run } from '@chamberu/core';
+import type { Run } from '@chamvi/core';
 import { fireCronTrigger } from '../tick/index.ts';
 import { SETTLING } from './constants.ts';
 import { isQueuedBehindApproval, resolveCronTrigger } from './helpers.ts';

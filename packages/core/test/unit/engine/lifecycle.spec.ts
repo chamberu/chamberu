@@ -23,8 +23,8 @@ import {
     InvalidRunStateError,
     LeaseLostError,
     defineAgent,
-} from '@chamberu/core';
-import type { EngineOptions, Run, RunEvent } from '@chamberu/core';
+} from '@chamvi/core';
+import type { EngineOptions, Run, RunEvent } from '@chamvi/core';
 import type { IClock } from '../../../src/clock/index.ts';
 import { systemClock } from '../../../src/clock/index.ts';
 import { ControllableClock } from '../../utils/clock.ts';

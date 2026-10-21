@@ -15,7 +15,7 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { Engine, ToolNotAllowedError, defineAgent } from '@chamberu/core';
+import { Engine, ToolNotAllowedError, defineAgent } from '@chamvi/core';
 import {
     EFFECT,
     defineEffectTool,
@@ -272,7 +272,7 @@ describe('effect tools', () => {
     });
 
     it('effectMarker format', () => {
-        expect(effectMarker('r1:post:abc')).toBe('<!-- chamberu:effect=r1:post:abc -->');
+        expect(effectMarker('r1:post:abc')).toBe('<!-- chamvi:effect=r1:post:abc -->');
     });
 
     it('stableHash ignores key order and undefined, keeps array order', () => {

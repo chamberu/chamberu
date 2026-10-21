@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { delay } from '@chamberu/sandbox';
+import { delay } from '@chamvi/sandbox';
 import { ControllableClock } from '../../utils/clock.ts';
 
 describe('delay', () => {

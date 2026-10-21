@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Budget, OverlapPolicy, TriggerSource } from '@chamberu/core';
+import type { Budget, OverlapPolicy, TriggerSource } from '@chamvi/core';
 
 // #region summaries
 /** An agent as `GET /agents` lists it. */

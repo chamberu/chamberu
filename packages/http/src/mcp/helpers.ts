@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError, RunNotFoundError, RunStatus } from '@chamberu/core';
-import type { Run } from '@chamberu/core';
+import { ChamviError, RunNotFoundError, RunStatus } from '@chamvi/core';
+import type { Run } from '@chamvi/core';
 import { isHTTPError } from '@ebec/http';
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
@@ -41,7 +41,7 @@ export async function runTool(ctx: HttpContext, fn: () => Promise<CallToolResult
     try {
         return await fn();
     } catch (error) {
-        if ((isHTTPError(error) && error.status < 500) || error instanceof ChamberuError) {
+        if ((isHTTPError(error) && error.status < 500) || error instanceof ChamviError) {
             return toolError(error.message);
         }
         ctx.onError(error);

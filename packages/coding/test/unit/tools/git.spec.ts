@@ -14,7 +14,7 @@ import {
     expect,
     it,
 } from 'vitest';
-import type { GitFixture } from '@chamberu/test-kit';
+import type { GitFixture } from '@chamvi/test-kit';
 import { createFixture, setupCoding } from '../../utils/setup.ts';
 import type { CodingSetup } from '../../utils/setup.ts';
 

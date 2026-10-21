@@ -5,10 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
-export class RunNotFoundError extends ChamberuError {
+export class RunNotFoundError extends ChamviError {
     constructor(runId: string) {
         super({ message: `Run "${runId}" was not found.`, code: ErrorCode.RUN_NOT_FOUND });
     }

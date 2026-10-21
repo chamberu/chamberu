@@ -38,7 +38,7 @@ jobs:
 
             # the snippets the pages include must compile against the current sources
             -   name: Typecheck snippets
-                run: npm run typecheck -w @chamberu/docs
+                run: npm run typecheck -w @chamvi/docs
 
             -   name: Build docs
                 run: npm run docs:build
@@ -51,7 +51,7 @@ jobs:
                     path: ./packages/docs/src/.vitepress/dist
 
     deploy:
-        name: Deploy to chamberu.dev
+        name: Deploy to chamvi.dev
         if: ${{ github.event_name == 'push' }}
         needs: build
         runs-on: ubuntu-latest

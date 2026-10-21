@@ -1,13 +1,13 @@
-import { createDockerSandbox } from '@chamberu/sandbox-docker';
-import { createKubernetesSandbox } from '@chamberu/sandbox-k8s';
+import { createDockerSandbox } from '@chamvi/sandbox-docker';
+import { createKubernetesSandbox } from '@chamvi/sandbox-k8s';
 
 export function docker() {
     // #region docker
     const provider = createDockerSandbox({
         // pin a digest in production
-        image: 'ghcr.io/chamberu/sandbox-node:24',
+        image: 'ghcr.io/chamvi/sandbox-node:24',
         // a bridge without inter-container traffic, firewalled from the host
-        network: 'chamberu-sandbox',
+        network: 'chamvi-sandbox',
         limits: {
             cpu: '2', 
             memory: '4Gi', 

@@ -35,7 +35,7 @@ Everything the engine persists goes through one interface, `IStore`. It is a set
 
 | Store | Package | Status |
 |---|---|---|
-| [`MemoryStore`](/stores/memory) | `@chamberu/core` | Shipped. Development and tests |
-| [TypeORM](/stores/typeorm) | `@chamberu/store-typeorm` | Shipped. PostgreSQL, production |
+| [`MemoryStore`](/stores/memory) | `@chamvi/core` | Shipped. Development and tests |
+| [TypeORM](/stores/typeorm) | `@chamvi/store-typeorm` | Shipped. PostgreSQL, production |
 
-Redis is never required. Any store that passes the [contract suite](/stores/writing-a-store) from `@chamberu/test-kit` works with the engine.
+Redis is never required. Any store that passes the [contract suite](/stores/writing-a-store) from `@chamvi/test-kit` works with the engine.

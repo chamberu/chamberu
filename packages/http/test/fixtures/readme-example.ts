@@ -4,8 +4,8 @@ import {
     MemoryStore,
     defineAgent,
     http,
-} from '@chamberu/core';
-import { createHttpApp, createShutdown, staticTokens } from '@chamberu/http';
+} from '@chamvi/core';
+import { createHttpApp, createShutdown, staticTokens } from '@chamvi/http';
 
 export async function createAgentServer(model: LanguageModel) {
     const echo = defineAgent({
@@ -22,8 +22,8 @@ export async function createAgentServer(model: LanguageModel) {
         resumeSecret: 'change-me',
     });
 
-    const token = process.env.CHAMBERU_TOKEN;
-    if (!token) throw new Error('Set CHAMBERU_TOKEN (at least 16 characters).');
+    const token = process.env.CHAMVI_TOKEN;
+    if (!token) throw new Error('Set CHAMVI_TOKEN (at least 16 characters).');
 
     const shutdown = createShutdown({ engine });
     const app = createHttpApp({

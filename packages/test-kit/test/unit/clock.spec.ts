@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ControllableClock } from '@chamberu/test-kit';
+import { ControllableClock } from '@chamvi/test-kit';
 
 describe('ControllableClock', () => {
     it('starts at the given date', () => {

@@ -1,8 +1,8 @@
 <!-- NOTE: Keep this file and all corresponding files in the .agents directory updated as the project evolves. When making architectural changes, adding new patterns, or discovering important conventions, update the relevant sections. -->
 
-# chamberu: Agent Guide
+# chamvi: Agent Guide
 
-chamberu is a TypeScript framework for building self-hosted, trigger-driven AI agents. Agents are declared with `defineAgent()`, started by triggers (cron, http, webhook, github, mcp), and executed as durable runs whose steps are checkpointed in a pluggable store, so runs survive restarts and approval pauses. LLM access goes through the Vercel AI SDK; its types (`ToolSet`, `LanguageModel`, `ModelMessage`) pass through unchanged and are never re-wrapped.
+chamvi is a TypeScript framework for building self-hosted, trigger-driven AI agents. Agents are declared with `defineAgent()`, started by triggers (cron, http, webhook, github, mcp), and executed as durable runs whose steps are checkpointed in a pluggable store, so runs survive restarts and approval pauses. LLM access goes through the Vercel AI SDK; its types (`ToolSet`, `LanguageModel`, `ModelMessage`) pass through unchanged and are never re-wrapped.
 
 ## Quick Reference
 
@@ -21,7 +21,7 @@ npm run lint
 - **Package manager**: npm (workspaces)
 - **Build orchestration**: nx (`nx run-many`), packages built with tsdown (ESM only)
 
-Packages live in `packages/*`. `@chamberu/coding`, `@chamberu/core`, `@chamberu/github`, `@chamberu/http`, `@chamberu/sandbox`, `@chamberu/sandbox-docker`, `@chamberu/sandbox-k8s`, `@chamberu/sandbox-local`, `@chamberu/scheduler`, `@chamberu/store-typeorm` and `@chamberu/test-kit` exist today (container images in `images/*`); the others are planned (see [Project Structure](.agents/structure.md)).
+Packages live in `packages/*`. `@chamvi/coding`, `@chamvi/core`, `@chamvi/github`, `@chamvi/http`, `@chamvi/sandbox`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s`, `@chamvi/sandbox-local`, `@chamvi/scheduler`, `@chamvi/store-typeorm` and `@chamvi/test-kit` exist today (container images in `images/*`); the others are planned (see [Project Structure](.agents/structure.md)).
 
 ## Detailed Guides
 

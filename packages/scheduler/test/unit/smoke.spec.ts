@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as scheduler from '@chamberu/scheduler';
+import * as scheduler from '@chamvi/scheduler';
 
 describe('package entry', () => {
     it('resolves', () => {

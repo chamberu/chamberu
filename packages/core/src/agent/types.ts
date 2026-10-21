@@ -11,7 +11,7 @@ import type { StateSchema } from '../state/types.ts';
 import type { ToolContext } from '../tool/types.ts';
 import type { TriggerDefinition } from '../trigger/types.ts';
 
-/** The factory's argument: the same ToolContext the run's chamberu tools get. */
+/** The factory's argument: the same ToolContext the run's chamvi tools get. */
 export type ToolFactoryContext<S extends StateSchema = StateSchema> = ToolContext<S>;
 
 export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: RunContext }) => 'user' | 'allow' | 'deny');
@@ -45,10 +45,10 @@ export type AgentDefinition<S extends StateSchema = StateSchema> = {
      */
     tools?: ToolSet | ((ctx: ToolContext<S>) => ToolSet);
     /**
-     * Per tool name, the context of a tool that is not chamberu's (e.g. a
+     * Per tool name, the context of a tool that is not chamvi's (e.g. a
      * third-party tool with its own `contextSchema`), passed through unchanged
      * by reference to every call of every run: treat it as immutable. An entry
-     * naming a chamberu tool or no tool is an InvalidAgentDefinitionError (at
+     * naming a chamvi tool or no tool is an InvalidAgentDefinitionError (at
      * defineAgent for a plain set, a failed run for a factory).
      */
     toolsContext?: Record<string, unknown>;

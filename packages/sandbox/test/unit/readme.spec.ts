@@ -7,7 +7,7 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { Engine, MemoryStore } from '@chamberu/core';
+import { Engine, MemoryStore } from '@chamvi/core';
 import { createWorkspaces } from '../fixtures/readme-example.ts';
 import { createFakeProvider } from '../utils/provider.ts';
 

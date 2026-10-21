@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { agentPermission } from '@chamberu/http';
+import { agentPermission } from '@chamvi/http';
 
 describe('agentPermission', () => {
     it('builds agent:<name>:<action>', () => {

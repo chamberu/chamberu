@@ -1,6 +1,6 @@
 # Tools & Tool Errors
 
-chamberu tools are AI SDK tools. Build them with `tool()` from `ai`, or with `defineTool()` when a tool needs the run context (`context.run`, `context.state`, `context.artifacts`; see [Tools and their context](/guide/agents#tools-and-their-context)), and pass them to the agent's `tools`. chamberu does not wrap or replace them, with one exception: [effect tools](/guide/effect-tools) are wrapped so their side effect applies at most once.
+chamvi tools are AI SDK tools. Build them with `tool()` from `ai`, or with `defineTool()` when a tool needs the run context (`context.run`, `context.state`, `context.artifacts`; see [Tools and their context](/guide/agents#tools-and-their-context)), and pass them to the agent's `tools`. chamvi does not wrap or replace them, with one exception: [effect tools](/guide/effect-tools) are wrapped so their side effect applies at most once.
 
 ## Errors go back to the model
 
@@ -28,7 +28,7 @@ A recovered run repeats the step that was in progress when the process died. A p
 
 ## Restricting tools per invoker
 
-A run started through `@chamberu/http` (REST or MCP) carries its **invoker**, `run.trigger.invoker`: `{ id, kind, name?, permissions }` of the authenticated principal (`kind` is the authenticator's label: `staticTokens()` sets `token` and `authup()` sets `authup`; `oidc()` keeps the kind its `principal` mapper returns, `oidc` in these docs). Cron and webhook runs have none. An agent's `toolPolicy(toolName, { run })` decides per tool whether the run may use it, and a refused tool is not offered to the model at all.
+A run started through `@chamvi/http` (REST or MCP) carries its **invoker**, `run.trigger.invoker`: `{ id, kind, name?, permissions }` of the authenticated principal (`kind` is the authenticator's label: `staticTokens()` sets `token` and `authup()` sets `authup`; `oidc()` keeps the kind its `principal` mapper returns, `oidc` in these docs). Cron and webhook runs have none. An agent's `toolPolicy(toolName, { run })` decides per tool whether the run may use it, and a refused tool is not offered to the model at all.
 
 `requireToolPermission()` is the built-in policy: it offers a tool when the invoker holds `tool:<agent>:<tool>` (with the usual matching: `*` alone grants everything, a `*` segment matches one segment). Runs without an invoker get no tools unless you pass `{ withoutInvoker: 'allow' }`. Wrap it for exceptions:
 
@@ -47,8 +47,8 @@ A tool from another library may declare its own `contextSchema` and expect its c
 
 <<< @/snippets/tools.ts#third-party
 
-- chamberu passes each entry unchanged, by reference, to the tool of that name: to every call of every run of the agent, so the value must be safe to share. It is never cloned, validated or stored; the tool's own `contextSchema` validates it.
+- chamvi passes each entry unchanged, by reference, to the tool of that name: to every call of every run of the agent, so the value must be safe to share. It is never cloned, validated or stored; the tool's own `contextSchema` validates it.
 - A tool without any `contextSchema` gets its entry too (the AI SDK hands it over unvalidated).
-- An entry naming a chamberu tool (built with `defineTool()`/`defineEffectTool()`, the state tools included) or no tool of the agent is a misconfiguration: with a plain tool set `defineAgent()` throws `InvalidAgentDefinitionError`; with a factory (whose set is only known per execution) the run fails with that error (`invalid_agent_definition`) before any model call. A factory that returns a tool only sometimes must leave its entry out and close over the value instead.
+- An entry naming a chamvi tool (built with `defineTool()`/`defineEffectTool()`, the state tools included) or no tool of the agent is a misconfiguration: with a plain tool set `defineAgent()` throws `InvalidAgentDefinitionError`; with a factory (whose set is only known per execution) the run fails with that error (`invalid_agent_definition`) before any model call. A factory that returns a tool only sometimes must leave its entry out and close over the value instead.
 - Without an entry, a tool whose `contextSchema` requires a value fails the run (the AI SDK validates the context outside its tool-error handling); an optional schema gets `undefined`.
 - An entry the tool's `contextSchema` rejects fails the run the same way, with `validation_error`. The run error names the tool and the failing paths only, never the entry's value, so a key in it is not stored or served with the run.

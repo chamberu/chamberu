@@ -7,8 +7,8 @@ import {
     defineTool,
     hasPermission,
     requireToolPermission,
-} from '@chamberu/core';
-import type { ToolPolicy } from '@chamberu/core';
+} from '@chamvi/core';
+import type { ToolPolicy } from '@chamvi/core';
 
 declare const model: LanguageModel;
 declare function readFile(path: string): Promise<string>;

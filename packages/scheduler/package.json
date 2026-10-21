@@ -1,17 +1,17 @@
 {
-    "name": "@chamberu/scheduler",
+    "name": "@chamvi/scheduler",
     "version": "0.1.0",
     "type": "module",
-    "description": "Fires chamberu cron triggers once per tick across replicas, on hubwire.",
+    "description": "Fires chamvi cron triggers once per tick across replicas, on hubwire.",
     "author": {
         "name": "Peter Placzek",
         "email": "contact@tada5hi.net",
         "url": "https://github.com/tada5hi"
     },
-    "homepage": "https://chamberu.dev",
+    "homepage": "https://chamvi.dev",
     "repository": {
         "type": "git",
-        "url": "https://github.com/chamberu/chamberu.git",
+        "url": "https://github.com/chamvi/chamvi.git",
         "directory": "packages/scheduler"
     },
     "main": "dist/index.mjs",
@@ -39,7 +39,7 @@
         "test:coverage": "vitest --config test/vitest.config.ts --run --coverage"
     },
     "keywords": [
-        "chamberu",
+        "chamvi",
         "cron",
         "scheduler",
         "hubwire"
@@ -52,13 +52,13 @@
         "hubwire": "^0.2.2"
     },
     "devDependencies": {
-        "@chamberu/core": "^0.1.0",
-        "@chamberu/test-kit": "^0.1.0",
+        "@chamvi/core": "^0.1.0",
+        "@chamvi/test-kit": "^0.1.0",
         "@hubwire/test": "^0.1.2",
         "ai": "^7.0.143",
         "zod": "^4.6.7"
     },
     "peerDependencies": {
-        "@chamberu/core": "^0.1.0"
+        "@chamvi/core": "^0.1.0"
     }
 }

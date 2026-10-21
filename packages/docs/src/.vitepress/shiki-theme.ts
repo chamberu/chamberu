@@ -16,8 +16,8 @@ const KEYWORD = '#ff7b84';
 const STRING = '#e7c58c';
 const COMMENT = '#958a8b';
 
-export const chamberuCodeTheme = {
-    name: 'chamberu',
+export const chamviCodeTheme = {
+    name: 'chamvi',
     type: 'dark' as const,
     colors: {
         'editor.background': '#19171a',

@@ -7,8 +7,8 @@
 
 import { UnauthorizedError } from '@ebec/http';
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
-import type { HttpRoute, HttpRouteContext, HttpRouteRequest } from '@chamberu/http';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
+import type { HttpRoute, HttpRouteContext, HttpRouteRequest } from '@chamvi/http';
 import type { App } from 'routup';
 import { createTestApp } from '../../utils/app.ts';
 

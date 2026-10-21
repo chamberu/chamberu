@@ -12,8 +12,8 @@ import {
     cron,
     http,
     webhook,
-} from '@chamberu/core';
-import type { TriggerEnvelope } from '@chamberu/core';
+} from '@chamvi/core';
+import type { TriggerEnvelope } from '@chamvi/core';
 
 describe('cron', () => {
     it('rejects invalid expression', () => {

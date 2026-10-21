@@ -1,19 +1,19 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo.svg" alt="@chamberu/github" width="128" height="128" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/logo.svg" alt="@chamvi/github" width="128" height="128" />
 </p>
 
-<h1 align="center">@chamberu/github</h1>
+<h1 align="center">@chamvi/github</h1>
 
 <p align="center">
-    <b>GitHub App webhooks and tools for chamberu agents.</b><br>
+    <b>GitHub App webhooks and tools for chamvi agents.</b><br>
     A verified delivery becomes one deduplicated run per matching agent,<br>
     and GitHub write tools never post twice after a retry, a recovery or a crash.
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@chamberu/github"><img src="https://img.shields.io/npm/v/@chamberu/github" alt="npm version" /></a>
-    <a href="https://github.com/chamberu/chamberu/actions/workflows/ci.yml"><img src="https://github.com/chamberu/chamberu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <a href="https://github.com/chamberu/chamberu/blob/master/packages/github/LICENSE"><img src="https://img.shields.io/npm/l/@chamberu/github" alt="License" /></a>
+    <a href="https://www.npmjs.com/package/@chamvi/github"><img src="https://img.shields.io/npm/v/@chamvi/github" alt="npm version" /></a>
+    <a href="https://github.com/chamvi/chamvi/actions/workflows/ci.yml"><img src="https://github.com/chamvi/chamvi/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/chamvi/chamvi/blob/master/packages/github/LICENSE"><img src="https://img.shields.io/npm/l/@chamvi/github" alt="License" /></a>
 </p>
 
 ---
@@ -33,10 +33,10 @@
 ## Installation
 
 ```bash
-npm install @chamberu/github @chamberu/http @chamberu/core ai --save
+npm install @chamvi/github @chamvi/http @chamvi/core ai --save
 ```
 
-ESM only, Node.js `>=22`. `@chamberu/core`, `@chamberu/http` and `ai` are peer dependencies. GitHub is reached through [`@octokit/core`](https://www.npmjs.com/package/@octokit/core) with the pagination plugin; the App JWT, the installation tokens and the webhook signatures use `node:crypto`.
+ESM only, Node.js `>=22`. `@chamvi/core`, `@chamvi/http` and `ai` are peer dependencies. GitHub is reached through [`@octokit/core`](https://www.npmjs.com/package/@octokit/core) with the pagination plugin; the App JWT, the installation tokens and the webhook signatures use `node:crypto`.
 
 ## GitHub App setup
 
@@ -53,10 +53,10 @@ One GitHub App per agent repository (or organisation):
 
 ```typescript
 import type { LanguageModel } from 'ai';
-import { Engine, MemoryStore, defineAgent } from '@chamberu/core';
-import { createGithubApp, githubWebhook } from '@chamberu/github';
-import type { GithubAppOptions } from '@chamberu/github';
-import { createHttpApp, createShutdown, staticTokens } from '@chamberu/http';
+import { Engine, MemoryStore, defineAgent } from '@chamvi/core';
+import { createGithubApp, githubWebhook } from '@chamvi/github';
+import type { GithubAppOptions } from '@chamvi/github';
+import { createHttpApp, createShutdown, staticTokens } from '@chamvi/http';
 
 export async function createTriageServer(
     model: LanguageModel,
@@ -66,11 +66,11 @@ export async function createTriageServer(
         GITHUB_APP_ID,
         GITHUB_PRIVATE_KEY,
         GITHUB_WEBHOOK_SECRET,
-        CHAMBERU_TOKEN,
+        CHAMVI_TOKEN,
         RESUME_SECRET,
     } = process.env;
-    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !CHAMBERU_TOKEN || !RESUME_SECRET) {
-        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, CHAMBERU_TOKEN and RESUME_SECRET.');
+    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !CHAMVI_TOKEN || !RESUME_SECRET) {
+        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, CHAMVI_TOKEN and RESUME_SECRET.');
     }
 
     const gh = createGithubApp({
@@ -102,7 +102,7 @@ export async function createTriageServer(
         engine,
         auth: staticTokens({
             tokens: [{
-                value: CHAMBERU_TOKEN,
+                value: CHAMVI_TOKEN,
                 id: 'ci',
                 permissions: ['*'],
             }],
@@ -138,7 +138,7 @@ A verified delivery is dispatched to every agent with a matching `githubWebhook(
 
 - **Dedupe**: the idempotency key is the delivery id (or the trigger's `idempotencyKey(event)`), so a redelivery returns the existing runs with `deduplicated: true`. The signature covers the body only, neither the `X-GitHub-Delivery` nor the `X-GitHub-Event` header (`e.delivery`, `e.name`): whoever holds one signed delivery (a proxy log, a support dump) can replay it under new delivery ids, or under another event name an agent listens on, and start a new run each time. On an exposed endpoint, derive the key from body fields only, e.g. `` idempotencyKey: (e) => `${e.action}:${e.payload.repository?.full_name}#${e.payload.issue?.number}@${e.payload.issue?.updated_at}` ``, and let a `filter` check that the body carries what the event name implies (`issue` without `comment` for `issues`, `comment` for `issue_comment`, `pull_request` for `pull_request`).
 - **Failures**: agents are matched and dispatched in order and a failing one (a throwing `filter` or key function, a key `dispatch` refuses, a failed dispatch) does not stop the others; each failure goes to the http app's `onError`, and the answer is then `500`. **GitHub does not redeliver failed deliveries automatically**: redeliver a `4xx`/`5xx` delivery by hand (the App's *Advanced* tab) or through the redelivery API. A redelivery keeps the delivery id, so the agents that already got their run are deduplicated.
-- **Self guard**: a delivery whose `sender` is the App's own bot (`<slug>[bot]`, `type: 'Bot'`) starts no run, so an agent is not woken by its own comment. Other bots (`dependabot[bot]`, a second chamberu App on the same repository) are ordinary senders; use a trigger `filter` to break loops between two Apps.
+- **Self guard**: a delivery whose `sender` is the App's own bot (`<slug>[bot]`, `type: 'Bot'`) starts no run, so an agent is not woken by its own comment. Other bots (`dependabot[bot]`, a second chamvi App on the same repository) are ordinary senders; use a trigger `filter` to break loops between two Apps.
 - **Body size**: the route inherits the app's `bodyLimit` (1 MiB by default). Issue and comment deliveries are far below it; raise `bodyLimit` on `createHttpApp` for large `push` or `pull_request` deliveries (GitHub sends up to 25 MB), which are otherwise answered `413`.
 - The route is not rate limited and not authenticated by the app's authenticators: the signature is its credential.
 
@@ -177,7 +177,7 @@ Every tool acts as an installation: the delivery's for a run started by a GitHub
 | `github_create_comment` | effect | `repo`, `number`, `body` | `{ id, url }`: **one comment per issue per model step** |
 | `github_close_issue` | effect | `repo`, `number`, `reason?` (`completed`, `not_planned`) | `{ number, state, stateReason }`; an issue already closed is not patched again |
 
-The write tools are effect tools (`defineEffectTool` from core). `github_create_comment` keys its effect by run, issue and model step (`<runId>:github_create_comment:<owner>/<repo>#<n>:<step>`, owner and repo lower-cased since GitHub resolves them case-insensitively) and embeds the key as a hidden marker (`<!-- chamberu:effect=... -->`). When the effect record is lost (a crash between GitHub accepting the comment and the checkpoint), the redone step finds the App's own comment with that marker (comments updated since the run was received, less an hour) and returns it instead of posting again, although the model wrote a different text. A second call for the same issue in the same step returns the first comment, so the tool description asks the model to put everything for one issue into one comment.
+The write tools are effect tools (`defineEffectTool` from core). `github_create_comment` keys its effect by run, issue and model step (`<runId>:github_create_comment:<owner>/<repo>#<n>:<step>`, owner and repo lower-cased since GitHub resolves them case-insensitively) and embeds the key as a hidden marker (`<!-- chamvi:effect=... -->`). When the effect record is lost (a crash between GitHub accepting the comment and the checkpoint), the redone step finds the App's own comment with that marker (comments updated since the run was received, less an hour) and returns it instead of posting again, although the model wrote a different text. A second call for the same issue in the same step returns the first comment, so the tool description asks the model to put everything for one issue into one comment.
 
 Approvals live on the agent: `approvals: { github_close_issue: 'user' }` pauses the run before an issue is closed.
 
@@ -185,7 +185,7 @@ Approvals live on the agent: `approvals: { github_close_issue: 'user' }` pauses 
 
 - Installation tokens are cached per installation and replaced five minutes before they expire, so a run resumed hours later after an approval gets a fresh one. Tokens, the private key and JWTs are never logged and never stored in a run, step or effect.
 - The tools reach every repository the installation can reach. An issue body is untrusted input: a model steered by it can act on any of those repositories, so install the App only where the agent may act, and gate destructive tools with approvals.
-- `requireToolPermission()` from `@chamberu/core` denies every tool to runs without an invoker, and delivery runs have none. GitHub agents use `requireToolPermission({ withoutInvoker: 'allow' })` or wrap it.
+- `requireToolPermission()` from `@chamvi/core` denies every tool to runs without an invoker, and delivery runs have none. GitHub agents use `requireToolPermission({ withoutInvoker: 'allow' })` or wrap it.
 - Webhook secrets can be rotated: pass `webhookSecret: [old, new]` while GitHub switches over.
 
 ## Options

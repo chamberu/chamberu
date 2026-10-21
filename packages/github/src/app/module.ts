@@ -6,7 +6,7 @@
  */
 
 import type { ToolSet } from 'ai';
-import { ChamberuError, systemClock } from '@chamberu/core';
+import { ChamviError, systemClock } from '@chamvi/core';
 import { GITHUB_USER_AGENT } from '../auth/constants.ts';
 import { normalizePrivateKey } from '../auth/helpers.ts';
 import { createInstallationTokens } from '../auth/module.ts';
@@ -70,7 +70,7 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
                         const { data } = await octokit.request('GET /app');
                         if (typeof data?.slug !== 'string' || data.slug.length === 0) {
                             // a login of `[bot]` would never match and disable the self-sender guard
-                            throw new ChamberuError({ message: 'GET /app answered without the App slug; set slug on createGithubApp().', code: GITHUB_REQUEST_ERROR_CODE });
+                            throw new ChamviError({ message: 'GET /app answered without the App slug; set slug on createGithubApp().', code: GITHUB_REQUEST_ERROR_CODE });
                         }
                         return `${data.slug}[bot]`;
                     })

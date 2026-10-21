@@ -13,9 +13,9 @@ import {
     expect,
     it,
 } from 'vitest';
-import type { Checkpoint } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
-import { TypeormStore } from '@chamberu/store-typeorm';
+import type { Checkpoint } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import { TypeormStore } from '@chamvi/store-typeorm';
 import { createTestDataSource, describePostgres, truncateStore } from '../../utils/database.ts';
 
 describePostgres('TypeormStore values', () => {

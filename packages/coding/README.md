@@ -1,19 +1,19 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo.svg" alt="@chamberu/coding" width="128" height="128" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/logo.svg" alt="@chamvi/coding" width="128" height="128" />
 </p>
 
-<h1 align="center">@chamberu/coding</h1>
+<h1 align="center">@chamvi/coding</h1>
 
 <p align="center">
-    <b>Coding tools for chamberu agents.</b><br>
+    <b>Coding tools for chamvi agents.</b><br>
     Read, write and edit files, search, run shell commands and show the diff,<br>
     in a disposable workspace of the calling run on any sandbox provider.
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@chamberu/coding"><img src="https://img.shields.io/npm/v/@chamberu/coding" alt="npm version" /></a>
-    <a href="https://github.com/chamberu/chamberu/actions/workflows/ci.yml"><img src="https://github.com/chamberu/chamberu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <a href="https://github.com/chamberu/chamberu/blob/master/packages/coding/LICENSE"><img src="https://img.shields.io/npm/l/@chamberu/coding" alt="License" /></a>
+    <a href="https://www.npmjs.com/package/@chamvi/coding"><img src="https://img.shields.io/npm/v/@chamvi/coding" alt="npm version" /></a>
+    <a href="https://github.com/chamvi/chamvi/actions/workflows/ci.yml"><img src="https://github.com/chamvi/chamvi/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/chamvi/chamvi/blob/master/packages/coding/LICENSE"><img src="https://img.shields.io/npm/l/@chamvi/coding" alt="License" /></a>
 </p>
 
 ---
@@ -32,18 +32,18 @@
 ## Installation
 
 ```bash
-npm install @chamberu/coding @chamberu/sandbox @chamberu/core ai --save
+npm install @chamvi/coding @chamvi/sandbox @chamvi/core ai --save
 ```
 
-ESM only, Node.js `>=22`. `@chamberu/core`, `@chamberu/sandbox` and `ai` are peer dependencies. Add a sandbox provider: `@chamberu/sandbox-docker` or `@chamberu/sandbox-k8s` (or `@chamberu/sandbox-local` for development).
+ESM only, Node.js `>=22`. `@chamvi/core`, `@chamvi/sandbox` and `ai` are peer dependencies. Add a sandbox provider: `@chamvi/sandbox-docker` or `@chamvi/sandbox-k8s` (or `@chamvi/sandbox-local` for development).
 
 ## Usage
 
 ```typescript
 import type { LanguageModel } from 'ai';
-import { codingTools } from '@chamberu/coding';
-import { defineAgent, http } from '@chamberu/core';
-import type { IWorkspaceManager } from '@chamberu/sandbox';
+import { codingTools } from '@chamvi/coding';
+import { defineAgent, http } from '@chamvi/core';
+import type { IWorkspaceManager } from '@chamvi/sandbox';
 
 export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceManager) {
     return defineAgent({
@@ -61,7 +61,7 @@ export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceMa
 }
 ```
 
-`workspaces` is a manager from `createWorkspaceManager({ provider })` (`@chamberu/sandbox`), attached to the engine with `workspaces.attach(engine)` so a run's workspaces go when it settles. The model calls `create_workspace` first, then works in it.
+`workspaces` is a manager from `createWorkspaceManager({ provider })` (`@chamvi/sandbox`), attached to the engine with `workspaces.attach(engine)` so a run's workspaces go when it settles. The model calls `create_workspace` first, then works in it.
 
 ## Tools
 

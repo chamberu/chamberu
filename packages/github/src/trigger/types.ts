@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-/** The parts of a GitHub webhook body chamberu reads; the rest passes through. */
+/** The parts of a GitHub webhook body chamvi reads; the rest passes through. */
 export type GithubPayload = {
     action?: string;
     installation?: { id: number };

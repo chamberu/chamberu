@@ -12,7 +12,7 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { InvalidAgentDefinitionError, defineAgent, http } from '@chamberu/core';
+import { InvalidAgentDefinitionError, defineAgent, http } from '@chamvi/core';
 import {
     ADMIN_TOKEN,
     call,

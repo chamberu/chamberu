@@ -47,7 +47,7 @@ export function stderrMessage(stderr: Uint8Array): string {
 
 /** A fresh marker for one exec: nobody else can print it. */
 export function exitMarker(): string {
-    return `chamberu-exit-${randomBytes(16).toString('hex')}:`;
+    return `chamvi-exit-${randomBytes(16).toString('hex')}:`;
 }
 
 /** `argv` inside `EXEC_SCRIPT`: run in `cwd`, the exit reported as `marker` on stderr. */

@@ -15,7 +15,7 @@ export const JWT_TTL_SECONDS = 540;
 export const TOKEN_REFRESH_MARGIN_MS = 5 * 60_000;
 
 /** The User-Agent of every GitHub request. */
-export const GITHUB_USER_AGENT = 'chamberu';
+export const GITHUB_USER_AGENT = 'chamvi';
 
 /**
  * A request authenticated as the App (the token exchange, `GET /app`) is

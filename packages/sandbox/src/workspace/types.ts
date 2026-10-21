@@ -48,7 +48,7 @@ export interface IWorkspace {
     readonly info: WorkspaceInfo;
     /**
      * True after `dispose()`, or once the workspace found its container, pod
-     * or directory gone (stopped, killed or removed outside chamberu). Every
+     * or directory gone (stopped, killed or removed outside chamvi). Every
      * call then rejects with SandboxError; the manager drops such a workspace
      * and disposes it, which removes what is left of it.
      */

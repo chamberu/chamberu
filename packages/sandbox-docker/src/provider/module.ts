@@ -6,7 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { ChamberuError, SandboxError, systemClock } from '@chamberu/core';
+import { ChamviError, SandboxError, systemClock } from '@chamvi/core';
 import {
     DEFAULT_SANDBOX_IMAGE,
     EXPIRES_AT_KEY,
@@ -20,8 +20,8 @@ import {
     isExpiredAt,
     prepareWorkspace,
     resolveLimits,
-} from '@chamberu/sandbox';
-import type { ISandboxProvider, IWorkspace } from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
+import type { ISandboxProvider, IWorkspace } from '@chamvi/sandbox';
 import Docker from 'dockerode';
 import { createDockerTransport } from '../transport/module.ts';
 import { DEFAULT_NETWORK } from './constants.ts';
@@ -147,7 +147,7 @@ export function createDockerSandbox(options: DockerSandboxOptions = {}): ISandbo
                 if (commit !== undefined) info.commit = commit;
             } catch (error) {
                 await workspace.dispose().catch(() => undefined);
-                if (error instanceof ChamberuError) throw error;
+                if (error instanceof ChamviError) throw error;
                 if (input.signal?.aborted) throw abortedCreate(error);
                 throw new SandboxError(`cannot start workspace container ${id}: ${dockerMessage(error)}`, { cause: error });
             }

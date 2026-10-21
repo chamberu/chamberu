@@ -6,13 +6,13 @@
  */
 
 import { createHmac } from 'node:crypto';
-import { Engine, MemoryStore } from '@chamberu/core';
-import type { Agent, INotifier } from '@chamberu/core';
-import { createGithubApp } from '@chamberu/github';
-import type { GithubAppOptions, GithubWebhookRouteOptions, IGithubApp } from '@chamberu/github';
-import { createHttpApp, staticTokens } from '@chamberu/http';
-import type { HttpAppOptions } from '@chamberu/http';
-import { ControllableClock } from '@chamberu/test-kit';
+import { Engine, MemoryStore } from '@chamvi/core';
+import type { Agent, INotifier } from '@chamvi/core';
+import { createGithubApp } from '@chamvi/github';
+import type { GithubAppOptions, GithubWebhookRouteOptions, IGithubApp } from '@chamvi/github';
+import { createHttpApp, staticTokens } from '@chamvi/http';
+import type { HttpAppOptions } from '@chamvi/http';
+import { ControllableClock } from '@chamvi/test-kit';
 import { createFakeGithub } from './github.ts';
 import type { FakeGithub } from './github.ts';
 

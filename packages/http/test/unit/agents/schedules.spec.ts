@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { cron, defineAgent, http } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
+import { cron, defineAgent, http } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
 import {
     READER_TOKEN,
     call,

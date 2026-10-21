@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { createOutputCollector } from '@chamberu/sandbox';
+import { createOutputCollector } from '@chamvi/sandbox';
 
 const encoder = new TextEncoder();
 

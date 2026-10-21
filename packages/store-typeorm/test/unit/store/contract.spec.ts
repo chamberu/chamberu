@@ -7,8 +7,8 @@
 
 import type { DataSource } from 'typeorm';
 import { afterAll, beforeAll } from 'vitest';
-import { describeStoreContract } from '@chamberu/test-kit';
-import { TypeormStore } from '@chamberu/store-typeorm';
+import { describeStoreContract } from '@chamvi/test-kit';
+import { TypeormStore } from '@chamvi/store-typeorm';
 import { createTestDataSource, describePostgres, truncateStore } from '../../utils/database.ts';
 
 describePostgres('postgres', () => {

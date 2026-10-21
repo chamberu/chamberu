@@ -14,16 +14,16 @@ import {
     defineAgent,
     http,
     webhook,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type {
     Agent,
     INotifier,
     IStore,
     Notification,
-} from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
-import { createHttpApp, staticTokens } from '@chamberu/http';
-import type { HttpAppOptions, Principal } from '@chamberu/http';
+} from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import { createHttpApp, staticTokens } from '@chamvi/http';
+import type { HttpAppOptions, Principal } from '@chamvi/http';
 import type { App } from 'routup';
 import { approvalModel, textModel } from './model.ts';
 

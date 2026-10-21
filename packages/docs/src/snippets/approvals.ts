@@ -6,8 +6,8 @@ import {
     MemoryStore,
     RunStatus,
     defineAgent,
-} from '@chamberu/core';
-import type { INotifier, Notification } from '@chamberu/core';
+} from '@chamvi/core';
+import type { INotifier, Notification } from '@chamvi/core';
 
 declare function deployVersion(version: string, env: string): Promise<string>;
 

@@ -17,7 +17,7 @@ import type { StateSchema } from './types.ts';
  * `state_<coll>_list`, `state_<coll>_upsert` and `state_<coll>_remove`
  * (the latter two are effect tools). Upsert validates via the state API, so an
  * invalid document becomes a tool error the model can correct. Every tool is
- * a chamberu tool and reads the state from its context (`context.state`).
+ * a chamvi tool and reads the state from its context (`context.state`).
  */
 export function createStateTools<S extends StateSchema>(schema: S): ToolSet {
     const tools: ToolSet = {};

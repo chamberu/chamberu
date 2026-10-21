@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as docker from '@chamberu/sandbox-docker';
+import * as docker from '@chamvi/sandbox-docker';
 
 describe('package entry', () => {
     it('resolves', () => {

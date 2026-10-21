@@ -1,5 +1,5 @@
-import { MemoryStore } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
+import { MemoryStore } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
 
 export async function leaseExpiry() {
     // #region clock

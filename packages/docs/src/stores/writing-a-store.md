@@ -1,13 +1,13 @@
 # Writing a Store
 
-A store is any object that implements `IStore` from `@chamberu/core`. Pass it to `new Engine({ store })`; the engine needs nothing else.
+A store is any object that implements `IStore` from `@chamvi/core`. Pass it to `new Engine({ store })`; the engine needs nothing else.
 
 ## Prove it with the contract suite
 
-`@chamberu/test-kit` ships `describeStoreContract`, the Vitest suite every store must pass. It is the same suite `MemoryStore` runs.
+`@chamvi/test-kit` ships `describeStoreContract`, the Vitest suite every store must pass. It is the same suite `MemoryStore` runs.
 
 ```bash
-npm install --save-dev @chamberu/test-kit vitest
+npm install --save-dev @chamvi/test-kit vitest
 ```
 
 <<< @/snippets/store-contract.ts#contract

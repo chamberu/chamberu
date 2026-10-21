@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { Run, Step } from '@chamberu/core';
+import type { Run, Step } from '@chamvi/core';
 import { serializeRun, serializeStep } from '../../../src/runs/helpers.ts';
 
 describe('serializeRun', () => {

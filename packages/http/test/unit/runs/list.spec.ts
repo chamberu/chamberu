@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { defineAgent, http } from '@chamberu/core';
+import { defineAgent, http } from '@chamvi/core';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,

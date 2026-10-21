@@ -10,7 +10,7 @@ import type {
     Engine,
     OverlapPolicy,
     TriggerDefinition,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 export type CronTriggerOptions = {
     expression: string;

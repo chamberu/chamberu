@@ -11,8 +11,8 @@ import { Writable } from 'node:stream';
 import { ApiException, KubeConfig } from '@kubernetes/client-node';
 import type { V1Pod, V1Status } from '@kubernetes/client-node';
 import { describe, expect, it } from 'vitest';
-import { SandboxError } from '@chamberu/core';
-import { createPodClient } from '@chamberu/sandbox-k8s';
+import { SandboxError } from '@chamvi/core';
+import { createPodClient } from '@chamvi/sandbox-k8s';
 import { createPodClientFrom } from '../../../src/client/helpers.ts';
 import { flush } from '../../utils/drive.ts';
 

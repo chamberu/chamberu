@@ -8,16 +8,16 @@
 import tailwindcss from '@tailwindcss/vite';
 import type { UserConfig } from 'vitepress';
 import { defineConfig, postcssIsolateStyles } from 'vitepress';
-import { chamberuCodeTheme } from './shiki-theme';
+import { chamviCodeTheme } from './shiki-theme';
 
 // a plugin as the vite bundled with VitePress types it
 type VitePressVitePlugin = NonNullable<NonNullable<UserConfig['vite']>['plugins']>[number];
 
 export default defineConfig({
-    title: 'chamberu',
+    title: 'chamvi',
     description: 'A TypeScript framework for self-hosted, trigger-driven AI agents on the Vercel AI SDK: durable runs, checkpoints, approvals and a pluggable store.',
     base: '/',
-    sitemap: { hostname: 'https://chamberu.dev' },
+    sitemap: { hostname: 'https://chamvi.dev' },
     cleanUrls: true,
     lastUpdated: true,
 
@@ -38,7 +38,7 @@ export default defineConfig({
 
     markdown: {
         // code blocks sit on a fixed-dark surface in both color modes
-        theme: chamberuCodeTheme,
+        theme: chamviCodeTheme,
     },
 
     head: [
@@ -59,8 +59,8 @@ export default defineConfig({
         }],
         ['meta', { name: 'theme-color', content: '#19171a' }],
         ['meta', { property: 'og:type', content: 'website' }],
-        ['meta', { property: 'og:url', content: 'https://chamberu.dev/' }],
-        ['meta', { property: 'og:title', content: 'chamberu' }],
+        ['meta', { property: 'og:url', content: 'https://chamvi.dev/' }],
+        ['meta', { property: 'og:title', content: 'chamvi' }],
         ['meta', {
             property: 'og:description',
             content: 'Self-hosted, trigger-driven AI agents on the Vercel AI SDK.',
@@ -71,7 +71,7 @@ export default defineConfig({
         logo: {
             light: '/logo-light.svg', 
             dark: '/logo-dark.svg', 
-            alt: 'chamberu', 
+            alt: 'chamvi', 
         },
 
         nav: [
@@ -179,24 +179,24 @@ export default defineConfig({
                 {
                     text: 'Reference',
                     items: [
-                        { text: '@chamberu/core', link: '/reference/' },
-                        { text: '@chamberu/coding', link: '/reference/coding' },
-                        { text: '@chamberu/github', link: '/reference/github' },
-                        { text: '@chamberu/http', link: '/reference/http' },
-                        { text: '@chamberu/sandbox', link: '/reference/sandbox' },
-                        { text: '@chamberu/scheduler', link: '/reference/scheduler' },
-                        { text: '@chamberu/test-kit', link: '/reference/test-kit' },
+                        { text: '@chamvi/core', link: '/reference/' },
+                        { text: '@chamvi/coding', link: '/reference/coding' },
+                        { text: '@chamvi/github', link: '/reference/github' },
+                        { text: '@chamvi/http', link: '/reference/http' },
+                        { text: '@chamvi/sandbox', link: '/reference/sandbox' },
+                        { text: '@chamvi/scheduler', link: '/reference/scheduler' },
+                        { text: '@chamvi/test-kit', link: '/reference/test-kit' },
                     ],
                 },
             ],
         },
 
         socialLinks: [
-            { icon: 'github', link: 'https://github.com/chamberu/chamberu' },
+            { icon: 'github', link: 'https://github.com/chamvi/chamvi' },
         ],
 
         editLink: {
-            pattern: 'https://github.com/chamberu/chamberu/edit/master/packages/docs/src/:path',
+            pattern: 'https://github.com/chamvi/chamvi/edit/master/packages/docs/src/:path',
             text: 'Edit this page on GitHub',
         },
 

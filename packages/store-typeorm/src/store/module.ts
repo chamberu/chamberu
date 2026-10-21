@@ -9,7 +9,7 @@ import {
     InvalidRunStateError,
     RunNotFoundError,
     systemClock,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type {
     Artifact,
     Checkpoint,
@@ -18,7 +18,7 @@ import type {
     Run,
     RunStatusLiteral,
     Step,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import {
     In,
     IsNull,

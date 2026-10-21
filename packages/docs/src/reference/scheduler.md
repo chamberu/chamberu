@@ -1,12 +1,12 @@
-# @chamberu/scheduler
+# @chamvi/scheduler
 
-Fires chamberu cron triggers once per tick across replicas, on hubwire. The public API of `packages/scheduler/src/index.ts`.
+Fires chamvi cron triggers once per tick across replicas, on hubwire. The public API of `packages/scheduler/src/index.ts`.
 
 ```bash
-npm install @chamberu/scheduler @chamberu/core --save
+npm install @chamvi/scheduler @chamvi/core --save
 ```
 
-`@chamberu/core` is a peer dependency. See [Cron Scheduling](/guide/scheduler) for the behaviour.
+`@chamvi/core` is a peer dependency. See [Cron Scheduling](/guide/scheduler) for the behaviour.
 
 ## createScheduler
 

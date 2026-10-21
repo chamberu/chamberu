@@ -12,7 +12,7 @@ import {
     expect,
     it,
 } from 'vitest';
-import { migrateStore } from '@chamberu/store-typeorm';
+import { migrateStore } from '@chamvi/store-typeorm';
 import { TableName } from '../../../src/entities/constants.ts';
 import { createTestDataSource, describePostgres } from '../../utils/database.ts';
 import type { TestDataSourceOptions } from '../../utils/database.ts';
@@ -40,7 +40,7 @@ describePostgres('schema', () => {
         const ds = await create();
         const rows: { indexdef: string }[] = await ds.query(
             'SELECT indexdef FROM pg_indexes WHERE indexname = $1',
-            ['IDX_chamberu_docs_doc_gin'],
+            ['IDX_chamvi_docs_doc_gin'],
         );
         expect(rows).toHaveLength(1);
         expect(rows[0]!.indexdef).toContain('USING gin');

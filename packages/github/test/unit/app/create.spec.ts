@@ -7,10 +7,10 @@
 
 import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
-import { createGithubApp } from '@chamberu/github';
-import type { GithubAppOptions } from '@chamberu/github';
-import { ControllableClock } from '@chamberu/test-kit';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
+import { createGithubApp } from '@chamvi/github';
+import type { GithubAppOptions } from '@chamvi/github';
+import { ControllableClock } from '@chamvi/test-kit';
 import { createFakeGithub } from '../../utils/github.ts';
 
 const clock = new ControllableClock(new Date('2026-10-20T10:00:00Z'));
@@ -44,11 +44,11 @@ describe('createGithubApp', () => {
         ['a zero installationId', { installationId: 0 }],
         ['a negative installationId', { installationId: -1 }],
         ['a fractional installationId', { installationId: 1.5 }],
-        ['a slug with upper case', { slug: 'Chamberu-Test' }],
-        ['a slug with a space', { slug: 'Chamberu Test' }],
-        ['a slug with a trailing space', { slug: 'chamberu-test ' }],
+        ['a slug with upper case', { slug: 'Chamvi-Test' }],
+        ['a slug with a space', { slug: 'Chamvi Test' }],
+        ['a slug with a trailing space', { slug: 'chamvi-test ' }],
         ['an empty slug', { slug: '' }],
-        ['a slug with the [bot] suffix', { slug: 'chamberu-test[bot]' }],
+        ['a slug with the [bot] suffix', { slug: 'chamvi-test[bot]' }],
         ['a scheme-less baseUrl', { baseUrl: 'ghe.example.com/api/v3' }],
         ['a non-http baseUrl', { baseUrl: 'ftp://ghe.example.com/api/v3' }],
         ['a plain http baseUrl', { baseUrl: 'http://ghe.example.com/api/v3' }],
@@ -78,8 +78,8 @@ describe('createGithubApp', () => {
     });
 
     it('takes the bot login from a valid slug without GET /app', async () => {
-        const gh = createGithubApp(options({ slug: 'chamberu-test' }));
-        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
+        const gh = createGithubApp(options({ slug: 'chamvi-test' }));
+        expect(await gh.botLogin()).toBe('chamvi-test[bot]');
     });
 
     it('refuses a GET /app answer without a slug and does not cache it', async () => {
@@ -93,8 +93,8 @@ describe('createGithubApp', () => {
         };
         const gh = createGithubApp(options({ fetch }));
         await expect(gh.botLogin()).rejects.toThrow(/slug/);
-        slug = 'chamberu-test';
-        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
+        slug = 'chamvi-test';
+        expect(await gh.botLogin()).toBe('chamvi-test[bot]');
     });
 
     it.each([
