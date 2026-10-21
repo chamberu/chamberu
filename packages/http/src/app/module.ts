@@ -30,7 +30,7 @@ export function createHttpApp(options: HttpAppOptions): App {
         ...(options.trustProxy !== undefined ? { options: { trustProxy: options.trustProxy } } : {}),
     });
 
-    installPlugins(app, options);
+    installPlugins(app, { ...options, basePath: ctx.basePath });
     app.use(defineCoreHandler((event) => {
         assertNoNul(event);
         return event.next();

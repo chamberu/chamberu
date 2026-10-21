@@ -297,6 +297,24 @@ describe('prefix routes, headers and byte bodies', () => {
         expect(seen).toBe('/Assets/App.JS');
     });
 
+    it('strips a basePath given with a trailing slash', async () => {
+        let seen: string | undefined;
+        const { app } = createTestApp({
+            basePath: '/api/',
+            routes: [route({
+                method: 'GET',
+                path: '/ui',
+                prefix: true,
+                handler: async ({ subpath }) => {
+                    seen = subpath;
+                    return { status: 204 };
+                },
+            })],
+        });
+        expect((await get(app, '/api/ui/assets/x.js')).status).toBe(204);
+        expect(seen).toBe('/assets/x.js');
+    });
+
     it('a plain route has an empty subpath', async () => {
         let seen: string | undefined;
         const { app } = createTestApp({

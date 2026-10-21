@@ -194,6 +194,11 @@ describe('rate limit', () => {
         for (let i = 0; i < 3; i++) expect((await send(app, '/api/healthz')).status).toBe(200);
     });
 
+    it('skips health under a basePath given with a trailing slash', async () => {
+        const { app } = createTestApp({ rateLimit: { max: 1 }, basePath: '/api/' });
+        for (let i = 0; i < 3; i++) expect((await send(app, '/api/healthz')).status).toBe(200);
+    });
+
     it('skips the limiter for every path of an unlimited prefix route', async () => {
         const { app } = createTestApp({
             rateLimit: { max: 1 },

@@ -49,6 +49,19 @@ const APP_ERROR_CODE = 'APP_ERROR';
 const STATIC_ROUTE_PATH = /^(?:\/[\w.~-]+)+$/;
 
 /**
+ * `basePath` without trailing slashes (`'/'` is no prefix at all), so every
+ * reader (route matching, subpaths, limiter skips, metric labels, hook
+ * URLs) sees one canonical prefix; anything but a static path is refused.
+ */
+export function normalizeBasePath(basePath: string | undefined): string {
+    const path = (basePath ?? '').replace(/\/+$/, '');
+    if (path !== '' && !STATIC_ROUTE_PATH.test(path)) {
+        throw new InvalidAgentDefinitionError(`basePath "${basePath}" must be a static path starting with "/".`);
+    }
+    return path;
+}
+
+/**
  * Extra routes: static paths, unique per method, never under a built-in
  * route's first segment or on the metrics path.
  */
@@ -131,7 +144,7 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         store: options.engine.store,
         agents: new Map(selectAgents(options.engine, options.agents).map((agent) => [agent.name, agent])),
         authenticators,
-        basePath: options.basePath ?? '',
+        basePath: normalizeBasePath(options.basePath),
         bodyLimit: options.bodyLimit ?? DEFAULT_BODY_LIMIT,
         streamPollMs: options.stream?.pollMs ?? DEFAULT_STREAM_POLL_MS,
         maxOpenStreams,
