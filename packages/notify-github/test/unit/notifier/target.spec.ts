@@ -76,6 +76,28 @@ describe('resolveTarget', () => {
         });
     });
 
+    it('takes target.installationId for a comment on target', () => {
+        const event = githubEvent({
+            name: 'push',
+            action: undefined,
+            payload: { repository: { full_name: 'orga/repo' } },
+        });
+        const resolved = options({ target: { ...TARGET, installationId: 99 } }, { installationId: 7 });
+        expect(resolveTarget(githubTrigger(event), resolved, 'r1')).toEqual({
+            owner: 'octo',
+            repo: 'fallback',
+            number: 3,
+            installationId: 99,
+        });
+        expect(resolveTarget(httpTrigger(), resolved, 'r1')).toMatchObject({ installationId: 99 });
+        // the event's own issue keeps the event's installation
+        expect(resolveTarget(githubTrigger(), resolved, 'r1')).toMatchObject({ repo: 'demo', installationId: 42 });
+    });
+
+    it('needs no app installation with target.installationId', () => {
+        expect(resolveTarget(httpTrigger(), options({ target: { ...TARGET, installationId: 99 } }), 'r1')).toMatchObject({ installationId: 99 });
+    });
+
     it.each([
         ['a malformed full_name', { repository: { full_name: 'a/../b' }, issue: { number: 7 } }],
         ['a non-integer number', { repository: { full_name: 'octo/demo' }, issue: { number: '7' } }],

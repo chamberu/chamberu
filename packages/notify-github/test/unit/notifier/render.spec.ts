@@ -49,6 +49,11 @@ describe('renderComment', () => {
         ].join('\n'));
     });
 
+    it('puts a title with line breaks on one heading line', () => {
+        const comment = renderComment({ ...approval, title: '  Approval\nrequired:\t\tdeploy ' }, { mentions: [], marker: '<!-- m -->' });
+        expect(comment.split('\n')[0]).toBe('### Approval required: deploy');
+    });
+
     it('never includes the bare token', () => {
         const comment = renderComment(approval, { mentions: [], marker: '<!-- chamvi:effect=r1:a1 -->' });
         expect(comment).not.toContain('secret-token');

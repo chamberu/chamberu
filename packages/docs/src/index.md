@@ -45,7 +45,7 @@ flow:
 packages:
     eyebrow: Packages
     title: Small today, planned in the open.
-    lead: The engine, the cron scheduler, the HTTP and MCP API, the TypeORM store and the test helpers ship now. The rest is designed milestone by milestone.
+    lead: The engine, the cron scheduler, the HTTP and MCP API, the TypeORM store, the GitHub connector, sandboxes, notifiers and the test helpers ship now. The rest is designed milestone by milestone.
     shipped:
         -   name: '@chamvi/core'
             body: Agents, triggers, the run engine, checkpoints, budgets, effect tools, approvals, agent state and the in-memory store.
@@ -62,16 +62,16 @@ packages:
         -   name: '@chamvi/http'
             body: REST, server-sent events, webhooks and an MCP endpoint, with bearer, authup and OIDC authentication.
             link: /guide/http
+        -   name: '@chamvi/github'
+            body: GitHub App auth, webhook triggers and issue tools with reconciliation.
+            link: /reference/github
+        -   name: '@chamvi/sandbox-*'
+            body: Disposable workspaces, local for development, a container or a pod per workspace in production, plus coding tools.
+            link: /guide/workspaces
         -   name: '@chamvi/notify-*'
             body: Approval requests into an OpenClaw chat or as one comment on the run's GitHub issue, once per approval.
             link: /guide/notifiers
     planned:
-        -   name: '@chamvi/github'
-            milestone: M1
-            body: GitHub App auth, webhook triggers and issue tools with reconciliation.
-        -   name: '@chamvi/sandbox-*'
-            milestone: M1
-            body: Disposable workspaces, local for development and a pod per workspace in production.
         -   name: '@chamvi/ui'
             milestone: M1
             body: A dashboard with live steps, an approvals inbox, agent state and schedules.

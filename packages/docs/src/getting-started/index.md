@@ -5,7 +5,7 @@ chamvi is a TypeScript framework for **self-hosted, trigger-driven AI agents**. 
 The LLM side is the [Vercel AI SDK](https://ai-sdk.dev) v7. chamvi adds what the AI SDK leaves out on purpose: triggers, a run queue, persistence, concurrency control, approvals and a graceful shutdown.
 
 ::: info Status
-chamvi is pre-1.0. [`@chamvi/core`](/reference/), the cron scheduler [`@chamvi/scheduler`](/reference/scheduler), the HTTP and MCP API [`@chamvi/http`](/reference/http), the [TypeORM store](/stores/typeorm) and the test helpers, [`@chamvi/test-kit`](/reference/test-kit), exist today. The GitHub connector, the UI and the deploy kit are planned; the [roadmap](/roadmap) lists them. Pages about planned work carry a <Badge type="warning" text="Planned" /> badge.
+chamvi is pre-1.0. [`@chamvi/core`](/reference/), the cron scheduler [`@chamvi/scheduler`](/reference/scheduler), the HTTP and MCP API [`@chamvi/http`](/reference/http), the [TypeORM store](/stores/typeorm), the GitHub connector [`@chamvi/github`](/reference/github), [sandboxes and coding tools](/guide/workspaces), the [notifiers](/guide/notifiers) and the test helpers, [`@chamvi/test-kit`](/reference/test-kit), exist today. The UI and the deploy kit are planned; the [roadmap](/roadmap) lists them. Pages about planned work carry a <Badge type="warning" text="Planned" /> badge.
 :::
 
 ## Why chamvi?

@@ -63,7 +63,15 @@ export function resolveOptions(options: GithubNotifierOptions): ResolvedGithubNo
         const repo = parseRepo(options.target?.repo);
         if (!repo) throw invalid('target.repo must look like "owner/name".');
         if (!isPositiveInteger(options.target.number)) throw invalid('target.number must be a positive integer.');
-        target = { ...repo, number: options.target.number };
+        const { installationId } = options.target;
+        if (installationId !== undefined && !isPositiveInteger(installationId)) {
+            throw invalid('target.installationId must be a positive integer.');
+        }
+        target = {
+            ...repo,
+            number: options.target.number,
+            ...(installationId === undefined ? {} : { installationId }),
+        };
     }
 
     if (options.resumeUrl !== undefined && typeof options.resumeUrl !== 'function') {
@@ -98,8 +106,9 @@ function eventTarget(trigger: TriggerEnvelope): CommentTarget | undefined {
 
 /**
  * Where the run's comment goes: the issue or pull request of a `github`
- * run, else `target`. The installation follows the github tools' rule: the
- * event's for a `github` run, else the app's.
+ * run, else `target`. The installation is `target.installationId` for a
+ * comment on `target`, else the github tools' rule: the event's for a
+ * `github` run, else the app's.
  */
 export function resolveTarget(
     trigger: TriggerEnvelope,
@@ -110,13 +119,14 @@ export function resolveTarget(
     if (!target) {
         throw invalid(`run ${runId} of agent "${trigger.agent}" has no issue or pull request; set target for runs not started by an issue or pull request event.`);
     }
-    let installationId: number | undefined;
-    if (trigger.source === 'github' && isObject(trigger.payload) && isPositiveInteger(trigger.payload.installationId)) {
+    // eventTarget() never sets one, so this is target.installationId
+    let { installationId } = target;
+    if (installationId === undefined && trigger.source === 'github' && isObject(trigger.payload) && isPositiveInteger(trigger.payload.installationId)) {
         installationId = trigger.payload.installationId;
     }
     installationId ??= options.app.installationId;
     if (installationId === undefined) {
-        throw invalid(`run ${runId} has no GitHub installation; set installationId on createGithubApp() for runs not started by a GitHub delivery.`);
+        throw invalid(`run ${runId} has no GitHub installation; set installationId on createGithubApp() (or target.installationId) for runs not started by a GitHub delivery.`);
     }
     return { ...target, installationId };
 }

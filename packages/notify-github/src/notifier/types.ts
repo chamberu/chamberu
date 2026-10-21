@@ -15,6 +15,8 @@ export type GithubNotifierTarget = {
     repo: string;
     /** The issue or pull request number. */
     number: number;
+    /** The installation on `repo`, for a repository the run's installation does not cover. */
+    installationId?: number;
 };
 
 export type GithubNotifierOptions = {
@@ -37,6 +39,7 @@ export type CommentTarget = {
     owner: string;
     repo: string;
     number: number;
+    installationId?: number;
 };
 
 export type ResolvedGithubNotifierOptions = {

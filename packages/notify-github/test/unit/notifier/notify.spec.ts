@@ -189,4 +189,26 @@ describe('githubNotifier notify', () => {
         expect(posts().map((r) => r.path)).toEqual([COMMENTS]);
         expect(fake.tokenInstallations).toEqual([42]);
     });
+
+    it('comments on a target of another installation as target.installationId', async () => {
+        const {
+            notifier,
+            posts,
+            fake,
+        } = setup({
+            target: {
+                repo: 'octo/demo',
+                number: 7,
+                installationId: 43,
+            },
+        });
+        const event = githubEvent({
+            name: 'push',
+            action: undefined,
+            payload: { repository: { full_name: 'other/repo' } },
+        });
+        await notifier.notify(approval, { idempotencyKey: 'r1:a1', trigger: githubTrigger(event) });
+        expect(posts().map((r) => r.path)).toEqual([COMMENTS]);
+        expect(fake.tokenInstallations).toEqual([43]);
+    });
 });

@@ -46,6 +46,13 @@ describe('githubNotifier options', () => {
         ['a target repo without owner', { target: { repo: 'nope', number: 1 } }],
         ['a target number of 0', { target: { repo: 'octo/demo', number: 0 } }],
         ['a fractional target number', { target: { repo: 'octo/demo', number: 1.5 } }],
+        ['a target installationId of 0', {
+            target: {
+                repo: 'octo/demo',
+                number: 1,
+                installationId: 0,
+            },
+        }],
         ['a zero timeoutMs', { timeoutMs: 0 }],
         ['a fractional timeoutMs', { timeoutMs: 2.5 }],
         ['a non-function resumeUrl', { resumeUrl: 'x' as unknown as GithubNotifierOptions['resumeUrl'] }],

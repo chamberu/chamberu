@@ -130,13 +130,13 @@ Every failure throws a `ChamviError` with code `github_request` (`GitHub <status
 ## Targets
 
 - A run started by a `githubWebhook()` trigger comments on the event's issue (`payload.issue.number`) or pull request (`payload.pull_request.number`) of `payload.repository.full_name`, as the event's installation.
-- Every other run (cron, http, mcp, or a GitHub event without issue or pull request, such as `push`) comments on `target: { repo, number }`, as the event's installation for a GitHub run, else the app's `installationId`.
+- Every other run (cron, http, mcp, or a GitHub event without issue or pull request, such as `push`) comments on `target: { repo, number, installationId? }`, as `target.installationId` when set, else the event's installation for a GitHub run, else the app's `installationId`. Set `target.installationId` when the target repository belongs to another installation than the runs (an App installed on several organizations); a wrong installation answers 404 on every poll.
 - **Set `target` for agents that are not started by issue or pull request events.** Without one every approval of such a run fails with `InvalidAgentDefinitionError` on every poll (reported to `onError`) until it times out.
 
 ## Security
 
 - The comment is public to everyone who can read the issue. It never carries the resume token. With `resumeUrl` it carries a link that does (opt in knowingly; `POST /resume` still requires `agent:<agent>:approve`), else the hint to answer in the UI, the REST API or the MCP tool `resume_run`.
-- The notification body (the tool input as the model wrote it) sits in a fence one backtick longer than any backtick run in it, so a `@login`, `@org/team` or `#123` inside notifies nobody and cross-links nothing, and no input closes the fence. Only the configured `mention` logins are notified.
+- The notification body (the tool input as the model wrote it) sits in a fence one backtick longer than any backtick run in it, so a `@login`, `@org/team` or `#123` inside notifies nobody and cross-links nothing, and no input closes the fence. Backtick runs over 31 are broken with U+200B zero-width spaces first, so the fence stays short and the comment within GitHub's limit; such a body is then not byte-identical to the tool input. The title's whitespace runs (line breaks included) are collapsed to one space, so it stays one heading line. Only the configured `mention` logins are notified.
 - The body is cut to 60 000 characters (GitHub refuses comments over 65 536), never inside a surrogate pair.
 - A comment by anyone but the App bot that copies the marker does not count as delivered.
 
@@ -147,7 +147,7 @@ Every failure throws a `ChamviError` with code `github_request` (`GitHub <status
 | `app` | `IGithubApp` | required | From `createGithubApp()` |
 | `name` | `string` | `'github'` | The notifier name an agent's `notify` references |
 | `mention` | `string \| string[]` | none | Logins (without `@`) mentioned at the top of every comment |
-| `target` | `{ repo, number }` | none | The issue or pull request for runs without one (`repo` as `owner/name`) |
+| `target` | `{ repo, number, installationId? }` | none | The issue or pull request for runs without one (`repo` as `owner/name`), and the installation to comment as |
 | `resumeUrl` | `(token) => string` | none | A link answering an approval; the link holds the token |
 | `timeoutMs` | `number` | `30_000` | Bound of the comment list and the post, on the `clock` |
 | `clock` | `IClock` | `systemClock` | Time source of the timeout |
