@@ -11,7 +11,7 @@ import {
     RunNotFoundError,
     RunStatus,
     hasPermission,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type {
     Agent,
     Artifact,
@@ -21,7 +21,7 @@ import type {
     RunStatusLiteral,
     Step,
     TriggerDefinition,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@ebec/http';
 import { defineSchema } from '@rapiq/core';
 import type { IFilter } from '@rapiq/core';

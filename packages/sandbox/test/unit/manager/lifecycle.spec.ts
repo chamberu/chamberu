@@ -17,9 +17,9 @@ import {
     RunStatus,
     SandboxError,
     defineAgent,
-} from '@chamberu/core';
-import type { AgentDefinition, Run, RunEvent } from '@chamberu/core';
-import { createWorkspaceManager } from '@chamberu/sandbox';
+} from '@chamvi/core';
+import type { AgentDefinition, Run, RunEvent } from '@chamvi/core';
+import { createWorkspaceManager } from '@chamvi/sandbox';
 import { ControllableClock } from '../../utils/clock.ts';
 import { mockModel } from '../../utils/model.ts';
 import type { MockResponse } from '../../utils/model.ts';

@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError } from '@chamberu/core';
-import type { Agent, Engine, TriggerDefinition } from '@chamberu/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
+import type { Agent, Engine, TriggerDefinition } from '@chamvi/core';
 import type { IScheduleLock, ScheduledComponentOptions } from 'hubwire';
 import { fireCronTrigger, readCronOptions } from '../tick/index.ts';
 import type { SchedulerOptions } from './types.ts';

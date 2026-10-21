@@ -7,7 +7,7 @@
 
 import type { IFilter, ISort } from '@rapiq/core';
 
-/** A rapiq query reduced to what chamberu routes support; internal. */
+/** A rapiq query reduced to what chamvi routes support; internal. */
 export type DecodedQuery = {
     /** Top-level leaves, joined with `and`. */
     filters: IFilter[];

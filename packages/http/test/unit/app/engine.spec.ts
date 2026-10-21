@@ -12,9 +12,9 @@ import {
     MemoryStore,
     defineAgent,
     http,
-} from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
-import { createHttpApp } from '@chamberu/http';
+} from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import { createHttpApp } from '@chamvi/http';
 import { textModel } from '../../utils/model.ts';
 import {
     ADMIN_TOKEN,

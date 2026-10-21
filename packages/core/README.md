@@ -1,8 +1,8 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo.svg" alt="@chamberu/core" width="128" height="128" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/logo.svg" alt="@chamvi/core" width="128" height="128" />
 </p>
 
-<h1 align="center">@chamberu/core</h1>
+<h1 align="center">@chamvi/core</h1>
 
 <p align="center">
     <b>Core engine for self-hosted, trigger-driven AI agents: agents, triggers and durable runs.</b><br>
@@ -11,9 +11,9 @@
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@chamberu/core"><img src="https://img.shields.io/npm/v/@chamberu/core" alt="npm version" /></a>
-    <a href="https://github.com/chamberu/chamberu/actions/workflows/ci.yml"><img src="https://github.com/chamberu/chamberu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <a href="https://github.com/chamberu/chamberu/blob/master/packages/core/LICENSE"><img src="https://img.shields.io/npm/l/@chamberu/core" alt="License" /></a>
+    <a href="https://www.npmjs.com/package/@chamvi/core"><img src="https://img.shields.io/npm/v/@chamvi/core" alt="npm version" /></a>
+    <a href="https://github.com/chamvi/chamvi/actions/workflows/ci.yml"><img src="https://github.com/chamvi/chamvi/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/chamvi/chamvi/blob/master/packages/core/LICENSE"><img src="https://img.shields.io/npm/l/@chamvi/core" alt="License" /></a>
 </p>
 
 <p align="center">
@@ -30,13 +30,13 @@
 
 ---
 
-## Why @chamberu/core?
+## Why @chamvi/core?
 
 The AI SDK runs the model and its tool loop, and stops there. An agent that reacts to webhooks and schedules also needs a place to queue the work, a way to survive a pod restart halfway through a run, a guard against posting the same comment twice after a retry, and a way to wait a day for a human to approve a call. That usually means a hosted orchestrator, or a lot of glue code.
 
-`@chamberu/core` is that layer as a library, with no orchestrator server and no Redis:
+`@chamvi/core` is that layer as a library, with no orchestrator server and no Redis:
 
-| Concern | AI SDK on its own | @chamberu/core |
+| Concern | AI SDK on its own | @chamvi/core |
 |---|---|---|
 | **Intake** | You call `generateText` from your handler | `dispatch()` stores a `queued` run; an `idempotencyKey` turns a redelivery into the existing run |
 | **Concurrency** | Two webhooks for the same issue race each other | One run at a time per `concurrencyKey`, enforced through the store across replicas |
@@ -46,10 +46,10 @@ The AI SDK runs the model and its tool loop, and stops there. An agent that reac
 | **Limits** | `stopWhen` per call | `maxSteps`, `maxTokens` and `timeoutMs` per run, settled as `completed` or `failed` |
 | **Shutdown** | Runs die with the process | `drain()` waits for in-flight runs, then marks the rest `interrupted` for another replica |
 
-Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageModel` and a plain `ToolSet` (tools built with `tool()`, or `defineTool()` for tools that read the run context), and nothing is wrapped in a chamberu type.
+Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageModel` and a plain `ToolSet` (tools built with `tool()`, or `defineTool()` for tools that read the run context), and nothing is wrapped in a chamvi type.
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
 </p>
 
 **Table of Contents**
@@ -68,7 +68,7 @@ Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageM
 ## Installation
 
 ```bash
-npm install @chamberu/core ai --save
+npm install @chamvi/core ai --save
 ```
 
 ESM only, Node.js `>=22`. `ai@^7` (the Vercel AI SDK) is a peer dependency; add the provider package of your model as well, for example `@ai-sdk/anthropic`.
@@ -86,7 +86,7 @@ import {
     defineAgent,
     defineEffectTool,
     http,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 export async function triageIssue(model: LanguageModel) {
     const labels: string[] = [];
@@ -145,7 +145,7 @@ const lookup = defineTool({
 });
 ```
 
-- Only tools whose `contextSchema` is chamberu's `toolContextSchema` get that context. A third-party tool with its own `contextSchema` gets its entry of the agent's `toolsContext`, passed through by reference. An entry the tool's schema rejects fails the run with `validation_error`, without recording the value. An entry naming a chamberu tool or no tool is an `InvalidAgentDefinitionError` (thrown by `defineAgent()` for a plain set, a failed run for a factory).
+- Only tools whose `contextSchema` is chamvi's `toolContextSchema` get that context. A third-party tool with its own `contextSchema` gets its entry of the agent's `toolsContext`, passed through by reference. An entry the tool's schema rejects fails the run with `validation_error`, without recording the value. An entry naming a chamvi tool or no tool is an `InvalidAgentDefinitionError` (thrown by `defineAgent()` for a plain set, a failed run for a factory).
 
 ```typescript
 tools: { search: searchTool },
@@ -221,7 +221,7 @@ await engine.resume(token, { approved: true });
 
 ### Invokers and tool access
 
-A run can carry its invoker: who started it, as an authenticator resolved it (`@chamberu/http` sets it from the request's principal). `toolPolicy` decides per tool whether the run may use it; a refused tool is not offered to the model.
+A run can carry its invoker: who started it, as an authenticator resolved it (`@chamvi/http` sets it from the request's principal). `toolPolicy` decides per tool whether the run may use it; a refused tool is not offered to the model.
 
 ```typescript
 const ops = defineAgent({
@@ -280,10 +280,10 @@ const digest = defineAgent({
 
 ### Stores
 
-`MemoryStore` keeps everything in process memory, for development and tests. A store implements the `IStore` interface (runs, steps, checkpoints, idempotency keys, locks, effects, state, artifacts) and proves it with the shared contract suite from [`@chamberu/test-kit`](../test-kit):
+`MemoryStore` keeps everything in process memory, for development and tests. A store implements the `IStore` interface (runs, steps, checkpoints, idempotency keys, locks, effects, state, artifacts) and proves it with the shared contract suite from [`@chamvi/test-kit`](../test-kit):
 
 ```typescript
-import { describeStoreContract } from '@chamberu/test-kit';
+import { describeStoreContract } from '@chamvi/test-kit';
 
 describeStoreContract((clock) => new MemoryStore({ clock }));
 ```
@@ -315,7 +315,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `instructions` | `string` | required | System instructions |
 | `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()` |
 | `tools` | `ToolSet \| (ctx) => ToolSet` | none | A plain tool set, or a factory called for each execution |
-| `toolsContext` | `Record<string, unknown>` | none | Per tool name, the context of a tool that is not chamberu's, passed through by reference |
+| `toolsContext` | `Record<string, unknown>` | none | Per tool name, the context of a tool that is not chamvi's, passed through by reference |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections |
 | `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()` |
 | `budget` | `{ maxSteps, maxTokens?, timeoutMs? }` | `{ maxSteps: 20, timeoutMs: 900_000 }` | Per run; the timeout applies to each execution |
@@ -334,7 +334,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineTool` | function | An AI SDK `tool()` whose `execute` gets the run's `ToolContext` as `context` |
-| `toolContextSchema` | object | The `contextSchema` that marks a chamberu tool |
+| `toolContextSchema` | object | The `contextSchema` that marks a chamvi tool |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |
 | `EFFECT` | symbol | Marks a tool created by `defineEffectTool()` |
 | `wrapToolsForRun` | function | `wrapToolsForRun(tools, ctx, store, allow?)`: applies effect recording to a `ToolSet` outside the engine, with a `ToolContext`; an optional `allow(toolName)` re-checks each call (a refused call throws `ToolNotAllowedError`) |
@@ -343,17 +343,17 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
 | `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
 | `isArtifactMediaType` | function | The media type rule for attachments and artifacts (`type/subtype`, no parameters) |
-| `ChamberuError` | class | Base class of every error below |
+| `ChamviError` | class | Base class of every error below |
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `IncompleteResponseError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
 | `ToolNotAllowedError` | class | The tool error recorded for a call to a tool the `toolPolicy` refuses |
-| `SandboxError` | class | A sandbox workspace or provider failed (`@chamberu/sandbox` and its providers); a tool error, never a failed run |
+| `SandboxError` | class | A sandbox workspace or provider failed (`@chamvi/sandbox` and its providers); a tool error, never a failed run |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
 Types: `Agent`, `AgentDefinition`, `ToolContext`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
 
-Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamberu/test-kit`](../test-kit).
+Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamvi/test-kit`](../test-kit).
 
 ## Notes
 

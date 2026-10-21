@@ -10,7 +10,7 @@ import type {
     Engine,
     IClock,
     IStore,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type { Options as CorsPluginOptions } from '@routup/cors';
 import type { Options as PrometheusPluginOptions } from '@routup/prometheus';
 import type { Options as RateLimitPluginOptions } from '@routup/rate-limit';

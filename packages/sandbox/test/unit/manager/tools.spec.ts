@@ -11,9 +11,9 @@ import {
     SandboxError,
     ValidationError,
     toolContextSchema,
-} from '@chamberu/core';
-import { createWorkspaceManager } from '@chamberu/sandbox';
-import type { WorkspaceToolResult } from '@chamberu/sandbox';
+} from '@chamvi/core';
+import { createWorkspaceManager } from '@chamvi/sandbox';
+import type { WorkspaceToolResult } from '@chamvi/sandbox';
 import { ControllableClock } from '../../utils/clock.ts';
 import { callTool, toolContext } from '../../utils/context.ts';
 import { FAKE_COMMIT, createFakeProvider } from '../../utils/provider.ts';
@@ -104,7 +104,7 @@ describe('workspace tools', () => {
         expect(provider.disposed).toEqual([]);
     });
 
-    it('are chamberu tools and not effect tools', () => {
+    it('are chamvi tools and not effect tools', () => {
         const { tools } = setup();
         expect(Object.keys(tools).sort()).toEqual(['create_workspace', 'dispose_workspace']);
         for (const tool of Object.values(tools)) {

@@ -7,7 +7,7 @@
 
 import { constants } from 'node:os';
 import { join } from 'node:path';
-import { SANDBOX_ENV } from '@chamberu/sandbox';
+import { SANDBOX_ENV } from '@chamvi/sandbox';
 import { FALLBACK_PATH } from './constants.ts';
 
 /** Kills the process group led by `pid`. Best effort: a gone group (ESRCH) is fine. */

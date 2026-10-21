@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IExecTransport, TransportExecOptions } from '@chamberu/sandbox';
+import type { IExecTransport, TransportExecOptions } from '@chamvi/sandbox';
 
 /** The options a fake exec sees, plus what the exec script was given. */
 export type FakeExecOptions = TransportExecOptions & {

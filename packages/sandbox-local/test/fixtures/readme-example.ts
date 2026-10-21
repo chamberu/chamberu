@@ -1,6 +1,6 @@
-import { createWorkspaceManager } from '@chamberu/sandbox';
-import type { IWorkspaceManager } from '@chamberu/sandbox';
-import { createLocalSandbox } from '@chamberu/sandbox-local';
+import { createWorkspaceManager } from '@chamvi/sandbox';
+import type { IWorkspaceManager } from '@chamvi/sandbox';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
 
 // no isolation: commands run as your user, for development and tests only
 export function createDevWorkspaces(root?: string): IWorkspaceManager {

@@ -1,5 +1,5 @@
-import type { Agent, IStore } from '@chamberu/core';
-import { Engine } from '@chamberu/core';
+import type { Agent, IStore } from '@chamvi/core';
+import { Engine } from '@chamvi/core';
 
 export async function serve(store: IStore, agents: Agent[], resumeSecret: string) {
     // #region shutdown

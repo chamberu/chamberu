@@ -3,12 +3,12 @@
 ## Directory Layout
 
 ```
-chamberu/
+chamvi/
 ├── packages/
-│   ├── core/                        # @chamberu/core
+│   ├── core/                        # @chamvi/core
 │   │   ├── src/                     # Library source (entry: src/index.ts), one folder per module
 │   │   ├── test/
-│   │   │   ├── vitest.config.ts     # Aliases @chamberu/core to ../src/index.ts
+│   │   │   ├── vitest.config.ts     # Aliases @chamvi/core to ../src/index.ts
 │   │   │   ├── unit/                # *.spec.ts, one folder per src module (agent/, engine/, ...)
 │   │   │   ├── fixtures/            # readme-example.ts (the README example, run as a test)
 │   │   │   └── utils/               # mock-model.ts, clock.ts (private ControllableClock copy)
@@ -16,26 +16,26 @@ chamberu/
 │   │   ├── tsdown.config.ts         # Builds dist/index.mjs + .d.mts
 │   │   ├── tsconfig.json            # src + test (typecheck)
 │   │   └── tsconfig.build.json      # src only (build:types)
-│   ├── scheduler/                   # @chamberu/scheduler (same layout; aliases core, test-kit and itself to src)
-│   ├── http/                        # @chamberu/http (same layout; aliases core, test-kit and itself to src)
-│   ├── test-kit/                    # @chamberu/test-kit (same layout; aliases core and itself to src)
-│   ├── github/                      # @chamberu/github (same layout; aliases core, http, test-kit and itself to src)
+│   ├── scheduler/                   # @chamvi/scheduler (same layout; aliases core, test-kit and itself to src)
+│   ├── http/                        # @chamvi/http (same layout; aliases core, test-kit and itself to src)
+│   ├── test-kit/                    # @chamvi/test-kit (same layout; aliases core and itself to src)
+│   ├── github/                      # @chamvi/github (same layout; aliases core, http, test-kit and itself to src)
 │   │   └── test/fixtures/deliveries/ # Recorded GitHub webhook bodies (issues.opened, a bot's issue_comment)
-│   ├── sandbox/                     # @chamberu/sandbox (same layout; aliases core and itself; private test/utils/clock.ts, since test-kit peers on it)
-│   ├── sandbox-local/               # @chamberu/sandbox-local (aliases core, sandbox, test-kit and itself)
-│   ├── sandbox-docker/              # @chamberu/sandbox-docker (same aliases as local)
-│   │   └── test/global-setup.ts     # dockerode ping() gate, builds images/sandbox-node as chamberu/sandbox-node:test
-│   ├── sandbox-k8s/                 # @chamberu/sandbox-k8s (same aliases; tests drive a fake IPodClient, test/utils/client.ts)
-│   ├── coding/                      # @chamberu/coding (aliases core, sandbox, sandbox-local, test-kit and itself)
-│   ├── store-typeorm/               # @chamberu/store-typeorm (same layout)
+│   ├── sandbox/                     # @chamvi/sandbox (same layout; aliases core and itself; private test/utils/clock.ts, since test-kit peers on it)
+│   ├── sandbox-local/               # @chamvi/sandbox-local (aliases core, sandbox, test-kit and itself)
+│   ├── sandbox-docker/              # @chamvi/sandbox-docker (same aliases as local)
+│   │   └── test/global-setup.ts     # dockerode ping() gate, builds images/sandbox-node as chamvi/sandbox-node:test
+│   ├── sandbox-k8s/                 # @chamvi/sandbox-k8s (same aliases; tests drive a fake IPodClient, test/utils/client.ts)
+│   ├── coding/                      # @chamvi/coding (aliases core, sandbox, sandbox-local, test-kit and itself)
+│   ├── store-typeorm/               # @chamvi/store-typeorm (same layout)
 │   │   ├── src/{entities,migrations,schema,store}/
 │   │   └── test/global-setup.ts     # Starts postgres:18-alpine via testcontainers for the suite
-│   └── docs/                        # @chamberu/docs (private, not released): VitePress site (npm run docs:dev / docs:build)
+│   └── docs/                        # @chamvi/docs (private, not released): VitePress site (npm run docs:dev / docs:build)
 │       ├── src/.vitepress/          # config.mts, theme/ (Tailwind v4 tokens, Layout.vue), components/{home,layout}/
 │       ├── src/public/              # logo.svg (favicon), fixed light/dark logo and run-lifecycle copies
 │       └── src/snippets/            # Code samples included via <<<, type-checked by the docs typecheck
 ├── images/
-│   └── sandbox-node/                # Dockerfile + README of ghcr.io/chamberu/sandbox-node (Node 24, git, tini, uid 1000)
+│   └── sandbox-node/                # Dockerfile + README of ghcr.io/chamvi/sandbox-node (Node 24, git, tini, uid 1000)
 ├── .github/
 │   ├── assets/                      # logo.svg (+ test-kit and organisation variants), run-lifecycle.svg
 │   ├── actions/{install,build}/     # Composite actions
@@ -46,7 +46,7 @@ chamberu/
 ├── .husky/commit-msg                # Runs commitlint
 ├── CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md
 ├── nx.json                          # Task orchestration and caching
-├── tsconfig.json                    # Root config, path aliases for every package (@chamberu/core, @chamberu/sandbox, ...) -> packages/*/src
+├── tsconfig.json                    # Root config, path aliases for every package (@chamvi/core, @chamvi/sandbox, ...) -> packages/*/src
 ├── tsconfig.build.json              # Shared compiler options
 ├── eslint.config.js                 # @tada5hi/eslint-config flat config
 ├── commitlint.config.mjs            # Conventional Commits
@@ -58,23 +58,23 @@ chamberu/
 
 | Package | Status | Responsibility |
 |---------|--------|----------------|
-| `@chamberu/core` | Exists (0.1.0) | defineAgent, run engine (streaming, structured output), checkpoints, trigger model, run artifacts, state API, budgets, IStore/INotifier interfaces, in-memory store |
-| `@chamberu/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`, `describeWorkspaceContract()`, `createGitFixture()`; depends on core, optional peer on sandbox (types only); core and sandbox never depend on it |
-| `@chamberu/http` | Exists (0.1.0) | `createHttpApp()` (routup v6): REST control API, SSE run stream, webhook intake, MCP endpoint, authenticators (static tokens, authup, oidc), health, metrics, `createShutdown()`; peer on core |
-| `@chamberu/scheduler` | Exists (0.1.0) | `createScheduler()` (one locked hubwire component per cron trigger), `runJob()`; depends on `hubwire`, peer on core |
-| `@chamberu/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |
-| `@chamberu/sandbox` | Exists (0.1.0) | `ISandboxProvider`/`IWorkspace`/`IExecTransport` contracts, path, repo, ref, limit and env rules, output collector, `createRemoteWorkspace()`, `prepareWorkspace()`, the run-scoped `createWorkspaceManager()` with `create_workspace`/`dispose_workspace`; depends on `smob`, peer on core and `ai` |
-| `@chamberu/sandbox-local` | Exists (0.1.0) | `createLocalSandbox()`: temp directory + spawn, no isolation; peer on core and sandbox |
-| `@chamberu/sandbox-docker` | Exists (0.1.0) | `createDockerSandbox()`: one hardened container per workspace; depends on `dockerode` + `@types/dockerode`, `smob`, peer on core and sandbox |
-| `@chamberu/sandbox-k8s` | Exists (0.1.0) | `createKubernetesSandbox()`, `createPodClient()`: one hardened pod per workspace; depends on `@kubernetes/client-node`, `smob`, peer on core and sandbox |
-| `@chamberu/coding` | Exists (0.1.0) | `codingTools()` (read_file, write_file, edit_file, grep, list_files, bash, git_diff), the `ICodingBackend` contract; depends on `smob`, peer on core, sandbox and `ai` |
-| `@chamberu/coding-claude-code` | Planned | Claude Code coding backend |
-| `@chamberu/github` | Exists (0.1.0) | `createGithubApp()` (App JWT, `IClock` installation-token cache, Octokit per installation), `githubWebhook()` trigger, the signed webhook route for `createHttpApp({ routes })`, read tools and effect write tools; depends on `@octokit/core` + `plugin-paginate-rest`, peer on core, http (types only) and `ai` |
-| `@chamberu/notify-openclaw`, `@chamberu/notify-github` | Planned | Notifiers |
-| `@chamberu/ui` | Planned | Vue 3 dashboard |
-| `chamberu` | Planned | Umbrella package and CLI |
+| `@chamvi/core` | Exists (0.1.0) | defineAgent, run engine (streaming, structured output), checkpoints, trigger model, run artifacts, state API, budgets, IStore/INotifier interfaces, in-memory store |
+| `@chamvi/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`, `describeWorkspaceContract()`, `createGitFixture()`; depends on core, optional peer on sandbox (types only); core and sandbox never depend on it |
+| `@chamvi/http` | Exists (0.1.0) | `createHttpApp()` (routup v6): REST control API, SSE run stream, webhook intake, MCP endpoint, authenticators (static tokens, authup, oidc), health, metrics, `createShutdown()`; peer on core |
+| `@chamvi/scheduler` | Exists (0.1.0) | `createScheduler()` (one locked hubwire component per cron trigger), `runJob()`; depends on `hubwire`, peer on core |
+| `@chamvi/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |
+| `@chamvi/sandbox` | Exists (0.1.0) | `ISandboxProvider`/`IWorkspace`/`IExecTransport` contracts, path, repo, ref, limit and env rules, output collector, `createRemoteWorkspace()`, `prepareWorkspace()`, the run-scoped `createWorkspaceManager()` with `create_workspace`/`dispose_workspace`; depends on `smob`, peer on core and `ai` |
+| `@chamvi/sandbox-local` | Exists (0.1.0) | `createLocalSandbox()`: temp directory + spawn, no isolation; peer on core and sandbox |
+| `@chamvi/sandbox-docker` | Exists (0.1.0) | `createDockerSandbox()`: one hardened container per workspace; depends on `dockerode` + `@types/dockerode`, `smob`, peer on core and sandbox |
+| `@chamvi/sandbox-k8s` | Exists (0.1.0) | `createKubernetesSandbox()`, `createPodClient()`: one hardened pod per workspace; depends on `@kubernetes/client-node`, `smob`, peer on core and sandbox |
+| `@chamvi/coding` | Exists (0.1.0) | `codingTools()` (read_file, write_file, edit_file, grep, list_files, bash, git_diff), the `ICodingBackend` contract; depends on `smob`, peer on core, sandbox and `ai` |
+| `@chamvi/coding-claude-code` | Planned | Claude Code coding backend |
+| `@chamvi/github` | Exists (0.1.0) | `createGithubApp()` (App JWT, `IClock` installation-token cache, Octokit per installation), `githubWebhook()` trigger, the signed webhook route for `createHttpApp({ routes })`, read tools and effect write tools; depends on `@octokit/core` + `plugin-paginate-rest`, peer on core, http (types only) and `ai` |
+| `@chamvi/notify-openclaw`, `@chamvi/notify-github` | Planned | Notifiers |
+| `@chamvi/ui` | Planned | Vue 3 dashboard |
+| `chamvi` | Planned | Umbrella package and CLI |
 
-The memory store lives inside `@chamberu/core` (no separate `store-memory` package), because every test needs it.
+The memory store lives inside `@chamvi/core` (no separate `store-memory` package), because every test needs it.
 
 ## Core Module Map (`packages/core/src`)
 
@@ -82,7 +82,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 
 | Path | Purpose |
 |------|---------|
-| `errors/` | `ChamberuError` (`base.ts`), one file per subclass, `ErrorCode` (`constants.ts`) |
+| `errors/` | `ChamviError` (`base.ts`), one file per subclass, `ErrorCode` (`constants.ts`) |
 | `agent/` | `defineAgent()`, `AgentDefinition`, name rules and budget defaults (`constants.ts`), `assertToolsContext()` (`helpers.ts`, internal) |
 | `trigger/` | `TriggerDefinition`, `TriggerEnvelope`, `Invoker` (`types.ts`), `toInvoker()` validation (`helpers.ts`, internal); `cron/`, `http/`, `webhook/` each hold their factory (`module.ts`) and options type (`types.ts`) |
 | `artifact/` | `Artifact`, `ArtifactInput`, `IRunArtifacts` (`types.ts`); `ARTIFACT_URI_PREFIX` (`constants.ts`, internal); `createRunArtifacts()`, `storeArtifact()`, `attachmentIds()` (`module.ts`, the latter two internal); `isArtifactMediaType()` (`media-type.ts`, public); `assertArtifactInput()`, `toFilePart()`, `hydrateMessages()` (`helpers.ts`) |
@@ -98,7 +98,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `state/` | `createAgentState()` (`module.ts`, validation via `@validup/standard-schema`), generated tools (`tools.ts`) |
 | `clock/` | `IClock`, `systemClock` |
 
-`src/index.ts` re-exports each folder's `index.ts`. `@chamberu/test-kit` (`packages/test-kit/src`) holds `clock/` (`ControllableClock`), `store-contract/` (`describeStoreContract`), `workspace-contract/` (`describeWorkspaceContract`, `WorkspaceContractFactory`) and `git-fixture/` (`createGitFixture`, `GitFixture`).
+`src/index.ts` re-exports each folder's `index.ts`. `@chamvi/test-kit` (`packages/test-kit/src`) holds `clock/` (`ControllableClock`), `store-contract/` (`describeStoreContract`), `workspace-contract/` (`describeWorkspaceContract`, `WorkspaceContractFactory`) and `git-fixture/` (`createGitFixture`, `GitFixture`).
 
 ## Scheduler Module Map (`packages/scheduler/src`)
 
@@ -151,7 +151,7 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | `remote/` | `createRemoteWorkspace()` over an `IExecTransport` (`module.ts`), `wrapTimeout()`, `wrapExec()`, `exitMarker()`, `createExitMarkerFilter()`, `isTimeoutExit()`, output helpers (`helpers.ts`, internal), `TIMEOUT_KILL_AFTER_SECONDS`, `EXEC_GRACE_MS`, `ALIVE_PROBE_TIMEOUT_MS` (public), `EXIT_DRAIN_MS`, `EXIT_MARKER_CWD`, `EXEC_SCRIPT` and `WRITE_FILE_SCRIPT` (`constants.ts`, internal) |
 | `manager/` | `createWorkspaceManager()` (`module.ts`), `createWorkspaceTools()` (`tools.ts`, internal), option checks and tool input helpers (`helpers.ts`), `MAX_WORKSPACES_PER_RUN`, `GC_INTERVAL_MS`, `CLOSE_TIMEOUT_MS` (`constants.ts`) |
 
-`@chamberu/sandbox-local` (`packages/sandbox-local/src/provider/`): `createLocalSandbox()` (`module.ts`), `LocalWorkspace` (`workspace.ts`, spawn per exec in its own process group), `collectExpired()` (`gc.ts`), `buildEnv()`, `killGroup()`, `exitCodeOf()` (`helpers.ts`), `LOCAL_PROVIDER_NAME`, `REPO_DIR`, `WORKSPACE_RECORD`, `KILL_GRACE_MS` (`constants.ts`, internal; only `createLocalSandbox` is exported).
+`@chamvi/sandbox-local` (`packages/sandbox-local/src/provider/`): `createLocalSandbox()` (`module.ts`), `LocalWorkspace` (`workspace.ts`, spawn per exec in its own process group), `collectExpired()` (`gc.ts`), `buildEnv()`, `killGroup()`, `exitCodeOf()` (`helpers.ts`), `LOCAL_PROVIDER_NAME`, `REPO_DIR`, `WORKSPACE_RECORD`, `KILL_GRACE_MS` (`constants.ts`, internal; only `createLocalSandbox` is exported).
 
 ## Docker Sandbox Module Map (`packages/sandbox-docker/src`)
 
@@ -180,6 +180,6 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | Path | Purpose |
 |------|---------|
 | `entities/` | One TypeORM entity per table, the repositories the store queries through; `TableName` and the jsonb transformers (`JSON_VALUE_TRANSFORMER`, `OPTIONAL_JSON_TRANSFORMER`) in `constants.ts`, `toJsonParameter()` (jsonb sanitizing) in `helpers.ts` |
-| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), `1792368000000-artifacts.ts` (table `chamberu_artifacts`), generated from the entities; `1792454400000-idempotency-scope.ts` (`scope` varchar(1024), hand-written) |
+| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), `1792368000000-artifacts.ts` (table `chamvi_artifacts`), generated from the entities; `1792454400000-idempotency-scope.ts` (`scope` varchar(1024), hand-written) |
 | `schema/` | `migrateStore()` (`module.ts`), `STORE_ENTITIES`, `STORE_MIGRATIONS`, `MIGRATION_LOCK_NAME` |
 | `store/` | `TypeormStore` (`module.ts`), entity to domain mapping, value builders and `RETURNING` row hydration (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |

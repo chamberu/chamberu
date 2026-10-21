@@ -8,8 +8,8 @@
 import { UnauthorizedError } from '@ebec/http';
 import { App, defineCoreHandler } from 'routup';
 import { describe, expect, it } from 'vitest';
-import { staticTokens } from '@chamberu/http';
-import type { Authenticator, Principal } from '@chamberu/http';
+import { staticTokens } from '@chamvi/http';
+import type { Authenticator, Principal } from '@chamvi/http';
 import { buildContext, createErrorHandler } from '../../../src/app/helpers.ts';
 import { authorize } from '../../../src/auth/helpers.ts';
 import { READER_TOKEN, createTestApp } from '../../utils/app.ts';

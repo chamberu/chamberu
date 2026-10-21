@@ -11,10 +11,10 @@ import {
     expectTypeOf,
     it,
 } from 'vitest';
-import { EFFECT, InvalidAgentDefinitionError, toolContextSchema } from '@chamberu/core';
-import * as coding from '@chamberu/coding';
-import type { CodingResult, ICodingBackend } from '@chamberu/coding';
-import type { IWorkspaceManager } from '@chamberu/sandbox';
+import { EFFECT, InvalidAgentDefinitionError, toolContextSchema } from '@chamvi/core';
+import * as coding from '@chamvi/coding';
+import type { CodingResult, ICodingBackend } from '@chamvi/coding';
+import type { IWorkspaceManager } from '@chamvi/sandbox';
 
 const manager: Pick<IWorkspaceManager, 'get'> = { get: () => { throw new TypeError('not used'); } };
 
@@ -48,7 +48,7 @@ describe('public api', () => {
         expect(() => coding.codingTools({} as never)).toThrow(InvalidAgentDefinitionError);
     });
 
-    it('are chamberu tools and not effect tools', () => {
+    it('are chamvi tools and not effect tools', () => {
         for (const tool of Object.values(coding.codingTools(manager))) {
             expect(tool.contextSchema).toBe(toolContextSchema);
             expect(EFFECT in tool).toBe(false);

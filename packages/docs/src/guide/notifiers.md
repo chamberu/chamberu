@@ -39,5 +39,5 @@ A store lock per approval keeps replicas from sending the same notification at t
 
 | Package | Delivers to |
 |---|---|
-| `@chamberu/notify-openclaw` | OpenClaw chats via `POST /hooks/agent` with an `Idempotency-Key`. See [OpenClaw](/deployment/openclaw) |
-| `@chamberu/notify-github` | A comment on the run's issue or pull request, deduplicated by a hidden marker |
+| `@chamvi/notify-openclaw` | OpenClaw chats via `POST /hooks/agent` with an `Idempotency-Key`. See [OpenClaw](/deployment/openclaw) |
+| `@chamvi/notify-github` | A comment on the run's issue or pull request, deduplicated by a hidden marker |

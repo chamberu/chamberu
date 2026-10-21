@@ -1,14 +1,14 @@
 # OpenClaw <Badge type="warning" text="Planned" />
 
 ::: warning Planned
-The OpenClaw notifier is planned (`@chamberu/notify-openclaw`). The MCP endpoint ships in [`@chamberu/http`](/guide/http#mcp).
+The OpenClaw notifier is planned (`@chamvi/notify-openclaw`). The MCP endpoint ships in [`@chamvi/http`](/guide/http#mcp).
 :::
 
-OpenClaw is a personal assistant gateway that connects chat channels to agents. chamberu's integration contract is **"MCP in, hooks out"**.
+OpenClaw is a personal assistant gateway that connects chat channels to agents. chamvi's integration contract is **"MCP in, hooks out"**.
 
 ## MCP in
 
-Each chamberu app serves an MCP endpoint at `/mcp` (Streamable HTTP, from [`@chamberu/http`](/guide/http#mcp)). OpenClaw lists it among its MCP servers and gets:
+Each chamvi app serves an MCP endpoint at `/mcp` (Streamable HTTP, from [`@chamvi/http`](/guide/http#mcp)). OpenClaw lists it among its MCP servers and gets:
 
 - one `run_<agent>` tool per agent with an `http()` trigger, which starts a run and returns the run id (or, with `waitSeconds`, waits up to a minute and returns the output or the pending approval),
 - `get_run` and `list_runs` for status,
@@ -24,7 +24,7 @@ For approvals the message includes how to answer: a link into the planned UI's a
 
 ## What works today
 
-The MCP side is in place ([`@chamberu/http`](/guide/http)), and so is the core side: approval notifications go through any [`INotifier`](/guide/notifiers) with a stable idempotency key and are retried until delivered, and [`engine.resume()`](/guide/approvals) answers them. The OpenClaw notifier itself is still planned.
+The MCP side is in place ([`@chamvi/http`](/guide/http)), and so is the core side: approval notifications go through any [`INotifier`](/guide/notifiers) with a stable idempotency key and are retried until delivered, and [`engine.resume()`](/guide/approvals) answers them. The OpenClaw notifier itself is still planned.
 
 ## In the cluster
 

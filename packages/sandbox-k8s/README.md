@@ -1,19 +1,19 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo.svg" alt="@chamberu/sandbox-k8s" width="128" height="128" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/logo.svg" alt="@chamvi/sandbox-k8s" width="128" height="128" />
 </p>
 
-<h1 align="center">@chamberu/sandbox-k8s</h1>
+<h1 align="center">@chamvi/sandbox-k8s</h1>
 
 <p align="center">
-    <b>One hardened pod per workspace, for chamberu agents on Kubernetes.</b><br>
+    <b>One hardened pod per workspace, for chamvi agents on Kubernetes.</b><br>
     Non-root, a read-only root, no capabilities, no service account token, resource limits<br>
     and <code>activeDeadlineSeconds</code>: a pod that cleans up after itself.
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@chamberu/sandbox-k8s"><img src="https://img.shields.io/npm/v/@chamberu/sandbox-k8s" alt="npm version" /></a>
-    <a href="https://github.com/chamberu/chamberu/actions/workflows/ci.yml"><img src="https://github.com/chamberu/chamberu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <a href="https://github.com/chamberu/chamberu/blob/master/packages/sandbox-k8s/LICENSE"><img src="https://img.shields.io/npm/l/@chamberu/sandbox-k8s" alt="License" /></a>
+    <a href="https://www.npmjs.com/package/@chamvi/sandbox-k8s"><img src="https://img.shields.io/npm/v/@chamvi/sandbox-k8s" alt="npm version" /></a>
+    <a href="https://github.com/chamvi/chamvi/actions/workflows/ci.yml"><img src="https://github.com/chamvi/chamvi/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/chamvi/chamvi/blob/master/packages/sandbox-k8s/LICENSE"><img src="https://img.shields.io/npm/l/@chamvi/sandbox-k8s" alt="License" /></a>
 </p>
 
 ---
@@ -34,17 +34,17 @@
 ## Installation
 
 ```bash
-npm install @chamberu/sandbox-k8s @chamberu/sandbox @chamberu/core ai --save
+npm install @chamvi/sandbox-k8s @chamvi/sandbox @chamvi/core ai --save
 ```
 
-ESM only, Node.js `>=22`. `@chamberu/core` and `@chamberu/sandbox` are peer dependencies. The API server is reached through [`@kubernetes/client-node`](https://www.npmjs.com/package/@kubernetes/client-node) 2 (`CoreV1Api` and `Exec` over a WebSocket). It declares `@types/node` `^26` as a runtime dependency, so a project on older Node.js types gets a nested copy; that is harmless with `skipLibCheck`.
+ESM only, Node.js `>=22`. `@chamvi/core` and `@chamvi/sandbox` are peer dependencies. The API server is reached through [`@kubernetes/client-node`](https://www.npmjs.com/package/@kubernetes/client-node) 2 (`CoreV1Api` and `Exec` over a WebSocket). It declares `@types/node` `^26` as a runtime dependency, so a project on older Node.js types gets a nested copy; that is harmless with `skipLibCheck`.
 
 ## Usage
 
 ```typescript
 import type { KubeConfig } from '@kubernetes/client-node';
-import type { ISandboxProvider } from '@chamberu/sandbox';
-import { createKubernetesSandbox } from '@chamberu/sandbox-k8s';
+import type { ISandboxProvider } from '@chamvi/sandbox';
+import { createKubernetesSandbox } from '@chamvi/sandbox-k8s';
 
 export function createSandbox(kubeConfig: KubeConfig): ISandboxProvider {
     // one pod per workspace in this namespace; nothing is contacted before the first create()
@@ -52,17 +52,17 @@ export function createSandbox(kubeConfig: KubeConfig): ISandboxProvider {
 }
 ```
 
-Without `kubeConfig` the provider calls `loadFromDefault()`: the in-cluster service account when chamberu runs in a pod, else `KUBECONFIG` or `~/.kube/config`. Pass the provider to `createWorkspaceManager({ provider })` from `@chamberu/sandbox`. Creating it contacts nothing; `create()` creates the pod, waits until it runs (polling every second, at most two minutes, failing fast on `ErrImagePull`, `ImagePullBackOff`, `InvalidImageName`, `CreateContainerConfigError` and `CreateContainerError`), then checks out.
+Without `kubeConfig` the provider calls `loadFromDefault()`: the in-cluster service account when chamvi runs in a pod, else `KUBECONFIG` or `~/.kube/config`. Pass the provider to `createWorkspaceManager({ provider })` from `@chamvi/sandbox`. Creating it contacts nothing; `create()` creates the pod, waits until it runs (polling every second, at most two minutes, failing fast on `ErrImagePull`, `ImagePullBackOff`, `InvalidImageName`, `CreateContainerConfigError` and `CreateContainerError`), then checks out.
 
 ## RBAC
 
-The identity chamberu runs as needs, in the sandbox namespace only:
+The identity chamvi runs as needs, in the sandbox namespace only:
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: chamberu-sandbox
+  name: chamvi-sandbox
   namespace: agents
 rules:
   - apiGroups: [""]
@@ -73,11 +73,11 @@ rules:
     verbs: ["get", "create"]
 ```
 
-`pods/exec` needs both verbs: the client opens the exec WebSocket with a `GET`, which the API server authorizes as `get`, while servers with the WebSocket-upgrade authorization change ask for `create`. Keep the sandbox namespace apart from chamberu's own, so the pods never share a namespace with its secrets.
+`pods/exec` needs both verbs: the client opens the exec WebSocket with a `GET`, which the API server authorizes as `get`, while servers with the WebSocket-upgrade authorization change ask for `create`. Keep the sandbox namespace apart from chamvi's own, so the pods never share a namespace with its secrets.
 
 ## The pod
 
-Each workspace is a bare pod `chamberu-ws-<id>` with one container `sandbox`:
+Each workspace is a bare pod `chamvi-ws-<id>` with one container `sandbox`:
 
 | Setting | Value |
 |---|---|
@@ -88,9 +88,9 @@ Each workspace is a bare pod `chamberu-ws-<id>` with one container `sandbox`:
 | Resources | requests equal limits: `cpu`, `memory`, `ephemeral-storage` from `storage` |
 | `/workspace` | an emptyDir with `sizeLimit` from `storage` |
 | `/tmp` | a memory-backed emptyDir of 512 MiB |
-| Environment | `SANDBOX_ENV` plus `env`, nothing from chamberu's pod |
-| Labels | `podLabels`, then `app.kubernetes.io/managed-by=chamberu`, `app.kubernetes.io/component=sandbox`, `chamberu.dev/run=<runId>`, `chamberu.dev/workspace=<id>` (the managed labels win; `podLabels` naming one throws; a `runId` that is no label value is a `ValidationError`, engine run ids are UUIDs) |
-| Annotation | `chamberu.dev/expires-at=<epoch ms>` |
+| Environment | `SANDBOX_ENV` plus `env`, nothing from chamvi's pod |
+| Labels | `podLabels`, then `app.kubernetes.io/managed-by=chamvi`, `app.kubernetes.io/component=sandbox`, `chamvi.dev/run=<runId>`, `chamvi.dev/workspace=<id>` (the managed labels win; `podLabels` naming one throws; a `runId` that is no label value is a `ValidationError`, engine run ids are UUIDs) |
+| Annotation | `chamvi.dev/expires-at=<epoch ms>` |
 
 A pod is used rather than a Job: exec needs a pod name known at create time, and a Job's controller, retries and generated names add nothing the pod spec does not already enforce.
 
@@ -98,12 +98,12 @@ A pod is used rather than a Job: exec needs a pod name known at create time, and
 
 ## Image
 
-The default image is `ghcr.io/chamberu/sandbox-node:24` (`DEFAULT_SANDBOX_IMAGE`), built for `linux/amd64` and `linux/arm64` from [`images/sandbox-node`](../../images/sandbox-node); tags `24` (rebuilt on changes and weekly) and `24-<short sha>`. `imagePullPolicy` defaults to `'IfNotPresent'`; use `'Always'` to follow the mutable `24` tag, or pin a digest in production (`image: 'ghcr.io/chamberu/sandbox-node@sha256:...'`).
+The default image is `ghcr.io/chamvi/sandbox-node:24` (`DEFAULT_SANDBOX_IMAGE`), built for `linux/amd64` and `linux/arm64` from [`images/sandbox-node`](../../images/sandbox-node); tags `24` (rebuilt on changes and weekly) and `24-<short sha>`. `imagePullPolicy` defaults to `'IfNotPresent'`; use `'Always'` to follow the mutable `24` tag, or pin a digest in production (`image: 'ghcr.io/chamvi/sandbox-node@sha256:...'`).
 
 ## Security
 
-- **Not a network boundary.** Without a NetworkPolicy a workspace pod reaches every service in the cluster by DNS, the chamberu API and its database included, and cloud metadata. Select the pods by `app.kubernetes.io/component=sandbox` (or your `podLabels`) and deny all egress except what the work needs (GitHub, the npm registry), the chamberu namespace and `169.254.169.254` explicitly denied. The Helm chart will ship this policy.
-- **No credentials**: no service account token is mounted, no service links are injected, and no chamberu environment variable reaches the pod.
+- **Not a network boundary.** Without a NetworkPolicy a workspace pod reaches every service in the cluster by DNS, the chamvi API and its database included, and cloud metadata. Select the pods by `app.kubernetes.io/component=sandbox` (or your `podLabels`) and deny all egress except what the work needs (GitHub, the npm registry), the chamvi namespace and `169.254.169.254` explicitly denied. The Helm chart will ship this policy.
+- **No credentials**: no service account token is mounted, no service links are injected, and no chamvi environment variable reaches the pod.
 - **Prompt injection**: what the model runs follows what it reads. Narrow `allowRepo` on the manager and put `bash` behind an approval where needed.
 
 ## Timeouts and abort
@@ -114,7 +114,7 @@ Stdin is closed only on the `v5.channel.k8s.io` exec protocol (Kubernetes 1.30+)
 
 ## Garbage collection
 
-`collectGarbage()` lists the namespace's pods with the managed labels and deletes those past their `chamberu.dev/expires-at` annotation and those in phase `Failed` or `Succeeded` (open workspaces of this process are disposed first). The manager calls it from `acquire` at most every 10 minutes; `activeDeadlineSeconds` stops a pod at expiry even when no collection runs. A pod that cannot be removed does not stop the pass: the others go, and one `SandboxError` with the count and the first failure is thrown at the end.
+`collectGarbage()` lists the namespace's pods with the managed labels and deletes those past their `chamvi.dev/expires-at` annotation and those in phase `Failed` or `Succeeded` (open workspaces of this process are disposed first). The manager calls it from `acquire` at most every 10 minutes; `activeDeadlineSeconds` stops a pod at expiry even when no collection runs. A pod that cannot be removed does not stop the pass: the others go, and one `SandboxError` with the count and the first failure is thrown at the end.
 
 ## Options
 
@@ -143,7 +143,7 @@ Misconfiguration throws core `InvalidAgentDefinitionError`; API and pod failures
 | `createKubernetesSandbox` | function | The `ISandboxProvider` (`name: 'k8s'`) |
 | `createPodClient` | function | The `IPodClient` over `@kubernetes/client-node` |
 | `CONTAINER_NAME` | constant | `'sandbox'` |
-| `POD_NAME_PREFIX` | constant | `'chamberu-ws-'` |
+| `POD_NAME_PREFIX` | constant | `'chamvi-ws-'` |
 | `START_TIMEOUT_MS`, `POLL_MS` | constant | `120_000`, `1_000` |
 | `FATAL_WAITING_REASONS` | constant | The container waiting reasons `create` fails on at once |
 

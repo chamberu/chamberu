@@ -6,9 +6,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as pkg from '@chamberu/store-typeorm';
+import * as pkg from '@chamvi/store-typeorm';
 
-describe('@chamberu/store-typeorm', () => {
+describe('@chamvi/store-typeorm', () => {
     it('resolves the package entry', () => {
         expect(typeof pkg).toBe('object');
     });

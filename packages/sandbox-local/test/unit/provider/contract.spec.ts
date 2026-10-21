@@ -9,13 +9,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll } from 'vitest';
-import { createLocalSandbox } from '@chamberu/sandbox-local';
-import { describeWorkspaceContract } from '@chamberu/test-kit';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
+import { describeWorkspaceContract } from '@chamvi/test-kit';
 
 let root: string;
 
 beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), 'chamberu-local-contract-'));
+    root = await mkdtemp(join(tmpdir(), 'chamvi-local-contract-'));
 });
 
 afterAll(async () => {

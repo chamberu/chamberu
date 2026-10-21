@@ -6,7 +6,7 @@
  */
 
 /** Marks a tool as a side-effecting tool that must apply at most once per run. */
-export const EFFECT: unique symbol = Symbol.for('chamberu.effect');
+export const EFFECT: unique symbol = Symbol.for('chamvi.effect');
 
 /** Key under which the effectKey/alreadyApplied hooks hang off an effect tool. */
-export const EFFECT_HOOKS: unique symbol = Symbol.for('chamberu.effect.hooks');
+export const EFFECT_HOOKS: unique symbol = Symbol.for('chamvi.effect.hooks');

@@ -11,7 +11,7 @@ import {
     Index,
     PrimaryGeneratedColumn,
 } from 'typeorm';
-import type { Step } from '@chamberu/core';
+import type { Step } from '@chamvi/core';
 import { OPTIONAL_JSON_TRANSFORMER, TableName } from './constants.ts';
 
 @Index(['runId', 'index'])

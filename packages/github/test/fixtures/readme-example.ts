@@ -1,8 +1,8 @@
 import type { LanguageModel } from 'ai';
-import { Engine, MemoryStore, defineAgent } from '@chamberu/core';
-import { createGithubApp, githubWebhook } from '@chamberu/github';
-import type { GithubAppOptions } from '@chamberu/github';
-import { createHttpApp, createShutdown, staticTokens } from '@chamberu/http';
+import { Engine, MemoryStore, defineAgent } from '@chamvi/core';
+import { createGithubApp, githubWebhook } from '@chamvi/github';
+import type { GithubAppOptions } from '@chamvi/github';
+import { createHttpApp, createShutdown, staticTokens } from '@chamvi/http';
 
 export async function createTriageServer(
     model: LanguageModel,
@@ -12,11 +12,11 @@ export async function createTriageServer(
         GITHUB_APP_ID,
         GITHUB_PRIVATE_KEY,
         GITHUB_WEBHOOK_SECRET,
-        CHAMBERU_TOKEN,
+        CHAMVI_TOKEN,
         RESUME_SECRET,
     } = process.env;
-    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !CHAMBERU_TOKEN || !RESUME_SECRET) {
-        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, CHAMBERU_TOKEN and RESUME_SECRET.');
+    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !CHAMVI_TOKEN || !RESUME_SECRET) {
+        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, CHAMVI_TOKEN and RESUME_SECRET.');
     }
 
     const gh = createGithubApp({
@@ -48,7 +48,7 @@ export async function createTriageServer(
         engine,
         auth: staticTokens({
             tokens: [{
-                value: CHAMBERU_TOKEN,
+                value: CHAMVI_TOKEN,
                 id: 'ci',
                 permissions: ['*'],
             }],

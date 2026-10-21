@@ -1,6 +1,6 @@
 # Overview
 
-This guide describes `@chamberu/core` as it is built today. Every sample on these pages type-checks against the current source.
+This guide describes `@chamvi/core` as it is built today. Every sample on these pages type-checks against the current source.
 
 ## The concepts
 
@@ -15,7 +15,7 @@ This guide describes `@chamberu/core` as it is built today. Every sample on thes
 | **State** | `AgentState` | Per-agent key-value data and typed collections that outlive runs |
 | **Notifier** | `Notifier` | Delivers approval requests and other messages to the owner |
 | **Store** | `Store` | Runs, steps, checkpoints, keys, locks, effects and state. Pluggable |
-| **Workspace** | `@chamberu/sandbox` | A disposable directory or container a run executes commands in, optionally a checkout of a repository. See [Workspaces & Coding](/guide/workspaces) |
+| **Workspace** | `@chamvi/sandbox` | A disposable directory or container a run executes commands in, optionally a checkout of a repository. See [Workspaces & Coding](/guide/workspaces) |
 
 The **App** concept (one app with HTTP, scheduler and UI) belongs to [planned packages](/roadmap).
 

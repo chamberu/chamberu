@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError, hasPermission } from '@chamberu/core';
-import type { Invoker } from '@chamberu/core';
+import { InvalidAgentDefinitionError, hasPermission } from '@chamvi/core';
+import type { Invoker } from '@chamvi/core';
 import { ForbiddenError, UnauthorizedError } from '@ebec/http';
 import type { IAppEvent } from 'routup';
 import type { HttpContext } from '../app/types.ts';

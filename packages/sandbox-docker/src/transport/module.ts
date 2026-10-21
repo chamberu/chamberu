@@ -6,9 +6,9 @@
  */
 
 import type { Duplex } from 'node:stream';
-import type { IClock } from '@chamberu/core';
-import { createSinkStream, delay } from '@chamberu/sandbox';
-import type { IExecTransport, TransportExecOptions, TransportExecResult } from '@chamberu/sandbox';
+import type { IClock } from '@chamvi/core';
+import { createSinkStream, delay } from '@chamvi/sandbox';
+import type { IExecTransport, TransportExecOptions, TransportExecResult } from '@chamvi/sandbox';
 import type Dockerode from 'dockerode';
 import { SANDBOX_USER } from '../provider/constants.ts';
 import { isStatus, removeContainer } from '../provider/helpers.ts';

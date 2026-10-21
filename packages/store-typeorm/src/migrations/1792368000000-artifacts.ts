@@ -12,7 +12,7 @@ export class Artifacts1792368000000 implements MigrationInterface {
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`
-            CREATE TABLE "chamberu_artifacts" (
+            CREATE TABLE "chamvi_artifacts" (
                 "id" character varying(128) COLLATE "C" NOT NULL,
                 "run_id" character varying(128) NOT NULL,
                 "agent" character varying(64) NOT NULL,
@@ -25,16 +25,16 @@ export class Artifacts1792368000000 implements MigrationInterface {
             )
         `);
         await queryRunner.query(`
-            CREATE INDEX "IDX_ba734c0a69e25b566f963cb8ca" ON "chamberu_artifacts" ("run_id")
+            CREATE INDEX "IDX_ff9ed484c27b76465c2b54f7cf" ON "chamvi_artifacts" ("run_id")
         `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`
-            DROP INDEX "IDX_ba734c0a69e25b566f963cb8ca"
+            DROP INDEX "IDX_ff9ed484c27b76465c2b54f7cf"
         `);
         await queryRunner.query(`
-            DROP TABLE "chamberu_artifacts"
+            DROP TABLE "chamvi_artifacts"
         `);
     }
 }

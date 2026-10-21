@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamberu/core';
+import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamvi/core';
 import {
     abortedCreate,
     assertClockOption,
@@ -15,7 +15,7 @@ import {
     buildWorkspaceInfo,
     collectionError,
     isExpiredAt,
-} from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
 import { ControllableClock } from '../../utils/clock.ts';
 
 describe('assertCreateInput', () => {

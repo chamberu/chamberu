@@ -4,8 +4,8 @@ import {
     MemoryStore,
     cron,
     defineAgent,
-} from '@chamberu/core';
-import { createScheduler } from '@chamberu/scheduler';
+} from '@chamvi/core';
+import { createScheduler } from '@chamvi/scheduler';
 
 export async function startScheduling(model: LanguageModel) {
     const sweep = defineAgent({

@@ -8,15 +8,15 @@
 import type { JWK } from 'jose';
 import { staticKeys } from 'vouchly';
 import type { VerifyResult } from 'vouchly';
-import type { OidcIssuer as Issuer, OidcOptions, Principal  } from '@chamberu/http';
+import type { OidcIssuer as Issuer, OidcOptions, Principal  } from '@chamvi/http';
 import {
     beforeAll,
     describe,
     expect,
     it,
 } from 'vitest';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
-import { oidc } from '@chamberu/http';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
+import { oidc } from '@chamvi/http';
 import { createSigningKey, signToken } from '../../utils/jwt.ts';
 
 const ISS = 'https://issuer.test';
@@ -36,7 +36,7 @@ describe('oidc', () => {
 
     const claims = (extra: Record<string, unknown> = {}) => ({
         iss: ISS,
-        aud: 'chamberu',
+        aud: 'chamvi',
         sub: 'repo:acme/x',
         ...extra,
     });
@@ -47,7 +47,7 @@ describe('oidc', () => {
         issuer = {
             id: 'ci',
             issuer: ISS,
-            audience: 'chamberu',
+            audience: 'chamvi',
             keys: staticKeys([key.jwk as JWK]),
         };
     });
@@ -66,7 +66,7 @@ describe('oidc', () => {
         ['missing', undefined],
         ['empty', ''],
         ['an empty list', []],
-        ['a list with an empty entry', ['chamberu', '']],
+        ['a list with an empty entry', ['chamvi', '']],
     ])('needs an audience on every issuer (%s)', (_name, audience) => {
         const candidate = { ...issuer, audience } as Issuer;
         expect(() => oidc({ issuers: [candidate], principal: mapper })).toThrow(InvalidAgentDefinitionError);

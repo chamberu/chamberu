@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { SandboxError, ValidationError } from '@chamberu/core';
-import { EXEC_TIMEOUT_MS, prepareWorkspace } from '@chamberu/sandbox';
+import { SandboxError, ValidationError } from '@chamvi/core';
+import { EXEC_TIMEOUT_MS, prepareWorkspace } from '@chamvi/sandbox';
 import { createScriptedWorkspace } from '../../utils/workspace.ts';
 
 const url = 'https://github.com/octo/demo.git';

@@ -10,8 +10,8 @@ import type {
     IRunStore,
     Run,
     TriggerDefinition,
-} from '@chamberu/core';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
+} from '@chamvi/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 
 /**
  * The cron trigger a job fires: `triggerId`, or the agent's only cron trigger.

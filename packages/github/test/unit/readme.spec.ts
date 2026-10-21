@@ -13,7 +13,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import { ControllableClock } from '@chamberu/test-kit';
+import { ControllableClock } from '@chamvi/test-kit';
 import { createTriageServer } from '../fixtures/readme-example.ts';
 import { START, deliver } from '../utils/app.ts';
 import { createFakeGithub } from '../utils/github.ts';
@@ -34,7 +34,7 @@ function stubEnv() {
     // as an env var usually carries it: one line with literal \n
     vi.stubEnv('GITHUB_PRIVATE_KEY', fake.privateKey.replaceAll('\n', '\\n'));
     vi.stubEnv('GITHUB_WEBHOOK_SECRET', SECRET);
-    vi.stubEnv('CHAMBERU_TOKEN', 'readme-token-0123456789');
+    vi.stubEnv('CHAMVI_TOKEN', 'readme-token-0123456789');
     vi.stubEnv('RESUME_SECRET', 'readme-resume-secret');
     return { clock, fake };
 }

@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as k8s from '@chamberu/sandbox-k8s';
+import * as k8s from '@chamvi/sandbox-k8s';
 
 describe('package entry', () => {
     it('resolves', () => {

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /**
@@ -14,7 +14,7 @@ import { ErrorCode } from './constants.ts';
  * run is not failed: its current owner, or recovery after the claim expired,
  * carries it on.
  */
-export class LeaseLostError extends ChamberuError {
+export class LeaseLostError extends ChamviError {
     readonly runId: string;
 
     constructor(runId: string) {

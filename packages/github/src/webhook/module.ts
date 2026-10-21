@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { DispatchEnvelope, TriggerDefinition } from '@chamberu/core';
-import type { HttpRoute, HttpRouteResult } from '@chamberu/http';
+import type { DispatchEnvelope, TriggerDefinition } from '@chamvi/core';
+import type { HttpRoute, HttpRouteResult } from '@chamvi/http';
 import { UnauthorizedError } from '@ebec/http';
 import { DEFAULT_WEBHOOK_PATH } from '../app/constants.ts';
 import { isSameLogin } from '../app/helpers.ts';

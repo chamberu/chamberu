@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as docker from '@chamberu/sandbox-docker';
+import * as docker from '@chamvi/sandbox-docker';
 
 describe('public api', () => {
     it('exports the provider and the constants', () => {
@@ -17,7 +17,7 @@ describe('public api', () => {
             'createDockerSandbox',
         ]);
         expect(docker.DEFAULT_NETWORK).toBe('bridge');
-        expect(docker.CONTAINER_NAME_PREFIX).toBe('chamberu-ws-');
+        expect(docker.CONTAINER_NAME_PREFIX).toBe('chamvi-ws-');
         expect(docker.SANDBOX_USER).toBe('1000:1000');
         expect(typeof docker.createDockerSandbox).toBe('function');
     });

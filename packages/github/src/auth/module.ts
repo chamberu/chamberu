@@ -6,8 +6,8 @@
  */
 
 import type { KeyObject } from 'node:crypto';
-import { ChamberuError } from '@chamberu/core';
-import type { IClock } from '@chamberu/core';
+import { ChamviError } from '@chamvi/core';
+import type { IClock } from '@chamvi/core';
 import { PaginatedOctokit } from '../app/helpers.ts';
 import type { GithubOctokit } from '../app/types.ts';
 import { GITHUB_REQUEST_ERROR_CODE } from '../tools/constants.ts';
@@ -51,7 +51,7 @@ export function createInstallationTokens(input: InstallationTokensInput): {
         });
         octokit.hook.wrap('request', async (send, options) => {
             const controller = new AbortController();
-            const timer = input.clock.setTimeout(() => controller.abort(new ChamberuError({
+            const timer = input.clock.setTimeout(() => controller.abort(new ChamviError({
                 message: `The GitHub App request did not answer within ${APP_REQUEST_TIMEOUT_MS}ms.`,
                 code: GITHUB_REQUEST_ERROR_CODE,
             })), APP_REQUEST_TIMEOUT_MS);

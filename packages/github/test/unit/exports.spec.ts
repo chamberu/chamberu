@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as github from '@chamberu/github';
+import * as github from '@chamvi/github';
 
 describe('public api', () => {
     it.each([

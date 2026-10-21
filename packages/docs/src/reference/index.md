@@ -1,12 +1,12 @@
-# @chamberu/core
+# @chamvi/core
 
-The public API of `@chamberu/core`, taken from `packages/core/src/index.ts`. Contract interfaces carry an `I` prefix (`IStore`, `IClock`, `INotifier`, `IAgentState`); data shapes are unprefixed types.
+The public API of `@chamvi/core`, taken from `packages/core/src/index.ts`. Contract interfaces carry an `I` prefix (`IStore`, `IClock`, `INotifier`, `IAgentState`); data shapes are unprefixed types.
 
 ```ts
-import { Engine, defineAgent } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamvi/core';
 ```
 
-Test helpers live in [`@chamberu/test-kit`](/reference/test-kit).
+Test helpers live in [`@chamvi/test-kit`](/reference/test-kit).
 
 ## Agents
 
@@ -17,7 +17,7 @@ const DEFAULT_MAX_STEPS: 20;
 const DEFAULT_TIMEOUT_MS: 900_000; // 15 minutes
 ```
 
-Throws `InvalidAgentDefinitionError` for an invalid name, duplicate trigger ids, or a `toolsContext` entry naming a chamberu tool or no tool of a plain tool set. See [Agents](/guide/agents).
+Throws `InvalidAgentDefinitionError` for an invalid name, duplicate trigger ids, or a `toolsContext` entry naming a chamvi tool or no tool of a plain tool set. See [Agents](/guide/agents).
 
 <<< ../../../core/src/agent/types.ts{ts}
 
@@ -139,7 +139,7 @@ class MemoryStore implements IStore {
 
 <<< ../../../core/src/artifact/types.ts{ts}
 
-`isArtifactMediaType(value: unknown): value is string` is the media type rule `dispatch` and `artifacts.put()` apply: `type/subtype` (RFC 6838 restricted names) without parameters. An intake layer can check attachments with it before dispatching (`@chamberu/http` does).
+`isArtifactMediaType(value: unknown): value is string` is the media type rule `dispatch` and `artifacts.put()` apply: `type/subtype` (RFC 6838 restricted names) without parameters. An intake layer can check attachments with it before dispatching (`@chamvi/http` does).
 
 See [Files](/guide/agents#files) and [Attachments](/guide/triggers#attachments).
 
@@ -153,10 +153,10 @@ function defineTool<I, O, S extends StateSchema = StateSchema>(
     },
 ): Tool<I, O, ToolContext<S>>;
 
-const toolContextSchema: StandardSchemaV1<ToolContext, ToolContext>; // vendor 'chamberu'
+const toolContextSchema: StandardSchemaV1<ToolContext, ToolContext>; // vendor 'chamvi'
 ```
 
-`defineTool()` is `tool()` with `contextSchema: toolContextSchema`; the engine hands the run's `ToolContext` to every tool carrying that schema (by reference, so a copy of the tool keeps it). Its `validate` returns the context unchanged and rejects a missing one, which fails the run (`validation_error`) with `Type validation failed for tool context (<tool>): No chamberu tool context: the tool was built by another copy of @chamberu/core, or runs outside a chamberu agent.` (the marker is the schema object itself, so a tool from a second copy of `@chamberu/core` gets no context).
+`defineTool()` is `tool()` with `contextSchema: toolContextSchema`; the engine hands the run's `ToolContext` to every tool carrying that schema (by reference, so a copy of the tool keeps it). Its `validate` returns the context unchanged and rejects a missing one, which fails the run (`validation_error`) with `Type validation failed for tool context (<tool>): No chamvi tool context: the tool was built by another copy of @chamvi/core, or runs outside a chamvi agent.` (the marker is the schema object itself, so a tool from a second copy of `@chamvi/core` gets no context).
 
 <<< ../../../core/src/tool/types.ts{ts}
 
@@ -172,7 +172,7 @@ function defineEffectTool<I, O, S extends StateSchema = StateSchema>(def: Tool<I
     alreadyApplied?: (effectKey: string, input: I, ctx: ToolContext<S>) => Promise<O | undefined>;
 }): EffectTool<I, O, S>;
 
-function effectMarker(effectKey: string): string; // '<!-- chamberu:effect=<key> -->'
+function effectMarker(effectKey: string): string; // '<!-- chamvi:effect=<key> -->'
 
 function wrapToolsForRun(
     tools: ToolSet,
@@ -233,7 +233,7 @@ const systemClock: IClock;
 
 ## Errors
 
-`ChamberuError`, `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
+`ChamviError`, `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
 
 <<< ../../../core/src/errors/constants.ts{ts}
 

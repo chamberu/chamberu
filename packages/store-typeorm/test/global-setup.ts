@@ -22,7 +22,7 @@ export default async function setup(project: TestProject) {
 
         const message = e instanceof Error ? e.message : String(e);
         // eslint-disable-next-line no-console
-        console.warn(`[@chamberu/store-typeorm] Docker is not available, skipping the Postgres tests: ${message}. Start Docker to run them.`);
+        console.warn(`[@chamvi/store-typeorm] Docker is not available, skipping the Postgres tests: ${message}. Start Docker to run them.`);
         return undefined;
     }
 

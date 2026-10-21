@@ -6,14 +6,14 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { systemClock } from '@chamberu/core';
-import type { IClock } from '@chamberu/core';
-import { DEFAULT_LIMITS } from '@chamberu/sandbox';
+import { systemClock } from '@chamvi/core';
+import type { IClock } from '@chamvi/core';
+import { DEFAULT_LIMITS } from '@chamvi/sandbox';
 import type {
     ISandboxProvider,
     IWorkspace,
     WorkspaceCreateOptions,
-} from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
 import { createScriptedWorkspace } from './workspace.ts';
 import type { ScriptedWorkspace } from './workspace.ts';
 

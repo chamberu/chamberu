@@ -13,7 +13,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import type { Agent, TriggerDefinition } from '@chamberu/core';
+import type { Agent, TriggerDefinition } from '@chamvi/core';
 import {
     Engine,
     InvalidAgentDefinitionError,
@@ -22,9 +22,9 @@ import {
     defineAgent,
     http,
     webhook,
-} from '@chamberu/core';
-import type { IScheduler, SchedulerOptions } from '@chamberu/scheduler';
-import { createScheduler } from '@chamberu/scheduler';
+} from '@chamvi/core';
+import type { IScheduler, SchedulerOptions } from '@chamvi/scheduler';
+import { createScheduler } from '@chamvi/scheduler';
 import { textModel } from '../../utils/model.ts';
 
 const agentWith = (triggers: TriggerDefinition[]) => defineAgent({

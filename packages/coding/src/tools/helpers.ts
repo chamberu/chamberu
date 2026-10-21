@@ -7,10 +7,10 @@
 
 import { jsonSchema } from 'ai';
 import type { JSONSchema7 } from 'ai';
-import { SandboxError, ValidationError } from '@chamberu/core';
-import type { ToolContext } from '@chamberu/core';
-import { resolveWorkspacePath } from '@chamberu/sandbox';
-import type { ExecResult, IWorkspace } from '@chamberu/sandbox';
+import { SandboxError, ValidationError } from '@chamvi/core';
+import type { ToolContext } from '@chamvi/core';
+import { resolveWorkspacePath } from '@chamvi/sandbox';
+import type { ExecResult, IWorkspace } from '@chamvi/sandbox';
 import { isObject } from 'smob';
 import { GIT_ERROR_MAX_CHARS, WORKSPACE_PROPERTY } from './constants.ts';
 import type { CodingWorkspaces } from './types.ts';

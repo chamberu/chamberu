@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as k8s from '@chamberu/sandbox-k8s';
+import * as k8s from '@chamvi/sandbox-k8s';
 
 describe('public api', () => {
     it('exports the provider, the pod client and the constants', () => {
@@ -22,7 +22,7 @@ describe('public api', () => {
         expect(typeof k8s.createKubernetesSandbox).toBe('function');
         expect(typeof k8s.createPodClient).toBe('function');
         expect(k8s.CONTAINER_NAME).toBe('sandbox');
-        expect(k8s.POD_NAME_PREFIX).toBe('chamberu-ws-');
+        expect(k8s.POD_NAME_PREFIX).toBe('chamvi-ws-');
         expect(k8s.START_TIMEOUT_MS).toBe(120_000);
         expect(k8s.POLL_MS).toBe(1_000);
         expect(k8s.FATAL_WAITING_REASONS).toEqual([

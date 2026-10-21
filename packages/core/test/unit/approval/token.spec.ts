@@ -7,7 +7,7 @@
 
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { InvalidResumeTokenError, createResumeToken, verifyResumeToken } from '@chamberu/core';
+import { InvalidResumeTokenError, createResumeToken, verifyResumeToken } from '@chamvi/core';
 
 const payload = {
     runId: 'run-1',

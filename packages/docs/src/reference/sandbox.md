@@ -1,14 +1,14 @@
 # Sandboxes
 
-The sandbox packages: `@chamberu/sandbox` (contracts, rules, the workspace manager) and the three providers. See [Workspaces & Coding](/guide/workspaces) for the behaviour.
+The sandbox packages: `@chamvi/sandbox` (contracts, rules, the workspace manager) and the three providers. See [Workspaces & Coding](/guide/workspaces) for the behaviour.
 
-## @chamberu/sandbox
+## @chamvi/sandbox
 
 ```bash
-npm install @chamberu/sandbox @chamberu/core ai --save
+npm install @chamvi/sandbox @chamvi/core ai --save
 ```
 
-`@chamberu/core` and `ai` are peer dependencies.
+`@chamvi/core` and `ai` are peer dependencies.
 
 ### createWorkspaceManager
 
@@ -64,23 +64,23 @@ A provider that can run argv in a container implements `IExecTransport`: it runs
 
 <<< ../../../sandbox/src/remote/types.ts{ts}
 
-## @chamberu/sandbox-local
+## @chamvi/sandbox-local
 
 ```ts
 function createLocalSandbox(options?: LocalSandboxOptions): ISandboxProvider; // name 'local'
 ```
 
-No isolation: development and tests only. Workspaces are folders under `root` (default `<os tmpdir>/chamberu-workspaces`); of the limits only `timeoutMs` applies.
+No isolation: development and tests only. Workspaces are folders under `root` (default `<os tmpdir>/chamvi-workspaces`); of the limits only `timeoutMs` applies.
 
 <<< ../../../sandbox-local/src/provider/types.ts{ts}
 
-## @chamberu/sandbox-docker
+## @chamvi/sandbox-docker
 
 ```ts
 function createDockerSandbox(options?: DockerSandboxOptions): ISandboxProvider; // name 'docker'
 
 const DEFAULT_NETWORK: 'bridge';
-const CONTAINER_NAME_PREFIX: 'chamberu-ws-';
+const CONTAINER_NAME_PREFIX: 'chamvi-ws-';
 const SANDBOX_USER: '1000:1000';
 ```
 
@@ -88,14 +88,14 @@ One container per workspace, removed with its volume on dispose. Creating the pr
 
 <<< ../../../sandbox-docker/src/provider/types.ts{ts}
 
-## @chamberu/sandbox-k8s
+## @chamvi/sandbox-k8s
 
 ```ts
 function createKubernetesSandbox(options: KubernetesSandboxOptions): ISandboxProvider; // name 'k8s'
 function createPodClient(input: CreatePodClientInput): IPodClient;
 
 const CONTAINER_NAME: 'sandbox';
-const POD_NAME_PREFIX: 'chamberu-ws-';
+const POD_NAME_PREFIX: 'chamvi-ws-';
 const START_TIMEOUT_MS: 120_000;
 const POLL_MS: 1_000;
 const FATAL_WAITING_REASONS: readonly string[];

@@ -14,7 +14,7 @@ import {
     it,
 } from 'vitest';
 import { z } from 'zod';
-import { Engine, ValidationError, defineAgent } from '@chamberu/core';
+import { Engine, ValidationError, defineAgent } from '@chamvi/core';
 import { EFFECT } from '../../../src/effect/constants.ts';
 import { wrapToolsForRun } from '../../../src/effect/wrap.ts';
 import { createRunArtifacts } from '../../../src/artifact/module.ts';

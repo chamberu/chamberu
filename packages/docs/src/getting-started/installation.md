@@ -1,7 +1,7 @@
 # Installation
 
 ```bash
-npm install @chamberu/core ai
+npm install @chamvi/core ai
 ```
 
 - **Runtime:** Node.js 22 or newer. The package is ESM only.
@@ -17,17 +17,17 @@ npm install @ai-sdk/anthropic zod
 For durable runs and more than one replica, add the TypeORM store with `typeorm` and the `pg` driver (PostgreSQL):
 
 ```bash
-npm install @chamberu/store-typeorm typeorm pg
+npm install @chamvi/store-typeorm typeorm pg
 ```
 
 See [TypeORM store](/stores/typeorm).
 
 ## Testing helpers
 
-`@chamberu/test-kit` exports the store contract suite and a controllable clock. `@chamberu/core` and `vitest` are its peer dependencies:
+`@chamvi/test-kit` exports the store contract suite and a controllable clock. `@chamvi/core` and `vitest` are its peer dependencies:
 
 ```bash
-npm install --save-dev @chamberu/test-kit vitest
+npm install --save-dev @chamvi/test-kit vitest
 ```
 
 See [Writing a Store](/stores/writing-a-store) and the [test-kit reference](/reference/test-kit).
@@ -37,25 +37,25 @@ See [Writing a Store](/stores/writing-a-store) and the [test-kit reference](/ref
 Agents that run commands or edit code add the sandbox manager, the coding tools and one provider:
 
 ```bash
-npm install @chamberu/sandbox @chamberu/coding @chamberu/sandbox-docker   # one container per workspace
-npm install @chamberu/sandbox @chamberu/coding @chamberu/sandbox-k8s      # one pod per workspace
-npm install @chamberu/sandbox @chamberu/coding @chamberu/sandbox-local    # development only, no isolation
+npm install @chamvi/sandbox @chamvi/coding @chamvi/sandbox-docker   # one container per workspace
+npm install @chamvi/sandbox @chamvi/coding @chamvi/sandbox-k8s      # one pod per workspace
+npm install @chamvi/sandbox @chamvi/coding @chamvi/sandbox-local    # development only, no isolation
 ```
 
-`@chamberu/core` and `ai` are peer dependencies of all of them. See [Workspaces & Coding](/guide/workspaces).
+`@chamvi/core` and `ai` are peer dependencies of all of them. See [Workspaces & Coding](/guide/workspaces).
 
 ## Packages
 
 | Package | Status |
 |---|---|
-| `@chamberu/core` | Shipped (0.x) |
-| `@chamberu/test-kit` | Shipped (0.x), test helpers |
-| `@chamberu/scheduler` | Shipped (0.x), cron triggers across replicas |
-| `@chamberu/store-typeorm` | Shipped (0.x), TypeORM store (PostgreSQL) |
-| `@chamberu/http` | Shipped (0.x), REST, SSE, webhooks and MCP |
-| `@chamberu/github` | Shipped (0.x), GitHub App webhooks and tools |
-| `@chamberu/sandbox`, `@chamberu/sandbox-local`, `@chamberu/sandbox-docker`, `@chamberu/sandbox-k8s` | Shipped (0.x), disposable workspaces |
-| `@chamberu/coding` | Shipped (0.x), coding tools over a workspace |
-| notifiers, `@chamberu/ui`, `chamberu` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
+| `@chamvi/core` | Shipped (0.x) |
+| `@chamvi/test-kit` | Shipped (0.x), test helpers |
+| `@chamvi/scheduler` | Shipped (0.x), cron triggers across replicas |
+| `@chamvi/store-typeorm` | Shipped (0.x), TypeORM store (PostgreSQL) |
+| `@chamvi/http` | Shipped (0.x), REST, SSE, webhooks and MCP |
+| `@chamvi/github` | Shipped (0.x), GitHub App webhooks and tools |
+| `@chamvi/sandbox`, `@chamvi/sandbox-local`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s` | Shipped (0.x), disposable workspaces |
+| `@chamvi/coding` | Shipped (0.x), coding tools over a workspace |
+| notifiers, `@chamvi/ui`, `chamvi` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
 
-chamberu is pre-1.0: a minor version may contain breaking changes, including changes to the store schema.
+chamvi is pre-1.0: a minor version may contain breaking changes, including changes to the store schema.

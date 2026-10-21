@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /**
@@ -14,7 +14,7 @@ import { ErrorCode } from './constants.ts';
  * a provider API error, an aborted exec. A tool error the model sees, never
  * a failed run.
  */
-export class SandboxError extends ChamberuError {
+export class SandboxError extends ChamviError {
     constructor(message: string, options: { cause?: unknown } = {}) {
         super({
             message,

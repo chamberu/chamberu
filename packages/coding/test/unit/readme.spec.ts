@@ -16,8 +16,8 @@ import {
     expect,
     it,
 } from 'vitest';
-import { createWorkspaceManager } from '@chamberu/sandbox';
-import { createLocalSandbox } from '@chamberu/sandbox-local';
+import { createWorkspaceManager } from '@chamvi/sandbox';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
 import { createCodingAgent } from '../fixtures/readme-example.ts';
 import { mockModel } from '../utils/model.ts';
 
@@ -27,7 +27,7 @@ describe('README example', () => {
     let root: string;
 
     beforeEach(async () => {
-        root = await mkdtemp(join(tmpdir(), 'chamberu-coding-readme-'));
+        root = await mkdtemp(join(tmpdir(), 'chamvi-coding-readme-'));
     });
 
     afterEach(async () => {

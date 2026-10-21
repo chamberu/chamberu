@@ -6,7 +6,7 @@
  */
 
 import { posix } from 'node:path';
-import { ValidationError } from '@chamberu/core';
+import { ValidationError } from '@chamvi/core';
 import { WORKSPACE_ROOT } from '../workspace/constants.ts';
 
 /**

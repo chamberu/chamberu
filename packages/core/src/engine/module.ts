@@ -116,7 +116,7 @@ export class Engine {
             }
         }
         // eslint-disable-next-line no-console
-        this.onError = opts.onError ?? ((error) => console.error('[chamberu]', error));
+        this.onError = opts.onError ?? ((error) => console.error('[chamvi]', error));
         this.queue = new RunQueue({
             store: this.store,
             clock: this.clock,

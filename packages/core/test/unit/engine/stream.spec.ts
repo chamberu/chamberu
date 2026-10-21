@@ -17,8 +17,8 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { Engine, defineAgent } from '@chamberu/core';
-import type { RunDelta } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamvi/core';
+import type { RunDelta } from '@chamvi/core';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 

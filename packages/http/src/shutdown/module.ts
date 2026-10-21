@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IClock } from '@chamberu/core';
+import type { IClock } from '@chamvi/core';
 import { DEFAULT_SHUTDOWN_CLOSE_TIMEOUT_MS, DEFAULT_SHUTDOWN_DRAIN_TIMEOUT_MS } from './constants.ts';
 import type { IShutdown, ShutdownOptions } from './types.ts';
 
@@ -27,7 +27,7 @@ function delay(clock: IClock, ms: number): { promise: Promise<'timeout'>; clear(
 export function createShutdown(options: ShutdownOptions): IShutdown {
     const { clock } = options.engine;
     // eslint-disable-next-line no-console
-    const onError = options.onError ?? ((error: unknown) => console.error('[chamberu]', error));
+    const onError = options.onError ?? ((error: unknown) => console.error('[chamvi]', error));
     const callbacks = new Set<() => void | Promise<void>>();
     let shuttingDown = false;
     let running: Promise<void> | undefined;

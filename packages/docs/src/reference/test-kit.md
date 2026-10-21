@@ -1,12 +1,12 @@
-# @chamberu/test-kit
+# @chamvi/test-kit
 
-Test helpers for chamberu: a controllable clock, the store contract suite and the workspace contract suite.
+Test helpers for chamvi: a controllable clock, the store contract suite and the workspace contract suite.
 
 ```bash
-npm install --save-dev @chamberu/test-kit @chamberu/core vitest
+npm install --save-dev @chamvi/test-kit @chamvi/core vitest
 ```
 
-`@chamberu/core` and `vitest` are peer dependencies; `@chamberu/sandbox` is an optional peer for the workspace contract.
+`@chamvi/core` and `vitest` are peer dependencies; `@chamvi/sandbox` is an optional peer for the workspace contract.
 
 ## describeStoreContract
 

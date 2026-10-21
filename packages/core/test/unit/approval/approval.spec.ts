@@ -23,13 +23,13 @@ import {
     InvalidRunStateError,
     createResumeToken,
     defineAgent,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type {
     AgentDefinition,
     EngineOptions,
     INotifier,
     Notification,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';

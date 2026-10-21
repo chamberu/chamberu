@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { defineAgent, webhook } from '@chamberu/core';
-import type { Principal } from '@chamberu/http';
+import { defineAgent, webhook } from '@chamvi/core';
+import type { Principal } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,

@@ -7,7 +7,7 @@
 
 import { hostname } from 'node:os';
 import { pid } from 'node:process';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import type { IScheduledComponent } from 'hubwire';
 import { defineScheduledComponent } from 'hubwire';
 import { createStoreScheduleLock } from '../lock/index.ts';
@@ -30,7 +30,7 @@ export function createScheduler(opts: SchedulerOptions): IScheduler {
         lock: createStoreScheduleLock(opts.engine.store, opts.owner ?? `${hostname()}-${pid}`),
         lockTtlMs: opts.lockTtlMs ?? SCHEDULE_LOCK_TTL_MS,
         // eslint-disable-next-line no-console
-        onError: opts.onError ?? ((error, errorCtx) => console.error('[chamberu]', error, errorCtx)),
+        onError: opts.onError ?? ((error, errorCtx) => console.error('[chamvi]', error, errorCtx)),
     } satisfies Parameters<typeof buildComponentOptions>[0];
 
     const components: IScheduledComponent[] = [];

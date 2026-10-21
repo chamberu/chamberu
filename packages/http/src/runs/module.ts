@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Run } from '@chamberu/core';
+import type { Run } from '@chamvi/core';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { defineCoreHandler } from 'routup';
 import type { App, IAppEvent } from 'routup';

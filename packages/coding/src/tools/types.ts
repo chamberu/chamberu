@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IWorkspaceManager } from '@chamberu/sandbox';
+import type { IWorkspaceManager } from '@chamvi/sandbox';
 
 /** What the coding tools need of a workspace manager: the run's workspaces by id. */
 export type CodingWorkspaces = Pick<IWorkspaceManager, 'get'>;

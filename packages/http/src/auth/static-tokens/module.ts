@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError } from '@chamberu/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { readBearerToken } from '../helpers.ts';
 import type { Authenticator, Principal } from '../types.ts';
 import { STATIC_TOKEN_MIN_LENGTH } from './constants.ts';

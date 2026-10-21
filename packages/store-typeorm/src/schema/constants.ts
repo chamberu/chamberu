@@ -36,4 +36,4 @@ export const STORE_ENTITIES = [
 
 export const STORE_MIGRATIONS = [Init1792195200000, Artifacts1792368000000, IdempotencyScope1792454400000];
 
-export const MIGRATION_LOCK_NAME = 'chamberu:migrations';
+export const MIGRATION_LOCK_NAME = 'chamvi:migrations';

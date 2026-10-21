@@ -13,9 +13,9 @@ import {
     expect,
     it,
 } from 'vitest';
-import type { Artifact } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
-import { TypeormStore } from '@chamberu/store-typeorm';
+import type { Artifact } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import { TypeormStore } from '@chamvi/store-typeorm';
 import { ArtifactEntity } from '../../../src/entities/index.ts';
 import { createTestDataSource, describePostgres, truncateStore } from '../../utils/database.ts';
 
@@ -51,7 +51,7 @@ describePostgres('TypeormStore artifacts', () => {
         await store.putArtifact(artifact('a1'), new Uint8Array([0, 1, 255]));
 
         const [{ type }] = await dataSource.query(
-            'SELECT pg_typeof(data)::text AS type FROM chamberu_artifacts WHERE id = $1',
+            'SELECT pg_typeof(data)::text AS type FROM chamvi_artifacts WHERE id = $1',
             ['a1'],
         );
         expect(type).toBe('bytea');

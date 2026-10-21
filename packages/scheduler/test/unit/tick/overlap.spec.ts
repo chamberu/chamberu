@@ -6,16 +6,16 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { RunStatusLiteral, TriggerDefinition } from '@chamberu/core';
+import type { RunStatusLiteral, TriggerDefinition } from '@chamvi/core';
 import {
     Engine,
     MemoryStore,
     cron,
     defineAgent,
-} from '@chamberu/core';
-import type { CronTickResult } from '@chamberu/scheduler';
-import { fireCronTrigger } from '@chamberu/scheduler';
-import { ControllableClock } from '@chamberu/test-kit';
+} from '@chamvi/core';
+import type { CronTickResult } from '@chamvi/scheduler';
+import { fireCronTrigger } from '@chamvi/scheduler';
+import { ControllableClock } from '@chamvi/test-kit';
 import { textModel } from '../../utils/model.ts';
 
 const T = new Date('2026-03-01T08:00:00.000Z');

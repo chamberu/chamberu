@@ -11,8 +11,8 @@ import {
     matchesPermission,
     requireToolPermission,
     toolPermission,
-} from '@chamberu/core';
-import type { Invoker, RunContext } from '@chamberu/core';
+} from '@chamvi/core';
+import type { Invoker, RunContext } from '@chamvi/core';
 
 describe('hasPermission', () => {
     it.each([

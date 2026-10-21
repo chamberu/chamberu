@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { defineAgent, http, webhook } from '@chamberu/core';
+import { defineAgent, http, webhook } from '@chamvi/core';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,

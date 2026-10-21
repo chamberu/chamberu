@@ -1,19 +1,19 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamberu/chamberu/master/.github/assets/logo.svg" alt="@chamberu/http" width="128" height="128" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/logo.svg" alt="@chamvi/http" width="128" height="128" />
 </p>
 
-<h1 align="center">@chamberu/http</h1>
+<h1 align="center">@chamvi/http</h1>
 
 <p align="center">
-    <b>REST, SSE, webhooks and MCP for chamberu agents, on routup.</b><br>
-    One routup App per chamberu app: humans start and follow runs over REST and SSE,<br>
+    <b>REST, SSE, webhooks and MCP for chamvi agents, on routup.</b><br>
+    One routup App per chamvi app: humans start and follow runs over REST and SSE,<br>
     machines post webhooks with bearer tokens, and agents call runs as MCP tools.
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@chamberu/http"><img src="https://img.shields.io/npm/v/@chamberu/http" alt="npm version" /></a>
-    <a href="https://github.com/chamberu/chamberu/actions/workflows/ci.yml"><img src="https://github.com/chamberu/chamberu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <a href="https://github.com/chamberu/chamberu/blob/master/packages/http/LICENSE"><img src="https://img.shields.io/npm/l/@chamberu/http" alt="License" /></a>
+    <a href="https://www.npmjs.com/package/@chamvi/http"><img src="https://img.shields.io/npm/v/@chamvi/http" alt="npm version" /></a>
+    <a href="https://github.com/chamvi/chamvi/actions/workflows/ci.yml"><img src="https://github.com/chamvi/chamvi/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/chamvi/chamvi/blob/master/packages/http/LICENSE"><img src="https://img.shields.io/npm/l/@chamvi/http" alt="License" /></a>
 </p>
 
 ---
@@ -35,10 +35,10 @@
 ## Installation
 
 ```bash
-npm install @chamberu/http @chamberu/core --save
+npm install @chamvi/http @chamvi/core --save
 ```
 
-ESM only, Node.js `>=22`. `@chamberu/core` is a peer dependency; [routup](https://www.npmjs.com/package/routup) v6, the [MCP TypeScript SDK](https://www.npmjs.com/package/@modelcontextprotocol/server) v2, [vouchly](https://www.npmjs.com/package/vouchly) and the authup server adapter are installed with the package.
+ESM only, Node.js `>=22`. `@chamvi/core` is a peer dependency; [routup](https://www.npmjs.com/package/routup) v6, the [MCP TypeScript SDK](https://www.npmjs.com/package/@modelcontextprotocol/server) v2, [vouchly](https://www.npmjs.com/package/vouchly) and the authup server adapter are installed with the package.
 
 ## Usage
 
@@ -51,8 +51,8 @@ import {
     MemoryStore,
     defineAgent,
     http,
-} from '@chamberu/core';
-import { createHttpApp, createShutdown, staticTokens } from '@chamberu/http';
+} from '@chamvi/core';
+import { createHttpApp, createShutdown, staticTokens } from '@chamvi/http';
 
 export async function createAgentServer(model: LanguageModel) {
     const echo = defineAgent({
@@ -69,8 +69,8 @@ export async function createAgentServer(model: LanguageModel) {
         resumeSecret: 'change-me',
     });
 
-    const token = process.env.CHAMBERU_TOKEN;
-    if (!token) throw new Error('Set CHAMBERU_TOKEN (at least 16 characters).');
+    const token = process.env.CHAMVI_TOKEN;
+    if (!token) throw new Error('Set CHAMVI_TOKEN (at least 16 characters).');
 
     const shutdown = createShutdown({ engine });
     const app = createHttpApp({
@@ -130,7 +130,7 @@ Paths are relative to `basePath` (default none).
 
 Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413 above, 415 for another media type). A refused body is drained (at most `bodyLimit` more bytes) so a keep-alive connection serves the next request; a longer one closes the connection. A protected route checks the bearer token before it reads the body, so an unauthenticated client cannot make the server buffer it. Unknown body keys are dropped without an error. A NUL character (U+0000, which Postgres text columns refuse) in the URL, in an `idempotencyKey`, `thread` or other string field, or in a key a webhook derives from its payload answers 400.
 
-`attachments` takes at most 16 files `{ mediaType, filename?, data }`: `mediaType` is `type/subtype` without parameters, `filename` 1 to 255 characters, `data` strict base64 (padded, standard alphabet, no whitespace); anything else is 400 `validation_error` with the field's path, and nothing is dispatched. The files are stored as artifacts of the run (see `@chamberu/core`) and handed to the model as file parts. Base64 rides in the JSON body, so `bodyLimit` bounds the files as well.
+`attachments` takes at most 16 files `{ mediaType, filename?, data }`: `mediaType` is `type/subtype` without parameters, `filename` 1 to 255 characters, `data` strict base64 (padded, standard alphabet, no whitespace); anything else is 400 `validation_error` with the field's path, and nothing is dispatched. The files are stored as artifacts of the run (see `@chamvi/core`) and handed to the model as file parts. Base64 rides in the JSON body, so `bodyLimit` bounds the files as well.
 
 `GET /runs/:id` answers 404 before 403, so any authenticated principal can tell whether a run id exists; run ids are random UUIDs. Runs on the wire never carry the internal `claim` (owner and lease).
 
@@ -153,7 +153,7 @@ Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`
 | `state:read`, `state:write` | Read and write agent state |
 | `*` | Everything |
 
-A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:run` but not `agent:triage:approve`, and `agent:*` grants neither. Matching is case-sensitive. `agentPermission(agent, action)` is exported; to check a principal yourself, use `hasPermission(principal.permissions, permission)` from `@chamberu/core`, the matcher the routes use.
+A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:run` but not `agent:triage:approve`, and `agent:*` grants neither. Matching is case-sensitive. `agentPermission(agent, action)` is exported; to check a principal yourself, use `hasPermission(principal.permissions, permission)` from `@chamvi/core`, the matcher the routes use.
 
 `POST /resume` needs authentication **and** the approve permission: the resume token alone is not enough. The token's signature and expiry are checked before any store lookup (a forged or expired token answers 400 without touching the store).
 
@@ -250,20 +250,20 @@ process.once('SIGTERM', () => {
 | `bodyLimit` | `number` | `1_048_576` | Bytes a REST or MCP request body may have |
 | `stream.pollMs` | `number` | `2_000` | Store poll of SSE streams |
 | `stream.maxOpen` | `number` | `1_000` | Open SSE streams plus waiting MCP `run_<agent>` calls per app; a positive integer, else `createHttpApp` throws `InvalidAgentDefinitionError` |
-| `mcp` | `false \| { name?, version?, maxWaitSeconds? }` | `chamberu`, `0.0.0`, `60` | MCP server info and wait cap; `false` mounts nothing |
+| `mcp` | `false \| { name?, version?, maxWaitSeconds? }` | `chamvi`, `0.0.0`, `60` | MCP server info and wait cap; `false` mounts nothing |
 | `cors` | `false \| CorsOptions` | off | `@routup/cors` options |
 | `rateLimit` | `false \| Partial<RateLimitOptions>` | 300 per minute | `@routup/rate-limit` options |
 | `metrics` | `false \| Partial<PrometheusOptions>` | `/metrics` | `@routup/prometheus` options |
 | `readyTimeoutMs` | `number` | `2_000` | How long `/readyz` waits for the store |
 | `onError` | `(error) => void` | `console.error` | 5xx causes and background failures |
-| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamberu/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter |
+| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamvi/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter |
 
 `createShutdown(options)`:
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `engine` | `Engine` | required | Drained during the shutdown; its `clock` drives the delays |
-| `scheduler` | `{ stop(): Promise<void> }` | none | Stopped first, e.g. `createScheduler()` from `@chamberu/scheduler` |
+| `scheduler` | `{ stop(): Promise<void> }` | none | Stopped first, e.g. `createScheduler()` from `@chamvi/scheduler` |
 | `server` | `{ close(force?): Promise<void> }` | none | The srvx server |
 | `readinessDelayMs` | `number` | `0` | Time for load balancers to see the failing readiness |
 | `drainTimeoutMs` | `number` | `30_000` | Passed to `engine.drain()` |

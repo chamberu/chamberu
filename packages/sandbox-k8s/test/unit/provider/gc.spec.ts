@@ -7,15 +7,15 @@
 
 import type { V1Pod } from '@kubernetes/client-node';
 import { describe, expect, it } from 'vitest';
-import { SandboxError } from '@chamberu/core';
-import { createKubernetesSandbox } from '@chamberu/sandbox-k8s';
-import { ControllableClock } from '@chamberu/test-kit';
+import { SandboxError } from '@chamvi/core';
+import { createKubernetesSandbox } from '@chamvi/sandbox-k8s';
+import { ControllableClock } from '@chamvi/test-kit';
 import { createFakePodClient } from '../../utils/client.ts';
 
 const START = 1_000_000;
 
 const managed = {
-    'app.kubernetes.io/managed-by': 'chamberu',
+    'app.kubernetes.io/managed-by': 'chamvi',
     'app.kubernetes.io/component': 'sandbox',
 };
 
@@ -23,8 +23,8 @@ function pod(name: string, expiresAt: number, phase: string, labels: Record<stri
     return {
         metadata: {
             name,
-            labels: { ...labels, 'chamberu.dev/workspace': name },
-            annotations: { 'chamberu.dev/expires-at': String(expiresAt) },
+            labels: { ...labels, 'chamvi.dev/workspace': name },
+            annotations: { 'chamvi.dev/expires-at': String(expiresAt) },
         },
         spec: { containers: [] },
         status: { phase },
@@ -60,7 +60,7 @@ describe('kubernetes garbage collection', () => {
 
         await expect(provider.collectGarbage()).resolves.toBe(2);
         expect(client.deleted).toEqual(['expired', 'failed']);
-        expect(client.selectors).toEqual(['app.kubernetes.io/managed-by=chamberu,app.kubernetes.io/component=sandbox']);
+        expect(client.selectors).toEqual(['app.kubernetes.io/managed-by=chamvi,app.kubernetes.io/component=sandbox']);
         expect(client.pods.keys().toArray()).toEqual(['fresh', 'stranger']);
     });
 
@@ -75,7 +75,7 @@ describe('kubernetes garbage collection', () => {
         clock.advance(60_000);
 
         await expect(provider.collectGarbage()).resolves.toBe(1);
-        expect(client.deleted).toEqual([`chamberu-ws-${first.id}`]);
+        expect(client.deleted).toEqual([`chamvi-ws-${first.id}`]);
         await expect(first.exec(['true'])).rejects.toThrow(/disposed/);
         await expect(second.exec(['true'])).resolves.toMatchObject({ exitCode: 0 });
 

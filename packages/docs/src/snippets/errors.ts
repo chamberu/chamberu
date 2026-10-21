@@ -3,8 +3,8 @@ import {
     ErrorCode,
     LeaseLostError,
     RunStatus,
-} from '@chamberu/core';
-import type { Agent, IStore } from '@chamberu/core';
+} from '@chamvi/core';
+import type { Agent, IStore } from '@chamvi/core';
 
 declare const logger: { error(fields: object, message: string): void };
 
@@ -19,7 +19,7 @@ export function createEngine(store: IStore, agents: Agent[], resumeSecret: strin
                 // another replica carries the run on; nothing to do
                 return;
             }
-            logger.error({ err: error, runId: run?.id }, 'chamberu');
+            logger.error({ err: error, runId: run?.id }, 'chamvi');
         },
     });
     // #endregion on-error

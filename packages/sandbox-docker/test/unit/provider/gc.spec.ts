@@ -12,10 +12,10 @@ import {
     expect,
     it,
 } from 'vitest';
-import { SandboxError, systemClock } from '@chamberu/core';
-import type { IWorkspace } from '@chamberu/sandbox';
-import { CONTAINER_NAME_PREFIX, createDockerSandbox } from '@chamberu/sandbox-docker';
-import { ControllableClock } from '@chamberu/test-kit';
+import { SandboxError, systemClock } from '@chamvi/core';
+import type { IWorkspace } from '@chamvi/sandbox';
+import { CONTAINER_NAME_PREFIX, createDockerSandbox } from '@chamvi/sandbox-docker';
+import { ControllableClock } from '@chamvi/test-kit';
 import { describeDocker, dockerImage } from '../../utils/docker.ts';
 
 /**
@@ -78,11 +78,11 @@ describeDocker('docker garbage collection', () => {
                 Image: dockerImage,
                 Cmd: ['sleep', '60'],
                 Labels: {
-                    'app.kubernetes.io/managed-by': 'chamberu',
+                    'app.kubernetes.io/managed-by': 'chamvi',
                     'app.kubernetes.io/component': 'sandbox',
-                    'chamberu.dev/run': runId,
-                    'chamberu.dev/workspace': randomUUID(),
-                    'chamberu.dev/expires-at': '1',
+                    'chamvi.dev/run': runId,
+                    'chamvi.dev/workspace': randomUUID(),
+                    'chamvi.dev/expires-at': '1',
                 },
             });
             containers.push(container);
@@ -105,7 +105,7 @@ describeDocker('docker garbage collection', () => {
             .catch((e: unknown) => e);
         expect(error).toBeInstanceOf(SandboxError);
         expect((error as Error).message).toMatch(/1 failed.*resource busy/);
-        const left = await docker.listContainers({ all: true, filters: { label: [`chamberu.dev/run=${runId}`] } });
+        const left = await docker.listContainers({ all: true, filters: { label: [`chamvi.dev/run=${runId}`] } });
         expect(left.map((info) => info.Id)).toEqual([stuck]);
     });
 
@@ -115,8 +115,8 @@ describeDocker('docker garbage collection', () => {
             Cmd: ['sleep', '60'],
             Labels: {
                 'app.kubernetes.io/component': 'sandbox',
-                'chamberu.dev/run': `test-${randomUUID()}`,
-                'chamberu.dev/expires-at': '0',
+                'chamvi.dev/run': `test-${randomUUID()}`,
+                'chamvi.dev/expires-at': '0',
             },
         });
         strangers.push(container);

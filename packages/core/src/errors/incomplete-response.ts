@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /**
@@ -13,7 +13,7 @@ import { ErrorCode } from './constants.ts';
  * or (with structured output) the answer was cut off or the loop ended on a
  * tool call nothing executed. Fails the run.
  */
-export class IncompleteResponseError extends ChamberuError {
+export class IncompleteResponseError extends ChamviError {
     constructor(message: string) {
         super({ message, code: ErrorCode.INCOMPLETE_RESPONSE });
     }

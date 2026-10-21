@@ -1,6 +1,6 @@
 # Quick Start
 
-One agent, an in-memory store and one manually dispatched run. This is the same code as the example in the `@chamberu/core` README, which the test suite runs against a scripted model.
+One agent, an in-memory store and one manually dispatched run. This is the same code as the example in the `@chamvi/core` README, which the test suite runs against a scripted model.
 
 <<< @/snippets/quick-start.ts
 

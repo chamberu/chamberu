@@ -9,15 +9,15 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { InvalidAgentDefinitionError, SandboxError, systemClock } from '@chamberu/core';
+import { InvalidAgentDefinitionError, SandboxError, systemClock } from '@chamvi/core';
 import {
     assertCreateInput,
     assertSandboxEnv,
     buildWorkspaceInfo,
     prepareWorkspace,
     resolveLimits,
-} from '@chamberu/sandbox';
-import type { ISandboxProvider, IWorkspace } from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
+import type { ISandboxProvider, IWorkspace } from '@chamvi/sandbox';
 import {
     DEFAULT_ROOT_NAME,
     LOCAL_PROVIDER_NAME,

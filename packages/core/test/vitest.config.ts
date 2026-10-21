@@ -5,7 +5,7 @@ export default defineConfig({
     resolve: {
         // the sources, not dist
         alias: [
-            { find: /^@chamberu\/core$/, replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)) },
+            { find: /^@chamvi\/core$/, replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)) },
         ],
     },
     test: {

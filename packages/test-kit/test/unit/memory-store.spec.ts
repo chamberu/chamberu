@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { MemoryStore } from '@chamberu/core';
-import { describeStoreContract } from '@chamberu/test-kit';
+import { MemoryStore } from '@chamvi/core';
+import { describeStoreContract } from '@chamvi/test-kit';
 
 describeStoreContract((clock) => new MemoryStore({ clock }));

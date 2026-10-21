@@ -7,7 +7,7 @@
 
 import { KubeConfig } from '@kubernetes/client-node';
 import type { V1Pod } from '@kubernetes/client-node';
-import { ChamberuError, InvalidAgentDefinitionError, SandboxError } from '@chamberu/core';
+import { ChamviError, InvalidAgentDefinitionError, SandboxError } from '@chamvi/core';
 import {
     EXPIRES_AT_KEY,
     RUN_LABEL,
@@ -21,7 +21,7 @@ import {
     assertSandboxEnv,
     isExpiredAt,
     resolveLimits,
-} from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
 import { isObject } from 'smob';
 import {
     CONTAINER_NAME,
@@ -216,12 +216,12 @@ export function isExpired(pod: V1Pod, now: number): boolean {
     return isExpiredAt(pod.metadata?.annotations?.[EXPIRES_AT_KEY], now);
 }
 
-/** Runs a client call; an error that is no ChamberuError (a custom client's) becomes a SandboxError. */
+/** Runs a client call; an error that is no ChamviError (a custom client's) becomes a SandboxError. */
 export async function guard<T>(action: string, run: () => Promise<T>): Promise<T> {
     try {
         return await run();
     } catch (error) {
-        if (error instanceof ChamberuError) throw error;
+        if (error instanceof ChamviError) throw error;
         throw new SandboxError(`cannot ${action}`, { cause: error });
     }
 }

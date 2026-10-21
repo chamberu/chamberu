@@ -13,8 +13,8 @@ import {
     expect,
     it,
 } from 'vitest';
-import { SandboxError, ValidationError } from '@chamberu/core';
-import type { IWorkspace } from '@chamberu/sandbox';
+import { SandboxError, ValidationError } from '@chamvi/core';
+import type { IWorkspace } from '@chamvi/sandbox';
 import type { WorkspaceContractFactory } from './types.ts';
 
 const TEST_TIMEOUT_MS = 30_000;
@@ -68,7 +68,7 @@ export function describeWorkspaceContract(name: string, factory: WorkspaceContra
         }, TEST_TIMEOUT_MS);
 
         it('reports a missing command as 127', async () => {
-            const result = await workspace.exec(['chamberu-no-such-command']);
+            const result = await workspace.exec(['chamvi-no-such-command']);
             expect(result.exitCode).toBe(127);
         }, TEST_TIMEOUT_MS);
 
@@ -168,7 +168,7 @@ export function describeWorkspaceContract(name: string, factory: WorkspaceContra
             await workspace.writeFile('run.sh', '#!/bin/sh\necho two\n');
             expect((await workspace.exec(['./run.sh'])).stdout).toBe('two\n');
             const listing = await workspace.exec(['ls', '-a']);
-            expect(listing.stdout).not.toContain('.chamberu-write-');
+            expect(listing.stdout).not.toContain('.chamvi-write-');
         }, TEST_TIMEOUT_MS);
 
         it('refuses escaping, missing and oversized files', async () => {

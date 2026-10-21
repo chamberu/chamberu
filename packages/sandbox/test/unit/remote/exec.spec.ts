@@ -6,13 +6,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { SandboxError, ValidationError } from '@chamberu/core';
+import { SandboxError, ValidationError } from '@chamvi/core';
 import {
     ALIVE_PROBE_TIMEOUT_MS,
     EXEC_GRACE_MS,
     OUTPUT_MAX_BYTES,
     createRemoteWorkspace,
-} from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
 import { EXEC_SCRIPT, EXIT_DRAIN_MS } from '../../../src/remote/constants.ts';
 import { ControllableClock } from '../../utils/clock.ts';
 import { createFakeTransport } from '../../utils/transport.ts';
@@ -228,7 +228,7 @@ describe('remote workspace: exec', () => {
         await workspace.exec(['true']);
         const [first, second] = transport.calls;
         expect(first!.raw).toEqual(['sh', '-c', EXEC_SCRIPT, 'sh', first!.options.marker, '/workspace/pkg', 'timeout', '-k', '5', '300', 'true']);
-        expect(first!.options.marker).toMatch(/^chamberu-exit-[0-9a-f]{32}:$/);
+        expect(first!.options.marker).toMatch(/^chamvi-exit-[0-9a-f]{32}:$/);
         expect(second!.options.marker).not.toBe(first!.options.marker);
     });
 
@@ -242,7 +242,7 @@ describe('remote workspace: exec', () => {
     });
 
     it('keeps a marker of another exec in stderr', async () => {
-        const other = 'chamberu-exit-00000000000000000000000000000000:0\n';
+        const other = 'chamvi-exit-00000000000000000000000000000000:0\n';
         const { workspace } = setup(() => ({ stderr: encode(other) }));
         expect((await workspace.exec(['x'])).stderr).toBe(other);
     });

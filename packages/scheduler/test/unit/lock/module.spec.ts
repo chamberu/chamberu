@@ -6,10 +6,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { ILockStore } from '@chamberu/core';
-import { MemoryStore } from '@chamberu/core';
-import { createStoreScheduleLock } from '@chamberu/scheduler';
-import { ControllableClock } from '@chamberu/test-kit';
+import type { ILockStore } from '@chamvi/core';
+import { MemoryStore } from '@chamvi/core';
+import { createStoreScheduleLock } from '@chamvi/scheduler';
+import { ControllableClock } from '@chamvi/test-kit';
 
 const setup = () => {
     const clock = new ControllableClock(new Date('2026-03-01T08:00:00.000Z'));

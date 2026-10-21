@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { defineAgent, webhook } from '@chamberu/core';
+import { defineAgent, webhook } from '@chamvi/core';
 import {
     ADMIN_TOKEN,
     call,

@@ -5,10 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
-export class BudgetExceededError extends ChamberuError {
+export class BudgetExceededError extends ChamviError {
     constructor(message = 'The run budget was exceeded.') {
         super({ message, code: ErrorCode.BUDGET_EXCEEDED });
     }

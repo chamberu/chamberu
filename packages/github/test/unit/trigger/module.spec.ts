@@ -6,9 +6,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError, cron, defineAgent } from '@chamberu/core';
-import { githubWebhook } from '@chamberu/github';
-import type { GithubEvent } from '@chamberu/github';
+import { InvalidAgentDefinitionError, cron, defineAgent } from '@chamvi/core';
+import { githubWebhook } from '@chamvi/github';
+import type { GithubEvent } from '@chamvi/github';
 import { defaultConcurrencyKey, matchesGithubTrigger } from '../../../src/trigger/helpers.ts';
 import { textModel } from '../../utils/model.ts';
 

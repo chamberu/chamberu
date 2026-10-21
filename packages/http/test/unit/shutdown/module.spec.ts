@@ -11,10 +11,10 @@ import {
     it,
     vi,
 } from 'vitest';
-import type { Engine } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
-import { createShutdown } from '@chamberu/http';
-import type { ShutdownOptions } from '@chamberu/http';
+import type { Engine } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import { createShutdown } from '@chamvi/http';
+import type { ShutdownOptions } from '@chamvi/http';
 import { createTestApp } from '../../utils/app.ts';
 
 const flush = () => new Promise<void>((resolve) => { setImmediate(resolve); });

@@ -1,7 +1,7 @@
 # Deployment <Badge type="warning" text="Planned" />
 
 ::: warning Planned
-The deploy kit does not exist yet. These pages describe the planned setup so you can see where chamberu is going. With `@chamberu/core` today you run the engine in your own Node process, start runs with `dispatch()` and shut down with [`drain()`](/guide/recovery#drain).
+The deploy kit does not exist yet. These pages describe the planned setup so you can see where chamvi is going. With `@chamvi/core` today you run the engine in your own Node process, start runs with `dispatch()` and shut down with [`drain()`](/guide/recovery#drain).
 :::
 
 The target workflow: agents live in their own GitHub repository, CI builds a Docker image, and Flux deploys it to your Kubernetes cluster. Every agent repository is an app with one or more agents, its own store connection, its own GitHub App and its own notifiers.
@@ -17,7 +17,7 @@ agent repo --push--> CI --image--> registry --Flux image automation--> HelmRelea
 
 | Piece | Planned as |
 |---|---|
-| `chamberu` package | `createApp({ agents, store, notifiers, ... })` boots config, store, engine, scheduler and HTTP in order and tears them down in reverse, draining on `SIGTERM`. A CLI with `dev`, `build`, `start`, `run-job` and `migrate` |
+| `chamvi` package | `createApp({ agents, store, notifiers, ... })` boots config, store, engine, scheduler and HTTP in order and tears them down in reverse, draining on `SIGTERM`. A CLI with `dev`, `build`, `start`, `run-job` and `migrate` |
 | [Base image](/deployment/docker) | A slim Node 24 runtime image; agent repositories use a two-stage Dockerfile |
 | [Helm chart](/deployment/kubernetes) | One shared OCI chart for every agent app; each repository gets a small `HelmRelease` |
 | Template repository | A GitHub template with an example agent, Dockerfile, CI that builds and tags images for Flux, and example Flux manifests |

@@ -13,10 +13,10 @@ import {
     ValidationError,
     defineAgent,
     wrapToolsForRun,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type { ToolSet } from 'ai';
-import { createGithubApp, githubWebhook } from '@chamberu/github';
-import type { GithubAppOptions } from '@chamberu/github';
+import { createGithubApp, githubWebhook } from '@chamvi/github';
+import type { GithubAppOptions } from '@chamvi/github';
 import { WEBHOOK_SECRET, createGithubFixture } from '../../utils/app.ts';
 import { callTool, toolContext } from '../../utils/tools.ts';
 import type { ToolContextInput } from '../../utils/tools.ts';

@@ -6,7 +6,7 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { TRIGGER_KEY_MAX_LENGTH } from '@chamberu/core';
+import { TRIGGER_KEY_MAX_LENGTH } from '@chamvi/core';
 import { BadRequestError } from '@ebec/http';
 import { isObject } from 'smob';
 import type { GithubEvent, GithubPayload } from '../trigger/types.ts';

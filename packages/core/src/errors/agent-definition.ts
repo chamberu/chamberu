@@ -5,10 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
-export class InvalidAgentDefinitionError extends ChamberuError {
+export class InvalidAgentDefinitionError extends ChamviError {
     constructor(message: string) {
         super({ message, code: ErrorCode.INVALID_AGENT_DEFINITION });
     }

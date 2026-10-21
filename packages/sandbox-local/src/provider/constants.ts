@@ -8,7 +8,7 @@
 export const LOCAL_PROVIDER_NAME = 'local';
 
 /** Folder under `os.tmpdir()` when no `root` is given. */
-export const DEFAULT_ROOT_NAME = 'chamberu-workspaces';
+export const DEFAULT_ROOT_NAME = 'chamvi-workspaces';
 
 /** `{ runId, expiresAt }` of a workspace, read by the garbage collection. */
 export const WORKSPACE_RECORD = 'workspace.json';

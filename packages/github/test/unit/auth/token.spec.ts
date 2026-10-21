@@ -6,9 +6,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { createGithubApp } from '@chamberu/github';
-import type { GithubAppOptions } from '@chamberu/github';
-import { ControllableClock } from '@chamberu/test-kit';
+import { createGithubApp } from '@chamvi/github';
+import type { GithubAppOptions } from '@chamvi/github';
+import { ControllableClock } from '@chamvi/test-kit';
 import { APP_REQUEST_TIMEOUT_MS } from '../../../src/auth/constants.ts';
 import { createFakeGithub } from '../../utils/github.ts';
 
@@ -126,8 +126,8 @@ describe('installation tokens', () => {
 describe('botLogin', () => {
     it('reads the slug once', async () => {
         const { fake, gh } = setup();
-        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
-        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
+        expect(await gh.botLogin()).toBe('chamvi-test[bot]');
+        expect(await gh.botLogin()).toBe('chamvi-test[bot]');
         expect(fake.requests.filter((r) => r.path === '/app')).toHaveLength(1);
     });
 
@@ -141,7 +141,7 @@ describe('botLogin', () => {
         const { fake, gh } = setup();
         fake.failNext('GET', '/app', 500);
         await expect(gh.botLogin()).rejects.toThrow();
-        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
+        expect(await gh.botLogin()).toBe('chamvi-test[bot]');
     });
 
     it('uses the configured slug without a request', async () => {
@@ -202,6 +202,6 @@ describe('app-authenticated requests', () => {
         await flush();
         clock.advance(APP_REQUEST_TIMEOUT_MS);
         await expect(login).rejects.toThrow(/did not answer/);
-        expect(await gh.botLogin()).toBe('chamberu-test[bot]');
+        expect(await gh.botLogin()).toBe('chamvi-test[bot]');
     });
 });

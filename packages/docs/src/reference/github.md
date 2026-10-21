@@ -1,12 +1,12 @@
-# @chamberu/github
+# @chamvi/github
 
-GitHub App webhooks and tools for chamberu agents. The public API of `packages/github/src/index.ts`.
+GitHub App webhooks and tools for chamvi agents. The public API of `packages/github/src/index.ts`.
 
 ```bash
-npm install @chamberu/github @chamberu/http @chamberu/core ai --save
+npm install @chamvi/github @chamvi/http @chamvi/core ai --save
 ```
 
-`@chamberu/core`, `@chamberu/http` and `ai` are peer dependencies. See [GitHub App](/deployment/github-app) for setup and behaviour.
+`@chamvi/core`, `@chamvi/http` and `ai` are peer dependencies. See [GitHub App](/deployment/github-app) for setup and behaviour.
 
 ## createGithubApp
 

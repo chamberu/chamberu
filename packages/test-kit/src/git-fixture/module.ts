@@ -21,7 +21,7 @@ import {
 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { ValidationError } from '@chamberu/core';
+import { ValidationError } from '@chamvi/core';
 import type { GitFixture } from './types.ts';
 
 const run = promisify(execFile);
@@ -39,18 +39,18 @@ export async function createGitFixture(files: Record<string, string>): Promise<G
             throw new ValidationError(`fixture file ${JSON.stringify(name)} must be a path inside the repository.`);
         }
     }
-    const path = await mkdtemp(join(tmpdir(), 'chamberu-git-fixture-'));
+    const path = await mkdtemp(join(tmpdir(), 'chamvi-git-fixture-'));
     const env = {
         PATH: process.env.PATH ?? '',
         HOME: path,
         GIT_CONFIG_NOSYSTEM: '1',
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_TERMINAL_PROMPT: '0',
-        GIT_AUTHOR_NAME: 'chamberu',
-        GIT_AUTHOR_EMAIL: 'fixture@chamberu.dev',
+        GIT_AUTHOR_NAME: 'chamvi',
+        GIT_AUTHOR_EMAIL: 'fixture@chamvi.dev',
         GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z',
-        GIT_COMMITTER_NAME: 'chamberu',
-        GIT_COMMITTER_EMAIL: 'fixture@chamberu.dev',
+        GIT_COMMITTER_NAME: 'chamvi',
+        GIT_COMMITTER_EMAIL: 'fixture@chamvi.dev',
         GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z',
     };
     const git = async (...args: string[]) => {

@@ -45,4 +45,4 @@ A shorter lease recovers crashed runs sooner and polls more often. A longer leas
 
 ## Cron across replicas
 
-Firing a cron trigger once across replicas needs a per-tick lock. [`@chamberu/scheduler`](/guide/scheduler) takes the store lock `cron:<agent>:<triggerId>:<scheduledAt>` per tick (never released, held for 10 minutes by default) and dispatches with the idempotency key `<triggerId>@<scheduledAt>`, so a second firing is harmless even if the lock failed. See [Cron Scheduling](/guide/scheduler) and [Multiple Replicas](/deployment/replicas).
+Firing a cron trigger once across replicas needs a per-tick lock. [`@chamvi/scheduler`](/guide/scheduler) takes the store lock `cron:<agent>:<triggerId>:<scheduledAt>` per tick (never released, held for 10 minutes by default) and dispatches with the idempotency key `<triggerId>@<scheduledAt>`, so a second firing is harmless even if the lock failed. See [Cron Scheduling](/guide/scheduler) and [Multiple Replicas](/deployment/replicas).

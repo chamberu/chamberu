@@ -7,8 +7,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { defineAgent, http } from '@chamberu/core';
-import { staticTokens } from '@chamberu/http';
+import { defineAgent, http } from '@chamvi/core';
+import { staticTokens } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,

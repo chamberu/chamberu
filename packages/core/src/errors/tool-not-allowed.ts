@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /**
@@ -15,7 +15,7 @@ import { ErrorCode } from './constants.ts';
  * approved call from an older history that the engine's per-call re-check
  * refuses (the model sees this error). It never fails the run.
  */
-export class ToolNotAllowedError extends ChamberuError {
+export class ToolNotAllowedError extends ChamviError {
     constructor(toolName: string) {
         super({ message: `The tool "${toolName}" is not allowed for this run.`, code: ErrorCode.TOOL_NOT_ALLOWED });
     }

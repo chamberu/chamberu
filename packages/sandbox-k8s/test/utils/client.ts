@@ -7,8 +7,8 @@
 
 import type { V1Pod, V1PodStatus } from '@kubernetes/client-node';
 import { expect } from 'vitest';
-import { SandboxError } from '@chamberu/core';
-import type { IPodClient, PodExecInput } from '@chamberu/sandbox-k8s';
+import { SandboxError } from '@chamvi/core';
+import type { IPodClient, PodExecInput } from '@chamvi/sandbox-k8s';
 
 export type FakeExecAnswer = {
     exitCode?: number;
@@ -133,7 +133,7 @@ export function wrapped(argv: readonly string[], timeoutSeconds = '300', cwd = '
         '-c',
         expect.any(String),
         'sh',
-        expect.stringMatching(/^chamberu-exit-[0-9a-f]{32}:$/),
+        expect.stringMatching(/^chamvi-exit-[0-9a-f]{32}:$/),
         cwd,
         'timeout',
         '-k',

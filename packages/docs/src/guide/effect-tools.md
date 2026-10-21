@@ -26,7 +26,7 @@ The third argument of `effectKey(input, ctx, options)` is the AI SDK's call opti
 
 The result is recorded after `execute` returns. A crash between the side effect and the store write leaves no record, so the retry would apply the effect again. `alreadyApplied` closes that window: it checks the remote system before acting.
 
-`effectMarker(key)` returns a hidden HTML comment, `<!-- chamberu:effect=<key> -->`. Embed it in what the tool creates (a comment body, a pull request description) so `alreadyApplied` can find it again. Other strategies:
+`effectMarker(key)` returns a hidden HTML comment, `<!-- chamvi:effect=<key> -->`. Embed it in what the tool creates (a comment body, a pull request description) so `alreadyApplied` can find it again. Other strategies:
 
 - **Set semantics.** Adding a label that is already there changes nothing; such tools need no reconciliation.
 - **Remote state.** Compare a remote ref or a commit trailer before pushing.
@@ -40,6 +40,6 @@ If recording the result fails after the effect happened, the call still succeeds
 
 ## Migrating from 0.1
 
-In `@chamberu/core` 0.1 the hooks got the `RunContext`; they now get the `ToolContext`, so `ctx.runId` becomes `ctx.run.runId` (likewise `ctx.agent`, `ctx.trigger`, `ctx.signal`). In JavaScript an old `ctx.runId` reads `undefined`, which would collapse a custom key across runs. `defineEffectTool()` requires `execute`, and an effect tool defined at module scope replaces the factory closing over `run`.
+In `@chamvi/core` 0.1 the hooks got the `RunContext`; they now get the `ToolContext`, so `ctx.runId` becomes `ctx.run.runId` (likewise `ctx.agent`, `ctx.trigger`, `ctx.signal`). In JavaScript an old `ctx.runId` reads `undefined`, which would collapse a custom key across runs. `defineEffectTool()` requires `execute`, and an effect tool defined at module scope replaces the factory closing over `run`.
 
 Streaming tools work too: when `execute` returns an async iterable, the last yielded value is the recorded result.

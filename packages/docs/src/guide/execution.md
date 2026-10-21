@@ -18,7 +18,7 @@ A `Checkpoint` holds the full message history after a step, the step index and t
 
 <<< ../../../core/src/run/types.ts{ts}
 
-Checkpoints never hold the bytes of an artifact: a file part keeps a reference (`data: 'chamberu-artifact:<id>'`) and every execution reads the bytes again.
+Checkpoints never hold the bytes of an artifact: a file part keeps a reference (`data: 'chamvi-artifact:<id>'`) and every execution reads the bytes again.
 
 The store keeps the checkpoint with the highest `stepIndex` per run; saving one with an equal index replaces it. That is how an approval response is appended to the history of the step that asked for it.
 
@@ -34,7 +34,7 @@ The engine always streams (every AI SDK provider does). Each text and reasoning 
 
 <<< @/snippets/lifecycle.ts#deltas
 
-`delta` is `{ runId, step, kind: 'text' | 'reasoning', text }`; `step` is the checkpoint `stepIndex` the step is saved under. Deltas arrive in order, and their concatenated text equals the text of the stored `llm` step. They are never stored and only reach listeners in the process that executes the run; after a cancel, drain or lost lease settled the run, no more arrive. A model error during the stream fails the run, after the errored step's `llm` row (finish reason `error`) and checkpoint are written. So does a stream that closes without the provider's finish part (a cut connection): the run fails with `incomplete_response` instead of completing with a partial answer, and a tool call of that step never runs. `@chamberu/http` forwards them on the run's SSE stream as `delta` events.
+`delta` is `{ runId, step, kind: 'text' | 'reasoning', text }`; `step` is the checkpoint `stepIndex` the step is saved under. Deltas arrive in order, and their concatenated text equals the text of the stored `llm` step. They are never stored and only reach listeners in the process that executes the run; after a cancel, drain or lost lease settled the run, no more arrive. A model error during the stream fails the run, after the errored step's `llm` row (finish reason `error`) and checkpoint are written. So does a stream that closes without the provider's finish part (a cut connection): the run fails with `incomplete_response` instead of completing with a partial answer, and a tool call of that step never runs. `@chamvi/http` forwards them on the run's SSE stream as `delta` events.
 
 ## Ownership
 

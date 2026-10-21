@@ -1,4 +1,4 @@
-import type { INotifier, Notification } from '@chamberu/core';
+import type { INotifier, Notification } from '@chamvi/core';
 
 // #region webhook
 export class WebhookNotifier implements INotifier {

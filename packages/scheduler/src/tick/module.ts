@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Agent, OverlapPolicy, TriggerDefinition } from '@chamberu/core';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
+import type { Agent, OverlapPolicy, TriggerDefinition } from '@chamvi/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { isOverlapping } from './helpers.ts';
 import type { CronTickContext, CronTickResult, CronTriggerOptions } from './types.ts';
 

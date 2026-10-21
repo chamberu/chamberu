@@ -6,7 +6,7 @@
  */
 
 /** Server name the MCP endpoint reports by default. */
-export const DEFAULT_MCP_NAME = 'chamberu';
+export const DEFAULT_MCP_NAME = 'chamvi';
 
 /** Server version the MCP endpoint reports by default. */
 export const DEFAULT_MCP_VERSION = '0.0.0';

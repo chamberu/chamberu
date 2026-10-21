@@ -1,12 +1,12 @@
 # TypeORM store
 
-`@chamberu/store-typeorm` keeps everything the engine persists in Postgres through TypeORM. It passes `describeStoreContract` unchanged, so the engine behaves the same on memory and on Postgres, also with several replicas on one database.
+`@chamvi/store-typeorm` keeps everything the engine persists in Postgres through TypeORM. It passes `describeStoreContract` unchanged, so the engine behaves the same on memory and on Postgres, also with several replicas on one database.
 
 ```bash
-npm install @chamberu/store-typeorm typeorm pg
+npm install @chamvi/store-typeorm typeorm pg
 ```
 
-`@chamberu/core`, `typeorm` (`^1.1.2`) and `pg` (`^8`) are peer dependencies.
+`@chamvi/core`, `typeorm` (`^1.1.2`) and `pg` (`^8`) are peer dependencies.
 
 ## Setup
 
@@ -25,21 +25,21 @@ On shutdown, drain the engine before destroying the data source:
 
 ## Migrations
 
-`migrateStore(dataSource)` runs the pending migrations under the Postgres advisory lock `chamberu:migrations` (`MIGRATION_LOCK_NAME`). Call it on every boot: replicas that start at once wait for each other, and each migration is applied and recorded once. Each call uses one pooled connection, the one holding the lock, for the migrations as well. chamberu is pre-1.0, so a new version may ship a new migration.
+`migrateStore(dataSource)` runs the pending migrations under the Postgres advisory lock `chamvi:migrations` (`MIGRATION_LOCK_NAME`). Call it on every boot: replicas that start at once wait for each other, and each migration is applied and recorded once. Each call uses one pooled connection, the one holding the lock, for the migrations as well. chamvi is pre-1.0, so a new version may ship a new migration.
 
 ## Tables
 
 | Table | Holds | Keys and indexes |
 |---|---|---|
-| `chamberu_runs` | Runs; JSON columns for trigger, output, error, usage and wait point; claim owner and expiry | PK `id` (`COLLATE "C"`); `(agent, status, concurrency_key)`; `(status, created_at, id)` |
-| `chamberu_steps` | Append-only steps | `(run_id, step_index)` |
-| `chamberu_checkpoints` | The latest checkpoint per run | PK `run_id` |
-| `chamberu_idempotency_keys` | Intake keys | PK `(scope, key)`; `expires_at` |
-| `chamberu_locks` | Keyed leases | PK `key`; `expires_at` |
-| `chamberu_effects` | Recorded effect results | PK `key` |
-| `chamberu_kv` | Agent key-value state | PK `(agent, key)` |
-| `chamberu_docs` | Agent document collections | PK `(agent, collection, id)`; GIN index on `doc` |
-| `chamberu_artifacts` | Artifact metadata and bytes (`data` `bytea`) | PK `id`; `run_id` |
+| `chamvi_runs` | Runs; JSON columns for trigger, output, error, usage and wait point; claim owner and expiry | PK `id` (`COLLATE "C"`); `(agent, status, concurrency_key)`; `(status, created_at, id)` |
+| `chamvi_steps` | Append-only steps | `(run_id, step_index)` |
+| `chamvi_checkpoints` | The latest checkpoint per run | PK `run_id` |
+| `chamvi_idempotency_keys` | Intake keys | PK `(scope, key)`; `expires_at` |
+| `chamvi_locks` | Keyed leases | PK `key`; `expires_at` |
+| `chamvi_effects` | Recorded effect results | PK `key` |
+| `chamvi_kv` | Agent key-value state | PK `(agent, key)` |
+| `chamvi_docs` | Agent document collections | PK `(agent, collection, id)`; GIN index on `doc` |
+| `chamvi_artifacts` | Artifact metadata and bytes (`data` `bytea`) | PK `id`; `run_id` |
 
 ## How it keeps the contract
 

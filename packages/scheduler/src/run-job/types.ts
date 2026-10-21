@@ -9,7 +9,7 @@ import type {
     Agent,
     Engine,
     RunStatusLiteral,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 export type RunJobOptions = {
     /**

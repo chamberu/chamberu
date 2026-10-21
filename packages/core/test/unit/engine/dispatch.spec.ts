@@ -20,8 +20,8 @@ import {
     TRIGGER_KEY_MAX_LENGTH,
     ValidationError,
     defineAgent,
-} from '@chamberu/core';
-import type { EngineOptions, Run, RunEvent } from '@chamberu/core';
+} from '@chamvi/core';
+import type { EngineOptions, Run, RunEvent } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 

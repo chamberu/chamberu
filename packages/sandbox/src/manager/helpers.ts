@@ -8,12 +8,12 @@
 import { jsonSchema } from 'ai';
 import type { JSONSchema7 } from 'ai';
 import {
-    ChamberuError,
+    ChamviError,
     InvalidAgentDefinitionError,
     RunStatus,
     SandboxError,
     ValidationError,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { isObject } from 'smob';
 import { assertSandboxEnv, resolveLimits } from '../limits/module.ts';
 import { assertImageOption } from '../provider/module.ts';
@@ -60,9 +60,9 @@ export function isExpired(workspace: IWorkspace, now: Date): boolean {
     return workspace.info.expiresAt.getTime() <= now.getTime();
 }
 
-/** chamberu errors pass through; anything else becomes a SandboxError `<what>: <message>` with the cause. */
-export function toSandboxError(error: unknown, what: string): ChamberuError {
-    if (error instanceof ChamberuError) return error;
+/** chamvi errors pass through; anything else becomes a SandboxError `<what>: <message>` with the cause. */
+export function toSandboxError(error: unknown, what: string): ChamviError {
+    if (error instanceof ChamviError) return error;
     const message = error instanceof Error ? error.message : String(error);
     return new SandboxError(`${what}: ${message}`, { cause: error });
 }

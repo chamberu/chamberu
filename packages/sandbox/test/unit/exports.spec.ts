@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as sandbox from '@chamberu/sandbox';
+import * as sandbox from '@chamvi/sandbox';
 
 describe('public api', () => {
     it.each([
@@ -65,17 +65,17 @@ describe('public api', () => {
             pids: 512,
             timeoutMs: 1_800_000,
         });
-        expect(sandbox.DEFAULT_SANDBOX_IMAGE).toBe('ghcr.io/chamberu/sandbox-node:24');
+        expect(sandbox.DEFAULT_SANDBOX_IMAGE).toBe('ghcr.io/chamvi/sandbox-node:24');
         expect(sandbox.TMP_SIZE).toBe('512Mi');
         expect(sandbox.SANDBOX_LABELS).toEqual({
-            'app.kubernetes.io/managed-by': 'chamberu',
+            'app.kubernetes.io/managed-by': 'chamvi',
             'app.kubernetes.io/component': 'sandbox',
         });
-        expect(sandbox.RUN_LABEL).toBe('chamberu.dev/run');
-        expect(sandbox.WORKSPACE_LABEL).toBe('chamberu.dev/workspace');
-        expect(sandbox.EXPIRES_AT_KEY).toBe('chamberu.dev/expires-at');
+        expect(sandbox.RUN_LABEL).toBe('chamvi.dev/run');
+        expect(sandbox.WORKSPACE_LABEL).toBe('chamvi.dev/workspace');
+        expect(sandbox.EXPIRES_AT_KEY).toBe('chamvi.dev/expires-at');
         expect(sandbox.SANDBOX_LABEL_SELECTORS).toEqual([
-            'app.kubernetes.io/managed-by=chamberu',
+            'app.kubernetes.io/managed-by=chamvi',
             'app.kubernetes.io/component=sandbox',
         ]);
     });

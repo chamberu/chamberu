@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { SANDBOX_ENV } from '@chamberu/sandbox';
+import { SANDBOX_ENV } from '@chamvi/sandbox';
 import {
     afterEach,
     describe,
@@ -35,13 +35,13 @@ function input(overrides: Partial<Parameters<typeof buildContainerOptions>[0]> =
 
 describe('buildContainerOptions', () => {
     afterEach(() => {
-        delete process.env.CHAMBERU_SECRET_PROBE;
+        delete process.env.CHAMVI_SECRET_PROBE;
     });
 
     it('builds a hardened container', () => {
         const options = buildContainerOptions(input());
 
-        expect(options.name).toBe('chamberu-ws-w1');
+        expect(options.name).toBe('chamvi-ws-w1');
         expect(options.Image).toBe('img');
         expect(options.Cmd).toEqual(['sleep', '600']);
         expect(options.User).toBe('1000:1000');
@@ -51,11 +51,11 @@ describe('buildContainerOptions', () => {
             'FOO=bar',
         ]);
         expect(options.Labels).toEqual({
-            'app.kubernetes.io/managed-by': 'chamberu',
+            'app.kubernetes.io/managed-by': 'chamvi',
             'app.kubernetes.io/component': 'sandbox',
-            'chamberu.dev/run': 'r1',
-            'chamberu.dev/workspace': 'w1',
-            'chamberu.dev/expires-at': '1767226200000',
+            'chamvi.dev/run': 'r1',
+            'chamvi.dev/workspace': 'w1',
+            'chamvi.dev/expires-at': '1767226200000',
         });
         expect(options.HostConfig).toEqual({
             NetworkMode: 'bridge',
@@ -85,12 +85,12 @@ describe('buildContainerOptions', () => {
     });
 
     it('does not copy the host environment', () => {
-        process.env.CHAMBERU_SECRET_PROBE = 's3cret';
+        process.env.CHAMVI_SECRET_PROBE = 's3cret';
 
         const options = buildContainerOptions(input());
 
         expect(JSON.stringify(options)).not.toContain('s3cret');
-        expect(JSON.stringify(options)).not.toContain('CHAMBERU_SECRET_PROBE');
+        expect(JSON.stringify(options)).not.toContain('CHAMVI_SECRET_PROBE');
     });
 
     it('lets the configured env replace a default without duplicating it', () => {
@@ -119,6 +119,6 @@ describe('buildContainerOptions', () => {
     });
 
     it('passes a user-created network through', () => {
-        expect(buildContainerOptions(input({ network: 'chamberu-sandbox' })).HostConfig?.NetworkMode).toBe('chamberu-sandbox');
+        expect(buildContainerOptions(input({ network: 'chamvi-sandbox' })).HostConfig?.NetworkMode).toBe('chamvi-sandbox');
     });
 });

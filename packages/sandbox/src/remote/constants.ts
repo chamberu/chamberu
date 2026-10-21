@@ -42,7 +42,7 @@ export const ERROR_STDERR_MAX_LENGTH = 2_000;
 /**
  * Creates the parent directories of `$1` and writes exactly `$2` bytes of
  * stdin to it (`head -c` stops after them, so no stdin EOF is needed):
- * into the temporary file `.chamberu-write-$3` next to it, carrying the old
+ * into the temporary file `.chamvi-write-$3` next to it, carrying the old
  * file's mode (`cp -p`), then renamed over it, so a reader or a second
  * writer never sees a cut file. A symbolic link, or a directory that takes
  * no new file, is written in place.
@@ -51,7 +51,7 @@ export const WRITE_FILE_SCRIPT = [
     'd=$(dirname -- "$1") && mkdir -p -- "$d" || exit',
     'if [ -d "$1" ]; then printf \'%s: Is a directory\\n\' "$1" >&2; exit 1; fi',
     'if [ -L "$1" ]; then head -c "$2" > "$1"; exit; fi',
-    't="$d/.chamberu-write-$3"',
+    't="$d/.chamvi-write-$3"',
     'trap \'rm -f -- "$t"\' EXIT',
     '{ true > "$t"; } 2>/dev/null || { head -c "$2" > "$1"; exit; }',
     'if [ -e "$1" ]; then cp -p -- "$1" "$t" || exit; fi',

@@ -7,8 +7,8 @@
 
 import type { ModelMessage, ToolSet } from 'ai';
 import { describe, expect, it } from 'vitest';
-import { MemoryStore, effectMarker, wrapToolsForRun } from '@chamberu/core';
-import type { ToolContext } from '@chamberu/core';
+import { MemoryStore, effectMarker, wrapToolsForRun } from '@chamvi/core';
+import type { ToolContext } from '@chamvi/core';
 import { START, createGithubFixture } from '../../utils/app.ts';
 import { assistant, callTool, toolContext } from '../../utils/tools.ts';
 
@@ -63,7 +63,7 @@ describe('write tools', () => {
         } = setup();
         const result = await comment(wrap(), ctx, 'Thanks!', STEP_1);
         const marker = effectMarker('run-1:github_create_comment:octo/demo#5:1');
-        expect(marker).toBe('<!-- chamberu:effect=run-1:github_create_comment:octo/demo#5:1 -->');
+        expect(marker).toBe('<!-- chamvi:effect=run-1:github_create_comment:octo/demo#5:1 -->');
         expect((posts(fake)[0]?.body as { body: string }).body).toBe(`Thanks!\n\n${marker}`);
         expect(result).toEqual({
             id: 9000,

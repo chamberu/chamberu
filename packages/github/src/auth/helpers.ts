@@ -7,7 +7,7 @@
 
 import { createPrivateKey, createSign } from 'node:crypto';
 import type { KeyObject } from 'node:crypto';
-import { InvalidAgentDefinitionError } from '@chamberu/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { JWT_BACKDATE_SECONDS, JWT_TTL_SECONDS } from './constants.ts';
 
 /** The App's private key (PKCS#1 or PKCS#8 PEM); literal "\n" sequences become newlines. */

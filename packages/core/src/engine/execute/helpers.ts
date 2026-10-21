@@ -83,7 +83,7 @@ function issuePath(issue: unknown): string | undefined {
  * A ValidationError for a tool context the AI SDK refused. The SDK's own
  * message holds the whole value (a toolsContext entry may carry a secret) and
  * issue messages may echo it too, so only the tool name and the issue paths
- * are kept; chamberu's own missing-context issue keeps its message.
+ * are kept; chamvi's own missing-context issue keeps its message.
  */
 function toolContextError(error: TypeValidationError): ValidationError {
     const prefix = `Type validation failed for tool context (${error.context?.entityName ?? 'unknown'}): `;
@@ -121,7 +121,7 @@ export function toRunError(error: unknown): { code: string; message: string } {
  * from an older history still gets an answer; `activeTools` (the names the
  * agent's toolPolicy allows, undefined without a policy) is what the model is
  * offered. wrapToolsForRun memoizes effects and re-checks the policy per call,
- * so a refused call is a tool error. `toolsContext` maps every chamberu tool
+ * so a refused call is a tool error. `toolsContext` maps every chamvi tool
  * (policy-hidden ones included) to the execution's one ToolContext, plus the
  * agent's own `toolsContext` entries for the other tools, by reference.
  * Throws InvalidAgentDefinitionError for a misconfigured `toolsContext`.

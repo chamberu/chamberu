@@ -1,11 +1,11 @@
 import type { LanguageModel } from 'ai';
-import { Engine, defineAgent } from '@chamberu/core';
+import { Engine, defineAgent } from '@chamvi/core';
 import {
     STORE_ENTITIES,
     STORE_MIGRATIONS,
     TypeormStore,
     migrateStore,
-} from '@chamberu/store-typeorm';
+} from '@chamvi/store-typeorm';
 import { DataSource } from 'typeorm';
 
 export async function createEngine(model: LanguageModel) {

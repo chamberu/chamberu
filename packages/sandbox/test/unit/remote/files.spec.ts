@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { SandboxError, ValidationError } from '@chamberu/core';
-import { FILE_MAX_BYTES, createRemoteWorkspace } from '@chamberu/sandbox';
+import { SandboxError, ValidationError } from '@chamvi/core';
+import { FILE_MAX_BYTES, createRemoteWorkspace } from '@chamvi/sandbox';
 import { WRITE_FILE_SCRIPT } from '../../../src/remote/constants.ts';
 import { ControllableClock } from '../../utils/clock.ts';
 import { createFakeTransport } from '../../utils/transport.ts';

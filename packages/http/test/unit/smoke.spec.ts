@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as http from '@chamberu/http';
+import * as http from '@chamvi/http';
 
 describe('package entry', () => {
     it('resolves', () => {

@@ -14,14 +14,14 @@
 | EditorConfig | Whitespace rules shared with the editor |
 | unplugin-swc | Compiles the store-typeorm entities' legacy decorators in tsdown and Vitest; the root `tsconfig.build.json` sets `experimentalDecorators: true` |
 
-The `@tada5hi/*` config packages are the source of truth for lint, TS and commit rules; the local config files are thin wrappers. Prefer changing the shared package over adding a local override, unless the deviation is chamberu-specific.
+The `@tada5hi/*` config packages are the source of truth for lint, TS and commit rules; the local config files are thin wrappers. Prefer changing the shared package over adding a local override, unless the deviation is chamvi-specific.
 
 ## Code Style
 
 - ESM only (`"type": "module"`), Node >= 22.
 - 4-space indent (also JSON and YAML), LF, UTF-8, final newline, trailing whitespace trimmed except in Markdown (see `.editorconfig`).
 - Single quotes, semicolons (enforced by ESLint).
-- Package scope `@chamberu/*`, Apache-2.0 license (`LICENSE` plus `NOTICE` in the root and every package), all packages public.
+- Package scope `@chamvi/*`, Apache-2.0 license (`LICENSE` plus `NOTICE` in the root and every package), all packages public.
 
 ## File Organization
 
@@ -41,10 +41,10 @@ The `@tada5hi/*` config packages are the source of truth for lint, TS and commit
   - `helpers.ts`: functions the implementation uses. When helpers grow, it becomes a `helpers/` folder with one file per helper and its own `index.ts`.
   - `constants.ts`: every exported constant (`agent/constants.ts`, `effect/constants.ts`, `errors/constants.ts`).
   - `index.ts`: the barrel. It re-exports **files of its own folder only**, alphabetically: `export *` when the whole file is public, named exports when the folder keeps part of it internal (`effect/index.ts` exports `EFFECT` but not `EFFECT_HOOKS`; helpers are never exported).
-- **One class per file.** `max-classes-per-file` is `1` in `@tada5hi/eslint-config`; never disable it in source. Sibling classes share a folder: `src/errors/base.ts` holds `ChamberuError`, and every other error has its own file named after its concept, kebab-case and without an `-error` suffix (`lease-lost.ts` holds `LeaseLostError`). Error codes live in `ErrorCode` (`errors/constants.ts`), never as string literals in the constructors.
+- **One class per file.** `max-classes-per-file` is `1` in `@tada5hi/eslint-config`; never disable it in source. Sibling classes share a folder: `src/errors/base.ts` holds `ChamviError`, and every other error has its own file named after its concept, kebab-case and without an `-error` suffix (`lease-lost.ts` holds `LeaseLostError`). Error codes live in `ErrorCode` (`errors/constants.ts`), never as string literals in the constructors.
 - **No cross-module re-export files.** A file that just pulls symbols out of other modules is not allowed; the code moves into the folder (or package) it belongs to.
 - **The package entry composes folder barrels.** `src/index.ts` is `export * from './<folder>/index.ts'` per folder. Inside a package, import the file you need (`../errors/index.ts`, `../state/types.ts`), not `src/index.ts`.
-- **Test helpers are a package.** Helpers other packages test with (`ControllableClock`, `describeStoreContract`) live in `@chamberu/test-kit`, which depends on `@chamberu/core`; core never depends on the kit (that would be an nx cycle), so core's own tests use the private copy in `test/utils/clock.ts`.
+- **Test helpers are a package.** Helpers other packages test with (`ControllableClock`, `describeStoreContract`) live in `@chamvi/test-kit`, which depends on `@chamvi/core`; core never depends on the kit (that would be an nx cycle), so core's own tests use the private copy in `test/utils/clock.ts`.
 
 ## Naming
 
@@ -56,7 +56,7 @@ The `@tada5hi/*` config packages are the source of truth for lint, TS and commit
 
 - Object checks use `isObject` from `smob`, never `typeof x === 'object' && x !== null` (note that `isObject` is false for arrays).
 - Standard Schema validation goes through validup (`buildIssuesForStandardSchemaIssues` from `@validup/standard-schema`); errors carry ebec `issues`, never a custom issue field.
-- Packages that answer HTTP (`@chamberu/http`) throw `@ebec/http` errors (`BadRequestError`, `ForbiddenError`, ...) and define no error classes of their own; core errors pass through and the error handler maps them by `code`.
+- Packages that answer HTTP (`@chamvi/http`) throw `@ebec/http` errors (`BadRequestError`, `ForbiddenError`, ...) and define no error classes of their own; core errors pass through and the error handler maps them by `code`.
 - Option misconfiguration in any package's factory (`createHttpApp`, `createScheduler`, `staticTokens`, ...) throws core `InvalidAgentDefinitionError`: it covers app definitions, not only agents.
 - validup has no built-in validators: build them with `defineValidator`, fail with `createValidupError` (an ebec issue code, never a bare `Error`) and reuse them (`packages/http/src/request/validators.ts`), never pull in zod for request validation (zod stays a dev dependency for specs).
 - Persistence code uses TypeORM repositories and their query builders (`insert().orIgnore()`, `orUpdate()` with an overwrite condition, `update().where().returning()`, find options). Raw SQL only where the ORM cannot express a statement, with a one-line comment saying why.
@@ -67,13 +67,13 @@ The `@tada5hi/*` config packages are the source of truth for lint, TS and commit
 - Never edit `dist/` (generated, git-ignored). Never hand-edit `.release-please-manifest.json` or package versions; release-please owns them.
 - Keep runtime `dependencies` minimal (the house libraries `@ebec/core`, `smob`, `validup` are fine); tooling belongs in `devDependencies`, and the AI SDK (`ai`) stays a peer dependency.
 - New package: add `packages/<name>` (copy `packages/test-kit` layout), a path alias in the root `tsconfig.json`, aliases in its `test/vitest.config.ts` for itself and every workspace package it imports, and an entry in `release-please-config.json` and `.release-please-manifest.json`.
-- Errors extend `ChamberuError` (`@ebec/core` `BaseError`) and live in `src/errors/`, one file each (see File Organization); never throw a bare `Error` from library code.
+- Errors extend `ChamviError` (`@ebec/core` `BaseError`) and live in `src/errors/`, one file each (see File Organization); never throw a bare `Error` from library code.
 - A new public export goes through its folder's `index.ts` (reached from `src/index.ts`) and must be added to the package's `test/unit/exports.spec.ts`.
 
 ## Planning and Delivery
 
 - Plans and specs stay local (gitignored): the design spec and research notes in `docs/superpowers/specs/`, plans in `.agents/plans/` with `000-roadmap.md` as the living index (open work only, next free plan number at the top). A finished plan is deleted; its outcome moves into `.agents/architecture.md` or `.agents/design.md`.
-- Before building, turn the next plan into TDD tasks (superpowers `writing-plans`), then execute subagent-driven in a git worktree under `/opt/projects/chamberu/worktrees/<name>`; keep `master` checked out in the main clone.
+- Before building, turn the next plan into TDD tasks (superpowers `writing-plans`), then execute subagent-driven in a git worktree under `/opt/projects/chamvi/worktrees/<name>`; keep `master` checked out in the main clone.
 - For larger work, orchestrate with workflows: Opus implementers, Fable reviewers, a per-task review and fix loop, and an adversarial whole-branch review with one fix wave before merge.
 - Every change lands through a pull request with a Conventional Commit title and an evidence-based body (what changed, what was run). The repo squash-merges with the PR title as the commit message and deletes merged branches.
 - Ask before pushing to `master`, publishing to npm or merging release PRs. Settle visual choices (brand, layouts) with rendered previews before implementing.

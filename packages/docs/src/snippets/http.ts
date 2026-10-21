@@ -1,15 +1,15 @@
 import type { ITokenVerifier } from '@authup/server-adapter-kit';
-import type { Agent, IStore } from '@chamberu/core';
-import { Engine } from '@chamberu/core';
+import type { Agent, IStore } from '@chamvi/core';
+import { Engine } from '@chamvi/core';
 import {
     authup,
     createHttpApp,
     createShutdown,
     oidc,
     staticTokens,
-} from '@chamberu/http';
-import type { Authenticator } from '@chamberu/http';
-import { createScheduler } from '@chamberu/scheduler';
+} from '@chamvi/http';
+import type { Authenticator } from '@chamvi/http';
+import { createScheduler } from '@chamvi/scheduler';
 import { serve } from 'routup';
 
 /** `verifier`: an authup `TokenVerifier` in remote mode (with a `creator`), so tokens carry their grants. */
@@ -35,7 +35,7 @@ export function authenticators(verifier: ITokenVerifier): Authenticator[] {
             issuers: [{
                 id: 'github-actions',
                 issuer: 'https://token.actions.githubusercontent.com',
-                audience: 'chamberu',
+                audience: 'chamvi',
             }],
             principal: ({ claims }) => (claims.repository === 'acme/infra' ?
                 {
@@ -75,7 +75,7 @@ export async function start(store: IStore, agents: Agent[], resumeSecret: string
         basePath: '/api',
         // behind one reverse proxy: trust its X-Forwarded-For
         trustProxy: 1,
-        cors: { origin: 'https://chamberu.example.com' },
+        cors: { origin: 'https://chamvi.example.com' },
     });
 
     await engine.start();
@@ -101,10 +101,10 @@ export async function start(store: IStore, agents: Agent[], resumeSecret: string
 // #region mcp
 // OpenClaw (or any MCP client) lists the app as a streamable HTTP server
 export const mcpServers = {
-    chamberu: {
+    chamvi: {
         type: 'http',
-        url: 'http://chamberu.agents.svc/api/mcp',
-        headers: { Authorization: 'Bearer ${CHAMBERU_TOKEN}' },
+        url: 'http://chamvi.agents.svc/api/mcp',
+        headers: { Authorization: 'Bearer ${CHAMVI_TOKEN}' },
     },
 };
 // #endregion mcp
@@ -112,7 +112,7 @@ export const mcpServers = {
 /** A client of the app above (`basePath: '/api'`): start a run with a file, then download what it stored. */
 export async function startWithAttachment(token: string, png: Uint8Array) {
     // #region attachments
-    const base = 'https://chamberu.example.com/api';
+    const base = 'https://chamvi.example.com/api';
     const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
 
     const started = await fetch(`${base}/agents/triage/runs`, {

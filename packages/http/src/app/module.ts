@@ -19,7 +19,7 @@ import { buildContext, createErrorHandler } from './helpers.ts';
 import type { HttpAppOptions } from './types.ts';
 
 /**
- * Builds the routup App of a chamberu app: health, REST, webhooks and MCP,
+ * Builds the routup App of a chamvi app: health, REST, webhooks and MCP,
  * one JSON error body for every route under `basePath`.
  */
 export function createHttpApp(options: HttpAppOptions): App {

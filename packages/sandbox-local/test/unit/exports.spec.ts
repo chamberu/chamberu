@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as local from '@chamberu/sandbox-local';
+import * as local from '@chamvi/sandbox-local';
 
 describe('public api', () => {
     it('exports createLocalSandbox only', () => {

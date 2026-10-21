@@ -10,7 +10,7 @@ import type {
     Run,
     RunStatusLiteral,
     TriggerDefinition,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type { StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Principal } from '../auth/types.ts';

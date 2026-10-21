@@ -31,21 +31,21 @@ Each agent repository gets:
 
 ## Sandboxes in the cluster
 
-[`@chamberu/sandbox-k8s`](/reference/sandbox#chamberu-sandbox-k8s) ships today; only the chart that wires it up is planned. Untrusted code runs in one bare pod per workspace (`chamberu-ws-<id>`):
+[`@chamvi/sandbox-k8s`](/reference/sandbox#chamvi-sandbox-k8s) ships today; only the chart that wires it up is planned. Untrusted code runs in one bare pod per workspace (`chamvi-ws-<id>`):
 
 - `runAsNonRoot` as uid 1000, seccomp `RuntimeDefault`, a read-only root filesystem, no capabilities, no privilege escalation
-- `automountServiceAccountToken: false`, `enableServiceLinks: false`, no chamberu Secrets or environment
+- `automountServiceAccountToken: false`, `enableServiceLinks: false`, no chamvi Secrets or environment
 - requests equal to limits for `cpu`, `memory` and `ephemeral-storage`; `/workspace` an emptyDir with a `sizeLimit`, `/tmp` a 512 MiB memory emptyDir; pids through the kubelet's `podPidsLimit`
 - `restartPolicy: Never` and `activeDeadlineSeconds` set to the workspace lifetime, so a pod stops itself at expiry
-- labels `app.kubernetes.io/managed-by=chamberu`, `app.kubernetes.io/component=sandbox`, `chamberu.dev/run=<runId>`, `chamberu.dev/workspace=<id>` plus your `podLabels`; the expiry as the annotation `chamberu.dev/expires-at`
+- labels `app.kubernetes.io/managed-by=chamvi`, `app.kubernetes.io/component=sandbox`, `chamvi.dev/run=<runId>`, `chamvi.dev/workspace=<id>` plus your `podLabels`; the expiry as the annotation `chamvi.dev/expires-at`
 
-Expired, failed and finished sandbox pods are garbage-collected by the provider. Run the pods in their own namespace and give chamberu's service account this Role there:
+Expired, failed and finished sandbox pods are garbage-collected by the provider. Run the pods in their own namespace and give chamvi's service account this Role there:
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: chamberu-sandbox
+  name: chamvi-sandbox
   namespace: agents-sandbox
 rules:
   - apiGroups: [""]
@@ -59,7 +59,7 @@ rules:
 `pods/exec` needs both `get` (the exec WebSocket opens with a GET) and `create` (API servers with the WebSocket-upgrade authorization change).
 
 ::: danger Not a network boundary yet
-Without a NetworkPolicy a workspace pod reaches every service in the cluster, the chamberu API and its database included, and cloud metadata. Until the chart ships its policy, add one that selects `app.kubernetes.io/component=sandbox` and denies all egress except DNS, GitHub and the npm registry, with the chamberu namespace and `169.254.169.254` denied explicitly.
+Without a NetworkPolicy a workspace pod reaches every service in the cluster, the chamvi API and its database included, and cloud metadata. Until the chart ships its policy, add one that selects `app.kubernetes.io/component=sandbox` and denies all egress except DNS, GitHub and the npm registry, with the chamvi namespace and `169.254.169.254` denied explicitly.
 :::
 
 A short-lived, narrowly scoped GitHub token for a sandbox that must push is planned.

@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ErrorCode, InvalidRunStateError } from '@chamberu/core';
+import { ErrorCode, InvalidRunStateError } from '@chamvi/core';
 import { attachmentIds, createRunArtifacts, storeArtifact } from '../../../src/artifact/module.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { ControllableClock } from '../../utils/clock.ts';

@@ -1,12 +1,12 @@
-# @chamberu/http
+# @chamvi/http
 
-REST, SSE, webhooks and MCP for chamberu agents, on routup. The public API of `packages/http/src/index.ts`.
+REST, SSE, webhooks and MCP for chamvi agents, on routup. The public API of `packages/http/src/index.ts`.
 
 ```bash
-npm install @chamberu/http @chamberu/core --save
+npm install @chamvi/http @chamvi/core --save
 ```
 
-`@chamberu/core` is a peer dependency. See [HTTP API & MCP](/guide/http) for the behaviour.
+`@chamvi/core` is a peer dependency. See [HTTP API & MCP](/guide/http) for the behaviour.
 
 ## createHttpApp
 
@@ -18,7 +18,7 @@ The store, the agents and the clock come from `engine` (`engine.store`, `engine.
 
 <<< ../../../http/src/app/types.ts#options{ts}
 
-`routes` takes extra routes from other packages, such as the GitHub webhook of `@chamberu/github`:
+`routes` takes extra routes from other packages, such as the GitHub webhook of `@chamvi/github`:
 
 <<< ../../../http/src/app/types.ts#routes{ts}
 

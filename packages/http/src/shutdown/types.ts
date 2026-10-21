@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Engine } from '@chamberu/core';
+import type { Engine } from '@chamvi/core';
 
 export interface IShutdown {
     /** True from the first `shutdown()` call on; `/readyz` then fails. */

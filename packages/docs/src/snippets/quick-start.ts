@@ -6,7 +6,7 @@ import {
     defineAgent,
     defineEffectTool,
     http,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 export async function triageIssue(model: LanguageModel) {
     const labels: string[] = [];

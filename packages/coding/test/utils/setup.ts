@@ -9,12 +9,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ToolSet } from 'ai';
-import { codingTools } from '@chamberu/coding';
-import { createWorkspaceManager } from '@chamberu/sandbox';
-import type { IWorkspace, IWorkspaceManager } from '@chamberu/sandbox';
-import { createLocalSandbox } from '@chamberu/sandbox-local';
-import { createGitFixture } from '@chamberu/test-kit';
-import type { GitFixture } from '@chamberu/test-kit';
+import { codingTools } from '@chamvi/coding';
+import { createWorkspaceManager } from '@chamvi/sandbox';
+import type { IWorkspace, IWorkspaceManager } from '@chamvi/sandbox';
+import { createLocalSandbox } from '@chamvi/sandbox-local';
+import { createGitFixture } from '@chamvi/test-kit';
+import type { GitFixture } from '@chamvi/test-kit';
 import { callTool, toolContext } from './context.ts';
 
 export const FIXTURE_FILES: Record<string, string> = {
@@ -40,7 +40,7 @@ export function createFixture(): Promise<GitFixture> {
 
 /** A manager over a local sandbox in a temp root, with run r1 holding a checkout of `fixture`. */
 export async function setupCoding(fixture: GitFixture): Promise<CodingSetup> {
-    const root = await mkdtemp(join(tmpdir(), 'chamberu-coding-'));
+    const root = await mkdtemp(join(tmpdir(), 'chamvi-coding-'));
     const manager = createWorkspaceManager({
         provider: createLocalSandbox({ root }),
         allowFileRepos: true,

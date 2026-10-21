@@ -57,6 +57,6 @@ jobs:
               uses: tada5hi/craneship@v4
               with:
                   dockerFilePath: images/sandbox-node
-                  registryRepository: chamberu/sandbox-node
+                  registryRepository: chamvi/sandbox-node
                   registryTag: ${{ steps.tags.outputs.list }}
                   platforms: linux/amd64,linux/arm64

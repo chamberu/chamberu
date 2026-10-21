@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ValidationError } from '@chamberu/core';
-import { assertGitRef, normalizeRepo } from '@chamberu/sandbox';
+import { ValidationError } from '@chamvi/core';
+import { assertGitRef, normalizeRepo } from '@chamvi/sandbox';
 
 describe('normalizeRepo', () => {
     it('expands owner/name to a GitHub https URL', () => {

@@ -12,7 +12,7 @@ import CFooter from '../components/layout/CFooter.vue';
 // Thin wrapper: the default layout plus the site-wide footer. Keep Tailwind
 // classes out of this file, `theme/` is not a Tailwind @source.
 export default defineComponent({
-    name: 'ChamberuLayout',
+    name: 'ChamviLayout',
     components: {
         DefaultLayout: DefaultTheme.Layout,
         CFooter,

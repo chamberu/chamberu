@@ -5,11 +5,11 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IClock } from '@chamberu/core';
-import type { SandboxLimits, WorkspaceInfo } from '@chamberu/sandbox';
+import type { IClock } from '@chamvi/core';
+import type { SandboxLimits, WorkspaceInfo } from '@chamvi/sandbox';
 
 export type LocalSandboxOptions = {
-    /** Directory holding one folder per workspace. Default `join(os.tmpdir(), 'chamberu-workspaces')`. */
+    /** Directory holding one folder per workspace. Default `join(os.tmpdir(), 'chamvi-workspaces')`. */
     root?: string;
     /** Added to every workspace's environment (after the defaults, so it wins). */
     env?: Record<string, string>;

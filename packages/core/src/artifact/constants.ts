@@ -6,4 +6,4 @@
  */
 
 /** Prefix of the `data` string a checkpoint keeps in a file part instead of an artifact's bytes. */
-export const ARTIFACT_URI_PREFIX = 'chamberu-artifact:';
+export const ARTIFACT_URI_PREFIX = 'chamvi-artifact:';

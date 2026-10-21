@@ -7,7 +7,7 @@
 
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import type { KeyObject } from 'node:crypto';
-import type { ControllableClock } from '@chamberu/test-kit';
+import type { ControllableClock } from '@chamvi/test-kit';
 
 export type FakeRequest = {
     method: string;
@@ -197,7 +197,7 @@ export function createFakeGithub(input: {
         if (path === '/app' || path.startsWith('/app/')) {
             if (!verifyJwt(authorization)) return json(401, { message: 'Bad credentials' });
             if (method === 'GET' && path === '/app') {
-                return json(200, { id: Number(input.appId), slug: input.slug ?? 'chamberu-test' });
+                return json(200, { id: Number(input.appId), slug: input.slug ?? 'chamvi-test' });
             }
             const exchange = /^\/app\/installations\/(\d+)\/access_tokens$/.exec(path);
             if (method === 'POST' && exchange?.[1]) {
@@ -232,7 +232,7 @@ export function createFakeGithub(input: {
     };
 
     fake.route('GET', '/rate_limit', () => ({ status: 200, body: { resources: {} } }));
-    addRepoRoutes(fake, `${input.slug ?? 'chamberu-test'}[bot]`, input.clock);
+    addRepoRoutes(fake, `${input.slug ?? 'chamvi-test'}[bot]`, input.clock);
     return fake;
 }
 

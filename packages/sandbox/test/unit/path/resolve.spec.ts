@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ValidationError } from '@chamberu/core';
-import { absoluteWorkspacePath, resolveWorkspacePath } from '@chamberu/sandbox';
+import { ValidationError } from '@chamvi/core';
+import { absoluteWorkspacePath, resolveWorkspacePath } from '@chamvi/sandbox';
 
 describe('resolveWorkspacePath', () => {
     it.each([

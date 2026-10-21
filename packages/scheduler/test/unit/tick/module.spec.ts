@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { TriggerDefinition } from '@chamberu/core';
+import type { TriggerDefinition } from '@chamvi/core';
 import {
     Engine,
     InvalidAgentDefinitionError,
@@ -14,9 +14,9 @@ import {
     cron,
     defineAgent,
     http,
-} from '@chamberu/core';
-import { fireCronTrigger, readCronOptions } from '@chamberu/scheduler';
-import { ControllableClock } from '@chamberu/test-kit';
+} from '@chamvi/core';
+import { fireCronTrigger, readCronOptions } from '@chamvi/scheduler';
+import { ControllableClock } from '@chamvi/test-kit';
 import { textModel } from '../../utils/model.ts';
 
 const T = new Date('2026-03-01T08:00:00.000Z');

@@ -1,13 +1,13 @@
 import type { LanguageModel } from 'ai';
-import type { IStore } from '@chamberu/core';
+import type { IStore } from '@chamvi/core';
 import {
     Engine,
     cron,
     defineAgent,
     requireToolPermission,
-} from '@chamberu/core';
-import { createGithubApp, githubWebhook } from '@chamberu/github';
-import { createHttpApp, staticTokens } from '@chamberu/http';
+} from '@chamvi/core';
+import { createGithubApp, githubWebhook } from '@chamvi/github';
+import { createHttpApp, staticTokens } from '@chamvi/http';
 
 export function createTriage(model: LanguageModel, store: IStore) {
     // #region app
@@ -55,7 +55,7 @@ export function createTriage(model: LanguageModel, store: IStore) {
         engine,
         auth: staticTokens({
             tokens: [{
-                value: process.env.CHAMBERU_TOKEN ?? '',
+                value: process.env.CHAMVI_TOKEN ?? '',
                 id: 'ci',
                 permissions: ['*'],
             }],

@@ -21,8 +21,8 @@ import {
     defineTool,
     http,
     webhook,
-} from '@chamberu/core';
-import type { AgentDefinition, TriggerDefinition } from '@chamberu/core';
+} from '@chamvi/core';
+import type { AgentDefinition, TriggerDefinition } from '@chamvi/core';
 
 const model = {} as LanguageModel;
 const base = { model, instructions: 'do things' };

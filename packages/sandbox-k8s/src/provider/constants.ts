@@ -8,8 +8,8 @@
 /** Name of the one container of a workspace pod. */
 export const CONTAINER_NAME = 'sandbox';
 
-/** A workspace pod is named `chamberu-ws-<workspace id>`. */
-export const POD_NAME_PREFIX = 'chamberu-ws-';
+/** A workspace pod is named `chamvi-ws-<workspace id>`. */
+export const POD_NAME_PREFIX = 'chamvi-ws-';
 
 /** How long `create` waits for a pod to run. */
 export const START_TIMEOUT_MS = 120_000;

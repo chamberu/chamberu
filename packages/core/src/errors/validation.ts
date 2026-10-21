@@ -6,14 +6,14 @@
  */
 
 import type { Issue } from '@ebec/core';
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /**
  * A value failed its Standard Schema validation (e.g. a state document on
  * upsert). `issues` holds the validup issues, with paths flattened to keys.
  */
-export class ValidationError extends ChamberuError {
+export class ValidationError extends ChamviError {
     constructor(message: string, issues: readonly Issue[] = []) {
         super({
             message, 

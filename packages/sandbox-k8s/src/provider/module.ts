@@ -7,11 +7,11 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-    ChamberuError,
+    ChamviError,
     SandboxError,
     ValidationError,
     systemClock,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import {
     DEFAULT_SANDBOX_IMAGE,
     SANDBOX_LABEL_SELECTORS,
@@ -24,8 +24,8 @@ import {
     delay,
     prepareWorkspace,
     resolveLimits,
-} from '@chamberu/sandbox';
-import type { ISandboxProvider, IWorkspace } from '@chamberu/sandbox';
+} from '@chamvi/sandbox';
+import type { ISandboxProvider, IWorkspace } from '@chamvi/sandbox';
 import { createPodClient } from '../client/module.ts';
 import { createPodTransport } from '../transport/module.ts';
 import {
@@ -148,7 +148,7 @@ export function createKubernetesSandbox(options: KubernetesSandboxOptions): ISan
             } catch (error) {
                 // deleting a pod that was never created is a 404, which is fine
                 await workspace.dispose().catch(() => undefined);
-                if (error instanceof ChamberuError) throw error;
+                if (error instanceof ChamviError) throw error;
                 throw new SandboxError(`cannot start workspace pod ${name}`, { cause: error });
             }
             return workspace;

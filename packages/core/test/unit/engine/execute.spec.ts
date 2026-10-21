@@ -17,8 +17,8 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { Engine, FatalToolError, defineAgent } from '@chamberu/core';
-import type { Budget, EngineOptions } from '@chamberu/core';
+import { Engine, FatalToolError, defineAgent } from '@chamvi/core';
+import type { Budget, EngineOptions } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';

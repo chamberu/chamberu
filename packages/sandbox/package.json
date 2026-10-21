@@ -1,17 +1,17 @@
 {
-    "name": "@chamberu/sandbox",
+    "name": "@chamvi/sandbox",
     "version": "0.1.0",
     "type": "module",
-    "description": "Sandbox contracts, workspace rules and run-scoped workspaces for chamberu agents.",
+    "description": "Sandbox contracts, workspace rules and run-scoped workspaces for chamvi agents.",
     "author": {
         "name": "Peter Placzek",
         "email": "contact@tada5hi.net",
         "url": "https://github.com/tada5hi"
     },
-    "homepage": "https://chamberu.dev",
+    "homepage": "https://chamvi.dev",
     "repository": {
         "type": "git",
-        "url": "https://github.com/chamberu/chamberu.git",
+        "url": "https://github.com/chamvi/chamvi.git",
         "directory": "packages/sandbox"
     },
     "main": "dist/index.mjs",
@@ -39,7 +39,7 @@
         "test:coverage": "vitest --config test/vitest.config.ts --run --coverage"
     },
     "keywords": [
-        "chamberu",
+        "chamvi",
         "sandbox",
         "workspace",
         "agent"
@@ -52,12 +52,12 @@
         "smob": "^1.6.2"
     },
     "devDependencies": {
-        "@chamberu/core": "^0.1.0",
+        "@chamvi/core": "^0.1.0",
         "ai": "^7.0.143",
         "zod": "^4.6.7"
     },
     "peerDependencies": {
-        "@chamberu/core": "^0.1.0",
+        "@chamvi/core": "^0.1.0",
         "ai": "^7"
     }
 }

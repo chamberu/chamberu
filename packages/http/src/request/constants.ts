@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { TRIGGER_KEY_MAX_LENGTH } from '@chamberu/core';
+import { TRIGGER_KEY_MAX_LENGTH } from '@chamvi/core';
 
 /**
  * Bounds of an `idempotencyKey`, a `thread`, an `Idempotency-Key` header and

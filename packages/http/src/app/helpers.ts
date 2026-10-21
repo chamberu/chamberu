@@ -6,11 +6,11 @@
  */
 
 import {
-    ChamberuError,
+    ChamviError,
     ErrorCode,
     InvalidAgentDefinitionError,
-} from '@chamberu/core';
-import type { Agent, Engine } from '@chamberu/core';
+} from '@chamvi/core';
+import type { Agent, Engine } from '@chamvi/core';
 import type { Issue } from '@ebec/core';
 import { isHTTPError } from '@ebec/http';
 import type { IHTTPError } from '@ebec/http';
@@ -125,7 +125,7 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         closed: false,
         routes: validateRoutes(options),
         // eslint-disable-next-line no-console
-        onError: options.onError ?? ((error) => console.error('[chamberu]', error)),
+        onError: options.onError ?? ((error) => console.error('[chamvi]', error)),
     };
 }
 
@@ -211,7 +211,7 @@ function toErrorBody(cause: unknown): ErrorBody | undefined {
         }, cause.issues);
     }
 
-    if (cause instanceof ChamberuError) {
+    if (cause instanceof ChamviError) {
         const status = CORE_STATUS[cause.code];
         if (status === undefined) return undefined;
         return withIssues({

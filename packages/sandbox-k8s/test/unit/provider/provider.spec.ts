@@ -6,11 +6,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamberu/core';
-import { DEFAULT_SANDBOX_IMAGE } from '@chamberu/sandbox';
-import { POLL_MS, START_TIMEOUT_MS, createKubernetesSandbox } from '@chamberu/sandbox-k8s';
-import type { KubernetesSandboxOptions } from '@chamberu/sandbox-k8s';
-import { ControllableClock } from '@chamberu/test-kit';
+import { InvalidAgentDefinitionError, SandboxError, ValidationError } from '@chamvi/core';
+import { DEFAULT_SANDBOX_IMAGE } from '@chamvi/sandbox';
+import { POLL_MS, START_TIMEOUT_MS, createKubernetesSandbox } from '@chamvi/sandbox-k8s';
+import type { KubernetesSandboxOptions } from '@chamvi/sandbox-k8s';
+import { ControllableClock } from '@chamvi/test-kit';
 import {
     createFakePodClient,
     unwrap,
@@ -75,9 +75,9 @@ describe('kubernetes sandbox', () => {
         const workspace = await creating;
         expect(client.reads).toBe(3);
         expect(client.created).toHaveLength(1);
-        const name = `chamberu-ws-${workspace.id}`;
+        const name = `chamvi-ws-${workspace.id}`;
         expect(client.created[0]!.metadata?.name).toBe(name);
-        expect(client.created[0]!.metadata?.labels?.['chamberu.dev/run']).toBe('r1');
+        expect(client.created[0]!.metadata?.labels?.['chamvi.dev/run']).toBe('r1');
         expect(client.execs.map((call) => call.name)).toEqual(Array(5).fill(name));
         expect(client.execs.map((call) => call.argv)).toEqual([
             wrapped(['git', 'init', '-q', '.']),
@@ -121,7 +121,7 @@ describe('kubernetes sandbox', () => {
             timeoutMs: 1500,
         });
         expect(client.execs.at(-1)).toEqual({
-            name: `chamberu-ws-${workspace.id}`,
+            name: `chamvi-ws-${workspace.id}`,
             argv: wrapped(['cat'], '1.5', '/workspace/sub'),
             stdin: 'piped ✓',
         });
@@ -253,13 +253,13 @@ describe('kubernetes sandbox', () => {
         expect(workspace.disposed).toBe(true);
         await expect(workspace.readFile('a.txt')).rejects.toThrow(/is gone/);
         await workspace.dispose();
-        expect(client.deleted).toEqual([`chamberu-ws-${workspace.id}`]);
+        expect(client.deleted).toEqual([`chamvi-ws-${workspace.id}`]);
     });
 
     it('marks a workspace whose pod was deleted as gone', async () => {
         const { client, provider } = setup();
         const workspace = await provider.create({ runId: 'r1' });
-        client.pods.delete(`chamberu-ws-${workspace.id}`);
+        client.pods.delete(`chamvi-ws-${workspace.id}`);
         client.onExec = () => { throw new SandboxError('cannot exec in pod: Unexpected server response: 404'); };
 
         await expect(workspace.exec(['true'])).rejects.toThrow(/is gone/);
@@ -283,7 +283,7 @@ describe('kubernetes sandbox', () => {
 
         await workspace.dispose();
         await workspace.dispose();
-        expect(client.deleted).toEqual([`chamberu-ws-${workspace.id}`]);
+        expect(client.deleted).toEqual([`chamvi-ws-${workspace.id}`]);
         await expect(workspace.exec(['true'])).rejects.toThrow(SandboxError);
     });
 
@@ -378,8 +378,8 @@ describe('kubernetes sandbox', () => {
     });
 
     it.each([
-        'chamberu.dev/run',
-        'chamberu.dev/workspace',
+        'chamvi.dev/run',
+        'chamvi.dev/workspace',
         'app.kubernetes.io/managed-by',
         'app.kubernetes.io/component',
     ])('rejects podLabels that override %s', (key) => {

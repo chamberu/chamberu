@@ -16,9 +16,9 @@ import {
     it,
     vi,
 } from 'vitest';
-import { cron } from '@chamberu/core';
+import { cron } from '@chamvi/core';
 
-// pins the upstream contract @chamberu/scheduler relies on (hubwire 0.2.2)
+// pins the upstream contract @chamvi/scheduler relies on (hubwire 0.2.2)
 describe('hubwire scheduled component', () => {
     let components: IScheduledComponent[] = [];
     let lock: MemoryScheduleLock;

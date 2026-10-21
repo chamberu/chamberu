@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { createOutputCollector, createSinkStream } from '@chamberu/sandbox';
+import { createOutputCollector, createSinkStream } from '@chamvi/sandbox';
 
 describe('createSinkStream', () => {
     it('hands every chunk to the sink', async () => {

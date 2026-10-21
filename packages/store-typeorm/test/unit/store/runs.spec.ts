@@ -13,10 +13,10 @@ import {
     expect,
     it,
 } from 'vitest';
-import { InvalidRunStateError, RunNotFoundError } from '@chamberu/core';
-import type { Run } from '@chamberu/core';
-import { ControllableClock } from '@chamberu/test-kit';
-import { TypeormStore } from '@chamberu/store-typeorm';
+import { InvalidRunStateError, RunNotFoundError } from '@chamvi/core';
+import type { Run } from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import { TypeormStore } from '@chamvi/store-typeorm';
 import { createTestDataSource, describePostgres, truncateStore } from '../../utils/database.ts';
 
 function makeRun(id: string, overrides: Partial<Run> = {}): Run {

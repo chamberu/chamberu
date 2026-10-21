@@ -4,7 +4,7 @@ import {
     defineAgent,
     defineEffectTool,
     effectMarker,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 interface Comment {
     id: number;

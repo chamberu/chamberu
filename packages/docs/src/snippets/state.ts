@@ -6,7 +6,7 @@ import {
     ValidationError,
     createAgentState,
     defineAgent,
-} from '@chamberu/core';
+} from '@chamvi/core';
 
 // #region schema
 const loop = z.object({

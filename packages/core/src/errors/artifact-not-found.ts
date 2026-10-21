@@ -5,10 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ChamberuError } from './base.ts';
+import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
-export class ArtifactNotFoundError extends ChamberuError {
+export class ArtifactNotFoundError extends ChamviError {
     constructor(artifactId: string) {
         super({ message: `Artifact "${artifactId}" was not found.`, code: ErrorCode.ARTIFACT_NOT_FOUND });
     }

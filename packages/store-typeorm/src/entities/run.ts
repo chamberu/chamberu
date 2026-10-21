@@ -11,7 +11,7 @@ import {
     Index,
     PrimaryColumn,
 } from 'typeorm';
-import type { Run, RunStatusLiteral, Usage } from '@chamberu/core';
+import type { Run, RunStatusLiteral, Usage } from '@chamvi/core';
 import { OPTIONAL_JSON_TRANSFORMER, TableName } from './constants.ts';
 
 @Index(['agent', 'status', 'concurrencyKey'])

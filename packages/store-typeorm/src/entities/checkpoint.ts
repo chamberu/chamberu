@@ -10,7 +10,7 @@ import {
     Entity,
     PrimaryColumn,
 } from 'typeorm';
-import type { Checkpoint } from '@chamberu/core';
+import type { Checkpoint } from '@chamvi/core';
 import { JSON_VALUE_TRANSFORMER, TableName } from './constants.ts';
 
 @Entity({ name: TableName.CHECKPOINTS })

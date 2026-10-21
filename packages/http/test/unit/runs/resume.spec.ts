@@ -11,7 +11,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import { createResumeToken } from '@chamberu/core';
+import { createResumeToken } from '@chamvi/core';
 import {
     ADMIN_TOKEN,
     call,

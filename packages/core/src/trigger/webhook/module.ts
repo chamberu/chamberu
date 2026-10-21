@@ -11,7 +11,7 @@ import type { WebhookTriggerOptions } from './types.ts';
 
 /**
  * A generic webhook (envelope `source: 'webhook'`), id `webhook:<path>`; an
- * agent may declare many. Served by `@chamberu/http` at
+ * agent may declare many. Served by `@chamvi/http` at
  * `POST /hooks/:agent<path>` (e.g. `/hooks/intake/issues`).
  */
 export function webhook(opts: WebhookTriggerOptions): TriggerDefinition {

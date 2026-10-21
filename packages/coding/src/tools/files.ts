@@ -7,7 +7,7 @@
 
 import { Buffer } from 'node:buffer';
 import type { Tool } from 'ai';
-import { ValidationError, defineTool } from '@chamberu/core';
+import { ValidationError, defineTool } from '@chamvi/core';
 import { READ_MAX_CHARS, READ_MAX_LINES } from './constants.ts';
 import {
     cutText,

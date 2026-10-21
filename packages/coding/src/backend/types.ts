@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IWorkspace } from '@chamberu/sandbox';
+import type { IWorkspace } from '@chamvi/sandbox';
 
 export type CodingBudget = {
     maxSteps?: number;

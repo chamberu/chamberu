@@ -13,7 +13,7 @@ import {
 } from 'typeorm';
 import { JSON_VALUE_TRANSFORMER, TableName } from './constants.ts';
 
-@Index('IDX_chamberu_docs_doc_gin', ['doc'], { type: 'gin' })
+@Index('IDX_chamvi_docs_doc_gin', ['doc'], { type: 'gin' })
 @Entity({ name: TableName.DOCS })
 export class DocEntity {
     @PrimaryColumn({

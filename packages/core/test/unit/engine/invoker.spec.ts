@@ -19,14 +19,14 @@ import {
     ValidationError,
     defineAgent,
     requireToolPermission,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import type {
     AgentDefinition,
     INotifier,
     Invoker,
     Notification,
     RunContext,
-} from '@chamberu/core';
+} from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
 import { mockModel } from '../../utils/mock-model.ts';
