@@ -105,8 +105,8 @@ export function messageOf(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
-/** The CliContext bound to this process. */
-export function processContext(): CliContext {
+/** The CliContext bound to this process; `cliPath` is the bin (`dist/cli.mjs`), which `chamvi dev` spawns. */
+export function processContext(cliPath: string = process.argv[1] ?? ''): CliContext {
     return {
         cwd: process.cwd(),
         env: process.env,
@@ -124,6 +124,6 @@ export function processContext(): CliContext {
         importModule: (specifier) => import(specifier),
         spawn,
         execPath: process.execPath,
-        cliPath: process.argv[1] ?? '',
+        cliPath,
     };
 }
