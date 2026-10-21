@@ -24,6 +24,7 @@ import type {
     RunDetail,
     RunPage,
     ScheduleWire,
+    StartRunResult,
 } from './types.ts';
 
 type RequestOptions = {
@@ -100,6 +101,7 @@ export function createApiClient(options: ApiClientOptions): IApiClient {
             `${path('agents', agent)}/state/collections${path(collection)}`,
             pageQuery(new URLSearchParams(), page),
         ))),
+        startRun: (agent, body) => request<StartRunResult>(`${path('agents', agent)}/runs`, { method: 'POST', body }),
         streamRun: (id, init) => send(`${path('runs', id)}/stream`, {
             headers: {
                 accept: 'text/event-stream',

@@ -34,6 +34,18 @@ describe('createApiClient', () => {
         });
     });
 
+    it('starts a run through the agent\'s http trigger', async () => {
+        const { fetch, requests } = createFakeFetch([json({ runId: 'r9', deduplicated: false }, 202)]);
+        const client = createApiClient({
+            apiBase: '/api',
+            token: async () => 'tok',
+            fetch,
+        });
+        expect(await client.startRun('release notes', { payload: { tag: 'v1' } })).toEqual({ runId: 'r9', deduplicated: false });
+        expect(requests[0]).toMatchObject({ url: '/api/agents/release%20notes/runs', method: 'POST' });
+        expect(JSON.parse(requests[0]!.body!)).toEqual({ payload: { tag: 'v1' } });
+    });
+
     it('sends no authorization without a token', async () => {
         const { fetch, requests } = createFakeFetch([json({ data: [] })]);
         const client = createApiClient({

@@ -127,6 +127,8 @@ describe('format', () => {
         expect(formatTokens(950)).toBe('950');
         expect(formatTokens(14_210)).toBe('14.2k');
         expect(formatTokens(2_500_000)).toBe('2.5M');
+        expect(formatTokens(200_000)).toBe('200k');
+        expect(formatTokens(1_000_000)).toBe('1M');
         expect(formatDuration(48_000)).toBe('0:48');
         expect(formatDuration(134_000)).toBe('2:14');
         expect(formatDuration(3_725_000)).toBe('1:02:05');

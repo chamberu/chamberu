@@ -84,8 +84,8 @@ export function isSettled(run: RunWire): boolean {
 }
 
 export function formatTokens(count: number): string {
-    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k`;
     return String(count);
 }
 

@@ -8,6 +8,8 @@
 export const RouteName = {
     LOGIN: 'login',
     LOGIN_CALLBACK: 'login-callback',
+    AGENTS: 'agents',
+    AGENT: 'agent',
     RUNS: 'runs',
     RUN: 'run',
     APPROVALS: 'approvals',

@@ -20,6 +20,9 @@ import type {
     RunListFilter,
     RunPage,
 } from '../api/types.ts';
+import { ACTIVITY_LIMIT } from '../agents/constants.ts';
+import { summarizeActivity } from '../agents/helpers.ts';
+import type { Activity } from '../agents/types.ts';
 import { createPoller } from '../polling/module.ts';
 import { openRunStream } from '../sse/module.ts';
 import type { IRunStream, RunStreamOptions } from '../sse/types.ts';
@@ -79,6 +82,25 @@ export function useRunCounts(client: IApiClient, statuses: readonly RunStatusLit
     onScopeDispose(() => poller.stop());
 
     return { counts, error };
+}
+
+/** The last 24 h over every agent, from the newest `ACTIVITY_LIMIT` runs (the API has no time filter). */
+export function useRunActivity(client: IApiClient) {
+    const activity = shallowRef<Activity>(summarizeActivity([], Date.now(), ACTIVITY_LIMIT));
+    const error = shallowRef<ApiError>();
+    const poller = createPoller(async () => {
+        try {
+            const page = await client.listRuns({ limit: ACTIVITY_LIMIT, offset: 0 });
+            activity.value = summarizeActivity(page.data, Date.now(), ACTIVITY_LIMIT);
+            error.value = undefined;
+        } catch (e) {
+            error.value = asApiError(e);
+        }
+    }, RUN_COUNTS_POLL_MS);
+    poller.start();
+    onScopeDispose(() => poller.stop());
+
+    return { activity, error };
 }
 
 export type RunDetailDeps = {

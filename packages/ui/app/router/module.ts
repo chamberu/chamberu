@@ -37,6 +37,16 @@ export function createUiRouter(config: UiConfig, guards: NavigationGuard[] = [],
                 component: () => import('../views/RunsView.vue'),
             },
             {
+                path: '/agents',
+                name: RouteName.AGENTS,
+                component: () => import('../views/AgentsView.vue'),
+            },
+            {
+                path: '/agents/:name',
+                name: RouteName.AGENT,
+                component: () => import('../views/AgentView.vue'),
+            },
+            {
                 path: '/runs/:id',
                 name: RouteName.RUN,
                 component: () => import('../views/RunView.vue'),

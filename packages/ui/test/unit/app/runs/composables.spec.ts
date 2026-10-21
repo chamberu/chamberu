@@ -8,7 +8,12 @@
 import { describe, expect, it } from 'vitest';
 import { effectScope, nextTick, ref } from 'vue';
 import type { RunListFilter } from '../../../../app/api/types.ts';
-import { useRunCounts, useRunDetail, useRunList } from '../../../../app/runs/composables.ts';
+import {
+    useRunActivity,
+    useRunCounts,
+    useRunDetail,
+    useRunList,
+} from '../../../../app/runs/composables.ts';
 import type { RunStreamEvent, RunStreamOptions } from '../../../../app/sse/types.ts';
 import { apiError, fakeClient } from '../../../utils/client.ts';
 import { wireRun, wireStep } from '../../../utils/runs.ts';
@@ -200,6 +205,40 @@ describe('useRunCounts', () => {
         await flush();
         expect(counts.value).toEqual({});
         expect(error.value).toMatchObject({ status: 429 });
+        scope.stop();
+    });
+});
+
+describe('useRunActivity', () => {
+    it('summarizes the newest runs of every agent for the last 24 h', async () => {
+        const seen: RunListFilter[] = [];
+        const now = new Date().toISOString();
+        const client = fakeClient({
+            listRuns: async (filter) => {
+                seen.push(filter);
+                return {
+                    data: [wireRun({
+                        id: 'a', 
+                        status: 'failed', 
+                        createdAt: now, 
+                    }), wireRun({ id: 'b', createdAt: '2020-01-01T00:00:00.000Z' })],
+                    meta: {
+                        total: 2, 
+                        limit: 100, 
+                        offset: 0, 
+                    },
+                };
+            },
+        });
+        const scope = effectScope();
+        const { activity } = scope.run(() => useRunActivity(client))!;
+        await flush();
+        expect(seen[0]).toEqual({ limit: 100, offset: 0 });
+        expect(activity.value).toMatchObject({
+            count: 1, 
+            failed: 1, 
+            saturated: false, 
+        });
         scope.stop();
     });
 });

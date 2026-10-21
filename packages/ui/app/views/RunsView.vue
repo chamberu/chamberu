@@ -7,20 +7,28 @@
  */
 
 import type { RunStatusLiteral } from '@chamvi/core';
-import { computed, shallowRef, watch } from 'vue';
+import { 
+    computed, 
+    inject, 
+    shallowRef, 
+    watch, 
+} from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { failedSummary, oldestWaiting, tokenShares } from '../agents/helpers.ts';
 import { useAgents } from '../agents/composables.ts';
+import { INBOX } from '../approvals/constants.ts';
 import type { RunListFilter } from '../api/types.ts';
 import EmptyState from '../components/empty-state/EmptyState.vue';
 import PageHead from '../components/page-head/PageHead.vue';
 import RunsTable from '../components/runs-table/RunsTable.vue';
 import { useAppContext } from '../context/module.ts';
-import { useRunCounts, useRunList } from '../runs/composables.ts';
+import { useRunActivity, useRunCounts, useRunList } from '../runs/composables.ts';
 import {
     ALL_AGENTS,
     RUN_LIST_POLL_MS,
     RUN_STATUSES,
 } from '../runs/constants.ts';
+import { formatTokens } from '../runs/helpers.ts';
 import { filterFromQuery, queryFromFilter } from '../runs/query.ts';
 
 const { client } = useAppContext();
@@ -38,7 +46,12 @@ const {
 const { agents } = useAgents(client);
 
 // the cards count every agent, on one slower poller
-const { counts } = useRunCounts(client, ['running', 'waiting', 'failed']);
+const { counts } = useRunCounts(client, ['running', 'waiting']);
+// failed and tokens over the last 24 h, from the newest runs
+const { activity } = useRunActivity(client);
+const inbox = inject(INBOX, undefined);
+const oldest = computed(() => (inbox ? oldestWaiting(inbox.runs.value) : undefined));
+const plus = computed(() => (activity.value.saturated ? '+' : ''));
 
 const agentOptions = computed(() => [
     { value: ALL_AGENTS, label: 'all agents' },
@@ -88,13 +101,17 @@ const filtered = computed(() => !!filter.value.agent || !!filter.value.status?.l
                 <small>Running</small><b>{{ counts.running ?? '–' }}</b><span>right now</span>
             </div>
             <div class="card stat stat-wait">
-                <small>Waiting</small><b>{{ counts.waiting ?? '–' }}</b><span>for an approval</span>
+                <small>Waiting</small><b>{{ counts.waiting ?? '–' }}</b>
+                <span v-if="oldest">oldest asked <VCTimeago :datetime="oldest.updatedAt" /></span>
+                <span v-else>for an approval</span>
             </div>
             <div class="card stat stat-fail">
-                <small>Failed</small><b>{{ counts.failed ?? '–' }}</b><span>all time</span>
+                <small>Failed · 24 h</small><b>{{ activity.failed }}{{ plus }}</b>
+                <span>{{ failedSummary(activity) }}</span>
             </div>
             <div class="card stat">
-                <small>Shown</small><b>{{ page?.meta.total ?? '–' }}</b><span>match the filters</span>
+                <small>Tokens · 24 h</small><b>{{ formatTokens(activity.tokens) }}{{ plus }}</b>
+                <span>{{ tokenShares(activity.runs) || 'no runs' }}</span>
             </div>
         </div>
 

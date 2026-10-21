@@ -18,6 +18,13 @@ describe('createUiRouter', () => {
         expect(router.resolve({ name: RouteName.RUNS }).href).toBe('/ui/');
         expect(router.resolve({ name: RouteName.RUN, params: { id: 'abc' } }).href).toBe('/ui/runs/abc');
         expect(router.resolve({ name: RouteName.APPROVALS }).href).toBe('/ui/approvals');
+        expect(router.resolve({ name: RouteName.AGENTS }).href).toBe('/ui/agents');
+        expect(router.resolve({ name: RouteName.AGENT, params: { name: 'release-notes' } }).href).toBe('/ui/agents/release-notes');
+        expect(router.resolve({
+            name: RouteName.AGENT, 
+            params: { name: 'triage' }, 
+            query: { tab: 'state' }, 
+        }).href).toBe('/ui/agents/triage?tab=state');
         expect(router.resolve({ name: RouteName.STATE }).href).toBe('/ui/state');
         expect(router.resolve({ name: RouteName.STATE, params: { agent: 'triage' } }).href).toBe('/ui/state/triage');
         expect(router.resolve({ name: RouteName.SCHEDULES }).href).toBe('/ui/schedules');

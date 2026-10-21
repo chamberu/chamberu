@@ -59,6 +59,12 @@ export type ApproveBody = {
     reason?: string
 };
 
+export type StartRunBody = {
+    payload: unknown;
+};
+
+export type StartRunResult = { runId: string; deduplicated: boolean };
+
 export type ResumeBody = {
     token: string;
     approved: boolean;
@@ -89,5 +95,7 @@ export interface IApiClient {
     listKv(agent: string, page?: PageQuery): Promise<KvEntry[]>;
     listDocs(agent: string, collection: string, page?: PageQuery): Promise<DocEntry[]>;
     /** The raw SSE response of `GET /runs/:id/stream` (an ApiError for a non-2xx answer). */
+    /** `POST /agents/:name/runs`: a run through the agent's `http()` trigger. */
+    startRun(agent: string, body: StartRunBody): Promise<StartRunResult>;
     streamRun(id: string, init: { lastEventId?: number; signal: AbortSignal }): Promise<Response>;
 }

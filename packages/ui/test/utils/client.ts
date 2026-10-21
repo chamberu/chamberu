@@ -23,6 +23,7 @@ export function fakeClient(overrides: Partial<IApiClient> = {}): IApiClient {
         listKv: missing('listKv'),
         listDocs: missing('listDocs'),
         streamRun: missing('streamRun'),
+        startRun: missing('startRun'),
         ...overrides,
     };
 }
