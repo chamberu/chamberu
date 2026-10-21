@@ -13,6 +13,8 @@ export default defineConfig(({ command }) => ({
         outDir: '../dist/app',
         emptyOutDir: true,
         assetsDir: 'assets',
+        // vuecs, reka-ui and the icon set in one entry chunk
+        chunkSizeWarningLimit: 1500,
     },
     server: { proxy: Object.fromEntries(['/agents', '/runs', '/resume', '/schedules', '/me'].map((path) => [path, API])) },
 }));

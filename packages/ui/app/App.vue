@@ -5,8 +5,18 @@
  * For the full copyright and license information,
  * view the LICENSE file that was distributed with this source code.
  */
+
+import { computed } from 'vue';
+import { RouterView, useRoute } from 'vue-router';
+import AppShell from './components/app-shell/AppShell.vue';
+
+const route = useRoute();
+const bare = computed(() => route.meta.public === true);
 </script>
 
 <template>
-    <div />
+    <RouterView v-if="bare" />
+    <AppShell v-else>
+        <RouterView />
+    </AppShell>
 </template>
