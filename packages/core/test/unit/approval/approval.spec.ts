@@ -21,6 +21,8 @@ import {
     InvalidAgentDefinitionError,
     InvalidResumeTokenError,
     InvalidRunStateError,
+    RunNotFoundError,
+    ValidationError,
     createResumeToken,
     defineAgent,
 } from '@chamvi/core';
@@ -793,5 +795,141 @@ describe('Engine.inspectResumeToken', () => {
         ctx.clock.advance(1_000_000);
         expect(() => ctx.engine.inspectResumeToken(token)).toThrow('The resume token has expired.');
         expect(getRun).not.toHaveBeenCalled();
+    });
+});
+
+describe('Engine.approve', () => {
+    const approver = {
+        id: 'u1', 
+        kind: 'authup', 
+        permissions: [], 
+    };
+
+    it('approve answers the current wait point without a token', async () => {
+        const model = mockModel([deployTurn(), text('done')]);
+        const ctx = setup({ model });
+        const { runId, run } = await dispatchToWaiting(ctx);
+        const { approvalId } = run!.waiting!;
+
+        await ctx.engine.approve(runId, {
+            approvalId, 
+            approved: true, 
+            approver, 
+        });
+        await ctx.engine.idle();
+
+        expect((await ctx.store.getRun(runId))?.status).toBe('completed');
+        expect(ctx.executed).toEqual([{ env: 'prod' }]);
+        const steps = await ctx.store.listSteps(runId);
+        expect(steps.find((s) => s.kind === 'wait')?.output).toEqual({
+            approvalId,
+            approved: true,
+            approver,
+        });
+    });
+
+    it('approve denies with a reason', async () => {
+        const model = mockModel([deployTurn(), text('ok')]);
+        const ctx = setup({ model });
+        const { runId, run } = await dispatchToWaiting(ctx);
+
+        await ctx.engine.approve(runId, {
+            approvalId: run!.waiting!.approvalId, 
+            approved: false, 
+            reason: 'no', 
+        });
+        await ctx.engine.idle();
+
+        expect((await ctx.store.getRun(runId))?.status).toBe('completed');
+        expect(ctx.executed).toEqual([]);
+        expect(promptOf(model, 1)).toContain('no');
+    });
+
+    it('approve rejects a stale approvalId and leaves the run waiting', async () => {
+        const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
+        const { runId } = await dispatchToWaiting(ctx);
+        const save = vi.spyOn(ctx.store, 'saveCheckpoint');
+
+        await expect(ctx.engine.approve(runId, { approvalId: 'other', approved: true }))
+            .rejects.toThrow(InvalidRunStateError);
+        expect((await ctx.store.getRun(runId))?.status).toBe('waiting');
+        expect(save).not.toHaveBeenCalled();
+    });
+
+    it('approve rejects an expired wait point', async () => {
+        const model = mockModel([deployTurn(), text('timed out')]);
+        const ctx = setup({ model });
+        const { runId, run } = await dispatchToWaiting(ctx);
+        const { approvalId } = run!.waiting!;
+        ctx.engine.stop();
+        ctx.clock.advance(TIMEOUT);
+
+        await expect(ctx.engine.approve(runId, { approvalId, approved: true }))
+            .rejects.toThrow(`Approval "${approvalId}" of run "${runId}" expired.`);
+        expect((await ctx.store.getRun(runId))?.status).toBe('waiting');
+
+        await ctx.engine.tick();
+        const wait = (await ctx.store.listSteps(runId)).find((s) => s.kind === 'wait');
+        expect(wait?.output).toMatchObject({ approved: false, reason: 'approval timed out' });
+    });
+
+    it('approve rejects a run that is not waiting', async () => {
+        const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
+        const { runId, run } = await dispatchToWaiting(ctx);
+        const { approvalId } = run!.waiting!;
+        await ctx.engine.approve(runId, { approvalId, approved: true });
+        await ctx.engine.idle();
+
+        await expect(ctx.engine.approve(runId, { approvalId, approved: true }))
+            .rejects.toThrow(InvalidRunStateError);
+    });
+
+    it('approve of an unknown run throws RunNotFoundError', async () => {
+        const ctx = setup({ model: mockModel([]) });
+        await expect(ctx.engine.approve('nope', { approvalId: 'a', approved: true }))
+            .rejects.toThrow(RunNotFoundError);
+    });
+
+    it('approve validates the approver before reading the store', async () => {
+        const ctx = setup({ model: mockModel([]) });
+        const getRun = vi.spyOn(ctx.store, 'getRun');
+        await expect(ctx.engine.approve('r1', {
+            approvalId: 'a',
+            approved: true,
+            approver: {
+                id: '', 
+                kind: 'x', 
+                permissions: [], 
+            },
+        })).rejects.toThrow(ValidationError);
+        expect(getRun).not.toHaveBeenCalled();
+    });
+
+    it('approve and resume race: exactly one wins', async () => {
+        const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
+        const { runId, run } = await dispatchToWaiting(ctx);
+
+        const results = await Promise.allSettled([
+            ctx.engine.approve(runId, { approvalId: run!.waiting!.approvalId, approved: true }),
+            ctx.engine.resume(tokenOf(ctx), { approved: false }),
+        ]);
+        expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+        const rejected = results.find((r) => r.status === 'rejected');
+        expect(
+            rejected?.reason instanceof InvalidRunStateError ||
+            rejected?.reason instanceof InvalidResumeTokenError,
+        ).toBe(true);
+        await ctx.engine.idle();
+        const steps = await ctx.store.listSteps(runId);
+        expect(steps.filter((s) => s.kind === 'wait')).toHaveLength(1);
+    });
+
+    it('the notified token is useless after approve', async () => {
+        const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
+        const { runId, run } = await dispatchToWaiting(ctx);
+
+        await ctx.engine.approve(runId, { approvalId: run!.waiting!.approvalId, approved: true });
+        await ctx.engine.idle();
+        await expect(ctx.engine.resume(tokenOf(ctx), { approved: true })).rejects.toThrow(InvalidRunStateError);
     });
 });

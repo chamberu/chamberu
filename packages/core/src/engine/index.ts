@@ -10,6 +10,7 @@ export type {
     ApprovalRequest,
 } from './execute/types.ts';
 export type {
+    ApprovalAnswer,
     DispatchEnvelope,
     ResumeDecision,
     RunDelta,

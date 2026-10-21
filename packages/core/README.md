@@ -217,6 +217,7 @@ await engine.resume(token, { approved: true });
 - A call that needs approval puts the run in `waiting` and frees its slot. The notifier receives the request once, with a resume token signed with `resumeSecret`; a failed send is retried on every poll until it is delivered.
 - A policy can also be a function that returns `'user'`, `'allow'` or `'deny'` per call.
 - A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
+- `engine.approve(runId, { approvalId, approved, reason? })` answers the current wait point without a token, for a caller that authorized the approver itself; it spends the notified token like `resume()`.
 - An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied, and the model sees the denial.
 
 ### Invokers and tool access

@@ -37,6 +37,10 @@ The engine throws `InvalidAgentDefinitionError` for an empty `resumeSecret` (any
 - A forged, malformed, expired or superseded token throws `InvalidResumeTokenError`.
 - If writing the answer fails, the run goes back to `waiting` and the token stays valid.
 
+## Approving without a token
+
+`engine.approve(runId, { approvalId, approved, reason?, approver? })` answers the run's current wait point without a resume token, for a caller that authorized the approver itself (the `@chamvi/http` endpoint `POST /runs/:id/approve`, which the dashboard uses). It takes the same path as `resume()`, so the token notified earlier is spent by the same transition. An `approvalId` that is not the current one, an expired wait point (the next `tick()` denies it) or a run that is not `waiting` throws `InvalidRunStateError`.
+
 ## Timeouts
 
 An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied with the reason `approval timed out`. The engine checks on every poll (`tick()`). The model sees the denial and can react.
