@@ -38,7 +38,18 @@ A revoked token or an expired authup session answers 401: the dashboard refreshe
 
 ## Approval links
 
-A notifier can link a person straight to an approval: `<origin><uiBase>/approvals#token=<resume token>`. Use the fragment: a browser never sends it, so the token stays out of the server's and every proxy's access log (`?token=` works too, a repeated one included, but travels in the request line). Before anything renders, the dashboard moves the token out of the address bar into `sessionStorage` (so the history, a sign-in redirect and the `Referer` never carry it; every answer is also sent with `referrer-policy: no-referrer`), survives the sign-in round-trip and a sign-out (a principal without the grant can hand over to one with it in the same tab), and answers through `POST /resume` with that token. An expired or already used token reads as "already answered". The inbox itself never sees a resume token: it answers by approval id, and a run that moved on to another approval answers 409.
+A notifier links a person straight to an approval by run, without a token: `<origin><uiBase>/approvals?run=<runId>&approval=<approvalId>` (`approval` is optional and then means the approval the run waits on when the page opens). A signed-out visit goes through sign-in, the token form or the authup round-trip, and comes back to the same URL. Signed in, the dashboard scrolls to that run's approval card, highlights and focuses it; Approve and Deny answer through `POST /runs/:id/approve` as the signed-in principal, so the link is only as powerful as the person who opens it. The page reads the run with `GET /runs/:id` (`run:read` or `agent:<name>:run`) and follows it with the inbox poll:
+
+| The run | The page shows |
+|---|---|
+| waits on that approval | the highlighted card |
+| waits on another approval | a notice linking the run; the new approval is listed in the inbox |
+| no longer waits (answered, finished) or the approval expired | a notice linking the run |
+| waits, but the principal lacks `agent:<name>:approve` | a 403 notice naming the grant, and the card without Approve and Deny |
+| is not readable with the principal's grants | a 403 notice |
+| does not exist | "not found" |
+
+The resume token reaches a notification only when a notifier is set up to hand it to a trusted channel (the OpenClaw notifier's `resumeTool: true`). The older token link still works: `<origin><uiBase>/approvals#token=<resume token>`. Use the fragment: a browser never sends it, so the token stays out of the server's and every proxy's access log (`?token=` works too, a repeated one included, but travels in the request line). Before anything renders, the dashboard moves the token out of the address bar into `sessionStorage` (so the history, a sign-in redirect and the `Referer` never carry it; every answer is also sent with `referrer-policy: no-referrer`), survives the sign-in round-trip and a sign-out (a principal without the grant can hand over to one with it in the same tab), and answers through `POST /resume` with that token. An expired or already used token reads as "already answered". The inbox itself never sees a resume token: it answers by approval id, and a run that moved on to another approval answers 409.
 
 ## Serving
 
