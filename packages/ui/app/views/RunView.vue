@@ -12,6 +12,7 @@ import { RouterLink, useRoute } from 'vue-router';
 import { useAgents } from '../agents/composables.ts';
 import { ApiError } from '../api/error.ts';
 import JsonBlock from '../components/json-block/JsonBlock.vue';
+import NavIcon from '../components/nav-icon/NavIcon.vue';
 import StatusChip from '../components/status-chip/StatusChip.vue';
 import StepItem from '../components/step-item/StepItem.vue';
 import { errorText } from '../components/step-item/helpers.ts';
@@ -59,10 +60,15 @@ const liveSteps = computed(() => {
         .filter((entry) => entry.step >= landedModelSteps(value.steps))
         .sort((a, b) => a.step - b.step);
 });
+const stepsCount = computed(() => {
+    const done = `${state.value?.steps.length ?? 0} done`;
+    return liveSteps.value.length > 0 ? `${done} · ${liveSteps.value.length} streaming` : done;
+});
 const nextIndex = computed(() => (state.value?.steps.at(-1)?.index ?? -1) + 1);
 
 const tokens = computed(() => (run.value ? run.value.usage.inputTokens + run.value.usage.outputTokens : 0));
 const llmSteps = computed(() => (state.value ? landedModelSteps(state.value.steps) : 0));
+const startedAt = computed(() => (run.value ? new Date(run.value.startedAt ?? run.value.createdAt).toLocaleTimeString() : ''));
 const elapsed = computed(() => (run.value ? runDuration(run.value, now.value) : undefined));
 const timeValue = computed(() => {
     if (elapsed.value === undefined) return '—';
@@ -93,12 +99,12 @@ async function onCancel(): Promise<void> {
 </script>
 
 <template>
-    <div class="crumbs">
-        <RouterLink :to="{ name: RouteName.RUNS }">
-            Runs
-        </RouterLink>
-        <span class="muted"> / {{ shortId(runId) }}</span>
-    </div>
+    <RouterLink
+        class="back"
+        :to="{ name: RouteName.RUNS }"
+    >
+        <NavIcon name="back" />runs / {{ shortId(runId) }}
+    </RouterLink>
 
     <div
         v-if="error && !state"
@@ -116,34 +122,70 @@ async function onCancel(): Promise<void> {
     </div>
 
     <template v-if="state && run">
-        <div class="card run-head">
-            <div class="run-title">
-                <h1 class="display">
-                    Run <span class="mono">{{ shortId(run.id) }}</span>
-                </h1>
-                <StatusChip :status="run.status" />
-                <VCButton
-                    v-if="cancellable"
-                    class="push"
-                    variant="outline"
-                    color="error"
-                    @click="onCancel"
-                >
-                    Cancel run
-                </VCButton>
+        <section class="card run-head">
+            <div class="run-head-top">
+                <div class="run-title">
+                    <h1 class="display">
+                        Run <span class="mono">{{ shortId(run.id) }}</span>
+                    </h1>
+                    <StatusChip :status="run.status" />
+                    <VCButton
+                        v-if="cancellable"
+                        class="btn btn-danger"
+                        @click="onCancel"
+                    >
+                        Cancel run
+                    </VCButton>
+                </div>
+                <dl class="facts">
+                    <div>
+                        <dt>agent</dt>
+                        <dd data-testid="run-agent">
+                            {{ run.agent }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>trigger</dt>
+                        <dd class="mono">
+                            {{ run.trigger.trigger }}
+                        </dd>
+                    </div>
+                    <div v-if="run.concurrencyKey">
+                        <dt>key</dt>
+                        <dd class="mono">
+                            {{ run.concurrencyKey }}
+                        </dd>
+                    </div>
+                    <div v-if="run.trigger.invoker">
+                        <dt>invoker</dt>
+                        <dd>
+                            {{ run.trigger.invoker.name ?? run.trigger.invoker.id }}
+                            <span class="muted mono">({{ run.trigger.invoker.kind }})</span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>started</dt>
+                        <dd class="tnum">
+                            {{ startedAt }}
+                        </dd>
+                    </div>
+                    <div v-if="run.finishedAt">
+                        <dt>finished</dt>
+                        <dd><VCTimeago :datetime="run.finishedAt" /></dd>
+                    </div>
+                    <div>
+                        <dt>live</dt>
+                        <dd data-testid="live">
+                            {{ live ? 'SSE' : 'off' }}
+                        </dd>
+                    </div>
+                </dl>
             </div>
-            <div class="kv-line">
-                <span>agent <b>{{ run.agent }}</b></span>
-                <span>trigger <b class="mono">{{ run.trigger.trigger }}</b></span>
-                <span>source <b class="mono">{{ run.trigger.source }}</b></span>
-                <span v-if="run.concurrencyKey">key <b class="mono">{{ run.concurrencyKey }}</b></span>
-                <span v-if="run.trigger.invoker">
-                    invoker <b>{{ run.trigger.invoker.name ?? run.trigger.invoker.id }}</b>
-                    <span class="mono">({{ run.trigger.invoker.kind }})</span>
-                </span>
-                <span>created <b><VCTimeago :datetime="run.createdAt" /></b></span>
-                <span v-if="run.finishedAt">finished <b><VCTimeago :datetime="run.finishedAt" /></b></span>
-                <span>live <b :data-testid="'live'">{{ live ? 'SSE' : 'off' }}</b></span>
+            <div
+                v-if="run.error"
+                class="err-line"
+            >
+                {{ errorText(run.error) }}
             </div>
             <div class="meters">
                 <UsageMeter
@@ -162,41 +204,34 @@ async function onCancel(): Promise<void> {
                     :ratio="elapsed !== undefined && budget?.timeoutMs ? elapsed / budget.timeoutMs : 0"
                 />
             </div>
-            <div
-                v-if="run.error"
-                class="err-line"
-            >
-                {{ errorText(run.error) }}
-            </div>
-        </div>
+        </section>
 
         <div
             v-if="run.status === 'waiting' && run.waiting"
             class="callout"
+            style="margin-bottom: 26px"
         >
             <div class="callout-head">
-                <h2>{{ run.waiting.toolName }}</h2>
-                <StatusChip status="waiting" />
-                <span
-                    class="muted"
-                    style="font-size: 13px"
-                >waits for an approval</span>
+                <span class="callout-icon"><NavIcon name="hand" /></span>
+                <div class="callout-title">
+                    <h2>{{ run.waiting.toolName }}<StatusChip status="waiting" /></h2>
+                    <p>The run waits for an approval of this tool call.</p>
+                </div>
                 <RouterLink
-                    class="push"
+                    class="btn btn-sm"
                     :to="{ name: RouteName.APPROVALS }"
                 >
-                    Open the approvals
+                    Open approvals
                 </RouterLink>
             </div>
         </div>
 
-        <h2 class="display section-h">
-            Steps
-            <span
-                class="section-count"
-                data-testid="steps-count"
-            >{{ state.steps.length }} done<template v-if="liveSteps.length > 0"> · {{ liveSteps.length }} streaming</template></span>
-        </h2>
+        <div class="section-head">
+            <h2 class="display">
+                Steps
+            </h2>
+            <span data-testid="steps-count">{{ stepsCount }}</span>
+        </div>
         <ol
             class="timeline"
             data-testid="timeline"
@@ -205,7 +240,8 @@ async function onCancel(): Promise<void> {
                 <span class="step-mark" />
                 <VCCollapse class="card step-card">
                     <VCCollapseTrigger class="step-sum">
-                        <span class="kind">trigger</span>
+                        <span class="step-idx">in</span>
+                        <span class="kind kind-trigger">trigger</span>
                         <span class="title">Envelope (first user message)</span>
                         <span class="meta">received <VCTimeago :datetime="run.trigger.receivedAt" /></span>
                     </VCCollapseTrigger>
@@ -226,10 +262,10 @@ async function onCancel(): Promise<void> {
                 data-testid="live-step"
             >
                 <span class="step-mark" />
-                <div class="card step-card">
+                <div class="card step-card live-card">
                     <div class="step-sum static">
-                        <span class="step-index">#{{ nextIndex + i }}</span>
-                        <span class="kind">llm</span>
+                        <span class="step-idx">#{{ nextIndex + i }}</span>
+                        <span class="kind kind-llm">llm</span>
                         <span class="streaming-tag">streaming</span>
                         <span class="meta">run.delta · {{ entry.reasoning ? 'reasoning, text' : 'text' }}</span>
                     </div>
@@ -245,17 +281,18 @@ async function onCancel(): Promise<void> {
         </ol>
 
         <template v-if="run.status === 'completed' && run.output !== undefined">
-            <h2 class="display section-h">
-                Output
-            </h2>
+            <div class="section-head spaced">
+                <h2 class="display">
+                    Output
+                </h2>
+            </div>
             <JsonBlock
                 v-if="typeof run.output !== 'string'"
                 :value="run.output"
             />
             <div
                 v-else
-                class="card"
-                style="padding: 14px 16px; white-space: pre-wrap"
+                class="card output-card"
                 data-testid="output"
             >
                 {{ run.output }}

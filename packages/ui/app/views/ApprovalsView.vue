@@ -16,6 +16,8 @@ import { pendingApprovals, readResumeToken } from '../approvals/helpers.ts';
 import type { AnswerResult, DecidedApproval } from '../approvals/types.ts';
 import { hasPermission } from '../auth/helpers.ts';
 import ApprovalCallout from '../components/approval-callout/ApprovalCallout.vue';
+import EmptyState from '../components/empty-state/EmptyState.vue';
+import NavIcon from '../components/nav-icon/NavIcon.vue';
 import PageHead from '../components/page-head/PageHead.vue';
 import StatusChip from '../components/status-chip/StatusChip.vue';
 import { useAppContext } from '../context/module.ts';
@@ -98,116 +100,134 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
         <span :class="['live', { off: !!inbox.error.value }]">polling · {{ INBOX_POLL_MS / 1000 }} s</span>
     </PageHead>
 
-    <template v-if="token && deepLink.claims.value">
-        <ApprovalCallout
-            v-if="deepLink.run.value?.waiting && deepLink.run.value.waiting.approvalId === deepLink.claims.value.approvalId"
-            :run="deepLink.run.value"
-            :can-answer="true"
-            :busy="busy === 'link'"
-            data-testid="deep-link"
-            @answer="answerLink"
-        />
+    <div class="callouts">
+        <template v-if="token && deepLink.claims.value">
+            <ApprovalCallout
+                v-if="deepLink.run.value?.waiting && deepLink.run.value.waiting.approvalId === deepLink.claims.value.approvalId"
+                :run="deepLink.run.value"
+                :can-answer="true"
+                :busy="busy === 'link'"
+                data-testid="deep-link"
+                @answer="answerLink"
+            />
+            <article
+                v-else
+                class="callout"
+                data-testid="deep-link"
+            >
+                <div class="callout-head">
+                    <span class="callout-icon"><NavIcon name="hand" /></span>
+                    <div class="callout-title">
+                        <h2>Approval from a link</h2>
+                        <p class="mono">
+                            run {{ deepLink.claims.value.runId }} · approval {{ deepLink.claims.value.approvalId }}
+                        </p>
+                    </div>
+                </div>
+                <div class="callout-body single">
+                    <p class="hint">
+                        <template v-if="deepLink.run.value">
+                            This run is no longer waiting for this approval.
+                        </template>
+                        <template v-else>
+                            The run is not readable with your grants; the link's token still answers it.
+                        </template>
+                    </p>
+                </div>
+                <div class="callout-foot">
+                    <p>The link's token answers through the resume endpoint.</p>
+                    <div class="callout-actions">
+                        <VCButton
+                            class="btn"
+                            :disabled="busy === 'link'"
+                            @click="answerLink(false, '')"
+                        >
+                            Deny
+                        </VCButton>
+                        <VCButton
+                            class="btn btn-primary"
+                            :loading="busy === 'link'"
+                            @click="answerLink(true, '')"
+                        >
+                            <NavIcon name="check" />Approve
+                        </VCButton>
+                    </div>
+                </div>
+            </article>
+        </template>
         <div
-            v-else
-            class="callout"
-            data-testid="deep-link"
+            v-else-if="linkResult"
+            :class="['callout', 'decided', { denied: !(linkResult.result === 'answered' && linkResult.approved) }]"
+            data-testid="deep-link-result"
         >
             <div class="callout-head">
-                <h2>Approval from a link</h2>
-                <span
-                    class="muted mono"
-                    style="font-size: 12px"
-                >run {{ deepLink.claims.value.runId }} · approval {{ deepLink.claims.value.approvalId }}</span>
-            </div>
-            <p
-                class="hint"
-                style="margin: 0"
-            >
-                <template v-if="deepLink.run.value">
-                    This run is no longer waiting for this approval.
-                </template>
-                <template v-else>
-                    The run is not readable with your grants; the link's token still answers it.
-                </template>
-            </p>
-            <div class="callout-actions">
-                <VCButton
-                    variant="outline"
-                    color="neutral"
-                    :disabled="busy === 'link'"
-                    @click="answerLink(false, '')"
-                >
-                    Deny
-                </VCButton>
-                <VCButton
-                    :loading="busy === 'link'"
-                    @click="answerLink(true, '')"
-                >
-                    Approve
-                </VCButton>
+                <span class="callout-icon"><NavIcon :name="linkResult.result === 'answered' && linkResult.approved ? 'check' : 'cross'" /></span>
+                <div class="callout-title">
+                    <h2>{{ MESSAGES[linkResult.result](linkResult.approved) }}</h2>
+                    <p v-if="linkResult.result === 'already-answered'">
+                        The link's token is expired or already used.
+                    </p>
+                </div>
             </div>
         </div>
-    </template>
-    <div
-        v-else-if="linkResult"
-        :class="['callout', linkResult.result === 'answered' && linkResult.approved ? 'done' : 'denied']"
-        data-testid="deep-link-result"
-    >
-        <div class="callout-head">
-            <h2>{{ MESSAGES[linkResult.result](linkResult.approved) }}</h2>
-            <span
-                v-if="linkResult.result === 'already-answered'"
-                class="muted"
-                style="font-size: 13px"
-            >The link's token is expired or already used.</span>
+
+        <div
+            v-if="inbox.error.value?.status === 403"
+            class="card notice"
+        >
+            Listing waiting runs needs <b class="mono">run:read</b>. An approval link from a notification still works.
         </div>
-    </div>
 
-    <div
-        v-if="inbox.error.value?.status === 403"
-        class="card notice"
-    >
-        Listing waiting runs needs <b class="mono">run:read</b>. An approval link from a notification still works.
-    </div>
+        <div
+            v-for="entry in decided"
+            :key="`decided-${entry.run.id}`"
+            :class="['callout', 'decided', { denied: !(entry.result === 'answered' && entry.approved) }]"
+            data-testid="decided"
+        >
+            <div class="callout-head">
+                <span class="callout-icon"><NavIcon :name="entry.result === 'answered' && entry.approved ? 'check' : 'cross'" /></span>
+                <div class="callout-title">
+                    <h2>
+                        {{ entry.run.waiting?.toolName }}
+                        <StatusChip
+                            v-if="entry.result === 'answered'"
+                            status="queued"
+                        />
+                    </h2>
+                    <p>
+                        {{ entry.run.agent }} · run
+                        <RouterLink
+                            class="mono"
+                            :to="{ name: RouteName.RUN, params: { id: entry.run.id } }"
+                        >
+                            {{ shortId(entry.run.id) }}
+                        </RouterLink>
+                    </p>
+                </div>
+                <span class="decision">
+                    <b>{{ MESSAGES[entry.result](entry.approved) }}</b><template v-if="entry.reason">: “{{ entry.reason }}”</template>
+                </span>
+            </div>
+        </div>
 
-    <div
-        v-for="entry in decided"
-        :key="`decided-${entry.run.id}`"
-        :class="['callout', entry.result === 'answered' && entry.approved ? 'done' : 'denied']"
-        data-testid="decided"
-    >
-        <div class="callout-head">
-            <h2>{{ entry.run.waiting?.toolName }}</h2>
-            <span
-                class="muted mono"
-                style="font-size: 12px"
-            >run <RouterLink :to="{ name: RouteName.RUN, params: { id: entry.run.id } }">{{ shortId(entry.run.id) }}</RouterLink></span>
-            <StatusChip
-                v-if="entry.result === 'answered'"
-                status="queued"
+        <ApprovalCallout
+            v-for="run in pending"
+            :key="`${run.id}-${run.waiting?.approvalId}`"
+            :run="run"
+            :can-answer="canAnswer(run.agent)"
+            :busy="busy === run.id"
+            @answer="(approved, reason) => answer(run, approved, reason)"
+        />
+
+        <div
+            v-if="!inbox.error.value && pending.length === 0 && !token"
+            class="card"
+        >
+            <EmptyState
+                icon="check"
+                title="Nothing waiting for you"
+                text="Every paused tool call has an answer. New ones appear here and in your notifier."
             />
-            <span
-                class="muted push"
-                style="font-size: 13px"
-            >
-                {{ MESSAGES[entry.result](entry.approved) }}<template v-if="entry.reason">: “{{ entry.reason }}”</template>
-            </span>
         </div>
-    </div>
-
-    <ApprovalCallout
-        v-for="run in pending"
-        :key="`${run.id}-${run.waiting?.approvalId}`"
-        :run="run"
-        :can-answer="canAnswer(run.agent)"
-        :busy="busy === run.id"
-        @answer="(approved, reason) => answer(run, approved, reason)"
-    />
-
-    <div
-        v-if="!inbox.error.value && pending.length === 0 && !token"
-        class="card notice"
-    >
-        Nothing waits for an approval.
     </div>
 </template>

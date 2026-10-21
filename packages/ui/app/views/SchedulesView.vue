@@ -7,29 +7,28 @@
  */
 
 import { computed } from 'vue';
-import type { ScheduleWire } from '../api/types.ts';
-import ExpiryCountdown from '../components/expiry-countdown/ExpiryCountdown.vue';
+import EmptyState from '../components/empty-state/EmptyState.vue';
 import PageHead from '../components/page-head/PageHead.vue';
+import ScheduleCard from '../components/schedule-card/ScheduleCard.vue';
 import { useAppContext } from '../context/module.ts';
 import { useSchedules } from '../schedules/composables.ts';
-import { describeCron, formatFireTime, groupByAgent } from '../schedules/helpers.ts';
+import { groupByAgent } from '../schedules/helpers.ts';
 
 const { client } = useAppContext();
 const { schedules, error } = useSchedules(client);
-const groups = computed(() => groupByAgent(schedules.value));
-
-function cronLabel(schedule: ScheduleWire): string {
-    const zone = schedule.timezone ?? 'server time zone';
-    const reading = describeCron(schedule.expression);
-    return reading ? `${reading} · ${zone}` : zone;
-}
+const list = computed(() => groupByAgent(schedules.value).flatMap((group) => group.schedules));
 </script>
 
 <template>
     <PageHead
         title="Schedules"
         lede="Cron triggers per agent and when they fire next. Times are in each trigger's time zone."
-    />
+    >
+        <span
+            v-if="!error"
+            class="live"
+        >{{ list.length }} cron {{ list.length === 1 ? 'trigger' : 'triggers' }}</span>
+    </PageHead>
 
     <div
         v-if="error?.status === 403"
@@ -38,54 +37,23 @@ function cronLabel(schedule: ScheduleWire): string {
         Listing schedules needs <b class="mono">run:read</b>.
     </div>
     <div
-        v-else-if="groups.length === 0"
-        class="card notice"
+        v-else-if="list.length === 0"
+        class="card"
     >
-        No agent has a cron trigger.
+        <EmptyState
+            icon="schedules"
+            title="No cron triggers"
+            text="No agent has a cron() trigger, so nothing starts on a schedule."
+        />
     </div>
-    <section
-        v-for="group in groups"
-        :key="group.agent"
-        class="sched-group"
+    <div
+        v-else
+        class="sched-cards"
     >
-        <div class="sched-cards">
-            <div
-                v-for="schedule in group.schedules"
-                :key="schedule.trigger"
-                class="card sched"
-                data-testid="schedule"
-            >
-                <div class="sched-top">
-                    <b style="font-weight: 600">{{ schedule.agent }}</b>
-                    <span
-                        class="mono muted"
-                        style="font-size: 12px"
-                    >{{ schedule.trigger }}</span>
-                </div>
-                <div>
-                    <span class="cron">{{ schedule.expression }}</span>
-                    <span
-                        class="muted"
-                        style="font-size: 13px"
-                    > {{ cronLabel(schedule) }}</span>
-                </div>
-                <div>
-                    <span class="field-label">Next fire in</span>
-                    <div class="sched-next">
-                        <ExpiryCountdown
-                            :until="schedule.nextAt"
-                            :soon-ms="0"
-                        />
-                        <span
-                            class="muted"
-                            style="font-size: 13px"
-                        >{{ formatFireTime(schedule.nextAt, schedule.timezone) }}</span>
-                    </div>
-                </div>
-                <div class="kv-line">
-                    <span>overlap <b class="mono">{{ schedule.overlap }}</b></span>
-                </div>
-            </div>
-        </div>
-    </section>
+        <ScheduleCard
+            v-for="schedule in list"
+            :key="`${schedule.agent}:${schedule.trigger}`"
+            :schedule="schedule"
+        />
+    </div>
 </template>

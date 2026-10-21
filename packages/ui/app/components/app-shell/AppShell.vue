@@ -28,6 +28,7 @@ const waiting = computed(() => inbox.runs.value.length);
 const emit = defineEmits<{ signOut: [] }>();
 
 const route = useRoute();
+const { host } = globalThis.location;
 const colorMode = useColorMode();
 
 const items = [
@@ -70,15 +71,13 @@ const grants = computed(() => {
 </script>
 
 <template>
-    <div class="app shell-a">
+    <div class="app shell">
         <aside class="side">
             <BrandLogo />
-            <div style="display: contents">
+            <nav aria-label="Main">
                 <div class="nav-group">
                     Operate
                 </div>
-            </div>
-            <nav aria-label="Main">
                 <RouterLink
                     v-for="item in items"
                     :key="item.name"
@@ -88,62 +87,63 @@ const grants = computed(() => {
                 >
                     <NavIcon :name="item.icon" />
                     {{ item.label }}
-                    <VCBadge
+                    <span
                         v-if="item.name === RouteName.APPROVALS && waiting"
                         class="badge"
                         :aria-label="`${waiting} waiting`"
-                    >
-                        {{ waiting }}
-                    </VCBadge>
+                    >{{ waiting }}</span>
                 </RouterLink>
             </nav>
-            <div class="who">
-                <VCAvatar
-                    class="avatar"
-                    :alt="displayName"
+            <div class="side-foot">
+                <div
+                    class="env"
+                    :title="host"
                 >
-                    <template #fallback>
-                        {{ initials }}
-                    </template>
-                </VCAvatar>
-                <div class="who-text">
-                    <div
-                        class="who-name"
-                        data-testid="principal"
-                    >
-                        {{ displayName }}
-                    </div>
-                    <div
-                        class="muted mono"
-                        style="font-size: 11px; white-space: nowrap"
-                    >
-                        {{ grants }}
-                    </div>
+                    <span>{{ host }}</span>
                 </div>
-                <div class="who-actions">
-                    <button
-                        type="button"
-                        class="icon-btn"
-                        :title="colorMode.isDark.value ? 'Light mode' : 'Dark mode'"
-                        :aria-label="colorMode.isDark.value ? 'Light mode' : 'Dark mode'"
-                        @click="colorMode.toggle()"
-                    >
-                        <NavIcon :name="colorMode.isDark.value ? 'sun' : 'moon'" />
-                    </button>
-                    <button
-                        type="button"
-                        class="icon-btn"
-                        title="Sign out"
-                        aria-label="Sign out"
-                        @click="emit('signOut')"
-                    >
-                        <NavIcon name="logout" />
-                    </button>
+                <div class="who">
+                    <span
+                        class="avatar"
+                        aria-hidden="true"
+                    >{{ initials }}</span>
+                    <div class="who-text">
+                        <div
+                            class="who-name"
+                            data-testid="principal"
+                        >
+                            {{ displayName }}
+                        </div>
+                        <div class="who-sub">
+                            {{ grants }}
+                        </div>
+                    </div>
+                    <div class="who-actions">
+                        <button
+                            type="button"
+                            class="icon-btn"
+                            :title="colorMode.isDark.value ? 'Light mode' : 'Dark mode'"
+                            :aria-label="colorMode.isDark.value ? 'Light mode' : 'Dark mode'"
+                            @click="colorMode.toggle()"
+                        >
+                            <NavIcon :name="colorMode.isDark.value ? 'sun' : 'moon'" />
+                        </button>
+                        <button
+                            type="button"
+                            class="icon-btn"
+                            title="Sign out"
+                            aria-label="Sign out"
+                            @click="emit('signOut')"
+                        >
+                            <NavIcon name="logout" />
+                        </button>
+                    </div>
                 </div>
             </div>
         </aside>
-        <main class="main-a">
-            <slot />
-        </main>
+        <div class="canvas">
+            <main class="main">
+                <slot />
+            </main>
+        </div>
     </div>
 </template>

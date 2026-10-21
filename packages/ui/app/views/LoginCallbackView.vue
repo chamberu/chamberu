@@ -30,34 +30,36 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="login-a">
-        <div class="card login-card">
-            <BrandLogo />
-            <div>
-                <p class="eyebrow">
-                    Dashboard
-                </p>
-                <h1 class="display">
-                    {{ error ? 'Sign-in failed' : 'Signing in' }}
-                </h1>
-            </div>
-            <template v-if="error">
+    <div class="login">
+        <div class="login-wrap">
+            <div class="card login-card">
+                <BrandLogo />
+                <div>
+                    <p class="eyebrow">
+                        Dashboard
+                    </p>
+                    <h1 class="display">
+                        {{ error ? 'Sign-in failed' : 'Signing in' }}
+                    </h1>
+                </div>
+                <template v-if="error">
+                    <p
+                        class="form-err"
+                        role="alert"
+                    >
+                        {{ error }}
+                    </p>
+                    <RouterLink :to="{ name: RouteName.LOGIN }">
+                        Back to sign-in
+                    </RouterLink>
+                </template>
                 <p
-                    class="form-error"
-                    role="alert"
+                    v-else
+                    class="hint"
                 >
-                    {{ error }}
+                    Completing the authup sign-in.
                 </p>
-                <RouterLink :to="{ name: RouteName.LOGIN }">
-                    Back to sign-in
-                </RouterLink>
-            </template>
-            <p
-                v-else
-                class="hint"
-            >
-                Completing the authup sign-in.
-            </p>
+            </div>
         </div>
     </div>
 </template>

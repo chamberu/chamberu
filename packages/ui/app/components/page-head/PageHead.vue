@@ -10,11 +10,11 @@ defineProps<{ title: string; lede?: string }>();
 </script>
 
 <template>
-    <div class="page-head">
-        <div>
-            <p class="eyebrow">
-                chamvi
-            </p>
+    <header class="page-head">
+        <div class="page-head-main">
+            <div class="crumbs">
+                operate <i>/</i> {{ title.toLowerCase() }}
+            </div>
             <h1 class="display">
                 {{ title }}
             </h1>
@@ -22,6 +22,11 @@ defineProps<{ title: string; lede?: string }>();
                 {{ lede }}
             </p>
         </div>
-        <slot />
-    </div>
+        <div
+            v-if="$slots.default"
+            class="page-head-aside"
+        >
+            <slot />
+        </div>
+    </header>
 </template>

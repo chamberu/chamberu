@@ -34,16 +34,16 @@ const classes = computed(() => ['step', `step-${props.step.kind}`, { 'step-err':
         <span class="step-mark" />
         <VCCollapse class="card step-card">
             <VCCollapseTrigger class="step-sum">
-                <span class="step-index">#{{ step.index }}</span>
-                <span class="kind">{{ step.kind }}</span>
+                <span class="step-idx">#{{ step.index }}</span>
+                <span :class="['kind', `kind-${step.kind}`]">{{ step.kind }}</span>
                 <span :class="['title', { mono: step.kind !== 'llm' }]">{{ stepTitle(step) }}</span>
                 <span
                     v-if="step.error !== undefined"
-                    class="tag"
+                    class="tag tag-error"
                 >tool error</span>
                 <span
                     v-if="step.kind === 'wait'"
-                    class="tag"
+                    :class="['tag', wait.approved ? 'tag-effect' : 'tag-error']"
                     data-testid="decision"
                 >{{ wait.approved ? 'approved' : 'denied' }}<template v-if="approverName(wait)"> by {{ approverName(wait) }}</template></span>
                 <span class="meta">{{ stepMeta(step) }}</span>
@@ -51,15 +51,12 @@ const classes = computed(() => ['step', `step-${props.step.kind}`, { 'step-err':
             <VCCollapseContent class="step-body">
                 <template v-if="step.kind === 'llm'">
                     <span class="field-label">Finish reason</span>
-                    <div
-                        class="mono"
-                        style="font-size: 13.5px"
-                    >
+                    <div class="step-text mono">
                         {{ llm.finishReason ?? '—' }}
                     </div>
                     <template v-if="llm.text">
                         <span class="field-label">Text</span>
-                        <div style="font-size: 13.5px; white-space: pre-wrap">
+                        <div class="step-text">
                             {{ llm.text }}
                         </div>
                     </template>
@@ -73,7 +70,7 @@ const classes = computed(() => ['step', `step-${props.step.kind}`, { 'step-err':
                     <JsonBlock :value="step.input" />
                     <template v-if="step.kind === 'wait'">
                         <span class="field-label">Decision</span>
-                        <div style="font-size: 13.5px">
+                        <div class="step-text">
                             {{ wait.approved ? 'Approved' : 'Denied' }}<template v-if="approverName(wait)">
                                 by <b>{{ approverName(wait) }}</b> ({{ wait.approver?.kind }})
                             </template><template v-if="wait.reason">

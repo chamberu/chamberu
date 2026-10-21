@@ -10,19 +10,17 @@ import type { RunStatusLiteral } from '@chamvi/core';
 import { computed, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAgents } from '../agents/composables.ts';
-import type { RunListFilter, RunWire } from '../api/types.ts';
+import type { RunListFilter } from '../api/types.ts';
+import EmptyState from '../components/empty-state/EmptyState.vue';
 import PageHead from '../components/page-head/PageHead.vue';
-import StatusChip from '../components/status-chip/StatusChip.vue';
+import RunsTable from '../components/runs-table/RunsTable.vue';
 import { useAppContext } from '../context/module.ts';
-import { RouteName } from '../router/constants.ts';
 import { useRunCounts, useRunList } from '../runs/composables.ts';
 import {
     ALL_AGENTS,
-    RUN_LIST_PAGE_SIZE,
     RUN_LIST_POLL_MS,
     RUN_STATUSES,
 } from '../runs/constants.ts';
-import { formatTokens, shortId } from '../runs/helpers.ts';
 import { filterFromQuery, queryFromFilter } from '../runs/query.ts';
 
 const { client } = useAppContext();
@@ -67,47 +65,7 @@ function toggleStatus(status: RunStatusLiteral): void {
     update({ status: current.includes(status) ? current.filter((s) => s !== status) : [...current, status] });
 }
 
-function maxTokensOf(run: RunWire): number | undefined {
-    return agents.value.find((a) => a.name === run.agent)?.budget.maxTokens;
-}
-
-function inOut(run: RunWire): string {
-    return `${formatTokens(run.usage.inputTokens)} in · ${formatTokens(run.usage.outputTokens)} out`;
-}
-
-function tokens(run: RunWire): number {
-    return run.usage.inputTokens + run.usage.outputTokens;
-}
-
-function triggerLabel(run: RunWire): string {
-    return run.trigger.trigger === run.trigger.source ? run.trigger.source : `${run.trigger.source} · ${run.trigger.trigger}`;
-}
-
-function open(run: RunWire): void {
-    void router.push({ name: RouteName.RUN, params: { id: run.id } });
-}
-
-const columns = [
-    { key: 'id', label: 'Run' },
-    { key: 'agent', label: 'Agent · trigger' },
-    { key: 'status', label: 'Status' },
-    { key: 'usage', label: 'Usage' },
-    { key: 'createdAt', label: 'Started' },
-];
-
-const range = computed(() => {
-    const meta = page.value?.meta;
-    if (!meta || meta.total === 0) return '0 runs';
-    return `${meta.offset + 1}–${Math.min(meta.offset + meta.limit, meta.total)} of ${meta.total}`;
-});
-
-function load(meta: { offset: number }): void {
-    update({
-        offset: meta.offset,
-        agent: filter.value.agent,
-        status: filter.value.status,
-    });
-}
+const filtered = computed(() => !!filter.value.agent || !!filter.value.status?.length);
 </script>
 
 <template>
@@ -126,17 +84,17 @@ function load(meta: { offset: number }): void {
     </div>
     <template v-else>
         <div class="stats">
-            <div class="card stat">
-                <small>Running</small><b>{{ counts.running ?? '–' }}</b>
+            <div class="card stat stat-run">
+                <small>Running</small><b>{{ counts.running ?? '–' }}</b><span>right now</span>
+            </div>
+            <div class="card stat stat-wait">
+                <small>Waiting</small><b>{{ counts.waiting ?? '–' }}</b><span>for an approval</span>
+            </div>
+            <div class="card stat stat-fail">
+                <small>Failed</small><b>{{ counts.failed ?? '–' }}</b><span>all time</span>
             </div>
             <div class="card stat">
-                <small>Waiting</small><b style="color: var(--ch-warn)">{{ counts.waiting ?? '–' }}</b>
-            </div>
-            <div class="card stat">
-                <small>Failed</small><b>{{ counts.failed ?? '–' }}</b>
-            </div>
-            <div class="card stat">
-                <small>Shown</small><b>{{ page?.meta.total ?? '–' }}</b>
+                <small>Shown</small><b>{{ page?.meta.total ?? '–' }}</b><span>match the filters</span>
             </div>
         </div>
 
@@ -154,112 +112,55 @@ function load(meta: { offset: number }): void {
                 style="min-width: 0; flex: 1"
             >
                 <span class="field-label">Status</span>
-                <div
-                    class="seg"
-                    role="group"
-                    aria-label="Status filter"
-                >
-                    <button
-                        v-for="status in RUN_STATUSES"
-                        :key="status"
-                        type="button"
-                        :aria-pressed="(filter.status ?? []).includes(status)"
-                        @click="toggleStatus(status)"
+                <div>
+                    <div
+                        class="seg"
+                        role="group"
+                        aria-label="Status filter"
                     >
-                        {{ status }}
-                    </button>
+                        <button
+                            v-for="status in RUN_STATUSES"
+                            :key="status"
+                            type="button"
+                            :data-status="status"
+                            :aria-pressed="(filter.status ?? []).includes(status)"
+                            @click="toggleStatus(status)"
+                        >
+                            {{ status }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div
-            class="card"
-            style="overflow: hidden"
+        <p
+            v-if="error"
+            class="err-line"
+            style="margin-bottom: 12px"
         >
-            <div class="table-wrap">
-                <VCTable
-                    class="t"
-                    :columns="columns"
-                    :data="page?.data ?? []"
-                    :busy="loading && !page"
-                    row-clickable
-                    responsive
-                    data-testid="runs"
-                    @row-click="(row: RunWire) => open(row)"
+            {{ error.code }} · {{ error.message }}
+        </p>
+        <RunsTable
+            :page="page"
+            :agents="agents"
+            :loading="loading"
+            @page="(offset) => update({ offset, agent: filter.agent, status: filter.status })"
+        >
+            <template #empty>
+                <EmptyState
+                    :icon="filtered ? 'search' : 'play'"
+                    :title="filtered ? 'No runs match these filters' : 'No runs yet'"
+                    :text="filtered ? 'Widen the status filter or pick all agents.' : 'Runs appear here once a trigger starts one.'"
                 >
-                    <template #cell-id="{ row }">
-                        <span class="id">{{ shortId((row as RunWire).id) }}</span>
-                        <div
-                            v-if="(row as RunWire).concurrencyKey"
-                            class="muted mono"
-                            style="font-size: 12px"
-                        >
-                            {{ (row as RunWire).concurrencyKey }}
-                        </div>
-                    </template>
-                    <template #cell-agent="{ row }">
-                        <b style="font-weight: 500">{{ (row as RunWire).agent }}</b>
-                        <div
-                            class="muted"
-                            style="font-size: 12px"
-                        >
-                            {{ triggerLabel(row as RunWire) }}
-                        </div>
-                    </template>
-                    <template #cell-status="{ row }">
-                        <StatusChip :status="(row as RunWire).status" />
-                    </template>
-                    <template #cell-usage="{ row }">
-                        <div class="usage">
-                            <div
-                                class="meter-top"
-                                style="font-size: 12px"
-                            >
-                                <span class="muted">{{ inOut(row as RunWire) }}</span>
-                                <span class="mono">{{ formatTokens(tokens(row as RunWire)) }} tok</span>
-                            </div>
-                            <div
-                                v-if="maxTokensOf(row as RunWire)"
-                                class="usage-bar"
-                            >
-                                <i :style="{ width: `${Math.min(100, Math.round(tokens(row as RunWire) / maxTokensOf(row as RunWire)! * 100))}%` }" />
-                            </div>
-                        </div>
-                    </template>
-                    <template #cell-createdAt="{ row }">
-                        <span
-                            class="muted"
-                            style="font-size: 13px; white-space: nowrap"
-                        >
-                            <VCTimeago :datetime="(row as RunWire).createdAt" />
-                        </span>
-                    </template>
-                </VCTable>
-                <p
-                    v-if="page && page.data.length === 0"
-                    class="empty muted"
-                    style="text-align: center; padding: 28px; margin: 0"
-                >
-                    No runs match these filters.
-                </p>
-                <p
-                    v-if="error"
-                    class="err-line"
-                    style="margin: 12px"
-                >
-                    {{ error.code }} · {{ error.message }}
-                </p>
-            </div>
-            <div class="pager">
-                <span>{{ range }}</span>
-                <VCPagination
-                    v-if="page && page.meta.total > RUN_LIST_PAGE_SIZE"
-                    :total="page.meta.total"
-                    :limit="page.meta.limit"
-                    :offset="page.meta.offset"
-                    @load="load"
-                />
-            </div>
-        </div>
+                    <VCButton
+                        v-if="filtered"
+                        class="btn btn-sm"
+                        @click="update({ agent: undefined, status: undefined })"
+                    >
+                        Clear filters
+                    </VCButton>
+                </EmptyState>
+            </template>
+        </RunsTable>
     </template>
 </template>

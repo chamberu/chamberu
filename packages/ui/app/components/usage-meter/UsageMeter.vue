@@ -22,7 +22,7 @@ const width = computed(() => `${Math.round(Math.min(1, Math.max(0, props.ratio ?
             <span class="muted">{{ label }}</span>
             <span>{{ value }}</span>
         </div>
-        <div class="usage-bar">
+        <div class="bar u-accent">
             <i :style="{ width }" />
         </div>
     </div>

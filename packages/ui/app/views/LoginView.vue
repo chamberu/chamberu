@@ -23,6 +23,7 @@ const busy = ref(false);
 
 const returnTo = computed(() => safeReturnPath(route.query.redirect));
 const authupHost = computed(() => (config.auth.authup ? new URL(config.auth.authup.url).host : ''));
+const { host } = globalThis.location;
 
 async function useToken(): Promise<void> {
     if (!token.value.trim()) {
@@ -57,73 +58,75 @@ async function useAuthup(): Promise<void> {
 </script>
 
 <template>
-    <div class="login-a">
-        <div class="card login-card">
-            <BrandLogo />
-            <div>
-                <p class="eyebrow">
-                    Dashboard
-                </p>
-                <h1 class="display">
-                    Sign in
-                </h1>
-            </div>
-            <template v-if="config.auth.authup">
-                <VCButton
-                    class="w-full"
-                    :loading="busy"
-                    @click="useAuthup"
+    <div class="login">
+        <div class="login-wrap">
+            <div class="card login-card">
+                <BrandLogo />
+                <div>
+                    <p class="eyebrow">
+                        Dashboard
+                    </p>
+                    <h1 class="display">
+                        Sign in
+                    </h1>
+                </div>
+                <template v-if="config.auth.authup">
+                    <VCButton
+                        class="btn btn-primary btn-block"
+                        :loading="busy"
+                        @click="useAuthup"
+                    >
+                        Continue with authup
+                    </VCButton>
+                    <p
+                        class="hint"
+                        style="text-align: center; margin-top: -8px"
+                    >
+                        Redirects to {{ authupHost }} and back (OIDC code flow).
+                    </p>
+                </template>
+                <div
+                    v-if="config.auth.authup && config.auth.tokens"
+                    class="or"
                 >
-                    Continue with authup
-                </VCButton>
+                    or paste a token
+                </div>
+                <form
+                    v-if="config.auth.tokens"
+                    @submit.prevent="useToken"
+                >
+                    <label class="field">
+                        <span class="field-label">Bearer token</span>
+                        <VCFormInput
+                            v-model="token"
+                            class="mono"
+                            type="password"
+                            placeholder="paste a static token"
+                            autocomplete="off"
+                            name="token"
+                        />
+                    </label>
+                    <VCButton
+                        type="submit"
+                        :class="['btn', 'btn-block', { 'btn-primary': !config.auth.authup }]"
+                        :loading="busy"
+                    >
+                        Use token
+                    </VCButton>
+                    <p class="hint">
+                        A static token from <span class="mono">staticTokens()</span>. Kept in sessionStorage for this tab only.
+                    </p>
+                </form>
                 <p
-                    class="hint"
-                    style="text-align: center"
+                    v-if="error"
+                    class="form-err"
+                    role="alert"
                 >
-                    Redirects to {{ authupHost }} and back (OIDC code flow).
+                    {{ error }}
                 </p>
-            </template>
-            <div
-                v-if="config.auth.authup && config.auth.tokens"
-                class="or"
-            >
-                or paste a token
             </div>
-            <form
-                v-if="config.auth.tokens"
-                style="display: grid; gap: 18px"
-                @submit.prevent="useToken"
-            >
-                <label class="field">
-                    <span class="field-label">Bearer token</span>
-                    <VCFormInput
-                        v-model="token"
-                        class="mono"
-                        type="password"
-                        placeholder="paste a static token"
-                        autocomplete="off"
-                        name="token"
-                    />
-                </label>
-                <VCButton
-                    type="submit"
-                    class="w-full"
-                    :variant="config.auth.authup ? 'outline' : 'solid'"
-                    :color="config.auth.authup ? 'neutral' : 'primary'"
-                    :loading="busy"
-                >
-                    Use token
-                </VCButton>
-                <p class="hint">
-                    A static token from <span class="mono">staticTokens()</span>. Kept in sessionStorage for this tab only.
-                </p>
-            </form>
-            <p
-                v-if="error"
-                class="form-error"
-                role="alert"
-            >
-                {{ error }}
+            <p class="login-foot">
+                chamvi · self-hosted at {{ host }}
             </p>
         </div>
     </div>
