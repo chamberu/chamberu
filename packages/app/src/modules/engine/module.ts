@@ -1,0 +1,117 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import { Engine, InvalidAgentDefinitionError } from '@chamvi/core';
+import type { INotifier } from '@chamvi/core';
+import type { IContainer } from 'eldin';
+import type { IModule } from 'orkos';
+import { createModelRegistry, installDefaultProvider } from '../../models/module.ts';
+import { AppToken, ModuleName } from '../../module/constants.ts';
+import { runHooks, throwIfStopped } from '../../module/helpers.ts';
+import type { EngineModuleOptions } from './types.ts';
+
+/**
+ * Builds the `Engine` (start and job mode; nothing in migrate mode). `setup`
+ * checks every string model against the provider registry and installs it as
+ * the AI SDK default provider, unless one is set already; `onReady` builds the
+ * engine from every `NOTIFIERS` contribution, registers `ENGINE`, runs the
+ * `engineCreated` hooks and, in start mode, starts it. `teardown` drains it
+ * and runs the `drained` hooks.
+ */
+export class EngineModule implements IModule {
+    readonly name: string = ModuleName.ENGINE;
+
+    readonly dependencies = [ModuleName.CONFIG, ModuleName.STORE];
+
+    protected options: EngineModuleOptions;
+
+    protected engine: Engine | undefined;
+
+    protected restore: (() => void) | undefined;
+
+    constructor(options: EngineModuleOptions = {}) {
+        this.options = options;
+    }
+
+    async setup(container: IContainer): Promise<void> {
+        const context = container.resolve(AppToken.CONTEXT);
+        if (context.mode === 'migrate') {
+            return;
+        }
+
+        if (globalThis.AI_SDK_DEFAULT_PROVIDER !== undefined) {
+            container.resolve(AppToken.LOGGER).debug('a default provider is set; chamvi leaves model strings to it');
+            return;
+        }
+
+        const registry = await createModelRegistry({
+            agents: context.agents,
+            env: context.env,
+            models: context.models,
+        });
+        this.restore = installDefaultProvider(registry);
+    }
+
+    async onReady(container: IContainer): Promise<void> {
+        const context = container.resolve(AppToken.CONTEXT);
+        if (context.mode === 'migrate') {
+            return;
+        }
+
+        const config = container.resolve(AppToken.CONFIG);
+        const logger = container.resolve(AppToken.LOGGER);
+
+        const notifiers: Record<string, INotifier> = {};
+        for (const notifier of container.resolveAll(AppToken.NOTIFIERS)) {
+            if (Object.prototype.hasOwnProperty.call(notifiers, notifier.name)) {
+                throw new InvalidAgentDefinitionError(`Two notifiers are named "${notifier.name}".`);
+            }
+            notifiers[notifier.name] = notifier;
+        }
+
+        const engine = new Engine({
+            store: container.resolve(AppToken.STORE),
+            agents: [...context.agents],
+            notifiers,
+            resumeSecret: config.engine.resumeSecret,
+            maxConcurrentRuns: config.engine.maxConcurrentRuns,
+            clock: container.resolve(AppToken.CLOCK),
+            ...(this.options.owner !== undefined && { owner: this.options.owner }),
+            ...(this.options.claimTtlMs !== undefined && { claimTtlMs: this.options.claimTtlMs }),
+            onError: (error, run) => logger.error('engine error', error, { run: run?.id, agent: run?.agent }),
+        });
+        this.engine = engine;
+        container.register(AppToken.ENGINE, { useValue: engine });
+
+        await runHooks(container, 'engineCreated', engine);
+
+        if (context.mode === 'start') {
+            throwIfStopped(context);
+            await engine.start();
+        }
+    }
+
+    async teardown(container: IContainer): Promise<void> {
+        const { engine, restore } = this;
+        this.engine = undefined;
+        this.restore = undefined;
+
+        try {
+            if (engine) {
+                // a no-op once createShutdown or runJob drained it
+                await engine.drain({ timeoutMs: container.resolve(AppToken.CONFIG).http.drainTimeoutMs });
+                await runHooks(container, 'drained');
+            }
+        } finally {
+            restore?.();
+        }
+    }
+}
+
+export function engineModule(options?: EngineModuleOptions): IModule {
+    return new EngineModule(options);
+}

@@ -12,5 +12,7 @@ export * from './models/index.ts';
 export * from './module/index.ts';
 export * from './modules/config/index.ts';
 export * from './modules/console-notifier/index.ts';
+export * from './modules/engine/index.ts';
+export * from './modules/scheduler/index.ts';
 export * from './modules/static-tokens/index.ts';
 export * from './modules/store/index.ts';
