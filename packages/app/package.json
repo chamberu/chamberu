@@ -21,6 +21,10 @@
         ".": {
             "types": "./dist/index.d.mts",
             "import": "./dist/index.mjs"
+        },
+        "./github": {
+            "types": "./dist/github.d.mts",
+            "import": "./dist/github.mjs"
         }
     },
     "files": [
