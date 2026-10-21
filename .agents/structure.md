@@ -195,7 +195,7 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 |------|---------|
 | `src/config/` | `UiConfig`, `UiAuthupConfig` (`types.ts`), `CONFIG_ELEMENT_ID` (public), `CONFIG_MARKER` (`constants.ts`); shared with the SPA as types and constants |
 | `src/routes/` | `uiRoutes()` (`module.ts`), `resolveBuildPath()`, `loadBuild()`, `renderIndex()`, `buildCsp()`, `defaultRoot()`, `isFileLike()` (`helpers.ts`, internal), `DEFAULT_UI_BASE_PATH`, `ASSET_CACHE_CONTROL`, `DOCUMENT_CACHE_CONTROL` (public), `BUILD_RETRY_MS`, `MEDIA_TYPES`, `SECURITY_HEADERS`, `UI_BASE_PATH_PATTERN` (`constants.ts`), `UiRoutesOptions`, `BuildFile` (`types.ts`) |
-| `app/` | The SPA: `main.ts` (install order: icons, authup when configured, vuecs, component plugins, router), `App.vue`, `style.css` (Crimson tokens, mockup A), `index.html` (with `CONFIG_MARKER`), `shims.d.ts`, `tsconfig.json` (vue-tsc, also checks `test/unit/app`) |
+| `app/` | The SPA: `main.ts` (install order: icons, authup when configured, vuecs, component plugins, router), `App.vue`, `style.css` (Crimson tokens and classes of the approved mockup version 3, light and dark), `index.html` (with `CONFIG_MARKER`), `shims.d.ts`, `tsconfig.json` (vue-tsc, also checks `test/unit/app`) |
 | `app/config/` | `readConfig()`, `DEV_CONFIG` |
 | `app/router/` | `createUiRouter()`, `RouteName` |
 | `app/context/` | `AppContext` (config, client, session, storage), `APP_CONTEXT`, `useAppContext()` |
@@ -203,10 +203,11 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | `app/sse/` | `openRunStream()`, `parseEventStream()`, `sleep()`, `RECONNECT_DELAYS_MS` |
 | `app/auth/` | `createSession()`, `createAuthGuard()` (`guard.ts`), `createAuthupAdapter()` (`authup.ts`, lazily imported), `hasPermission()`, `safeReturnPath()`, `clearStorage()`, `createSessionCookies()` (`helpers.ts`), storage keys |
 | `app/polling/` | `createPoller()`, `documentVisibility()` (`helpers.ts`), `IPageVisibility` |
-| `app/runs/` | `useRunList()`, `useRunCounts()`, `useRunDetail()` (`composables.ts`), `mergeRunEvent()`, `canCancel()`, formatters (`helpers.ts`), route-query mapping (`query.ts`), constants |
+| `app/runs/` | `useRunList()`, `useRunCounts()`, `useRunActivity()`, `useRunDetail()` (`composables.ts`), `mergeRunEvent()`, `canCancel()`, formatters (`helpers.ts`), route-query mapping (`query.ts`), constants |
 | `app/approvals/` | `useApprovals()`, `useDeepLinkApproval()`, `decodeResumeToken()`, `stripResumeToken()`, `readResumeToken()`, `pendingApprovals()`, `RESUME_STORAGE_KEY`, `INBOX` |
-| `app/agents/`, `app/state/`, `app/schedules/` | `useAgents()`, `useAgentState()`, `useSchedules()` and their helpers (`describeCron()` in `schedules/helpers.ts`) |
-| `app/components/` | One folder per component: `app-shell`, `brand-logo`, `nav-icon`, `page-head`, `status-chip`, `json-block`, `step-item`, `usage-meter`, `approval-callout`, `expiry-countdown` |
-| `app/views/` | `LoginView`, `LoginCallbackView`, `RunsView`, `RunView`, `ApprovalsView`, `StateView`, `SchedulesView` |
+| `app/agents/` | `useAgents()`, `useAgentRollups()` (overview), `useAgentDetail()` (agent page, `start()`) (`composables.ts`); `triggerChips()`, `summarizeActivity()`, `failedSummary()`, `tokenShares()`, `nextFireOf()`, `lastRunOf()`, `oldestWaiting()`, `hasHttpTrigger()`, `matchesName()`, `parsePayload()`, `formatBudgetTime()` (`helpers.ts`); `ACTIVITY_WINDOW_MS`, `ACTIVITY_LIMIT`, `AGENTS_POLL_MS`, `RECENT_RUNS`, `AGENT_WAITING_LIMIT` (`constants.ts`); `TriggerChip`, `Activity`, `AgentRollup` (`types.ts`) |
+| `app/state/`, `app/schedules/` | `useAgentState()`, `useSchedules()` and their helpers (`describeCron()` in `schedules/helpers.ts`) |
+| `app/components/` | One folder per component: `app-shell`, `brand-logo`, `nav-icon` (`IconName`, the mockup's glyphs), `page-head`, `empty-state`, `status-chip`, `trigger-chip`, `json-block`, `step-item`, `usage-meter`, `approval-callout`, `expiry-countdown`, `runs-table`, `schedule-card`, `activity-strip`, `agent-card`, `agent-runs`, `agent-state` (`AgentStatePanel`), `start-run` (`StartRunModal`) |
+| `app/views/` | `LoginView`, `LoginCallbackView`, `AgentsView`, `AgentView`, `RunsView`, `RunView`, `ApprovalsView`, `SchedulesView` |
 | `vite.config.ts` | Root `app`, out `dist/app`, `base: './'` for the build, the dev proxy to port 3000, the `virtual:chamvi-icons` plugin |
 | `test/e2e/` | `smoke.spec.ts` (Playwright), `demo/` (`server.ts`, `model.ts`, `constants.ts`) |

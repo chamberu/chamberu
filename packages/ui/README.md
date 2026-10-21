@@ -6,7 +6,7 @@
 
 <p align="center">
     <b>The chamvi dashboard.</b><br>
-    Watch runs live, answer approvals, look into agent state and schedules,<br>
+    See what each agent does, start runs, watch them live, answer approvals,<br>look into agent state and schedules,<br>
     served by your own <code>@chamvi/http</code> app on the same origin.
 </p>
 
@@ -71,11 +71,14 @@ Open `http://<host>/ui/` and sign in with a bearer token of the app.
 
 | View | Shows | Needs |
 |---|---|---|
+| Agents | A card per agent: triggers, running and waiting runs, next cron fire, 24 h activity, last run, notifier, approval tools; the landing page | `run:read` |
+| Agent | Budget, notifier, approval tools, Start run (with an `http()` trigger), and the tabs Overview, Runs, State, Schedules | `run:read`; `agent:<name>:run` to start; `state:read` for State |
 | Runs | Every run, newest first, filtered by agent and status, with status and tokens; refreshes every 5 s | `run:read` |
 | Run | Header with budgets, the trigger envelope and the step timeline (llm, tool, wait), live over SSE with streamed text; cancel | `run:read` or `agent:<name>:run`; `run:cancel` to cancel |
 | Approvals | Waiting runs with the tool and its input; Approve or Deny with a reason | `run:read` to list, `agent:<name>:approve` to answer |
-| Agent state | Key-value entries and collections, read-only | `state:read` |
 | Schedules | Cron triggers per agent with the next fire time | `run:read` |
+
+The 24 h figures are counted from the newest 100 runs (the API has no time filter) and read `100+` beyond.
 
 A notifier's deep link `/ui/approvals#token=<resume token>` opens the approval of that token (the fragment never reaches the server or a proxy log; `?token=` works too). The SPA moves the token out of the address bar before anything renders (into the tab's `sessionStorage`, kept across a sign-out so another principal can answer it, removed once answered or refused as spent) and answers it through `POST /resume`, so it works with only `agent:<name>:approve`.
 

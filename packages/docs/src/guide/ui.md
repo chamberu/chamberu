@@ -1,6 +1,6 @@
 # Dashboard
 
-`@chamvi/ui` is a dashboard for the runs of an app: watch them live, answer approvals, look into agent state and see when cron triggers fire next. It is a prebuilt Vue 3 app (vuecs, the Crimson design) that your own `@chamvi/http` app serves on the same origin, so there is no CORS and no second deployment.
+`@chamvi/ui` is a dashboard for the agents of an app: see what each agent does, start a run, watch runs live, answer approvals, look into agent state and see when cron triggers fire next. It is a prebuilt Vue 3 app (vuecs, the Crimson design) that your own `@chamvi/http` app serves on the same origin, so there is no CORS and no second deployment.
 
 ```bash
 npm install @chamvi/ui --save
@@ -10,17 +10,20 @@ npm install @chamvi/ui --save
 
 <<< @/snippets/ui.ts#tokens
 
-Open `/ui/` and paste a token. Nothing of the dashboard runs on the server but one static file route; every page talks to the API it already has, with the signed-in principal's bearer token.
+Open `/ui/` and paste a token; the dashboard opens on the agents overview. Nothing of the dashboard runs on the server but one static file route; every page talks to the API it already has, with the signed-in principal's bearer token.
 
 ## Pages
 
 | Page | Shows | Needs |
 |---|---|---|
-| Runs | Every run, newest first (`GET /runs?sort=-createdAt`), filtered by agent and status in the address bar; counts of running, waiting and failed runs; tokens per run. Refreshes every 5 s. | `run:read` |
+| Agents | A card per agent: its triggers (GitHub events, cron expressions, hook paths, http), running and waiting runs, the next cron fire, a 24 h activity strip, the last run, the notifier and the tools that need approval; a name filter. The landing page after sign-in. | `run:read` |
+| Agent | The agent's budget, notifier and approval tools, Start run (with an `http()` trigger: a JSON payload sent to `POST /agents/:name/runs` as you) and View all runs, and four tabs: Overview (runs, failures, waiting approvals and tokens, recent runs, its waiting approvals, its triggers with route, hook or next fire), Runs (filtered by status), State (key-value entries and collections, read-only) and Schedules. | `run:read`; `agent:<name>:run` to start; `state:read` for State |
+| Runs | Every run, newest first (`GET /runs?sort=-createdAt`), filtered by agent and status in the address bar; running and waiting counts, failures and tokens of the last 24 h; tokens per run. Refreshes every 5 s. | `run:read` |
 | Run | Status, budgets (steps, tokens, time), the trigger envelope and the step timeline (llm, tool and wait steps, inputs and outputs collapsed). Live over the run's SSE stream, including the streamed text of the step in progress. A cancel button with a confirmation. | `run:read` or `agent:<name>:run`; `run:cancel` to cancel |
 | Approvals | Each waiting run with the tool, its input, the expiry countdown and a reason field; Approve or Deny (`POST /runs/:id/approve`). The sidebar shows the count. | `run:read` to list, `agent:<name>:approve` to answer |
-| Agent state | Key-value entries and the declared collections, read-only. | `state:read` (and `run:read` for the agent list) |
 | Schedules | The `cron()` triggers per agent with the next fire time in the trigger's time zone. | `run:read` |
+
+Agent names link to the agent page from every other page. The 24 h figures come from the newest 100 runs (per agent, or overall on the runs page), since the API has no time filter: an agent that ran more often than that in a day shows `100+`. Only tools that need an approval are listed, because an agent may build its tool set per run.
 
 A principal without the grant a page needs sees a notice naming it; the rest of the dashboard keeps working. An approval link from a notification works with `agent:<name>:approve` alone.
 
