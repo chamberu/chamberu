@@ -61,9 +61,10 @@ export function createIssueApprovalEngine(
         GITHUB_WEBHOOK_SECRET,
         GITHUB_OWNER,
         RESUME_SECRET,
+        APP_URL,
     } = process.env;
-    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !GITHUB_OWNER || !RESUME_SECRET) {
-        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, GITHUB_OWNER and RESUME_SECRET.');
+    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !GITHUB_OWNER || !RESUME_SECRET || !APP_URL) {
+        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, GITHUB_OWNER, RESUME_SECRET and APP_URL.');
     }
 
     const gh = createGithubApp({
@@ -89,10 +90,12 @@ export function createIssueApprovalEngine(
         agents: [triage],
         notifiers: {
             github: githubNotifier({
-                app: gh, 
-                mention: GITHUB_OWNER, 
-                clock: options.clock, 
-            }), 
+                app: gh,
+                mention: GITHUB_OWNER,
+                // a link to the approval in the chamvi UI, without the token
+                approvalUrl: ({ runId, approvalId }) => `${APP_URL}/ui/approvals?run=${encodeURIComponent(runId)}&approval=${encodeURIComponent(approvalId)}`,
+                clock: options.clock,
+            }),
         },
         resumeSecret: RESUME_SECRET,
         clock: options.clock,
@@ -117,7 +120,7 @@ Agent "triage" wants to call "github_close_issue" with:
 { "repo": "octo/demo", "number": 7 }
 ```
 
-Waiting for approval until 2026-10-22T09:00:00.000Z. Answer it in the chamvi UI, the REST API or the MCP tool resume_run.
+Waiting for approval until 2026-10-22T09:00:00.000Z. Approve or deny: https://chamvi.example/ui/approvals?run=<runId>&approval=<approvalId>
 Run `<runId>` of agent `triage`.
 
 <!-- chamvi:effect=<runId>:<approvalId> -->
@@ -135,7 +138,7 @@ Every failure throws a `ChamviError` with code `github_request` (`GitHub <status
 
 ## Security
 
-- The comment is public to everyone who can read the issue. It never carries the resume token. With `resumeUrl` it carries a link that does (opt in knowingly; `POST /resume` still requires `agent:<agent>:approve`), else the hint to answer in the UI, the REST API or the MCP tool `resume_run`.
+- The comment is public to everyone who can read the issue. It never carries the resume token. With `approvalUrl` it carries a link to the approval in the chamvi UI (run and approval id only), where the owner signs in and answers through `POST /runs/:id/approve` (`agent:<agent>:approve` of the signed-in principal); without it, the hint to answer in the UI, the REST API or the MCP tool `resume_run`.
 - The notification body (the tool input as the model wrote it) sits in a fence one backtick longer than any backtick run in it, so a `@login`, `@org/team` or `#123` inside notifies nobody and cross-links nothing, and no input closes the fence. Backtick runs over 31 are broken with U+200B zero-width spaces first, so the fence stays short and the comment within GitHub's limit; such a body is then not byte-identical to the tool input. The title's whitespace runs (line breaks included) are collapsed to one space, so it stays one heading line. Only the configured `mention` logins are notified.
 - The body is cut to 60 000 characters (GitHub refuses comments over 65 536), never inside a surrogate pair.
 - A comment by anyone but the App bot that copies the marker does not count as delivered.
@@ -148,7 +151,7 @@ Every failure throws a `ChamviError` with code `github_request` (`GitHub <status
 | `name` | `string` | `'github'` | The notifier name an agent's `notify` references |
 | `mention` | `string \| string[]` | none | Logins (without `@`) mentioned at the top of every comment |
 | `target` | `{ repo, number, installationId? }` | none | The issue or pull request for runs without one (`repo` as `owner/name`), and the installation to comment as |
-| `resumeUrl` | `(token) => string` | none | A link answering an approval; the link holds the token |
+| `approvalUrl` | `({ runId, approvalId, agent }) => string` | none | A link to the approval in the chamvi UI, e.g. `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`; it carries no token |
 | `timeoutMs` | `number` | `30_000` | Bound of the comment list and the post, on the `clock` |
 | `clock` | `IClock` | `systemClock` | Time source of the timeout |
 

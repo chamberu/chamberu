@@ -30,6 +30,7 @@ const approval: Notification = {
     runId: 'r1',
     title: 'Approval required: github_close_issue',
     body: 'Agent "release" wants to call "github_close_issue" with:\n{"repo":"octo/demo","number":7}',
+    approvalId: 'a1',
     resumeToken: 'secret-token',
     expiresAt: new Date('2026-10-22T09:00:00Z'),
 };
@@ -76,6 +77,48 @@ describe('githubNotifier notify', () => {
         });
         // as installation 42, the event's
         expect(fake.tokenInstallations).toEqual([42]);
+    });
+
+    it.each<[string, Partial<GithubNotifierOptions>]>([
+        ['without options', {}],
+        ['with approvalUrl', { approvalUrl: (ref) => `https://app.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}` }],
+    ])('never sends the token %s', async (_label, patch) => {
+        const sent: string[] = [];
+        let forward: typeof globalThis.fetch | undefined;
+        const record: typeof globalThis.fetch = async (resource, init) => {
+            const request = new Request(resource as RequestInfo, init);
+            sent.push(JSON.stringify({
+                url: request.url,
+                headers: [...request.headers],
+                body: await request.clone().text(),
+            }));
+            return forward!(request);
+        };
+        const { notifier, posts, fake } = setup(patch, { fetch: record });
+        forward = fake.fetch;
+        await notifier.notify(approval, { idempotencyKey: 'r1:a1', trigger: githubTrigger() });
+        expect(posts()).toHaveLength(1);
+        expect(sent.length).toBeGreaterThan(1);
+        for (const request of sent) {
+            expect(request).not.toContain('secret-token');
+        }
+    });
+
+    it('passes the approval ref to approvalUrl', async () => {
+        const refs: unknown[] = [];
+        const { notifier, posts } = setup({
+            approvalUrl: (ref) => {
+                refs.push(ref);
+                return `https://app.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}`;
+            },
+        });
+        await notifier.notify(approval, { idempotencyKey: 'r1:a1', trigger: githubTrigger() });
+        expect(refs).toEqual([{
+            runId: 'r1',
+            approvalId: 'a1',
+            agent: 'release',
+        }]);
+        expect((posts()[0]!.body as { body: string }).body).toContain('Approve or deny: https://app.example/ui/approvals?run=r1&approval=a1');
     });
 
     it('finds its own comment', async () => {

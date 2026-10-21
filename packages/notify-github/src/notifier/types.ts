@@ -27,8 +27,12 @@ export type GithubNotifierOptions = {
     mention?: string | readonly string[];
     /** Where to comment for runs without an issue or pull request (cron, http, a push delivery). */
     target?: GithubNotifierTarget;
-    /** A link that answers an approval (the chamvi UI); holds the token, so opt in knowingly. */
-    resumeUrl?: (token: string) => string;
+    /**
+     * A link to the approval in the chamvi UI, e.g.
+     * `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`, where the
+     * signed-in owner answers it; it carries no token.
+     */
+    approvalUrl?: (ref: { runId: string; approvalId: string; agent: string }) => string;
     /** Default `GITHUB_NOTIFIER_TIMEOUT_MS` (30 s). */
     timeoutMs?: number;
     clock?: IClock;
@@ -47,7 +51,7 @@ export type ResolvedGithubNotifierOptions = {
     name: string;
     mentions: string[];
     target?: CommentTarget;
-    resumeUrl?: (token: string) => string;
+    approvalUrl?: (ref: { runId: string; approvalId: string; agent: string }) => string;
     timeoutMs: number;
     clock: IClock;
 };

@@ -78,7 +78,7 @@ export function githubNotifier(options: GithubNotifierOptions): INotifier {
                     ...route,
                     body: renderComment(n, {
                         mentions: resolved.mentions,
-                        ...(resolved.resumeUrl ? { resumeUrl: resolved.resumeUrl } : {}),
+                        ...(resolved.approvalUrl ? { approvalUrl: resolved.approvalUrl } : {}),
                         marker,
                     }),
                 });

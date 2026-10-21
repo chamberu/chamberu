@@ -14,9 +14,10 @@ export function createIssueApprovalEngine(
         GITHUB_WEBHOOK_SECRET,
         GITHUB_OWNER,
         RESUME_SECRET,
+        APP_URL,
     } = process.env;
-    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !GITHUB_OWNER || !RESUME_SECRET) {
-        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, GITHUB_OWNER and RESUME_SECRET.');
+    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !GITHUB_OWNER || !RESUME_SECRET || !APP_URL) {
+        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, GITHUB_OWNER, RESUME_SECRET and APP_URL.');
     }
 
     const gh = createGithubApp({
@@ -42,10 +43,12 @@ export function createIssueApprovalEngine(
         agents: [triage],
         notifiers: {
             github: githubNotifier({
-                app: gh, 
-                mention: GITHUB_OWNER, 
-                clock: options.clock, 
-            }), 
+                app: gh,
+                mention: GITHUB_OWNER,
+                // a link to the approval in the chamvi UI, without the token
+                approvalUrl: ({ runId, approvalId }) => `${APP_URL}/ui/approvals?run=${encodeURIComponent(runId)}&approval=${encodeURIComponent(approvalId)}`,
+                clock: options.clock,
+            }),
         },
         resumeSecret: RESUME_SECRET,
         clock: options.clock,

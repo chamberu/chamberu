@@ -14,11 +14,13 @@ import {
 import {
     Engine,
     MemoryStore,
+    createResumeToken,
     defineAgent,
 } from '@chamvi/core';
 import type { ChamviError } from '@chamvi/core';
 import { githubWebhook } from '@chamvi/github';
 import { githubNotifier } from '@chamvi/notify-github';
+import type { GithubNotifierOptions } from '@chamvi/notify-github';
 import { createGithubFixture, githubEvent } from '../../utils/github.ts';
 import { approvalModel } from '../../utils/model.ts';
 
@@ -29,7 +31,7 @@ afterEach(async () => {
     engines.length = 0;
 });
 
-function setup() {
+function setup(patch: Partial<GithubNotifierOptions> = {}) {
     const {
         clock, 
         fake, 
@@ -53,6 +55,7 @@ function setup() {
                 app: gh, 
                 mention: 'owner', 
                 clock, 
+                ...patch,
             }), 
         },
         resumeSecret: 'resume-secret',
@@ -99,6 +102,18 @@ describe('githubNotifier with the engine', () => {
         await ctx.engine.tick();
         expect(ctx.comments()).toHaveLength(1);
         expect(ctx.errors).toEqual([]);
+    });
+
+    it('links to the approval without the token', async () => {
+        const ctx = setup({ approvalUrl: (ref) => `https://chamvi.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}&agent=${ref.agent}` });
+        const runId = await dispatchToWaiting(ctx);
+        const waiting = (await ctx.engine.getRun(runId))!.waiting!;
+        const body = String(ctx.comments()[0]!.body);
+        expect(body).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${waiting.approvalId}&agent=triage`);
+        const token = createResumeToken('resume-secret', waiting);
+        const posted = JSON.stringify(ctx.fake.requests.filter((r) => r.method === 'POST' && r.path.endsWith('/comments')));
+        expect(posted).not.toContain(token);
+        expect(posted).not.toContain(token.split('.')[1]);
     });
 
     it('reconciles a lost response', async () => {

@@ -74,8 +74,8 @@ export function resolveOptions(options: GithubNotifierOptions): ResolvedGithubNo
         };
     }
 
-    if (options.resumeUrl !== undefined && typeof options.resumeUrl !== 'function') {
-        throw invalid('resumeUrl must be a function.');
+    if (options.approvalUrl !== undefined && typeof options.approvalUrl !== 'function') {
+        throw invalid('approvalUrl must be a function.');
     }
     const timeoutMs = options.timeoutMs ?? GITHUB_NOTIFIER_TIMEOUT_MS;
     if (!isPositiveInteger(timeoutMs)) throw invalid('timeoutMs must be a positive integer.');
@@ -85,7 +85,7 @@ export function resolveOptions(options: GithubNotifierOptions): ResolvedGithubNo
         name,
         mentions,
         ...(target ? { target } : {}),
-        ...(options.resumeUrl ? { resumeUrl: options.resumeUrl } : {}),
+        ...(options.approvalUrl ? { approvalUrl: options.approvalUrl } : {}),
         timeoutMs,
         clock: options.clock ?? systemClock,
     };
@@ -174,13 +174,14 @@ export function isSameLogin(a: unknown, b: string): boolean {
 /**
  * The comment: mentions, the title, the body in a fence no backtick run in
  * it can close (so a `@login` or `#123` inside notifies nobody), the
- * approval line (never the bare token), the run and the marker.
+ * approval line (a link with run and approval id, never the token), the
+ * run and the marker.
  */
 export function renderComment(
     n: Notification,
     input: {
         mentions: readonly string[]; 
-        resumeUrl?: (token: string) => string; 
+        approvalUrl?: (ref: { runId: string; approvalId: string; agent: string }) => string; 
         marker: string 
     },
 ): string {
@@ -193,8 +194,15 @@ export function renderComment(
     const footer: string[] = [];
     if (n.kind === 'approval') {
         const until = n.expiresAt ? `Waiting for approval until ${n.expiresAt.toISOString()}.` : 'Waiting for approval.';
-        footer.push(input.resumeUrl && n.resumeToken ?
-            `${until} Approve or deny: ${input.resumeUrl(n.resumeToken)}` :
+        const link = input.approvalUrl && n.approvalId ?
+            input.approvalUrl({
+                runId: n.runId,
+                approvalId: n.approvalId,
+                agent: n.agent,
+            }) :
+            undefined;
+        footer.push(link ?
+            `${until} Approve or deny: ${link}` :
             `${until} Answer it in the chamvi UI, the REST API or the MCP tool resume_run.`);
     }
     footer.push(`Run \`${n.runId}\` of agent \`${n.agent}\`.`);

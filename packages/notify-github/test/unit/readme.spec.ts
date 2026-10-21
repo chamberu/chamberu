@@ -33,6 +33,7 @@ function stubEnv() {
     vi.stubEnv('GITHUB_WEBHOOK_SECRET', 'readme-webhook-secret');
     vi.stubEnv('GITHUB_OWNER', 'octocat');
     vi.stubEnv('RESUME_SECRET', 'readme-resume-secret');
+    vi.stubEnv('APP_URL', 'https://chamvi.example');
     return { clock, fake };
 }
 
@@ -62,6 +63,8 @@ describe('README example', () => {
             const comments = fake.comments.get('octo/demo#7') ?? [];
             expect(comments).toHaveLength(1);
             expect(String(comments[0]!.body).startsWith('@octocat\n')).toBe(true);
+            const { approvalId } = (await engine.getRun(runId))!.waiting!;
+            expect(String(comments[0]!.body)).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${approvalId}`);
         } finally {
             await engine.stop();
         }

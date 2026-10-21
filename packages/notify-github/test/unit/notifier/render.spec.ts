@@ -20,6 +20,7 @@ const approval: Notification = {
     runId: 'r1',
     title: 'Approval required: deploy',
     body: 'Agent "release" wants to call "deploy" with:\n{\n  "env": "prod"\n}',
+    approvalId: 'a1',
     resumeToken: 'secret-token',
     expiresAt: new Date('2026-10-21T10:00:00Z'),
 };
@@ -30,7 +31,7 @@ describe('renderComment', () => {
     it('renders an approval', () => {
         const comment = renderComment(approval, {
             mentions: ['owner'],
-            resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}`,
+            approvalUrl: (ref) => `https://app.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}&agent=${ref.agent}`,
             marker: '<!-- chamvi:effect=r1:a1 -->',
         });
         expect(comment).toBe([
@@ -42,7 +43,7 @@ describe('renderComment', () => {
             approval.body,
             '```',
             '',
-            'Waiting for approval until 2026-10-21T10:00:00.000Z. Approve or deny: https://app.example/ui/approvals?token=secret-token',
+            'Waiting for approval until 2026-10-21T10:00:00.000Z. Approve or deny: https://app.example/ui/approvals?run=r1&approval=a1&agent=release',
             'Run `r1` of agent `release`.',
             '',
             '<!-- chamvi:effect=r1:a1 -->',
@@ -54,11 +55,33 @@ describe('renderComment', () => {
         expect(comment.split('\n')[0]).toBe('### Approval required: deploy');
     });
 
-    it('never includes the bare token', () => {
+    it('never includes the token', () => {
         const comment = renderComment(approval, { mentions: [], marker: '<!-- chamvi:effect=r1:a1 -->' });
         expect(comment).not.toContain('secret-token');
         expect(comment).toContain('Answer it in the chamvi UI, the REST API or the MCP tool resume_run.');
         expect(comment.startsWith('### ')).toBe(true);
+        const linked = renderComment(approval, {
+            mentions: [],
+            approvalUrl: (ref) => `https://app.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}`,
+            marker: '<!-- chamvi:effect=r1:a1 -->',
+        });
+        expect(linked).not.toContain('secret-token');
+    });
+
+    it('renders the hint instead of a link for an approval without an approvalId', () => {
+        const { approvalId: _approvalId, ...withoutId } = approval;
+        const urls: unknown[] = [];
+        const comment = renderComment(withoutId, {
+            mentions: [],
+            approvalUrl: (ref) => {
+                urls.push(ref);
+                return 'https://app.example/ui/approvals';
+            },
+            marker: '<!-- m -->',
+        });
+        expect(urls).toEqual([]);
+        expect(comment).not.toContain('Approve or deny');
+        expect(comment).toContain('Answer it in the chamvi UI, the REST API or the MCP tool resume_run.');
     });
 
     it('renders other kinds without the approval line', () => {

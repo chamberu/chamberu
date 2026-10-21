@@ -55,7 +55,7 @@ describe('githubNotifier options', () => {
         }],
         ['a zero timeoutMs', { timeoutMs: 0 }],
         ['a fractional timeoutMs', { timeoutMs: 2.5 }],
-        ['a non-function resumeUrl', { resumeUrl: 'x' as unknown as GithubNotifierOptions['resumeUrl'] }],
+        ['a non-function approvalUrl', { approvalUrl: 'https://app.example/ui/approvals' as unknown as GithubNotifierOptions['approvalUrl'] }],
     ])('rejects %s', (_label, patch) => {
         expect(() => resolveOptions({ app: gh, ...patch })).toThrow(InvalidAgentDefinitionError);
     });
