@@ -26,8 +26,9 @@ Keep text contrast at 4.5:1 or more; the primary button and code comment colours
 
 ## Type and shape
 
-- Display: **Bricolage Grotesque** 700, letter-spacing -0.025em (hero, section headings, doc H1/H2).
-- Body: **IBM Plex Sans**. Code and labels: **IBM Plex Mono**.
+- Display: **Instrument Sans** 600, letter-spacing -0.015em, hero line height 1.02 (hero, section headings, doc H1/H2, dashboard headings and figures). Tighter tracking or 700 crowds the letters at hero size.
+- Body: **Instrument Sans**. Code and labels: **JetBrains Mono**.
+- Both are self-hosted as variable fonts (`@fontsource-variable/instrument-sans`, `@fontsource-variable/jetbrains-mono`) in the docs and the dashboard; no Google Fonts, and every weight is a real one (no faux bold).
 - Corners: 4px radius everywhere, except square corners (0) for status chips and approval callouts, which read as "signed".
 
 ## Logo and artwork

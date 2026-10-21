@@ -9,7 +9,7 @@ import { VPLink } from 'vitepress/theme';
 import { computed, defineComponent } from 'vue';
 import { useHome } from './use-home';
 
-const TITLE_CLASS = 'ch-display mt-1 text-[clamp(2.75rem,7vw,4.75rem)] leading-[0.98] text-ink';
+const TITLE_CLASS = 'ch-display mt-1 text-[clamp(2.75rem,7vw,4.75rem)] leading-[1.02] text-ink';
 const GRID_CLASS = 'ch-wrap grid grid-cols-1 items-center gap-12 vp:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] vp:gap-16';
 
 export default defineComponent({

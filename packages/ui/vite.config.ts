@@ -53,6 +53,8 @@ export default defineConfig(({ command }) => ({
         assetsDir: 'assets',
         // vuecs, reka-ui and the icon set in one entry chunk
         chunkSizeWarningLimit: 1500,
+        // a font subset under 4 KiB would become a data: URI, which font-src 'self' refuses
+        assetsInlineLimit: (file) => (file.endsWith('.woff2') ? false : undefined),
     },
     server: { proxy: Object.fromEntries(['/agents', '/runs', '/resume', '/schedules', '/me'].map((path) => [path, API])) },
 }));

@@ -148,7 +148,7 @@ test('fonts are self-hosted, dark mode applies and phones get no sideways scroll
         await page.evaluate(() => document.fonts.ready);
         expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBeLessThanOrEqual(390);
     }
-    expect(await page.evaluate(() => document.fonts.check('700 16px "Bricolage Grotesque"'))).toBe(true);
+    expect(await page.evaluate(() => document.fonts.check('700 16px "Instrument Sans Variable"'))).toBe(true);
     expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(true);
     // the dark page ground of the Crimson tokens
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(15, 14, 16)');

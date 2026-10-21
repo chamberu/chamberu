@@ -55,7 +55,7 @@
 
 @layer base {
     :root {
-        --ch-font-display: "Bricolage Grotesque", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        --ch-font-display: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
 
         --ch-hero-bg: #f4f4f5;
         --ch-paper: #ffffff;
@@ -135,15 +135,15 @@
 
     .ch-display {
         font-family: var(--ch-font-display);
-        font-weight: 700;
-        letter-spacing: -0.025em;
+        font-weight: 600;
+        letter-spacing: -0.015em;
     }
 
     .ch-heading {
         @apply m-0 text-3xl leading-[1.1] md:text-[2.5rem];
         font-family: var(--ch-font-display);
-        font-weight: 700;
-        letter-spacing: -0.025em;
+        font-weight: 600;
+        letter-spacing: -0.015em;
         color: var(--ch-ink);
     }
 
@@ -244,8 +244,8 @@
  */
 
 :root {
-    --vp-font-family-base: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --vp-font-family-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+    --vp-font-family-base: "Instrument Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --vp-font-family-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
 
     --vp-c-bg: var(--ch-paper);
     --vp-c-bg-alt: var(--ch-hero-bg);
@@ -298,12 +298,18 @@
     --vp-c-text-3: #8a7f80;
 }
 
+/* JetBrains Mono would draw `=>` and `!==` as ligatures; samples should show what to type. */
+pre,
+code {
+    font-variant-ligatures: none;
+}
+
 /* Display face on document headings. */
 .vp-doc h1,
 .vp-doc h2 {
     font-family: var(--ch-font-display);
-    font-weight: 700;
-    letter-spacing: -0.025em;
+    font-weight: 600;
+    letter-spacing: -0.015em;
 }
 
 /* 4px radius on the default theme's rounded chrome. */
