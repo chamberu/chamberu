@@ -35,7 +35,7 @@ Keep text contrast at 4.5:1 or more; the primary button and code comment colours
 - The logo is three arched chambers on one floor, one per agent, each holding the steps its run has checkpointed; the middle chamber is the running one.
 - Colours: the arches use the crimson accent, the floor and step pills use the ink (`#1b1a1c` light, `#ede6e3` dark), the pending step pill a warm grey.
 - `.github/assets/*.svg` are theme-aware through a `prefers-color-scheme` style block inside the SVG. The docs use fixed `logo-light.svg` / `logo-dark.svg` (and the lifecycle diagram variants) switched by the site's colour mode, because an SVG in an `<img>` follows the OS setting, not the site toggle.
-- GitHub org avatar and repo social preview are PNG renders kept in `.github/assets/`: `avatar.png` (1000×1000, the dark logo tile with a solid charcoal fill and transparent corners outside the rounded border) and `social-preview.png` (1280×640, charcoal card with logo, name, pitch and `chamvi.dev`). GitHub has no API for either, so upload them in the web UI (org settings, profile picture; repo settings, social preview) and regenerate them when the logo changes.
+- GitHub org avatar and repo social preview are PNG renders kept in `.github/assets/`: `avatar.png` (1000×1000, the dark logo tile with a solid charcoal fill and transparent corners outside the rounded border), `avatar-light.png` (the same render of the light tile on a solid white fill) and `social-preview.png` (1280×640, charcoal card with logo, name, pitch and `chamvi.dev`). GitHub has no API for either, so upload them in the web UI (org settings, profile picture; repo settings, social preview) and regenerate them when the logo changes.
 
 ## Landing page
 
