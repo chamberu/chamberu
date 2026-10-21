@@ -1,0 +1,70 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import type { KeyObject } from 'node:crypto';
+import type { IClock } from '@chamvi/core';
+
+export type FakeRequest = {
+    method: string;
+    path: string;
+    query: Record<string, string>;
+    body: unknown;
+    authorization: string | null;
+};
+
+export type JwtClaims = {
+    iat: number;
+    exp: number;
+    iss: string;
+};
+
+export type FakeRouteInput = {
+    params: Record<string, string>;
+    query: Record<string, string>;
+    body: unknown;
+    /** The installation the token belongs to. */
+    installationId: number;
+};
+
+export type FakeRouteResult = {
+    status: number;
+    body?: unknown;
+    headers?: Record<string, string>;
+};
+
+export type FakeRouteHandler = (input: FakeRouteInput) => FakeRouteResult | Promise<FakeRouteResult>;
+
+export type FakeGithub = {
+    fetch: typeof globalThis.fetch;
+    /** PKCS#1 PEM of the App's private key. */
+    privateKey: string;
+    publicKey: KeyObject;
+    requests: FakeRequest[];
+    /** Claims of every JWT the fake accepted, in order. */
+    jwtClaims: JwtClaims[];
+    readonly tokensIssued: number;
+    /** Installation id of every issued token, in order. */
+    tokenInstallations: number[];
+    issues: Map<string, Record<string, unknown>>;
+    comments: Map<string, Array<Record<string, unknown>>>;
+    labels: Map<string, Array<Record<string, unknown>>>;
+    releases: Map<string, Array<Record<string, unknown>>>;
+    files: Map<string, Record<string, unknown>>;
+    pulls: Map<string, Record<string, unknown>>;
+    /** Adds a route (it wins over the built-in ones) for an installation token, e.g. `route('GET', '/repos/:owner/:repo/issues/:number', ...)`. */
+    route(method: string, path: string, handler: FakeRouteHandler): void;
+    /** The next request matching method and path answers `status` (once). */
+    failNext(method: string, path: string, status: number): void;
+};
+
+export type FakeGithubOptions = {
+    appId: string;
+    /** The App's slug (default `chamvi-test`); its bot login is `<slug>[bot]`. */
+    slug?: string;
+    /** Token expiry and JWT checks read `now()` only. */
+    clock: IClock;
+};

@@ -11,6 +11,7 @@ import * as kit from '@chamvi/test-kit';
 describe('public api', () => {
     it.each([
         'ControllableClock',
+        'createFakeGithub',
         'createGitFixture',
         'describeStoreContract',
         'describeWorkspaceContract',

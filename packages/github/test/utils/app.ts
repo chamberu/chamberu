@@ -12,9 +12,8 @@ import { createGithubApp } from '@chamvi/github';
 import type { GithubAppOptions, GithubWebhookRouteOptions, IGithubApp } from '@chamvi/github';
 import { createHttpApp, staticTokens } from '@chamvi/http';
 import type { HttpAppOptions } from '@chamvi/http';
-import { ControllableClock } from '@chamvi/test-kit';
-import { createFakeGithub } from './github.ts';
-import type { FakeGithub } from './github.ts';
+import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
+import type { FakeGithub } from '@chamvi/test-kit';
 
 /** The http app (a routup `App`). */
 export type App = ReturnType<typeof createHttpApp>;
