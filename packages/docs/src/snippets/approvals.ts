@@ -7,7 +7,7 @@ import {
     RunStatus,
     defineAgent,
 } from '@chamvi/core';
-import type { INotifier, Notification } from '@chamvi/core';
+import type { INotifier, Notification, NotifyOptions } from '@chamvi/core';
 
 declare function deployVersion(version: string, env: string): Promise<string>;
 
@@ -17,7 +17,7 @@ class InboxNotifier implements INotifier {
 
     readonly tokens = new Map<string, string>();
 
-    async notify(n: Notification, opts: { idempotencyKey: string }): Promise<void> {
+    async notify(n: Notification, opts: NotifyOptions): Promise<void> {
         // a real notifier sends a message; it must throw when the send fails
         if (n.kind === 'approval' && n.resumeToken) {
             this.tokens.set(opts.idempotencyKey, n.resumeToken);

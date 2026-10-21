@@ -604,7 +604,7 @@ export class Engine {
                     expiresAt: waiting.expiresAt,
                 }),
                 expiresAt: waiting.expiresAt,
-            }, { idempotencyKey });
+            }, { idempotencyKey, trigger: run.trigger });
             // answered meanwhile: nothing left to record
             if (!isCurrent(await this.store.getRun(run.id))) return;
             const notified = await this.store.updateRun(

@@ -1,4 +1,4 @@
-import type { INotifier, Notification } from '@chamvi/core';
+import type { INotifier, Notification, NotifyOptions } from '@chamvi/core';
 
 // #region webhook
 export class WebhookNotifier implements INotifier {
@@ -6,7 +6,7 @@ export class WebhookNotifier implements INotifier {
 
     constructor(protected readonly url: string) {}
 
-    async notify(n: Notification, opts: { idempotencyKey: string }): Promise<void> {
+    async notify(n: Notification, opts: NotifyOptions): Promise<void> {
         const response = await fetch(this.url, {
             method: 'POST',
             headers: {

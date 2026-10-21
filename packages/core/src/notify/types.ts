@@ -5,6 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { TriggerEnvelope } from '../trigger/types.ts';
+
 export type Notification = {
     kind: 'approval' | 'stuck' | 'result' | 'info';
     agent: string;
@@ -16,11 +18,24 @@ export type Notification = {
     expiresAt?: Date;
 };
 
+export type NotifyOptions = {
+    /**
+     * Stable per logical notification (`runId:approvalId` for approvals), so
+     * transports can dedupe a resend.
+     */
+    idempotencyKey: string;
+    /**
+     * The run's trigger envelope as stored; read the source, payload and
+     * receivedAt, never write it.
+     */
+    trigger: TriggerEnvelope;
+};
+
 export interface INotifier {
     readonly name: string;
     /**
-     * Delivers a notification. `idempotencyKey` is stable per logical
-     * notification (`runId:approvalId` for approvals), so transports can dedupe.
+     * Delivers a notification and throws on failure (the engine retries an
+     * approval until one send succeeds), idempotent on `opts.idempotencyKey`.
      */
-    notify(n: Notification, opts: { idempotencyKey: string }): Promise<void>;
+    notify(n: Notification, opts: NotifyOptions): Promise<void>;
 }
