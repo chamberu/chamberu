@@ -35,86 +35,87 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ---------- Crimson tokens (mockup A) ---------- */
+/* unlayered: @layer vuecs comes after tailwind's layers, so a layered override would lose */
+:root {
+    --ch-font-display: "Bricolage Grotesque", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --ch-font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --ch-font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --ch-hero-bg: #f4f4f5;
+    --ch-paper: #ffffff;
+    --ch-ink: #1b1a1c;
+    --ch-muted: #5c5b60;
+    --ch-line: #e6e6e9;
+    --ch-chip: #f0f0f2;
+    --ch-accent: #c8303b;
+    --ch-accent-text: #b02a34;
+    --ch-button-bg: #c8303b;
+    --ch-ok: #2f7d4f;
+    --ch-warn: #8a5a00;
+    --ch-warn-tint: #fbf3e2;
+    --ch-hover: #f7f7f8;
+    --ch-code-bg: #19171a;
+    --ch-code-ink: #e6dfde;
+    --ch-code-key: #ff7b84;
+    --ch-code-str: #e7c58c;
+    --ch-code-com: #958a8b;
+    --ch-radius: 4px;
+
+    /* vuecs tokens: the components follow the same palette */
+    --vc-color-primary-50: #fdf3f3;
+    --vc-color-primary-100: #fbe5e6;
+    --vc-color-primary-200: #f7cdd0;
+    --vc-color-primary-300: #f0a6ab;
+    --vc-color-primary-400: #e6717a;
+    --vc-color-primary-500: #e04652;
+    --vc-color-primary-600: #c8303b;
+    --vc-color-primary-700: #b02a34;
+    --vc-color-primary-800: #8f242c;
+    --vc-color-primary-900: #76222a;
+    --vc-color-primary-950: #410d12;
+    --vc-color-on-primary: #ffffff;
+    --vc-color-bg: var(--ch-paper);
+    --vc-color-bg-muted: var(--ch-chip);
+    --vc-color-bg-elevated: var(--ch-paper);
+    --vc-color-fg: var(--ch-ink);
+    --vc-color-fg-muted: var(--ch-muted);
+    --vc-color-border: var(--ch-line);
+    --vc-color-border-muted: var(--ch-line);
+    --vc-color-ring: var(--ch-accent);
+    --vc-radius-sm: 4px;
+    --vc-radius-md: 4px;
+    --vc-radius-lg: 4px;
+    color-scheme: light;
+}
+
+.dark {
+    --ch-hero-bg: #19171a;
+    --ch-paper: #201d1f;
+    --ch-ink: #efe8e6;
+    --ch-muted: #b0a5a4;
+    --ch-line: #332e30;
+    --ch-chip: #2c2729;
+    --ch-accent: #e04652;
+    --ch-accent-text: #ff7b84;
+    --ch-ok: #6cc08f;
+    --ch-warn: #e7c58c;
+    --ch-warn-tint: #2e2620;
+    --ch-hover: #262224;
+    --ch-code-bg: #121012;
+
+    --vc-color-primary-600: #c8303b;
+    --vc-color-primary-700: #e04652;
+    --vc-color-bg: var(--ch-paper);
+    --vc-color-bg-muted: var(--ch-chip);
+    --vc-color-bg-elevated: var(--ch-paper);
+    --vc-color-fg: var(--ch-ink);
+    --vc-color-fg-muted: var(--ch-muted);
+    --vc-color-border: var(--ch-line);
+    --vc-color-border-muted: var(--ch-line);
+    color-scheme: dark;
+}
+
 @layer base {
-    :root {
-        --ch-font-display: "Bricolage Grotesque", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-        --ch-font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-        --ch-font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-
-        --ch-hero-bg: #f4f4f5;
-        --ch-paper: #ffffff;
-        --ch-ink: #1b1a1c;
-        --ch-muted: #5c5b60;
-        --ch-line: #e6e6e9;
-        --ch-chip: #f0f0f2;
-        --ch-accent: #c8303b;
-        --ch-accent-text: #b02a34;
-        --ch-button-bg: #c8303b;
-        --ch-ok: #2f7d4f;
-        --ch-warn: #8a5a00;
-        --ch-warn-tint: #fbf3e2;
-        --ch-hover: #f7f7f8;
-        --ch-code-bg: #19171a;
-        --ch-code-ink: #e6dfde;
-        --ch-code-key: #ff7b84;
-        --ch-code-str: #e7c58c;
-        --ch-code-com: #958a8b;
-        --ch-radius: 4px;
-
-        /* vuecs tokens: the components follow the same palette */
-        --vc-color-primary-50: #fdf3f3;
-        --vc-color-primary-100: #fbe5e6;
-        --vc-color-primary-200: #f7cdd0;
-        --vc-color-primary-300: #f0a6ab;
-        --vc-color-primary-400: #e6717a;
-        --vc-color-primary-500: #e04652;
-        --vc-color-primary-600: #c8303b;
-        --vc-color-primary-700: #b02a34;
-        --vc-color-primary-800: #8f242c;
-        --vc-color-primary-900: #76222a;
-        --vc-color-primary-950: #410d12;
-        --vc-color-on-primary: #ffffff;
-        --vc-color-bg: var(--ch-paper);
-        --vc-color-bg-muted: var(--ch-chip);
-        --vc-color-bg-elevated: var(--ch-paper);
-        --vc-color-fg: var(--ch-ink);
-        --vc-color-fg-muted: var(--ch-muted);
-        --vc-color-border: var(--ch-line);
-        --vc-color-border-muted: var(--ch-line);
-        --vc-color-ring: var(--ch-accent);
-        --vc-radius-sm: 4px;
-        --vc-radius-md: 4px;
-        --vc-radius-lg: 4px;
-        color-scheme: light;
-    }
-
-    .dark {
-        --ch-hero-bg: #19171a;
-        --ch-paper: #201d1f;
-        --ch-ink: #efe8e6;
-        --ch-muted: #b0a5a4;
-        --ch-line: #332e30;
-        --ch-chip: #2c2729;
-        --ch-accent: #e04652;
-        --ch-accent-text: #ff7b84;
-        --ch-ok: #6cc08f;
-        --ch-warn: #e7c58c;
-        --ch-warn-tint: #2e2620;
-        --ch-hover: #262224;
-        --ch-code-bg: #121012;
-
-        --vc-color-primary-600: #c8303b;
-        --vc-color-primary-700: #e04652;
-        --vc-color-bg: var(--ch-paper);
-        --vc-color-bg-muted: var(--ch-chip);
-        --vc-color-bg-elevated: var(--ch-paper);
-        --vc-color-fg: var(--ch-ink);
-        --vc-color-fg-muted: var(--ch-muted);
-        --vc-color-border: var(--ch-line);
-        --vc-color-border-muted: var(--ch-line);
-        color-scheme: dark;
-    }
-
     html, body { margin: 0; }
 
     body {

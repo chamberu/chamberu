@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+/** Every key the dashboard keeps in `sessionStorage` starts with this; sign-out removes them all. */
+export const STORAGE_PREFIX = 'chamvi.';
+
+export const TOKEN_STORAGE_KEY = 'chamvi.token';
+
+/** Where to go after the authup round-trip (it loses the query). */
+export const RETURN_STORAGE_KEY = 'chamvi.return';

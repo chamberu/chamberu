@@ -20,12 +20,26 @@ import tailwind from '@vuecs/theme-tailwind';
 import installTimeago from '@vuecs/timeago';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { createApiClient } from './api/module.ts';
+import type { IApiClient } from './api/types.ts';
+import { createAuthGuard } from './auth/guard.ts';
+import { createSession } from './auth/module.ts';
+import type { IAuthupAdapter } from './auth/types.ts';
 import { readConfig } from './config/module.ts';
+import { APP_CONTEXT } from './context/constants.ts';
+import { RouteName } from './router/constants.ts';
 import { createUiRouter } from './router/module.ts';
 import './style.css';
 
 const config = readConfig(document);
 const app = createApp(App);
+
+// the authup kit (and its pinia) must be installed before vuecs
+let adapter: IAuthupAdapter | undefined;
+if (config.auth.authup) {
+    const { createAuthupAdapter } = await import('./auth/authup.ts');
+    adapter = createAuthupAdapter(app, config.auth.authup, config.uiBase);
+}
 
 app.use(vuecs, { themes: [tailwind()], icons: [lucide()] });
 for (const plugin of [
@@ -41,5 +55,29 @@ for (const plugin of [
     installTimeago,
 ]) app.use(plugin);
 
-app.use(createUiRouter(config));
+let client: IApiClient;
+const session = createSession(config, {
+    storage: window.sessionStorage,
+    client: () => client,
+    ...(adapter ? { authup: async () => adapter } : {}),
+});
+const router = createUiRouter(config, [createAuthGuard(session)]);
+
+client = createApiClient({
+    apiBase: config.apiBase,
+    token: () => session.token(),
+    refresh: () => session.refresh(),
+    onUnauthorized: () => {
+        const current = router.currentRoute.value;
+        if (current.meta.public === true) return;
+        void session.signOut().then(() => router.replace({ name: RouteName.LOGIN, query: { redirect: current.fullPath } }));
+    },
+});
+
+app.provide(APP_CONTEXT, {
+    config, 
+    client, 
+    session, 
+});
+app.use(router);
 app.mount('#app');

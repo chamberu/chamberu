@@ -7,16 +7,29 @@
  */
 
 import { computed } from 'vue';
-import { RouterView, useRoute } from 'vue-router';
+import { RouterView, useRoute, useRouter } from 'vue-router';
 import AppShell from './components/app-shell/AppShell.vue';
+import { useAppContext } from './context/module.ts';
+import { RouteName } from './router/constants.ts';
 
 const route = useRoute();
+const router = useRouter();
+const { session } = useAppContext();
 const bare = computed(() => route.meta.public === true);
+
+async function signOut(): Promise<void> {
+    await session.signOut();
+    await router.replace({ name: RouteName.LOGIN });
+}
 </script>
 
 <template>
     <RouterView v-if="bare" />
-    <AppShell v-else>
+    <AppShell
+        v-else
+        :principal="session.principal.value"
+        @sign-out="signOut"
+    >
         <RouterView />
     </AppShell>
 </template>
