@@ -7,18 +7,23 @@
  */
 
 import { useColorMode } from '@vuecs/design';
-import { computed } from 'vue';
+import { computed, provide } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import type { MeWire } from '../../api/types.ts';
+import { useApprovals } from '../../approvals/composables.ts';
+import { INBOX } from '../../approvals/constants.ts';
+import { useAppContext } from '../../context/module.ts';
 import { RouteName } from '../../router/constants.ts';
 import BrandLogo from '../brand-logo/BrandLogo.vue';
 import NavIcon from '../nav-icon/NavIcon.vue';
 
-const props = defineProps<{
-    principal?: MeWire;
-    /** Waiting approvals, shown as the Approvals badge. */
-    waiting?: number;
-}>();
+const props = defineProps<{ principal?: MeWire }>();
+
+// one inbox for the badge and the approvals view
+const { client } = useAppContext();
+const inbox = useApprovals(client);
+provide(INBOX, inbox);
+const waiting = computed(() => inbox.runs.value.length);
 
 const emit = defineEmits<{ signOut: [] }>();
 

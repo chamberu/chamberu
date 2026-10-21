@@ -16,6 +16,10 @@ const route = useRoute();
 const router = useRouter();
 const { session } = useAppContext();
 const bare = computed(() => route.meta.public === true);
+// nothing renders before the first navigation resolved (the start route is no real page),
+// and the shell, which polls the API, only for a signed-in principal
+const ready = computed(() => route.matched.length > 0);
+const shell = computed(() => ready.value && !bare.value && !!session.principal.value);
 
 async function signOut(): Promise<void> {
     await session.signOut();
@@ -25,9 +29,9 @@ async function signOut(): Promise<void> {
 
 <template>
     <VCToastProvider>
-        <RouterView v-if="bare" />
+        <RouterView v-if="ready && bare" />
         <AppShell
-            v-else
+            v-else-if="shell"
             :principal="session.principal.value"
             @sign-out="signOut"
         >

@@ -21,6 +21,7 @@ import installTimeago from '@vuecs/timeago';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { createApiClient } from './api/module.ts';
+import { stripResumeToken } from './approvals/helpers.ts';
 import type { IApiClient } from './api/types.ts';
 import { createAuthGuard } from './auth/guard.ts';
 import { createSession } from './auth/module.ts';
@@ -61,7 +62,11 @@ const session = createSession(config, {
     client: () => client,
     ...(adapter ? { authup: async () => adapter } : {}),
 });
-const router = createUiRouter(config, [createAuthGuard(session)]);
+// the deep-link token leaves the address bar before the auth guard copies the path
+const router = createUiRouter(config, [
+    (to) => stripResumeToken(to, window.sessionStorage) ?? true,
+    createAuthGuard(session),
+]);
 
 client = createApiClient({
     apiBase: config.apiBase,
@@ -75,9 +80,10 @@ client = createApiClient({
 });
 
 app.provide(APP_CONTEXT, {
-    config, 
-    client, 
-    session, 
+    config,
+    client,
+    session,
+    storage: window.sessionStorage,
 });
 app.use(router);
 app.mount('#app');

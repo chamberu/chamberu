@@ -14,4 +14,6 @@ export type AppContext = {
     config: UiConfig;
     client: IApiClient;
     session: ISession;
+    /** The tab's `sessionStorage`: tokens and the deep-link token live here only. */
+    storage: Storage;
 };
