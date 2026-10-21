@@ -11,7 +11,9 @@ import type { ConsoleNotifierOptions, INotifier } from './types.ts';
 /**
  * A notifier for development: writes each notification (and an approval's
  * resume token) as a few lines to `write`, `console.log` by default. Never
- * throws, so a dev setup marks every approval notified at once.
+ * throws, so a dev setup marks every approval notified at once. Development
+ * only: the logged token approves the tool call, so keep it out of logs
+ * others read.
  */
 export function consoleNotifier(options: ConsoleNotifierOptions = {}): INotifier {
     const name = options.name ?? 'console';

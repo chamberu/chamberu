@@ -215,7 +215,7 @@ await engine.resume(token, { approved: true });
 ```
 
 - A call that needs approval puts the run in `waiting` and frees its slot. The notifier receives the request once, with a resume token signed with `resumeSecret` and the run's trigger envelope (`NotifyOptions.trigger`); a failed send is retried on every poll until it is delivered.
-- For development, `notifiers: { owner: consoleNotifier() }` logs every notification and its resume token; `@chamvi/notify-openclaw` and `@chamvi/notify-github` deliver to an OpenClaw chat or the run's issue.
+- For development, `notifiers: { owner: consoleNotifier() }` logs every notification and its resume token (development only: keep it out of logs others read); `@chamvi/notify-openclaw` and `@chamvi/notify-github` deliver to an OpenClaw chat or the run's issue.
 - A policy can also be a function that returns `'user'`, `'allow'` or `'deny'` per call.
 - A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
 - An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied, and the model sees the denial.

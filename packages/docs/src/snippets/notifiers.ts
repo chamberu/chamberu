@@ -7,6 +7,7 @@ export class ConsoleNotifier implements INotifier {
     async notify(n: Notification, opts: NotifyOptions): Promise<void> {
         console.log(`[${n.kind}] ${n.title} (${opts.idempotencyKey})`);
         console.log(n.body);
+        // development only: the token approves the call, keep it out of shared logs
         if (n.resumeToken) console.log(`resume token: ${n.resumeToken}`);
     }
 }

@@ -13,7 +13,19 @@ export class WebhookNotifier implements INotifier {
                 'content-type': 'application/json',
                 'idempotency-key': opts.idempotencyKey,
             },
-            body: JSON.stringify(n),
+            // never forward n.resumeToken: send the approval id and a UI link, the owner answers signed in
+            body: JSON.stringify({
+                kind: n.kind,
+                agent: n.agent,
+                runId: n.runId,
+                title: n.title,
+                body: n.body,
+                approvalId: n.approvalId,
+                expiresAt: n.expiresAt,
+                link: n.approvalId ?
+                    `https://chamvi.example/ui/approvals?run=${n.runId}&approval=${n.approvalId}` :
+                    undefined,
+            }),
         });
         // throw on failure: the engine retries the approval notification on the next poll
         if (!response.ok) throw new Error(`Notification failed with ${response.status}.`);

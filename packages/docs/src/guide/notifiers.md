@@ -28,7 +28,7 @@ The engine rejects an agent whose `notify` names no registered notifier.
 
 ## Built-in
 
-`consoleNotifier()` from `@chamvi/core` logs each notification and an approval's resume token, for development:
+`consoleNotifier()` from `@chamvi/core` logs each notification and an approval's resume token, for development only: the token approves the tool call, so keep it off in a deployment whose logs others read (a container's log collector).
 
 ```ts
 import { Engine, consoleNotifier } from '@chamvi/core';
@@ -42,7 +42,7 @@ It takes `name` (default `console`) and `write(line)` (default `console.log`) an
 
 <<< @/snippets/notifiers.ts#console
 
-A notifier that talks to a remote service:
+A notifier that talks to a remote service sends no resume token (like the shipped notifiers): it posts the approval id, and the owner answers in the UI, signed in:
 
 <<< @/snippets/webhook-notifier.ts#webhook
 
@@ -61,4 +61,4 @@ A store lock per approval keeps replicas from sending the same notification at t
 | [`@chamvi/notify-openclaw`](/reference/notify-openclaw) | An OpenClaw chat via `POST <hooks.path>/agent`. See [OpenClaw](/deployment/openclaw) | `Idempotency-Key` and a byte-identical message |
 | [`@chamvi/notify-github`](/reference/notify-github) | A comment on the run's issue or pull request (or a configured `target`) | A hidden marker, looked for before posting |
 
-Both transports bound one send to 30 s on the `IClock` (below the engine's 60 s notify lock) and cut the notification body (8 000 and 60 000 characters), so a stalled endpoint or a huge tool input never blocks `tick()` or turns into a permanent rejection. Neither carries the resume token by default: the optional `approvalUrl` link opens the run's approval in the UI (run and approval id only, no token), where a signed-in principal with `agent:<name>:approve` answers it. Only the OpenClaw message adds the token and a `resume_run` call, when `resumeTool: true` is set; a GitHub comment never carries it.
+Both transports bound one send to 30 s on the `IClock` (below the engine's 60 s notify lock) and cut the notification body (8 000 and 60 000 characters), so a stalled endpoint or a huge tool input never blocks `tick()` or turns into a permanent rejection. Neither carries the resume token by default: the optional `approvalUrl` link opens the run's approval in the UI (run and approval id only, no token), where a signed-in principal with `agent:<name>:approve` (plus `run:read` or `agent:<name>:run` for the UI to show the run) answers it. Of the two, only the OpenClaw message adds the token and a `resume_run` call, when `resumeTool: true` is set; a GitHub comment never carries it. `consoleNotifier()` logs the token (development only), and a notifier you write decides itself.
