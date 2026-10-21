@@ -62,9 +62,9 @@ describe('renderIndex', () => {
 describe('buildCsp', () => {
     it('adds the authup origin only when configured', () => {
         expect(buildCsp({
-            apiBase: '', 
-            uiBase: '/ui', 
-            auth: { tokens: true }, 
+            apiBase: '',
+            uiBase: '/ui',
+            auth: { tokens: true },
         })).not.toContain('https');
         expect(buildCsp({
             apiBase: '',

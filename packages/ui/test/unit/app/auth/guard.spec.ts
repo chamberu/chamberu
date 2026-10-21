@@ -30,9 +30,9 @@ function setup(storage = new MemoryStorage()) {
     });
     const router = createUiRouter(DEV_CONFIG, [createAuthGuard(session)], createMemoryHistory('/ui'));
     return {
-        router, 
-        session, 
-        meCalls: () => meCalls, 
+        router,
+        session,
+        meCalls: () => meCalls,
     };
 }
 

@@ -20,9 +20,9 @@ export type WaitOutput = {
     approved?: boolean;
     reason?: string;
     approver?: {
-        id: string; 
-        kind: string; 
-        name?: string 
+        id: string;
+        kind: string;
+        name?: string
     };
 };
 

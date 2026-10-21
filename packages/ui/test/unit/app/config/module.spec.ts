@@ -32,9 +32,9 @@ describe('readConfig', () => {
 
     it('is the dev server default', () => {
         expect(DEV_CONFIG).toEqual({
-            apiBase: '', 
-            uiBase: '/ui', 
-            auth: { tokens: true }, 
+            apiBase: '',
+            uiBase: '/ui',
+            auth: { tokens: true },
         });
     });
 });

@@ -32,28 +32,28 @@ const colorMode = useColorMode();
 
 const items = [
     {
-        name: RouteName.RUNS, 
-        label: 'Runs', 
-        icon: 'runs', 
-        also: [RouteName.RUN], 
+        name: RouteName.RUNS,
+        label: 'Runs',
+        icon: 'runs',
+        also: [RouteName.RUN],
     },
     {
-        name: RouteName.APPROVALS, 
-        label: 'Approvals', 
-        icon: 'approvals', 
-        also: [], 
+        name: RouteName.APPROVALS,
+        label: 'Approvals',
+        icon: 'approvals',
+        also: [],
     },
     {
-        name: RouteName.STATE, 
-        label: 'Agent state', 
-        icon: 'state', 
-        also: [], 
+        name: RouteName.STATE,
+        label: 'Agent state',
+        icon: 'state',
+        also: [],
     },
     {
-        name: RouteName.SCHEDULES, 
-        label: 'Schedules', 
-        icon: 'schedules', 
-        also: [], 
+        name: RouteName.SCHEDULES,
+        label: 'Schedules',
+        icon: 'schedules',
+        also: [],
     },
 ] as const;
 

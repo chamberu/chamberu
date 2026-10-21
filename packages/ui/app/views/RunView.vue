@@ -35,10 +35,10 @@ const toast = useToast();
 
 const runId = computed(() => String(route.params.id));
 const {
-    state, 
-    error, 
-    live, 
-    cancel, 
+    state,
+    error,
+    live,
+    cancel,
 } = useRunDetail(client, runId);
 const { agents } = useAgents(client);
 
@@ -84,9 +84,9 @@ async function onCancel(): Promise<void> {
         toast.add({ title: `Cancel requested · run ${shortId(runId.value)}` });
     } catch (e) {
         toast.add({
-            title: 'Cancel failed', 
-            description: e instanceof ApiError ? e.message : String(e), 
-            color: 'error', 
+            title: 'Cancel failed',
+            description: e instanceof ApiError ? e.message : String(e),
+            color: 'error',
         });
     }
 }

@@ -9,9 +9,9 @@
 import { computed } from 'vue';
 
 const props = defineProps<{
-    label: string; 
-    value: string; 
-    ratio?: number 
+    label: string;
+    value: string;
+    ratio?: number
 }>();
 const width = computed(() => `${Math.round(Math.min(1, Math.max(0, props.ratio ?? 0)) * 100)}%`);
 </script>

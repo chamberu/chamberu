@@ -19,10 +19,10 @@ import { wireStep } from '../../../utils/runs.ts';
 describe('tokenizeJson', () => {
     it('marks keys, strings and literals and keeps every character', () => {
         const json = JSON.stringify({
-            env: 'prod "x"', 
-            ok: true, 
-            n: 1, 
-            z: null, 
+            env: 'prod "x"',
+            ok: true,
+            n: 1,
+            z: null,
         }, null, 2);
         const tokens = tokenizeJson(json);
         expect(tokens.map((t) => t.text).join('')).toBe(json);

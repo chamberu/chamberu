@@ -48,9 +48,9 @@ describe('uiRoutes', () => {
         expect(html).toContain('<base href="/ui/">');
         expect(html).not.toContain('<!--chamvi-config-->');
         expect(readConfig(html)).toEqual({
-            apiBase: '', 
-            uiBase: '/ui', 
-            auth: { tokens: true }, 
+            apiBase: '',
+            uiBase: '/ui',
+            auth: { tokens: true },
         });
     });
 

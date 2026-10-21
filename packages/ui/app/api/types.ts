@@ -28,9 +28,9 @@ export type RunDetail = RunWire & { steps: StepWire[] };
 export type RunPage = {
     data: RunWire[];
     meta: {
-        total: number; 
-        limit: number; 
-        offset: number 
+        total: number;
+        limit: number;
+        offset: number
     };
 };
 
@@ -54,15 +54,15 @@ export type MeWire = MeView;
 export type PageQuery = { limit?: number; offset?: number };
 
 export type ApproveBody = {
-    approvalId: string; 
-    approved: boolean; 
-    reason?: string 
+    approvalId: string;
+    approved: boolean;
+    reason?: string
 };
 
 export type ResumeBody = {
-    token: string; 
-    approved: boolean; 
-    reason?: string 
+    token: string;
+    approved: boolean;
+    reason?: string
 };
 
 /** Options of `createApiClient()`. */

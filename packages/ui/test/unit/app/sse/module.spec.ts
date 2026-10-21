@@ -26,17 +26,17 @@ async function collect(chunks: string[]): Promise<SseEvent[]> {
 
 const run = (status: string) => `event: run.updated\ndata: ${JSON.stringify({ id: 'r1', status })}\n\n`;
 const step = (index: number) => `event: step.appended\nid: ${index}\ndata: ${JSON.stringify({
-    runId: 'r1', 
-    index, 
-    type: 'llm', 
+    runId: 'r1',
+    index,
+    type: 'llm',
 })}\n\n`;
 
 function setup(answers: FakeAnswer[]) {
     const { fetch, requests } = createFakeFetch(answers);
     const client = createApiClient({
-        apiBase: '', 
-        token: async () => 't', 
-        fetch, 
+        apiBase: '',
+        token: async () => 't',
+        fetch,
     });
     const events: RunStreamEvent[] = [];
     const errors: ApiError[] = [];
@@ -76,9 +76,9 @@ describe('parseEventStream', () => {
     it('parses CRLF and multi-line data, and ignores comments', async () => {
         expect(await collect([': keep-alive\r\n\r\nevent: x\r\nid: 7\r\ndata: one\r\ndata: two\r\n\r\ndata: plain\n\n'])).toEqual([
             {
-                event: 'x', 
-                data: 'one\ntwo', 
-                id: '7', 
+                event: 'x',
+                data: 'one\ntwo',
+                id: '7',
             },
             { event: 'message', data: 'plain' },
         ]);
@@ -113,10 +113,10 @@ describe('openRunStream', () => {
             {
                 type: 'step',
                 step: {
-                    runId: 'r1', 
-                    index: 0, 
-                    type: 'llm', 
-                }, 
+                    runId: 'r1',
+                    index: 0,
+                    type: 'llm',
+                },
             },
             {
                 type: 'delta',
@@ -132,9 +132,9 @@ describe('openRunStream', () => {
     it('starts after the given step', async () => {
         const { fetch, requests } = createFakeFetch([sse([run('completed')])]);
         const client = createApiClient({
-            apiBase: '', 
-            token: async () => 't', 
-            fetch, 
+            apiBase: '',
+            token: async () => 't',
+            fetch,
         });
         await new Promise<void>((resolve) => {
             openRunStream({
@@ -184,9 +184,9 @@ describe('openRunStream', () => {
     it('honours Retry-After on 503', async () => {
         const s = setup([
             json({
-                status: 503, 
-                code: 'service_unavailable', 
-                message: 'busy', 
+                status: 503,
+                code: 'service_unavailable',
+                message: 'busy',
             }, 503, { 'retry-after': '7' }),
             sse([run('completed')]),
         ]);
@@ -211,9 +211,9 @@ describe('openRunStream', () => {
 
     it('stops on 404 and reports it', async () => {
         const s = setup([json({
-            status: 404, 
-            code: 'run_not_found', 
-            message: 'gone', 
+            status: 404,
+            code: 'run_not_found',
+            message: 'gone',
         }, 404)]);
         await s.finished;
         expect(s.errors).toHaveLength(1);
@@ -230,9 +230,9 @@ describe('openRunStream', () => {
             });
         }]);
         const client = createApiClient({
-            apiBase: '', 
-            token: async () => 't', 
-            fetch, 
+            apiBase: '',
+            token: async () => 't',
+            fetch,
         });
         const errors: unknown[] = [];
         const stream = openRunStream({

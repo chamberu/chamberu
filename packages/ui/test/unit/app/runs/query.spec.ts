@@ -11,9 +11,9 @@ import { filterFromQuery, queryFromFilter } from '../../../../app/runs/query.ts'
 describe('run list query', () => {
     it('reads agent, known statuses and the page', () => {
         expect(filterFromQuery({
-            agent: 'deploy', 
-            status: 'waiting,nope,failed', 
-            page: '3', 
+            agent: 'deploy',
+            status: 'waiting,nope,failed',
+            page: '3',
         })).toEqual({
             agent: 'deploy',
             status: ['waiting', 'failed'],
@@ -31,9 +31,9 @@ describe('run list query', () => {
             offset: 25,
         };
         expect(queryFromFilter(filter)).toEqual({
-            agent: 'a', 
-            status: 'queued', 
-            page: '2', 
+            agent: 'a',
+            status: 'queued',
+            page: '2',
         });
         expect(filterFromQuery(queryFromFilter(filter) as Record<string, string>)).toEqual(filter);
         expect(queryFromFilter({ limit: 25, offset: 0 })).toEqual({});

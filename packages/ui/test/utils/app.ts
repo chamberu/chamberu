@@ -34,10 +34,10 @@ export function createUiTestApp(options: Partial<Omit<HttpAppOptions, 'engine' |
         engine,
         auth: [staticTokens({
             tokens: [{
-                value: ADMIN_TOKEN, 
-                id: 'admin', 
-                permissions: ['*'], 
-            }], 
+                value: ADMIN_TOKEN,
+                id: 'admin',
+                permissions: ['*'],
+            }],
         })],
         metrics: false,
         onError: (error) => { errors.push(error); },

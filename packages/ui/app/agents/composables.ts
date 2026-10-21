@@ -22,8 +22,8 @@ export function useAgents(client: IApiClient) {
         }
     })();
     return {
-        agents, 
-        error, 
-        loaded, 
+        agents,
+        error,
+        loaded,
     };
 }

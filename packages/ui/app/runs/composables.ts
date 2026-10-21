@@ -91,9 +91,9 @@ export function useRunDetail(client: IApiClient, runId: Ref<string>, deps: RunDe
             const { steps, ...run } = await client.getRun(id);
             if (current !== generation) return;
             state.value = {
-                run, 
-                steps: [...steps].sort((a, b) => a.index - b.index), 
-                live: {}, 
+                run,
+                steps: [...steps].sort((a, b) => a.index - b.index),
+                live: {},
             };
         } catch (e) {
             if (current === generation) error.value = toApiError(e);

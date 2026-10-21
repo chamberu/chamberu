@@ -10,9 +10,9 @@ import type { IApiClient, RunWire, StepWire } from '../api/types.ts';
 
 /** One server-sent event; `event` is `message` when the block names none. */
 export type SseEvent = {
-    event: string; 
-    data: string; 
-    id?: string 
+    event: string;
+    data: string;
+    id?: string
 };
 
 export type RunStreamEvent = { type: 'run'; run: RunWire } |

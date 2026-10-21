@@ -15,31 +15,31 @@ describe('createApiClient', () => {
     it('sends the bearer token and the JSON body', async () => {
         const { fetch, requests } = createFakeFetch([json({ runId: 'r1', status: 'queued' }, 202)]);
         const client = createApiClient({
-            apiBase: '/api', 
-            token: async () => 'tok', 
-            fetch, 
+            apiBase: '/api',
+            token: async () => 'tok',
+            fetch,
         });
         await client.approve('r1', {
-            approvalId: 'a1', 
-            approved: false, 
-            reason: 'no', 
+            approvalId: 'a1',
+            approved: false,
+            reason: 'no',
         });
         expect(requests[0]).toMatchObject({ url: '/api/runs/r1/approve', method: 'POST' });
         expect(requests[0]!.headers.get('authorization')).toBe('Bearer tok');
         expect(requests[0]!.headers.get('content-type')).toBe('application/json');
         expect(JSON.parse(requests[0]!.body!)).toEqual({
-            approvalId: 'a1', 
-            approved: false, 
-            reason: 'no', 
+            approvalId: 'a1',
+            approved: false,
+            reason: 'no',
         });
     });
 
     it('sends no authorization without a token', async () => {
         const { fetch, requests } = createFakeFetch([json({ data: [] })]);
         const client = createApiClient({
-            apiBase: '', 
-            token: async () => undefined, 
-            fetch, 
+            apiBase: '',
+            token: async () => undefined,
+            fetch,
         });
         expect(await client.listAgents()).toEqual([]);
         expect(requests[0]!.headers.has('authorization')).toBe(false);
@@ -48,23 +48,23 @@ describe('createApiClient', () => {
     it('maps an error body to ApiError', async () => {
         const { fetch } = createFakeFetch([
             json({
-                status: 409, 
-                code: 'invalid_run_state', 
-                message: 'moved on', 
+                status: 409,
+                code: 'invalid_run_state',
+                message: 'moved on',
             }, 409),
             new Response('bad gateway', { status: 502 }),
         ]);
         const client = createApiClient({
-            apiBase: '', 
-            token: async () => 't', 
-            fetch, 
+            apiBase: '',
+            token: async () => 't',
+            fetch,
         });
         const error = await client.getRun('r1').catch((e: unknown) => e);
         expect(error).toBeInstanceOf(ApiError);
         expect(error).toMatchObject({
-            status: 409, 
-            code: 'invalid_run_state', 
-            message: 'moved on', 
+            status: 409,
+            code: 'invalid_run_state',
+            message: 'moved on',
         });
         await expect(client.getRun('r1')).rejects.toMatchObject({ status: 502, code: 'http_502' });
     });
@@ -74,14 +74,14 @@ describe('createApiClient', () => {
         let refreshed = 0;
         let unauthorized = 0;
         const unauth = () => json({
-            status: 401, 
-            code: 'unauthorized', 
-            message: 'no', 
+            status: 401,
+            code: 'unauthorized',
+            message: 'no',
         }, 401);
         const { fetch, requests } = createFakeFetch([unauth(), json({
-            id: 'u', 
-            kind: 'k', 
-            permissions: [], 
+            id: 'u',
+            kind: 'k',
+            permissions: [],
         }), unauth(), unauth()]);
         const client = createApiClient({
             apiBase: '',
@@ -96,9 +96,9 @@ describe('createApiClient', () => {
             fetch,
         });
         expect(await client.me()).toEqual({
-            id: 'u', 
-            kind: 'k', 
-            permissions: [], 
+            id: 'u',
+            kind: 'k',
+            permissions: [],
         });
         expect(requests.map((r) => r.headers.get('authorization'))).toEqual(['Bearer old', 'Bearer new']);
         expect(unauthorized).toBe(0);
@@ -112,9 +112,9 @@ describe('createApiClient', () => {
     it('me with an explicit token neither refreshes nor signs out', async () => {
         let unauthorized = 0;
         const { fetch, requests } = createFakeFetch([json({
-            status: 401, 
-            code: 'unauthorized', 
-            message: 'no', 
+            status: 401,
+            code: 'unauthorized',
+            message: 'no',
         }, 401)]);
         const client = createApiClient({
             apiBase: '',
@@ -132,16 +132,16 @@ describe('createApiClient', () => {
         const page = {
             data: [],
             meta: {
-                total: 0, 
-                limit: 25, 
-                offset: 50, 
-            }, 
+                total: 0,
+                limit: 25,
+                offset: 50,
+            },
         };
         const { fetch, requests } = createFakeFetch([json(page)]);
         const client = createApiClient({
-            apiBase: '', 
-            token: async () => 't', 
-            fetch, 
+            apiBase: '',
+            token: async () => 't',
+            fetch,
         });
         expect(await client.listRuns({
             agent: 'triage',
@@ -164,9 +164,9 @@ describe('createApiClient', () => {
             new Response(null, { status: 202 }),
         ]);
         const client = createApiClient({
-            apiBase: '', 
-            token: async () => 't', 
-            fetch, 
+            apiBase: '',
+            token: async () => 't',
+            fetch,
         });
         await client.getRun('a/b');
         await client.listKv('a b', { limit: 10, offset: 20 });
@@ -183,9 +183,9 @@ describe('createApiClient', () => {
     it('resumes with the token in the body', async () => {
         const { fetch, requests } = createFakeFetch([json({ runId: 'r1', status: 'queued' }, 202)]);
         const client = createApiClient({
-            apiBase: '', 
-            token: async () => 't', 
-            fetch, 
+            apiBase: '',
+            token: async () => 't',
+            fetch,
         });
         expect(await client.resume({ token: 'resume.sig', approved: true })).toEqual({ runId: 'r1', status: 'queued' });
         expect(JSON.parse(requests[0]!.body!)).toEqual({ token: 'resume.sig', approved: true });
@@ -195,9 +195,9 @@ describe('createApiClient', () => {
         const controller = new AbortController();
         const { fetch, requests } = createFakeFetch([new Response('', { status: 200 })]);
         const client = createApiClient({
-            apiBase: '/api', 
-            token: async () => 't', 
-            fetch, 
+            apiBase: '/api',
+            token: async () => 't',
+            fetch,
         });
         await client.streamRun('r1', { lastEventId: 3, signal: controller.signal });
         expect(requests[0]).toMatchObject({ url: '/api/runs/r1/stream' });

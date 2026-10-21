@@ -27,9 +27,9 @@ export function decodeResumeToken(token: string): ResumeClaims | undefined {
 type Location = { path: string; query: Record<string, unknown> };
 
 type Redirect = {
-    path: string; 
-    query: LocationQueryRaw; 
-    replace: true 
+    path: string;
+    query: LocationQueryRaw;
+    replace: true
 };
 
 /**
@@ -43,9 +43,9 @@ export function stripResumeToken(to: Location, storage: Storage): Redirect | und
     if (typeof token !== 'string' || token.length === 0) return undefined;
     storage.setItem(RESUME_STORAGE_KEY, token);
     return {
-        path: to.path, 
-        query: query as LocationQueryRaw, 
-        replace: true, 
+        path: to.path,
+        query: query as LocationQueryRaw,
+        replace: true,
     };
 }
 

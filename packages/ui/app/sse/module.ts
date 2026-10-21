@@ -28,9 +28,9 @@ function toRunStreamEvent(event: SseEvent): RunStreamEvent | undefined {
             return { type: 'step', step: JSON.parse(event.data) as StepWire };
         case 'delta': {
             const delta = JSON.parse(event.data) as {
-                step: number; 
-                kind: 'text' | 'reasoning'; 
-                text: string 
+                step: number;
+                kind: 'text' | 'reasoning';
+                text: string
             };
             return {
                 type: 'delta',

@@ -23,16 +23,16 @@ import { RouteName } from '../router/constants.ts';
 import { shortId } from '../runs/helpers.ts';
 
 type Decided = {
-    run: RunWire; 
-    result: AnswerResult; 
-    approved: boolean; 
-    reason?: string 
+    run: RunWire;
+    result: AnswerResult;
+    approved: boolean;
+    reason?: string
 };
 
 const {
-    client, 
-    session, 
-    storage, 
+    client,
+    session,
+    storage,
 } = useAppContext();
 const toast = useToast();
 const inbox = inject(INBOX, undefined) ?? useApprovals(client);
@@ -60,17 +60,17 @@ async function answer(run: RunWire, approved: boolean, reason: string): Promise<
     try {
         const result = await inbox.answer(run, approved, reason);
         decided.value = [{
-            run, 
-            result, 
-            approved, 
-            reason: reason.trim() || undefined, 
+            run,
+            result,
+            approved,
+            reason: reason.trim() || undefined,
         }, ...decided.value.filter((d) => d.run.id !== run.id)];
         toast.add({ title: `${MESSAGES[result](approved)} · run ${shortId(run.id)}`, color: result === 'answered' ? 'success' : 'warning' });
     } catch (e) {
         toast.add({
-            title: 'The answer failed', 
-            description: e instanceof Error ? e.message : String(e), 
-            color: 'error', 
+            title: 'The answer failed',
+            description: e instanceof Error ? e.message : String(e),
+            color: 'error',
         });
     } finally {
         busy.value = undefined;
@@ -88,9 +88,9 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
         void inbox.refresh();
     } catch (e) {
         toast.add({
-            title: 'The answer failed', 
-            description: e instanceof Error ? e.message : String(e), 
-            color: 'error', 
+            title: 'The answer failed',
+            description: e instanceof Error ? e.message : String(e),
+            color: 'error',
         });
     } finally {
         busy.value = undefined;

@@ -28,9 +28,9 @@ const filter = shallowRef<RunListFilter>(filterFromQuery(route.query));
 watch(() => route.query, (query) => { filter.value = filterFromQuery(query); });
 
 const {
-    page, 
-    error, 
-    loading, 
+    page,
+    error,
+    loading,
 } = useRunList(client, filter);
 const { agents } = useAgents(client);
 
@@ -48,10 +48,10 @@ const agentOptions = computed(() => [
 function update(next: Partial<RunListFilter>): void {
     void router.replace({
         query: queryFromFilter({
-            ...filter.value, 
-            offset: 0, 
-            ...next, 
-        }), 
+            ...filter.value,
+            offset: 0,
+            ...next,
+        }),
     });
 }
 
@@ -101,9 +101,9 @@ const range = computed(() => {
 
 function load(meta: { offset: number }): void {
     update({
-        offset: meta.offset, 
-        agent: filter.value.agent, 
-        status: filter.value.status, 
+        offset: meta.offset,
+        agent: filter.value.agent,
+        status: filter.value.status,
     });
 }
 </script>

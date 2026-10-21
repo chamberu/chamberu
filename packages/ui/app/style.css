@@ -352,3 +352,5 @@ tr.expansion td, .expansion-cell { background: var(--ch-hero-bg); padding: 10px 
 }
 
 @keyframes ch-pulse { 50% { opacity: .25; } }
+
+.sched-next .countdown { font-family: var(--ch-font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }

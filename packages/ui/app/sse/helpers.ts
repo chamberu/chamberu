@@ -7,9 +7,9 @@
 
 /** `event`, `data` (lines joined by \\n) and `id` of one block, or nothing for a comment-only block. */
 function toEvent(lines: string[]): {
-    event: string; 
-    data: string; 
-    id?: string 
+    event: string;
+    data: string;
+    id?: string
 } | undefined {
     let event = 'message';
     let id: string | undefined;
@@ -34,9 +34,9 @@ function toEvent(lines: string[]): {
     }
     if (!seen) return undefined;
     return id === undefined ? { event, data: data.join('\n') } : {
-        event, 
-        data: data.join('\n'), 
-        id, 
+        event,
+        data: data.join('\n'),
+        id,
     };
 }
 

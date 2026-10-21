@@ -117,10 +117,10 @@ describe('useRunList', () => {
                 return {
                     data: [wireRun()],
                     meta: {
-                        total: 1, 
-                        limit: 25, 
-                        offset: 0, 
-                    }, 
+                        total: 1,
+                        limit: 25,
+                        offset: 0,
+                    },
                 };
             },
         });
@@ -130,18 +130,18 @@ describe('useRunList', () => {
         await flush();
         expect(list.page.value?.meta.total).toBe(1);
         filter.value = {
-            agent: 'deploy', 
-            status: ['waiting'], 
-            limit: 25, 
-            offset: 0, 
+            agent: 'deploy',
+            status: ['waiting'],
+            limit: 25,
+            offset: 0,
         };
         await nextTick();
         await flush();
         expect(seen.at(-1)).toEqual({
-            agent: 'deploy', 
-            status: ['waiting'], 
-            limit: 25, 
-            offset: 0, 
+            agent: 'deploy',
+            status: ['waiting'],
+            limit: 25,
+            offset: 0,
         });
         scope.stop();
     });

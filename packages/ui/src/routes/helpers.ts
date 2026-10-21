@@ -7,11 +7,11 @@
 
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
-import { 
-    extname, 
-    join, 
-    relative, 
-    sep, 
+import {
+    extname,
+    join,
+    relative,
+    sep,
 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_ELEMENT_ID, CONFIG_MARKER } from '../config/constants.ts';

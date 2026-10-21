@@ -39,18 +39,18 @@ function inboxClient(approve: (id: string, body: ApproveBody) => Promise<void>) 
             return {
                 data: [waitingRun()],
                 meta: {
-                    total: 1, 
-                    limit: 100, 
-                    offset: 0, 
-                }, 
+                    total: 1,
+                    limit: 100,
+                    offset: 0,
+                },
             };
         },
         approve,
     });
     return {
-        client, 
-        queries, 
-        lists: () => lists, 
+        client,
+        queries,
+        lists: () => lists,
     };
 }
 
@@ -61,9 +61,9 @@ describe('useApprovals', () => {
         const inbox = scope.run(() => useApprovals(client))!;
         await flush();
         expect(queries[0]).toEqual({
-            status: ['waiting'], 
-            limit: 100, 
-            offset: 0, 
+            status: ['waiting'],
+            limit: 100,
+            offset: 0,
         });
         expect(inbox.runs.value.map((run) => run.id)).toEqual(['r1']);
         scope.stop();
@@ -77,9 +77,9 @@ describe('useApprovals', () => {
         await flush();
         expect(await inbox.answer(waitingRun(), false, 'not now')).toBe('answered');
         expect(answered).toEqual([['r1', {
-            approvalId: 'a1', 
-            approved: false, 
-            reason: 'not now', 
+            approvalId: 'a1',
+            approved: false,
+            reason: 'not now',
         }]]);
         expect(await inbox.answer(waitingRun(), true, '  ')).toBe('answered');
         expect(answered[1]).toEqual(['r1', { approvalId: 'a1', approved: true }]);
@@ -152,9 +152,9 @@ describe('useDeepLinkApproval', () => {
         expect(link.run.value?.id).toBe('r1');
         expect(await link.answer(false, 'no')).toBe('answered');
         expect(resumed).toEqual([{
-            token, 
-            approved: false, 
-            reason: 'no', 
+            token,
+            approved: false,
+            reason: 'no',
         }]);
         expect(storage.getItem(RESUME_STORAGE_KEY)).toBeNull();
         scope.stop();

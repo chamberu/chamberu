@@ -38,9 +38,9 @@ export function useApprovals(client: IApiClient) {
     const poller = createPoller(async () => {
         try {
             const page = await client.listRuns({
-                status: ['waiting'], 
-                limit: INBOX_PAGE_SIZE, 
-                offset: 0, 
+                status: ['waiting'],
+                limit: INBOX_PAGE_SIZE,
+                offset: 0,
             });
             runs.value = page.data.filter((run) => run.waiting);
             error.value = undefined;
@@ -55,9 +55,9 @@ export function useApprovals(client: IApiClient) {
         if (!run.waiting) return 'already-answered';
         try {
             await client.approve(run.id, {
-                approvalId: run.waiting.approvalId, 
-                approved, 
-                ...reasonOf(reason), 
+                approvalId: run.waiting.approvalId,
+                approved,
+                ...reasonOf(reason),
             });
             return 'answered';
         } catch (e) {
@@ -105,9 +105,9 @@ export function useDeepLinkApproval(client: IApiClient, token: Ref<string | unde
         if (!token.value) return 'already-answered';
         try {
             await client.resume({
-                token: token.value, 
-                approved, 
-                ...reasonOf(reason), 
+                token: token.value,
+                approved,
+                ...reasonOf(reason),
             });
             clearResumeToken(storage);
             return 'answered';

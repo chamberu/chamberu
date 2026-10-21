@@ -82,9 +82,9 @@ export function uiRoutes(options: UiRoutesOptions = {}): HttpRoute[] {
 
     // one config, CSP and index per app basePath (the route context's)
     const rendered = new Map<string, {
-        config: UiConfig; 
-        headers: Record<string, string>; 
-        index?: Uint8Array 
+        config: UiConfig;
+        headers: Record<string, string>;
+        index?: Uint8Array
     }>();
     const view = (apiBase: string) => {
         let entry = rendered.get(apiBase);
@@ -112,9 +112,9 @@ export function uiRoutes(options: UiRoutesOptions = {}): HttpRoute[] {
                 status: 404,
                 headers: entry.headers,
                 body: {
-                    status: 404, 
-                    code: 'not_found', 
-                    message: 'Not Found', 
+                    status: 404,
+                    code: 'not_found',
+                    message: 'Not Found',
                 },
             });
             if (key === undefined) return notFound();

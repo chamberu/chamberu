@@ -45,9 +45,9 @@ describe('stripResumeToken', () => {
         const storage = new MemoryStorage();
         const redirect = stripResumeToken({ path: '/approvals', query: { token: 'abc.def', x: '1' } }, storage);
         expect(redirect).toEqual({
-            path: '/approvals', 
-            query: { x: '1' }, 
-            replace: true, 
+            path: '/approvals',
+            query: { x: '1' },
+            replace: true,
         });
         expect(storage.getItem(RESUME_STORAGE_KEY)).toBe('abc.def');
         expect(readResumeToken(storage)).toBe('abc.def');

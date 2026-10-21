@@ -19,9 +19,9 @@ import { wireRun, wireStep } from '../../../utils/runs.ts';
 
 function state(steps = [wireStep(0), wireStep(1, 'tool')]): RunDetailState {
     return {
-        run: wireRun(), 
-        steps, 
-        live: {}, 
+        run: wireRun(),
+        steps,
+        live: {},
     };
 }
 

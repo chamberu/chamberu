@@ -28,9 +28,9 @@ export function fakeClient(overrides: Partial<IApiClient> = {}): IApiClient {
 }
 
 export const ME: MeWire = {
-    id: 'admin', 
-    kind: 'token', 
-    permissions: ['*'], 
+    id: 'admin',
+    kind: 'token',
+    permissions: ['*'],
 };
 
 export function apiError(status: number, code = `http_${status}`): ApiError {
