@@ -14,6 +14,7 @@ import { DEV_CONFIG } from '../../../../app/config/constants.ts';
 import type { UiConfig } from '../../../../src/config/types.ts';
 import {
     ME,
+    apiError,
     fakeClient,
     meFor,
 } from '../../../utils/client.ts';
@@ -79,6 +80,17 @@ describe('createSession', () => {
         expect(session.principal.value).toBeUndefined();
     });
 
+    it('restore keeps the stored token when me() fails with anything but 401', async () => {
+        for (const error of [apiError(503, 'service_unavailable'), apiError(429, 'too_many_requests'), new TypeError('fetch failed')]) {
+            const storage = new MemoryStorage();
+            storage.setItem(TOKEN_STORAGE_KEY, 'good');
+            const session = createSession(DEV_CONFIG, { storage, client: () => fakeClient({ me: async () => { throw error; } }) });
+            expect(await session.restore()).toBe(false);
+            expect(storage.getItem(TOKEN_STORAGE_KEY)).toBe('good');
+            expect(session.principal.value).toBeUndefined();
+        }
+    });
+
     it('restore is false without any credential', async () => {
         const session = createSession(DEV_CONFIG, { storage: new MemoryStorage(), client: () => fakeClient() });
         expect(await session.restore()).toBe(false);
@@ -108,10 +120,13 @@ describe('createSession', () => {
         storage.setItem(TOKEN_STORAGE_KEY, 'x');
         storage.setItem(RETURN_STORAGE_KEY, '/runs');
         storage.setItem('chamvi.resume', 'resume-token');
+        storage.setItem('chamvi.authup.access_token', '"at"');
         storage.setItem('other', 'kept');
         await session.signOut();
-        expect(storage.length).toBe(1);
+        expect(storage.length).toBe(2);
         expect(storage.getItem('other')).toBe('kept');
+        // a pending deep link stays for the next principal of this tab
+        expect(storage.getItem('chamvi.resume')).toBe('resume-token');
         expect(session.principal.value).toBeUndefined();
         expect(session.method).toBeUndefined();
         expect(adapter.calls).toContain('signOut');

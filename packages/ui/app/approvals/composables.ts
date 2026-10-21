@@ -15,7 +15,7 @@ import type { Ref } from 'vue';
 import { ApiError } from '../api/error.ts';
 import type { IApiClient, RunDetail, RunWire } from '../api/types.ts';
 import { createPoller } from '../polling/module.ts';
-import { toApiError } from '../runs/composables.ts';
+import { asApiError } from '../api/helpers.ts';
 import { INBOX_PAGE_SIZE, INBOX_POLL_MS } from './constants.ts';
 import { clearResumeToken, decodeResumeToken } from './helpers.ts';
 import type { AnswerResult } from './types.ts';
@@ -45,7 +45,7 @@ export function useApprovals(client: IApiClient) {
             runs.value = page.data.filter((run) => run.waiting);
             error.value = undefined;
         } catch (e) {
-            error.value = toApiError(e);
+            error.value = asApiError(e);
         }
     }, INBOX_POLL_MS);
     poller.start();
@@ -97,7 +97,7 @@ export function useDeepLinkApproval(client: IApiClient, token: Ref<string | unde
             delete detail.steps;
             run.value = detail as RunWire;
         } catch (e) {
-            error.value = toApiError(e);
+            error.value = asApiError(e);
         }
     }, { immediate: true });
 

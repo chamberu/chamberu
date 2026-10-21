@@ -11,6 +11,9 @@ export const RUN_LIST_POLL_MS = 5000;
 
 export const RUN_LIST_PAGE_SIZE = 25;
 
+/** The runs page's status counters refresh slower than the list: three requests per pass. */
+export const RUN_COUNTS_POLL_MS = 15_000;
+
 export const RUN_STATUSES: readonly RunStatusLiteral[] = ['queued', 'running', 'waiting', 'completed', 'failed', 'cancelled', 'interrupted'];
 
 export const SETTLED_STATUSES: readonly RunStatusLiteral[] = ['completed', 'failed', 'cancelled'];

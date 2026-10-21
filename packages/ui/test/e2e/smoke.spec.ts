@@ -109,12 +109,12 @@ test('the run page follows a run live', async ({ page, request }) => {
     expect(errors).toEqual([]);
 });
 
-test('a deep link answers through resume', async ({ page, request }) => {
+test('a deep link (token in the fragment) answers through resume', async ({ page, request }) => {
     const errors = watchErrors(page);
     const runId = await dispatch(request);
     const token = await tokenFor(request, runId);
 
-    await page.goto(`approvals?token=${encodeURIComponent(token)}&from=mail`);
+    await page.goto(`approvals?from=mail#token=${encodeURIComponent(token)}`);
     await expect(page).toHaveURL(/\/ui\/login\?redirect=/);
     expect(page.url()).not.toContain(token.slice(0, 20));
     expect(new URL(page.url()).searchParams.get('redirect')).toBe('/approvals?from=mail');

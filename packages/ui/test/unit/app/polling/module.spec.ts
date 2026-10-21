@@ -83,4 +83,46 @@ describe('createPoller', () => {
         await flush();
         expect(fake.pending()).toEqual([]);
     });
+
+    it('holds a tick that came due while the page is hidden until it is shown', async () => {
+        const fake = createFakeTimers();
+        let hidden = false;
+        const listeners = new Set<() => void>();
+        const visibility = {
+            hidden: () => hidden,
+            onChange: (fn: () => void) => {
+                listeners.add(fn);
+                return () => { listeners.delete(fn); };
+            },
+        };
+        const change = (value: boolean) => {
+            hidden = value;
+            for (const fn of listeners) fn();
+        };
+        let calls = 0;
+        const poller = createPoller(async () => { calls++; }, 5000, fake.timers, visibility);
+        poller.start();
+        await flush();
+        expect(calls).toBe(1);
+
+        change(true);
+        fake.fire();
+        await flush();
+        expect(calls).toBe(1); // hidden: nothing sent
+        expect(fake.pending()).toEqual([]);
+
+        change(false);
+        await flush();
+        expect(calls).toBe(2); // shown again: polls at once, then on its interval
+        expect(fake.pending()).toEqual([5000]);
+
+        await poller.refresh();
+        expect(calls).toBe(3);
+        poller.stop();
+        expect(listeners.size).toBe(0);
+        change(true);
+        change(false);
+        await flush();
+        expect(calls).toBe(3);
+    });
 });

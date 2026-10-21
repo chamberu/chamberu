@@ -18,14 +18,21 @@ import {
 import { createPinia } from 'pinia';
 import type { App } from 'vue';
 import type { UiAuthupConfig } from '../../src/config/types.ts';
+import { createSessionCookies } from './helpers.ts';
 import type { IAuthupAdapter } from './types.ts';
 
 /**
  * Installs `@authup/client-web-kit` (with its own pinia, before vuecs, as
  * the kit asks) and wraps its code flow with PKCE. The redirect URI is
- * `<origin><uiBase>/login/callback`.
+ * `<origin><uiBase>/login/callback`. The kit keeps its tokens in the
+ * tab's `storage` (`createSessionCookies`), never in `document.cookie`.
  */
-export function createAuthupAdapter(app: App, config: UiAuthupConfig, uiBase: string): IAuthupAdapter {
+export function createAuthupAdapter(
+    app: App,
+    config: UiAuthupConfig,
+    uiBase: string,
+    storage: Storage = window.sessionStorage,
+): IAuthupAdapter {
     const pinia = createPinia();
     app.use(pinia);
     install(app, {
@@ -35,6 +42,7 @@ export function createAuthupAdapter(app: App, config: UiAuthupConfig, uiBase: st
         realtime: false,
         cookiePath: `${uiBase}/`,
         cookieSecure: window.location.protocol === 'https:',
+        ...createSessionCookies(storage),
     });
     const store = injectStore(pinia, app);
 
@@ -75,14 +83,16 @@ export function createAuthupAdapter(app: App, config: UiAuthupConfig, uiBase: st
             await store.resolve();
             return store.accessToken || undefined;
         },
+        // true while a token is in place after resolve(), rotated or not: a
+        // 401 that raced another refresh retries once with the current token,
+        // and only a 401 on that retry signs out
         async refresh() {
-            const before = store.accessToken;
             try {
                 await store.resolve();
             } catch {
                 return false;
             }
-            return !!store.accessToken && store.accessToken !== before;
+            return !!store.accessToken;
         },
         async signOut() {
             await store.logout();

@@ -195,6 +195,21 @@ describe('openRunStream', () => {
         expect(s.settled()).toBe(1);
     });
 
+    it('honours Retry-After on 429', async () => {
+        const s = setup([
+            json({
+                status: 429,
+                code: 'too_many_requests',
+                message: 'slow down',
+            }, 429, { 'retry-after': '30' }),
+            sse([run('completed')]),
+        ]);
+        await s.finished;
+        expect(s.delays).toEqual([30000]);
+        expect(s.errors).toEqual([]);
+        expect(s.settled()).toBe(1);
+    });
+
     it('stops after a settled run', async () => {
         const s = setup([sse([run('failed')])]);
         await s.finished;

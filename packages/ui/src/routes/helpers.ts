@@ -6,13 +6,13 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readFile, readdir } from 'node:fs/promises';
 import {
-    extname,
-    join,
-    relative,
-    sep,
-} from 'node:path';
+    readFile,
+    readdir,
+    realpath,
+    stat,
+} from 'node:fs/promises';
+import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_ELEMENT_ID, CONFIG_MARKER } from '../config/constants.ts';
 import type { UiConfig } from '../config/types.ts';
@@ -46,20 +46,42 @@ export function resolveBuildPath(subpath: string): string | undefined {
     return segments.join('/');
 }
 
-/** Every file below `root`, keyed by its `/`-joined relative path, read once. */
+/**
+ * Every file below `root`, keyed by its `/`-joined relative path, read
+ * once. Symbolic links are followed (a mounted `assets/` or a linked
+ * `index.html` is served); a dangling link is skipped and a directory
+ * reached twice (a link cycle) is read once.
+ */
 export async function loadBuild(root: string): Promise<Map<string, BuildFile>> {
     const files = new Map<string, BuildFile>();
-    const entries = await readdir(root, { recursive: true, withFileTypes: true });
-    for (const entry of entries) {
-        if (!entry.isFile()) continue;
-        const path = join(entry.parentPath, entry.name);
-        const key = relative(root, path).split(sep).join('/');
-        files.set(key, {
-            bytes: new Uint8Array(await readFile(path)),
-            type: MEDIA_TYPES[extname(key).toLowerCase()] ?? DEFAULT_MEDIA_TYPE,
-            immutable: key.startsWith('assets/'),
-        });
-    }
+    const visited = new Set<string>();
+    const walk = async (dir: string, prefix: string): Promise<void> => {
+        const real = await realpath(dir);
+        if (visited.has(real)) return;
+        visited.add(real);
+        for (const entry of await readdir(dir, { withFileTypes: true })) {
+            const path = join(dir, entry.name);
+            const key = prefix ? `${prefix}/${entry.name}` : entry.name;
+            let kind: { isFile(): boolean; isDirectory(): boolean } = entry;
+            if (entry.isSymbolicLink()) {
+                try {
+                    kind = await stat(path);
+                } catch {
+                    continue;
+                }
+            }
+            if (kind.isDirectory()) {
+                await walk(path, key);
+            } else if (kind.isFile()) {
+                files.set(key, {
+                    bytes: new Uint8Array(await readFile(path)),
+                    type: MEDIA_TYPES[extname(key).toLowerCase()] ?? DEFAULT_MEDIA_TYPE,
+                    immutable: key.startsWith('assets/'),
+                });
+            }
+        }
+    };
+    await walk(root, '');
     return files;
 }
 

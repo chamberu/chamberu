@@ -54,3 +54,9 @@ export async function toApiError(response: Response): Promise<ApiError> {
     }
     return new ApiError(response.status, `http_${response.status}`, response.statusText || `HTTP ${response.status}`, retryAfter);
 }
+
+/** `error` when it is an `ApiError`, else a `network_error` (status 0) carrying its message. */
+export function asApiError(error: unknown): ApiError {
+    if (error instanceof ApiError) return error;
+    return new ApiError(0, 'network_error', error instanceof Error ? error.message : String(error));
+}

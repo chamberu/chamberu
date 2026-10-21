@@ -8,7 +8,7 @@
 import { shallowRef } from 'vue';
 import type { ApiError } from '../api/error.ts';
 import type { AgentWire, IApiClient } from '../api/types.ts';
-import { toApiError } from '../runs/composables.ts';
+import { asApiError } from '../api/helpers.ts';
 
 /** The registered agents (`GET /agents`, needs `run:read`), loaded once per call site. */
 export function useAgents(client: IApiClient) {
@@ -18,7 +18,7 @@ export function useAgents(client: IApiClient) {
         try {
             agents.value = await client.listAgents();
         } catch (e) {
-            error.value = toApiError(e);
+            error.value = asApiError(e);
         }
     })();
     return {

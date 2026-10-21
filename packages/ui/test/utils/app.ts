@@ -20,6 +20,7 @@ export const ADMIN_TOKEN = 'admin-token-0123456789';
 export function createUiTestApp(options: Partial<Omit<HttpAppOptions, 'engine' | 'auth'>> = {}): {
     app: App;
     errors: unknown[];
+    clock: ControllableClock;
 } {
     const clock = new ControllableClock(new Date(1_000_000));
     const engine = new Engine({
@@ -43,7 +44,11 @@ export function createUiTestApp(options: Partial<Omit<HttpAppOptions, 'engine' |
         onError: (error) => { errors.push(error); },
         ...options,
     });
-    return { app, errors };
+    return {
+        app, 
+        errors, 
+        clock, 
+    };
 }
 
 /** A GET with a socket address (the rate limiter keys by it). */

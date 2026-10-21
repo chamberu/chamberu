@@ -12,3 +12,6 @@ export const TOKEN_STORAGE_KEY = 'chamvi.token';
 
 /** Where to go after the authup round-trip (it loses the query). */
 export const RETURN_STORAGE_KEY = 'chamvi.return';
+
+/** The authup kit's "cookies" (tokens, expiry, realm) live in `sessionStorage` under this prefix. */
+export const AUTHUP_STORAGE_PREFIX = 'chamvi.authup.';

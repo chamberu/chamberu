@@ -29,6 +29,9 @@ export const MEDIA_TYPES: Readonly<Record<string, string>> = {
     '.txt': 'text/plain; charset=utf-8',
 };
 
+/** @internal How long a missing build is answered from memory before the folder is read again. */
+export const BUILD_RETRY_MS = 5000;
+
 /** @internal */
 export const DEFAULT_MEDIA_TYPE = 'application/octet-stream';
 

@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectScope, nextTick, ref } from 'vue';
 import type { RunListFilter } from '../../../../app/api/types.ts';
-import { useRunDetail, useRunList } from '../../../../app/runs/composables.ts';
+import { useRunCounts, useRunDetail, useRunList } from '../../../../app/runs/composables.ts';
 import type { RunStreamEvent, RunStreamOptions } from '../../../../app/sse/types.ts';
 import { apiError, fakeClient } from '../../../utils/client.ts';
 import { wireRun, wireStep } from '../../../utils/runs.ts';
@@ -152,6 +152,54 @@ describe('useRunList', () => {
         const list = scope.run(() => useRunList(client, ref({})))!;
         await flush();
         expect(list.error.value).toMatchObject({ status: 403 });
+        scope.stop();
+    });
+});
+
+describe('useRunCounts', () => {
+    it('reads every total in one pass on one poller', async () => {
+        const seen: RunListFilter[] = [];
+        const client = fakeClient({
+            listRuns: async (filter) => {
+                seen.push(filter);
+                const total = {
+                    running: 2, 
+                    waiting: 1, 
+                    failed: 0, 
+                }[filter.status![0] as string]!;
+                return {
+                    data: [],
+                    meta: {
+                        total,
+                        limit: 1,
+                        offset: 0,
+                    },
+                };
+            },
+        });
+        const scope = effectScope();
+        const { counts } = scope.run(() => useRunCounts(client, ['running', 'waiting', 'failed']))!;
+        await flush();
+        expect(counts.value).toEqual({
+            running: 2, 
+            waiting: 1, 
+            failed: 0, 
+        });
+        expect(seen).toEqual([
+            { status: ['running'], limit: 1 },
+            { status: ['waiting'], limit: 1 },
+            { status: ['failed'], limit: 1 },
+        ]);
+        scope.stop();
+    });
+
+    it('keeps the last totals and the error when a pass fails', async () => {
+        const client = fakeClient({ listRuns: async () => { throw apiError(429, 'too_many_requests'); } });
+        const scope = effectScope();
+        const { counts, error } = scope.run(() => useRunCounts(client, ['running']))!;
+        await flush();
+        expect(counts.value).toEqual({});
+        expect(error.value).toMatchObject({ status: 429 });
         scope.stop();
     });
 });

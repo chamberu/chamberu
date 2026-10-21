@@ -189,13 +189,28 @@ describe('uiRoutes', () => {
     it('answers 500 and reports a missing build, then serves it once it exists', async () => {
         const root = await mkdtemp(join(tmpdir(), 'chamvi-ui-'));
         try {
-            const { app, errors } = createUiTestApp({ routes: uiRoutes({ root }) });
+            const {
+                app, 
+                errors, 
+                clock, 
+            } = createUiTestApp({ routes: uiRoutes({ root }) });
             expect((await get(app, '/ui/')).status).toBe(500);
             expect(errors).toHaveLength(1);
             expect(errors[0]).toBeInstanceOf(InvalidAgentDefinitionError);
             expect((errors[0] as Error).message).toMatch(/build @chamvi\/ui first/);
 
+            // within the retry window: answered from memory, the folder is not read, nothing reported
             await writeFile(join(root, 'index.html'), '<head><!--chamvi-config--></head>');
+            const again = await get(app, '/ui/x');
+            expect(again.status).toBe(500);
+            expect(await again.json()).toEqual({
+                status: 500, 
+                code: 'internal_error', 
+                message: 'Internal Server Error', 
+            });
+            expect(errors).toHaveLength(1);
+
+            clock.advance(5000);
             expect((await get(app, '/ui/')).status).toBe(200);
         } finally {
             await rm(root, { recursive: true, force: true });

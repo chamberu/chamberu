@@ -126,7 +126,7 @@ async function onCancel(): Promise<void> {
                     v-if="cancellable"
                     class="push"
                     variant="outline"
-                    color="neutral"
+                    color="error"
                     @click="onCancel"
                 >
                     Cancel run
@@ -192,6 +192,10 @@ async function onCancel(): Promise<void> {
 
         <h2 class="display section-h">
             Steps
+            <span
+                class="section-count"
+                data-testid="steps-count"
+            >{{ state.steps.length }} done<template v-if="liveSteps.length > 0"> · {{ liveSteps.length }} streaming</template></span>
         </h2>
         <ol
             class="timeline"

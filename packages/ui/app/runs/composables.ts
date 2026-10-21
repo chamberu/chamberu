@@ -12,7 +12,9 @@ import {
     watch,
 } from 'vue';
 import type { Ref } from 'vue';
-import { ApiError } from '../api/error.ts';
+import type { RunStatusLiteral } from '@chamvi/core';
+import type { ApiError } from '../api/error.ts';
+import { asApiError } from '../api/helpers.ts';
 import type {
     IApiClient,
     RunListFilter,
@@ -21,14 +23,9 @@ import type {
 import { createPoller } from '../polling/module.ts';
 import { openRunStream } from '../sse/module.ts';
 import type { IRunStream, RunStreamOptions } from '../sse/types.ts';
-import { RUN_LIST_POLL_MS } from './constants.ts';
+import { RUN_COUNTS_POLL_MS, RUN_LIST_POLL_MS } from './constants.ts';
 import { isSettled, lastStepIndex, mergeRunEvent } from './helpers.ts';
 import type { RunDetailState } from './helpers.ts';
-
-export function toApiError(error: unknown): ApiError {
-    if (error instanceof ApiError) return error;
-    return new ApiError(0, 'network_error', error instanceof Error ? error.message : String(error));
-}
 
 /** One page of runs, newest first, polled every `RUN_LIST_POLL_MS` while the scope lives. */
 export function useRunList(client: IApiClient, filter: Ref<RunListFilter>) {
@@ -42,7 +39,7 @@ export function useRunList(client: IApiClient, filter: Ref<RunListFilter>) {
             page.value = await client.listRuns(filter.value);
             error.value = undefined;
         } catch (e) {
-            error.value = toApiError(e);
+            error.value = asApiError(e);
         } finally {
             loading.value = false;
         }
@@ -58,6 +55,30 @@ export function useRunList(client: IApiClient, filter: Ref<RunListFilter>) {
         loading,
         refresh: () => poller.refresh(),
     };
+}
+
+/**
+ * Every agent's run totals for `statuses` (one `limit: 1` query each, the
+ * page's `total`), refreshed together every `RUN_COUNTS_POLL_MS`: one
+ * poller instead of one per counter, so the runs page stays far below the
+ * app's per-IP rate limit. A failed pass keeps the last totals.
+ */
+export function useRunCounts(client: IApiClient, statuses: readonly RunStatusLiteral[]) {
+    const counts = shallowRef<Partial<Record<RunStatusLiteral, number>>>({});
+    const error = shallowRef<ApiError>();
+    const poller = createPoller(async () => {
+        try {
+            const pages = await Promise.all(statuses.map((status) => client.listRuns({ status: [status], limit: 1 })));
+            counts.value = Object.fromEntries(statuses.map((status, i) => [status, pages[i]!.meta.total]));
+            error.value = undefined;
+        } catch (e) {
+            error.value = asApiError(e);
+        }
+    }, RUN_COUNTS_POLL_MS);
+    poller.start();
+    onScopeDispose(() => poller.stop());
+
+    return { counts, error };
 }
 
 export type RunDetailDeps = {
@@ -96,7 +117,7 @@ export function useRunDetail(client: IApiClient, runId: Ref<string>, deps: RunDe
                 live: {},
             };
         } catch (e) {
-            if (current === generation) error.value = toApiError(e);
+            if (current === generation) error.value = asApiError(e);
             return;
         }
         if (isSettled(state.value.run)) return;

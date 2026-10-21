@@ -7,15 +7,22 @@
  */
 
 import { computed } from 'vue';
+import type { ScheduleWire } from '../api/types.ts';
 import ExpiryCountdown from '../components/expiry-countdown/ExpiryCountdown.vue';
 import PageHead from '../components/page-head/PageHead.vue';
 import { useAppContext } from '../context/module.ts';
 import { useSchedules } from '../schedules/composables.ts';
-import { formatFireTime, groupByAgent } from '../schedules/helpers.ts';
+import { describeCron, formatFireTime, groupByAgent } from '../schedules/helpers.ts';
 
 const { client } = useAppContext();
 const { schedules, error } = useSchedules(client);
 const groups = computed(() => groupByAgent(schedules.value));
+
+function cronLabel(schedule: ScheduleWire): string {
+    const zone = schedule.timezone ?? 'server time zone';
+    const reading = describeCron(schedule.expression);
+    return reading ? `${reading} · ${zone}` : zone;
+}
 </script>
 
 <template>
@@ -60,7 +67,7 @@ const groups = computed(() => groupByAgent(schedules.value));
                     <span
                         class="muted"
                         style="font-size: 13px"
-                    > {{ schedule.timezone ?? 'server time zone' }}</span>
+                    > {{ cronLabel(schedule) }}</span>
                 </div>
                 <div>
                     <span class="field-label">Next fire in</span>

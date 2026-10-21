@@ -13,7 +13,12 @@ import { createSession } from '../../../../app/auth/module.ts';
 import { DEV_CONFIG } from '../../../../app/config/constants.ts';
 import { RouteName } from '../../../../app/router/constants.ts';
 import { createUiRouter } from '../../../../app/router/module.ts';
-import { fakeClient, meFor } from '../../../utils/client.ts';
+import {
+    ME,
+    apiError,
+    fakeClient,
+    meFor,
+} from '../../../utils/client.ts';
 import { MemoryStorage } from '../../../utils/storage.ts';
 
 function setup(storage = new MemoryStorage()) {
@@ -66,5 +71,27 @@ describe('auth guard', () => {
         await router.push('/');
         expect(router.currentRoute.value.name).toBe(RouteName.RUNS);
         expect(meCalls()).toBe(1);
+    });
+
+    it('restores again on the next navigation after the server was unreachable', async () => {
+        const storage = new MemoryStorage();
+        storage.setItem(TOKEN_STORAGE_KEY, 'good');
+        let up = false;
+        const session = createSession(DEV_CONFIG, {
+            storage,
+            client: () => fakeClient({
+                me: async () => {
+                    if (!up) throw apiError(503, 'service_unavailable');
+                    return ME;
+                },
+            }),
+        });
+        const router = createUiRouter(DEV_CONFIG, [createAuthGuard(session)], createMemoryHistory('/ui'));
+        await router.push('/schedules');
+        expect(router.currentRoute.value.name).toBe(RouteName.LOGIN);
+        expect(storage.getItem(TOKEN_STORAGE_KEY)).toBe('good');
+        up = true;
+        await router.push('/schedules');
+        expect(router.currentRoute.value.name).toBe(RouteName.SCHEDULES);
     });
 });

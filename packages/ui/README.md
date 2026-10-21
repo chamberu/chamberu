@@ -71,18 +71,18 @@ Open `http://<host>/ui/` and sign in with a bearer token of the app.
 
 | View | Shows | Needs |
 |---|---|---|
-| Runs | Every run, newest first, filtered by agent and status, with status, steps and tokens; refreshes every 5 s | `run:read` |
+| Runs | Every run, newest first, filtered by agent and status, with status and tokens; refreshes every 5 s | `run:read` |
 | Run | Header with budgets, the trigger envelope and the step timeline (llm, tool, wait), live over SSE with streamed text; cancel | `run:read` or `agent:<name>:run`; `run:cancel` to cancel |
 | Approvals | Waiting runs with the tool and its input; Approve or Deny with a reason | `run:read` to list, `agent:<name>:approve` to answer |
 | Agent state | Key-value entries and collections, read-only | `state:read` |
 | Schedules | Cron triggers per agent with the next fire time | `run:read` |
 
-A notifier's deep link `/ui/approvals?token=<resume token>` opens the approval of that token. The SPA moves the token out of the address bar before anything renders (into `sessionStorage`, gone on sign-out) and answers it through `POST /resume`, so it works with only `agent:<name>:approve`.
+A notifier's deep link `/ui/approvals#token=<resume token>` opens the approval of that token (the fragment never reaches the server or a proxy log; `?token=` works too). The SPA moves the token out of the address bar before anything renders (into the tab's `sessionStorage`, kept across a sign-out so another principal can answer it, removed once answered or refused as spent) and answers it through `POST /resume`, so it works with only `agent:<name>:approve`.
 
 ## Sign-in
 
-- **Token** (default): paste a static bearer token (`staticTokens()` of `@chamvi/http`). `GET /me` checks it before it is kept, in `sessionStorage` of the tab only.
-- **authup**: `uiRoutes({ auth: { authup: { url, clientId, realmId? } } })` adds "Continue with authup" (OIDC code flow with PKCE). The authup client needs `<origin><uiBase>/login/callback` as a redirect URI, e.g. `https://chamvi.example.com/ui/login/callback`. Pair it with the app's `authup()` authenticator. `auth: { tokens: false }` hides the token form.
+- **Token** (default): paste a static bearer token (`staticTokens()` of `@chamvi/http`). `GET /me` checks it before it is kept, in `sessionStorage` of the tab only; a reload while the API is unreachable keeps it.
+- **authup**: `uiRoutes({ auth: { authup: { url, clientId, realmId? } } })` adds "Continue with authup" (OIDC code flow with PKCE); its tokens live in the tab's `sessionStorage` too, never in cookies. The authup client needs `<origin><uiBase>/login/callback` as a redirect URI, e.g. `https://chamvi.example.com/ui/login/callback`. Pair it with the app's `authup()` authenticator. `auth: { tokens: false }` hides the token form.
 
 An expired or revoked credential answers 401: the dashboard refreshes an authup session once, else returns to sign-in and back to the page it was on.
 

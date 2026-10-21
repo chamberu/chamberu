@@ -13,7 +13,7 @@ import type {
     IApiClient,
     KvEntry,
 } from '../api/types.ts';
-import { toApiError } from '../runs/composables.ts';
+import { asApiError } from '../api/helpers.ts';
 import { DOC_PAGE_SIZE, KV_PAGE_SIZE } from './constants.ts';
 
 /**
@@ -51,7 +51,7 @@ export function useAgentState(client: IApiClient, agent: Ref<string | undefined>
             collections.value = agents.find((a) => a.name === name)?.state ?? [];
             await loadKv(name, 0, current);
         } catch (e) {
-            if (current === generation) error.value = toApiError(e);
+            if (current === generation) error.value = asApiError(e);
         }
     }, { immediate: true });
 
@@ -67,7 +67,7 @@ export function useAgentState(client: IApiClient, agent: Ref<string | undefined>
             try {
                 await loadKv(name, kv.value.length, generation);
             } catch (e) {
-                error.value = toApiError(e);
+                error.value = asApiError(e);
             }
         },
         async loadCollection(collection: string) {
@@ -78,7 +78,7 @@ export function useAgentState(client: IApiClient, agent: Ref<string | undefined>
                 const list = await client.listDocs(name, collection, { limit: DOC_PAGE_SIZE });
                 if (current === generation) docs.value = { ...docs.value, [collection]: list };
             } catch (e) {
-                if (current === generation) error.value = toApiError(e);
+                if (current === generation) error.value = asApiError(e);
             }
         },
     };

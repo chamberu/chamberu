@@ -5,18 +5,32 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IPoller, PollerTimers } from './types.ts';
+import { documentVisibility } from './helpers.ts';
+import type {
+    IPageVisibility,
+    IPoller,
+    PollerTimers,
+} from './types.ts';
 
 /**
  * Runs `run` now and then `intervalMs` after each run settled, never two
  * at once; a failed run is ignored (the caller keeps its own error state).
+ * A tick that comes due while the page is hidden waits until it is shown
+ * again (a background tab sends nothing); `refresh()` always runs.
  */
-export function createPoller(run: () => Promise<void>, intervalMs: number, timers?: PollerTimers): IPoller {
+export function createPoller(
+    run: () => Promise<void>,
+    intervalMs: number,
+    timers?: PollerTimers,
+    visibility: IPageVisibility | undefined = documentVisibility(),
+): IPoller {
     const set = timers?.set ?? setTimeout;
     const clear = timers?.clear ?? clearTimeout;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let inflight: Promise<void> | undefined;
     let active = false;
+    let deferred = false;
+    let unsubscribe: (() => void) | undefined;
 
     const cancelTimer = () => {
         if (timer !== undefined) clear(timer);
@@ -25,6 +39,7 @@ export function createPoller(run: () => Promise<void>, intervalMs: number, timer
 
     const tick = (): Promise<void> => {
         cancelTimer();
+        deferred = false;
         if (inflight) return inflight;
         inflight = (async () => {
             try {
@@ -33,21 +48,38 @@ export function createPoller(run: () => Promise<void>, intervalMs: number, timer
                 // the next tick tries again
             } finally {
                 inflight = undefined;
-                if (active) timer = set(() => { void tick(); }, intervalMs);
+                if (active) timer = set(due, intervalMs);
             }
         })();
         return inflight;
     };
 
+    function due(): void {
+        timer = undefined;
+        if (visibility?.hidden()) {
+            deferred = true;
+            return;
+        }
+        void tick();
+    }
+
     return {
         start() {
             if (active) return;
             active = true;
+            unsubscribe = visibility?.onChange(() => {
+                if (!active || !deferred || visibility.hidden()) return;
+                deferred = false;
+                void tick();
+            });
             void tick();
         },
         stop() {
             active = false;
+            deferred = false;
             cancelTimer();
+            unsubscribe?.();
+            unsubscribe = undefined;
         },
         async refresh() {
             if (inflight) await inflight;

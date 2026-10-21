@@ -5,6 +5,15 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import {
+    mkdir,
+    mkdtemp,
+    rm,
+    symlink,
+    writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
     buildCsp,
@@ -85,6 +94,34 @@ describe('loadBuild', () => {
         ]);
         expect(files.get('assets/app-1a2b3c4d.js')).toMatchObject({ type: 'text/javascript; charset=utf-8', immutable: true });
         expect(files.get('favicon.svg')).toMatchObject({ immutable: false });
+    });
+
+    it('follows symbolic links, skips dangling ones and reads a link cycle once', async () => {
+        const base = await mkdtemp(join(tmpdir(), 'chamvi-ui-links-'));
+        try {
+            const shared = join(base, 'shared');
+            const root = join(base, 'root');
+            await mkdir(join(shared, 'nested'), { recursive: true });
+            await mkdir(root);
+            await writeFile(join(shared, 'app-1.js'), 'js');
+            await writeFile(join(shared, 'nested', 'x.css'), 'css');
+            await writeFile(join(base, 'index.html'), '<head></head>');
+            await symlink(shared, join(root, 'assets'));
+            await symlink(join(base, 'index.html'), join(root, 'index.html'));
+            await symlink(join(base, 'missing'), join(root, 'dangling.txt'));
+            await symlink(root, join(shared, 'loop'));
+
+            const files = await loadBuild(root);
+            expect(files.keys().toArray().sort()).toEqual([
+                'assets/app-1.js',
+                'assets/nested/x.css',
+                'index.html',
+            ]);
+            expect(files.get('assets/app-1.js')).toMatchObject({ immutable: true });
+            expect(new TextDecoder().decode(files.get('index.html')!.bytes)).toBe('<head></head>');
+        } finally {
+            await rm(base, { recursive: true, force: true });
+        }
     });
 });
 

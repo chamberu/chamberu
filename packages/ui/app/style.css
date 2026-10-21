@@ -277,6 +277,7 @@
 .caret { display: inline-block; width: 8px; height: 1.05em; background: var(--ch-accent); vertical-align: text-bottom; margin-left: 2px; animation: ch-pulse 1s steps(2) infinite; }
 .streaming-tag { display: inline-flex; gap: 6px; align-items: center; font: 600 11px var(--ch-font-mono); color: var(--ch-accent-text); text-transform: uppercase; letter-spacing: .08em; }
 .section-h { font-size: 20px; margin: 22px 0 12px; }
+.section-h .section-count { font: 400 13px var(--ch-font-sans); color: var(--ch-muted); margin-left: 8px; }
 
 /* approvals callout: square */
 .callout { border-radius: 0; border: 1px solid var(--ch-line); border-left: 4px solid var(--ch-warn); background: var(--ch-paper); padding: 16px 18px; display: grid; gap: 12px; margin-bottom: 14px; }

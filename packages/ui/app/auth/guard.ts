@@ -11,14 +11,17 @@ import type { ISession } from './types.ts';
 
 /**
  * Every route but the public ones (`meta.public`: login, callback) needs
- * a principal; the first navigation restores the session once. A visit
- * without one goes to login with its full path as `redirect`.
+ * a principal; the first navigation restores the session, and so does
+ * the next one after a restore that found no principal (the stored token
+ * survives a server that was unreachable). A visit without one goes to
+ * login with its full path as `redirect`.
  */
 export function createAuthGuard(session: ISession): NavigationGuard {
     let restored: Promise<boolean> | undefined;
     return async (to) => {
         restored ??= session.restore();
         await restored;
+        if (!session.principal.value) restored = undefined;
         if (to.meta.public === true) return true;
         if (session.principal.value) return true;
         return { name: RouteName.LOGIN, query: { redirect: to.fullPath } };

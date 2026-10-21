@@ -26,8 +26,8 @@ A principal without the grant a page needs sees a notice naming it; the rest of 
 
 ## Sign-in
 
-- **Token** (default): a static bearer token of `staticTokens()`. `GET /me` checks it before it is kept, in the tab's `sessionStorage` only; sign-out removes every `chamvi.` key.
-- **authup**: `auth.authup` adds "Continue with authup", the OIDC code flow with PKCE through `@authup/client-web-kit`. The authup client needs `<origin><uiBase>/login/callback` as a redirect URI. Pair it with the app's `authup()` authenticator. `auth.tokens: false` hides the token form (then `auth.authup` is required).
+- **Token** (default): a static bearer token of `staticTokens()`. `GET /me` checks it before it is kept, in the tab's `sessionStorage` only; sign-out removes every `chamvi.` key but a pending approval link. Only a 401 drops a stored token: a reload while the API restarts or rate limits keeps it, and the next navigation tries again.
+- **authup**: `auth.authup` adds "Continue with authup", the OIDC code flow with PKCE through `@authup/client-web-kit`, whose tokens are kept in the tab's `sessionStorage` (`chamvi.authup.*`), never in cookies. The authup client needs `<origin><uiBase>/login/callback` as a redirect URI. Pair it with the app's `authup()` authenticator. `auth.tokens: false` hides the token form (then `auth.authup` is required).
 
 <<< @/snippets/ui.ts#authup
 
@@ -35,7 +35,7 @@ A revoked token or an expired authup session answers 401: the dashboard refreshe
 
 ## Approval links
 
-A notifier can link a person straight to an approval: `<origin><uiBase>/approvals?token=<resume token>`. Before anything renders, the dashboard moves the token out of the address bar into `sessionStorage` (so the history, a sign-in redirect and the `Referer` never carry it; every answer is also sent with `referrer-policy: no-referrer`), survives the sign-in round-trip, and answers through `POST /resume` with that token. An expired or already used token reads as "already answered". The inbox itself never sees a resume token: it answers by approval id, and a run that moved on to another approval answers 409.
+A notifier can link a person straight to an approval: `<origin><uiBase>/approvals#token=<resume token>`. Use the fragment: a browser never sends it, so the token stays out of the server's and every proxy's access log (`?token=` works too, a repeated one included, but travels in the request line). Before anything renders, the dashboard moves the token out of the address bar into `sessionStorage` (so the history, a sign-in redirect and the `Referer` never carry it; every answer is also sent with `referrer-policy: no-referrer`), survives the sign-in round-trip and a sign-out (a principal without the grant can hand over to one with it in the same tab), and answers through `POST /resume` with that token. An expired or already used token reads as "already answered". The inbox itself never sees a resume token: it answers by approval id, and a run that moved on to another approval answers 409.
 
 ## Serving
 

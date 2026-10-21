@@ -12,8 +12,8 @@ import { RouterLink } from 'vue-router';
 import type { RunWire } from '../api/types.ts';
 import { useApprovals, useDeepLinkApproval } from '../approvals/composables.ts';
 import { INBOX, INBOX_POLL_MS  } from '../approvals/constants.ts';
-import { readResumeToken } from '../approvals/helpers.ts';
-import type { AnswerResult } from '../approvals/types.ts';
+import { pendingApprovals, readResumeToken } from '../approvals/helpers.ts';
+import type { AnswerResult, DecidedApproval } from '../approvals/types.ts';
 import { hasPermission } from '../auth/helpers.ts';
 import ApprovalCallout from '../components/approval-callout/ApprovalCallout.vue';
 import PageHead from '../components/page-head/PageHead.vue';
@@ -21,13 +21,6 @@ import StatusChip from '../components/status-chip/StatusChip.vue';
 import { useAppContext } from '../context/module.ts';
 import { RouteName } from '../router/constants.ts';
 import { shortId } from '../runs/helpers.ts';
-
-type Decided = {
-    run: RunWire;
-    result: AnswerResult;
-    approved: boolean;
-    reason?: string
-};
 
 const {
     client,
@@ -43,11 +36,10 @@ const deepLink = useDeepLinkApproval(client, token, storage);
 const permissions = computed(() => session.principal.value?.permissions ?? []);
 const canAnswer = (agent: string) => hasPermission(permissions.value, `agent:${agent}:approve`);
 
-const decided = ref<Decided[]>([]);
+const decided = ref<DecidedApproval[]>([]);
 const busy = ref<string>();
 const linkRunId = computed(() => (token.value ? deepLink.claims.value?.runId : undefined));
-const pending = computed(() => inbox.runs.value.filter((run) => run.id !== linkRunId.value &&
-    decided.value.every((d) => !(d.run.id === run.id && d.result === 'answered'))));
+const pending = computed(() => pendingApprovals(inbox.runs.value, decided.value, linkRunId.value));
 
 const MESSAGES: Record<AnswerResult, (approved: boolean) => string> = {
     answered: (approved) => (approved ? 'Approved' : 'Denied'),

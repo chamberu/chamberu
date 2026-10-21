@@ -15,7 +15,7 @@ import PageHead from '../components/page-head/PageHead.vue';
 import StatusChip from '../components/status-chip/StatusChip.vue';
 import { useAppContext } from '../context/module.ts';
 import { RouteName } from '../router/constants.ts';
-import { useRunList } from '../runs/composables.ts';
+import { useRunCounts, useRunList } from '../runs/composables.ts';
 import {
     ALL_AGENTS,
     RUN_LIST_PAGE_SIZE,
@@ -39,11 +39,8 @@ const {
 } = useRunList(client, filter);
 const { agents } = useAgents(client);
 
-// the cards count every agent: one small query per status
-const counts = (status: RunStatusLiteral) => useRunList(client, shallowRef({ status: [status], limit: 1 })).page;
-const running = counts('running');
-const waiting = counts('waiting');
-const failed = counts('failed');
+// the cards count every agent, on one slower poller
+const { counts } = useRunCounts(client, ['running', 'waiting', 'failed']);
 
 const agentOptions = computed(() => [
     { value: ALL_AGENTS, label: 'all agents' },
@@ -130,13 +127,13 @@ function load(meta: { offset: number }): void {
     <template v-else>
         <div class="stats">
             <div class="card stat">
-                <small>Running</small><b>{{ running?.meta.total ?? '–' }}</b>
+                <small>Running</small><b>{{ counts.running ?? '–' }}</b>
             </div>
             <div class="card stat">
-                <small>Waiting</small><b style="color: var(--ch-warn)">{{ waiting?.meta.total ?? '–' }}</b>
+                <small>Waiting</small><b style="color: var(--ch-warn)">{{ counts.waiting ?? '–' }}</b>
             </div>
             <div class="card stat">
-                <small>Failed</small><b>{{ failed?.meta.total ?? '–' }}</b>
+                <small>Failed</small><b>{{ counts.failed ?? '–' }}</b>
             </div>
             <div class="card stat">
                 <small>Shown</small><b>{{ page?.meta.total ?? '–' }}</b>

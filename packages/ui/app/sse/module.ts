@@ -82,7 +82,7 @@ export function openRunStream(options: RunStreamOptions): IRunStream {
                         options.onError?.(error);
                         return;
                     }
-                    if (error.status === 503 && error.retryAfter !== undefined) delay = error.retryAfter * 1000;
+                    if ((error.status === 503 || error.status === 429) && error.retryAfter !== undefined) delay = error.retryAfter * 1000;
                 }
                 settled = false;
             }

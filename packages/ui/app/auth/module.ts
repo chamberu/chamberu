@@ -6,6 +6,7 @@
  */
 
 import { shallowRef } from 'vue';
+import { ApiError } from '../api/error.ts';
 import type { MeWire } from '../api/types.ts';
 import type { UiConfig } from '../../src/config/types.ts';
 import { RETURN_STORAGE_KEY, TOKEN_STORAGE_KEY } from './constants.ts';
@@ -54,8 +55,17 @@ export function createSession(config: UiConfig, deps: SessionDeps): ISession {
                     principal.value = await client().me(stored);
                     method = 'token';
                     return true;
-                } catch {
-                    deps.storage.removeItem(TOKEN_STORAGE_KEY);
+                } catch (e) {
+                    // only a refused token goes: a network error, a 503
+                    // while the server drains or a 429 keeps it, and the
+                    // next navigation tries again
+                    if (e instanceof ApiError && e.status === 401) {
+                        deps.storage.removeItem(TOKEN_STORAGE_KEY);
+                    } else {
+                        principal.value = undefined;
+                        method = undefined;
+                        return false;
+                    }
                 }
             }
             if (config.auth.authup && deps.authup) {

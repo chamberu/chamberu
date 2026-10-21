@@ -30,3 +30,48 @@ export function formatFireTime(iso: string, timezone?: string): string {
         ...(timezone ? { timeZone: timezone } : {}),
     }).format(new Date(iso));
 }
+
+const WEEKDAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+function fieldNumber(field: string, max: number): number | undefined {
+    if (!/^\d{1,2}$/.test(field)) return undefined;
+    const value = Number(field);
+    return value <= max ? value : undefined;
+}
+
+function dayPart(dow: string): string | undefined {
+    if (dow === '*') return 'daily';
+    if (dow === '1-5' || dow === 'MON-FRI' || dow === 'mon-fri') return 'weekdays';
+    if (dow === '0,6' || dow === '6,0' || dow === 'SAT,SUN' || dow === 'sat,sun') return 'weekends';
+    const day = fieldNumber(dow, 7);
+    return day === undefined ? undefined : WEEKDAYS[day % 7];
+}
+
+/**
+ * A short reading of the common five-field shapes (`0 8 * * 1-5` ->
+ * `weekdays 08:00`, `*\/15 * * * *` -> `every 15 min`, `0 * * * *` ->
+ * `hourly`), else `undefined` (the expression alone is shown).
+ */
+export function describeCron(expression: string): string | undefined {
+    const fields = expression.trim().split(/\s+/);
+    if (fields.length !== 5) return undefined;
+    const [minute, hour, dom, month, dow] = fields as [string, string, string, string, string];
+    if (dom !== '*' || month !== '*') return undefined;
+
+    const step = /^\*\/(\d{1,2})$/.exec(minute);
+    if (step && hour === '*' && dow === '*') return Number(step[1]) === 1 ? 'every minute' : `every ${Number(step[1])} min`;
+    if (minute === '*' && hour === '*' && dow === '*') return 'every minute';
+
+    const m = fieldNumber(minute, 59);
+    if (m === undefined) return undefined;
+    if (hour === '*') {
+        if (dow !== '*') return undefined;
+        return m === 0 ? 'hourly' : `hourly at :${pad(m)}`;
+    }
+    const h = fieldNumber(hour, 23);
+    const days = dayPart(dow);
+    if (h === undefined || !days) return undefined;
+    return `${days} ${pad(h)}:${pad(m)}`;
+}

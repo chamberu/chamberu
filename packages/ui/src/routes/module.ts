@@ -6,10 +6,12 @@
  */
 
 import { InvalidAgentDefinitionError } from '@chamvi/core';
+import type { IClock } from '@chamvi/core';
 import type { HttpRoute, HttpRouteResult } from '@chamvi/http';
 import type { UiAuthupConfig, UiConfig } from '../config/types.ts';
 import {
     ASSET_CACHE_CONTROL,
+    BUILD_RETRY_MS,
     DEFAULT_UI_BASE_PATH,
     DOCUMENT_CACHE_CONTROL,
     SECURITY_HEADERS,
@@ -67,14 +69,21 @@ export function uiRoutes(options: UiRoutesOptions = {}): HttpRoute[] {
     }
     const root = options.root ?? defaultRoot();
 
+    // a missing build is read again at most every BUILD_RETRY_MS (the
+    // route is unauthenticated and not rate limited): in between, requests
+    // answer 500 without reading the folder or reporting again
     let build: Promise<Map<string, BuildFile>> | undefined;
-    const load = (): Promise<Map<string, BuildFile>> => {
+    let failedAt: number | undefined;
+    const load = (clock: IClock): Promise<Map<string, BuildFile>> | undefined => {
+        if (failedAt !== undefined && clock.now().getTime() - failedAt < BUILD_RETRY_MS) return undefined;
         build ??= loadBuild(root).then((files) => {
             if (!files.has('index.html')) throw new Error('index.html missing');
+            failedAt = undefined;
             return files;
         }).catch(() => {
-            // not memoized: the build may land later (e.g. a volume mounted after start)
+            // not memoized for good: the build may land later (e.g. a volume mounted after start)
             build = undefined;
+            failedAt = clock.now().getTime();
             throw new InvalidAgentDefinitionError(`uiRoutes: no dashboard build in ${root}; build @chamvi/ui first.`);
         });
         return build;
@@ -119,7 +128,19 @@ export function uiRoutes(options: UiRoutesOptions = {}): HttpRoute[] {
             });
             if (key === undefined) return notFound();
 
-            const files = await load();
+            const loading = load(ctx.clock);
+            if (!loading) {
+                return {
+                    status: 500,
+                    headers: entry.headers,
+                    body: {
+                        status: 500,
+                        code: 'internal_error',
+                        message: 'Internal Server Error',
+                    },
+                };
+            }
+            const files = await loading;
             if (key === '' || key === 'index.html' || (!files.has(key) && !isFileLike(key))) {
                 entry.index ??= new TextEncoder().encode(renderIndex(new TextDecoder().decode(files.get('index.html')!.bytes), entry.config));
                 return {
