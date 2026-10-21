@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+export * from './app/index.ts';
 export * from './config/index.ts';
 export * from './env/index.ts';
 export * from './logger/index.ts';

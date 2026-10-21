@@ -1,0 +1,180 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import {
+    InvalidAgentDefinitionError,
+    defineAgent,
+    http,
+} from '@chamvi/core';
+import { ControllableClock } from '@chamvi/test-kit';
+import {
+    afterEach,
+    describe,
+    expect,
+    it,
+} from 'vitest';
+import {
+    APP_ERROR_CODE,
+    ModuleName,
+    configModule,
+    createApp,
+    storeModule,
+} from '@chamvi/app';
+import type { IApp } from '@chamvi/app';
+import {
+    SECRET,
+    TOKENS,
+    recording,
+    rejectionOf,
+} from '../../utils/app.ts';
+import { createRecordingLogger } from '../../utils/logger.ts';
+import { textModel } from '../../utils/model.ts';
+import { closeServer, freePort, listenOn } from '../../utils/port.ts';
+
+const agent = defineAgent({
+    name: 'triage',
+    model: textModel(),
+    instructions: 'x',
+    triggers: [http()],
+});
+
+let apps: IApp[] = [];
+
+afterEach(async () => {
+    await Promise.all(apps.map((app) => app.stop().catch(() => {})));
+    apps = [];
+    globalThis.AI_SDK_DEFAULT_PROVIDER = undefined;
+});
+
+function track(app: IApp): IApp {
+    apps.push(app);
+    return app;
+}
+
+async function envFor(extra: Record<string, string> = {}) {
+    const port = await freePort();
+    return {
+        port,
+        env: {
+            RESUME_SECRET: SECRET,
+            HOST: '127.0.0.1',
+            PORT: String(port),
+            CHAMVI_TOKENS: TOKENS,
+            ...extra,
+        },
+    };
+}
+
+function quiet() {
+    const clock = new ControllableClock(new Date('2026-10-21T00:00:00Z'));
+    return configModule({ clock, logger: createRecordingLogger(clock) });
+}
+
+async function isFree(port: number): Promise<boolean> {
+    try {
+        await closeServer(await listenOn(port));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+describe('App.start', () => {
+    it('starts and serves /readyz', async () => {
+        const app = track(createApp({ agents: [agent], modules: [quiet()] }));
+        const { env, port } = await envFor();
+
+        await app.start({ env });
+
+        expect((await fetch(`http://127.0.0.1:${port}/readyz`)).status).toBe(200);
+        await app.stop();
+        expect(await isFree(port)).toBe(true);
+    });
+
+    it('rejects InvalidAgentDefinitionError for a missing RESUME_SECRET', async () => {
+        const app = track(createApp({ agents: [agent], modules: [quiet()] }));
+        const { env } = await envFor();
+
+        const error = await rejectionOf(app.start({ env: { ...env, RESUME_SECRET: '' } }));
+
+        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect(error.message).toContain('RESUME_SECRET');
+    });
+
+    it('a second start rejects app_in_use', async () => {
+        const app = track(createApp({ agents: [agent], modules: [quiet()] }));
+        const { env } = await envFor();
+        await app.start({ env });
+
+        expect(await rejectionOf(app.start({ env }))).toMatchObject({ code: APP_ERROR_CODE.IN_USE });
+        expect(await rejectionOf(app.runJob({ env, agent: 'triage' }))).toMatchObject({ code: APP_ERROR_CODE.IN_USE });
+        expect(await rejectionOf(app.migrate({ env }))).toMatchObject({ code: APP_ERROR_CODE.IN_USE });
+    });
+
+    it('a lifecycle after stop rejects app_in_use', async () => {
+        const app = track(createApp({ agents: [agent], modules: [quiet()] }));
+        await app.stop();
+
+        expect(await rejectionOf(app.start({ env: {} }))).toMatchObject({ code: APP_ERROR_CODE.IN_USE });
+    });
+
+    it('a setup failure tears the ready modules down in reverse order', async () => {
+        const events: string[] = [];
+        const failure = new Error('engine setup failed');
+        const app = track(createApp({
+            agents: [agent],
+            modules: [
+                recording(quiet(), events, 'config'),
+                recording(storeModule(), events, 'store'),
+                {
+                    name: ModuleName.ENGINE,
+                    dependencies: [ModuleName.CONFIG, ModuleName.STORE],
+                    async setup() {
+                        throw failure;
+                    },
+                    async teardown() {
+                        events.push('engine teardown');
+                    },
+                },
+            ],
+        }));
+        const { env } = await envFor();
+
+        expect(await rejectionOf(app.start({ env }))).toBe(failure);
+        expect(events.filter((e) => e.endsWith('teardown'))).toEqual(['store teardown', 'config teardown']);
+        await app.stop();
+        expect(events.filter((e) => e.endsWith('teardown'))).toHaveLength(2);
+    });
+
+    it('an onReady failure tears every module down', async () => {
+        const events: string[] = [];
+        const failure = new Error('onReady failed');
+        const app = track(createApp({
+            agents: [agent],
+            modules: [
+                recording(storeModule(), events, 'store'),
+                quiet(),
+                {
+                    name: 'late',
+                    dependencies: [ModuleName.HTTP],
+                    setup: async () => undefined,
+                    async onReady() {
+                        throw failure;
+                    },
+                    async teardown() {
+                        events.push('late teardown');
+                    },
+                },
+            ],
+        }));
+        const { env, port } = await envFor();
+
+        expect(await rejectionOf(app.start({ env }))).toBe(failure);
+        expect(events.filter((e) => e.endsWith('teardown'))).toEqual(['late teardown', 'store teardown']);
+        expect(await isFree(port)).toBe(true);
+    });
+});
