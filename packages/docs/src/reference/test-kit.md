@@ -33,7 +33,7 @@ type WorkspaceContractFactory = () => Promise<IWorkspace>;
 Registers the Vitest suite every sandbox provider's workspaces must pass: argv exec and exit codes (127 for a command that cannot start), stdin, `cwd` and path escapes (`../..`, `/etc`, an empty path, a NUL byte), the 64 KiB output caps under a flood, a process-group kill on timeout that takes a backgrounded grandchild with it, abort, UTF-8 files and their size cap, and dispose during an exec. `factory` returns a fresh, repo-less workspace per test; the suite disposes it. It runs real processes with short real timeouts, not a `ControllableClock`.
 
 ```ts
-describeWorkspaceContract('local', () => createLocalSandbox({ root }).create({ runId: 'r1' }));
+describeWorkspaceContract('local', () => createLocalSandbox().create({ runId: 'r1' }));
 ```
 
 ## createGitFixture
