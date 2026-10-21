@@ -183,6 +183,8 @@ export default defineConfig({
                         { text: '@chamvi/coding', link: '/reference/coding' },
                         { text: '@chamvi/github', link: '/reference/github' },
                         { text: '@chamvi/http', link: '/reference/http' },
+                        { text: '@chamvi/notify-github', link: '/reference/notify-github' },
+                        { text: '@chamvi/notify-openclaw', link: '/reference/notify-openclaw' },
                         { text: '@chamvi/sandbox', link: '/reference/sandbox' },
                         { text: '@chamvi/scheduler', link: '/reference/scheduler' },
                         { text: '@chamvi/test-kit', link: '/reference/test-kit' },

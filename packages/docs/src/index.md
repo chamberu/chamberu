@@ -62,10 +62,10 @@ packages:
         -   name: '@chamvi/http'
             body: REST, server-sent events, webhooks and an MCP endpoint, with bearer, authup and OIDC authentication.
             link: /guide/http
+        -   name: '@chamvi/notify-*'
+            body: Approval requests into an OpenClaw chat or as one comment on the run's GitHub issue, once per approval.
+            link: /guide/notifiers
     planned:
-        -   name: '@chamvi/notify-openclaw'
-            milestone: M1
-            body: Results and approval requests delivered into OpenClaw chats.
         -   name: '@chamvi/github'
             milestone: M1
             body: GitHub App auth, webhook triggers and issue tools with reconciliation.
@@ -75,6 +75,9 @@ packages:
         -   name: '@chamvi/ui'
             milestone: M1
             body: A dashboard with live steps, an approvals inbox, agent state and schedules.
+        -   name: 'chamvi'
+            milestone: M1
+            body: The umbrella package and CLI, with a base image, a Helm chart and a template repository.
     link:
         text: Roadmap
         link: /roadmap

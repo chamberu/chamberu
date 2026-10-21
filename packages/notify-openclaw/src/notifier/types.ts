@@ -7,6 +7,7 @@
 
 import type { IClock } from '@chamvi/core';
 
+// #region public
 /** Where OpenClaw delivers the agent turn's answer; both `channel` and `to` are concrete. */
 export type OpenclawDelivery = {
     /** E.g. `telegram`, `slack`, `whatsapp`; `last` is refused by OpenClaw for hooks. */
@@ -47,6 +48,7 @@ export type OpenclawHookBody = {
     to: string;
     accountId?: string;
 };
+// #endregion public
 
 export type ResolvedOpenclawOptions = {
     name: string;

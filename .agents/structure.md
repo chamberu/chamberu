@@ -21,6 +21,8 @@ chamvi/
 │   ├── test-kit/                    # @chamvi/test-kit (same layout; aliases core and itself to src)
 │   ├── github/                      # @chamvi/github (same layout; aliases core, http, test-kit and itself to src)
 │   │   └── test/fixtures/deliveries/ # Recorded GitHub webhook bodies (issues.opened, a bot's issue_comment)
+│   ├── notify-openclaw/             # @chamvi/notify-openclaw (aliases core, test-kit and itself; fake gateway in test/utils/openclaw.ts)
+│   ├── notify-github/               # @chamvi/notify-github (aliases core, github, http, test-kit and itself)
 │   ├── sandbox/                     # @chamvi/sandbox (same layout; aliases core and itself; private test/utils/clock.ts, since test-kit peers on it)
 │   ├── sandbox-local/               # @chamvi/sandbox-local (aliases core, sandbox, test-kit and itself)
 │   ├── sandbox-docker/              # @chamvi/sandbox-docker (same aliases as local)
@@ -46,7 +48,7 @@ chamvi/
 ├── .husky/commit-msg                # Runs commitlint
 ├── CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md
 ├── nx.json                          # Task orchestration and caching
-├── tsconfig.json                    # Root config, path aliases for every package (@chamvi/core, @chamvi/sandbox, ...) -> packages/*/src
+├── tsconfig.json                    # Root config, path aliases for every package (@chamvi/core, @chamvi/sandbox, @chamvi/notify-*, ...) -> packages/*/src
 ├── tsconfig.build.json              # Shared compiler options
 ├── eslint.config.js                 # @tada5hi/eslint-config flat config
 ├── commitlint.config.mjs            # Conventional Commits
@@ -58,8 +60,8 @@ chamvi/
 
 | Package | Status | Responsibility |
 |---------|--------|----------------|
-| `@chamvi/core` | Exists (0.1.0) | defineAgent, run engine (streaming, structured output), checkpoints, trigger model, run artifacts, state API, budgets, IStore/INotifier interfaces, in-memory store |
-| `@chamvi/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`, `describeWorkspaceContract()`, `createGitFixture()`; depends on core, optional peer on sandbox (types only); core and sandbox never depend on it |
+| `@chamvi/core` | Exists (0.1.0) | defineAgent, run engine (streaming, structured output), checkpoints, trigger model, run artifacts, state API, budgets, IStore/INotifier interfaces (`NotifyOptions` with the run's trigger), `consoleNotifier()`, in-memory store |
+| `@chamvi/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`, `describeWorkspaceContract()`, `createGitFixture()`, `createFakeGithub()` (in-process GitHub for `createGithubApp({ fetch })`); depends on core, optional peer on sandbox (types only); core and sandbox never depend on it |
 | `@chamvi/http` | Exists (0.1.0) | `createHttpApp()` (routup v6): REST control API, SSE run stream, webhook intake, MCP endpoint, authenticators (static tokens, authup, oidc), health, metrics, `createShutdown()`; peer on core |
 | `@chamvi/scheduler` | Exists (0.1.0) | `createScheduler()` (one locked hubwire component per cron trigger), `runJob()`; depends on `hubwire`, peer on core |
 | `@chamvi/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |
@@ -70,7 +72,8 @@ chamvi/
 | `@chamvi/coding` | Exists (0.1.0) | `codingTools()` (read_file, write_file, edit_file, grep, list_files, bash, git_diff), the `ICodingBackend` contract; depends on `smob`, peer on core, sandbox and `ai` |
 | `@chamvi/coding-claude-code` | Planned | Claude Code coding backend |
 | `@chamvi/github` | Exists (0.1.0) | `createGithubApp()` (App JWT, `IClock` installation-token cache, Octokit per installation), `githubWebhook()` trigger, the signed webhook route for `createHttpApp({ routes })`, read tools and effect write tools; depends on `@octokit/core` + `plugin-paginate-rest`, peer on core, http (types only) and `ai` |
-| `@chamvi/notify-openclaw`, `@chamvi/notify-github` | Planned | Notifiers |
+| `@chamvi/notify-openclaw` | Exists (0.1.0) | `openclaw()`: `POST <hooksPath>/agent` with `Idempotency-Key`, a deterministic message, an `IClock` timeout; no runtime dependencies, peer on core |
+| `@chamvi/notify-github` | Exists (0.1.0) | `githubNotifier()`: one comment on the run's issue/PR (or `target`), deduplicated by `effectMarker()` found before posting; depends on `smob`, peer on core and github |
 | `@chamvi/ui` | Planned | Vue 3 dashboard |
 | `chamvi` | Planned | Umbrella package and CLI |
 
@@ -93,12 +96,12 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 | `effect/` | `defineEffectTool()`, `effectMarker()` (`define.ts`), `wrapToolsForRun()` (`wrap.ts`), `EFFECT` |
 | `tool/` | `ToolContext` (`types.ts`), `toolContextSchema` (`constants.ts`), `defineTool()` (`define.ts`), `hasToolContext()` (`helpers.ts`, internal) |
 | `approval/` | Signed resume tokens |
-| `notify/types.ts` | `INotifier`, `Notification` |
+| `notify/` | `INotifier`, `Notification`, `NotifyOptions`, `ConsoleNotifierOptions` (`types.ts`), `consoleNotifier()` (`console.ts`) |
 | `permission/` | `matchesPermission()`, `hasPermission()`, `toolPermission()` (`match.ts`), `requireToolPermission()` (`policy.ts`), `RequireToolPermissionOptions` (`types.ts`), `PERMISSION_ALL` (`constants.ts`, internal) |
 | `state/` | `createAgentState()` (`module.ts`, validation via `@validup/standard-schema`), generated tools (`tools.ts`) |
 | `clock/` | `IClock`, `systemClock` |
 
-`src/index.ts` re-exports each folder's `index.ts`. `@chamvi/test-kit` (`packages/test-kit/src`) holds `clock/` (`ControllableClock`), `store-contract/` (`describeStoreContract`), `workspace-contract/` (`describeWorkspaceContract`, `WorkspaceContractFactory`) and `git-fixture/` (`createGitFixture`, `GitFixture`).
+`src/index.ts` re-exports each folder's `index.ts`. `@chamvi/test-kit` (`packages/test-kit/src`) holds `clock/` (`ControllableClock`), `store-contract/` (`describeStoreContract`), `workspace-contract/` (`describeWorkspaceContract`, `WorkspaceContractFactory`), `git-fixture/` (`createGitFixture`, `GitFixture`) and `github-fake/` (`createFakeGithub` in `module.ts`, `FakeGithub`, `FakeGithubOptions`, `FakeRequest`, `FakeRoute*`, `JwtClaims` in `types.ts`, the repository routes and `abortable()` in `helpers.ts`).
 
 ## Scheduler Module Map (`packages/scheduler/src`)
 
@@ -135,7 +138,13 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | `auth/` | No barrel: `createInstallationTokens()` (`module.ts`, token cache), `createAppJwt()`, `normalizePrivateKey()` (`helpers.ts`), `JWT_*`, `TOKEN_REFRESH_MARGIN_MS`, `GITHUB_USER_AGENT` (`constants.ts`) |
 | `trigger/` | `githubWebhook()` (`module.ts`), `GithubEvent`, `GithubPayload`, `GithubWebhookTriggerOptions` (`types.ts`); `matchesGithubTrigger()`, `defaultConcurrencyKey()` (`helpers.ts`, internal) |
 | `webhook/` | `createWebhookRoute()` (`module.ts`, internal), `verifySignature()`, `readHeaders()`, `toGithubEvent()`, `assertDerivedKey()` (`helpers.ts`), `GithubWebhookRouteOptions`, `GithubWebhookResult` (`types.ts`, the only exports) |
-| `tools/` | `createReadTools()` (`read.ts`), `createWriteTools()` (`write.ts`), `installationIdOf()`, `parseRepo()`, `stepOf()`, `toolError()`, `withOctokit()` and the input schema builders (`helpers.ts`), limits and `REPO_PATTERN` (`constants.ts`), result shapes (`types.ts`, the only exports) and the internal `RepoInput`/`NumberInput` |
+| `tools/` | `createReadTools()` (`read.ts`), `createWriteTools()` (`write.ts`), `installationIdOf()`, `parseRepo()`, `stepOf()`, `toolError()`, `withOctokit()` and the input schema builders (`helpers.ts`), limits, `REPO_PATTERN` and `GITHUB_REQUEST_ERROR_CODE` (`constants.ts`; those two are exported, for `@chamvi/notify-github`), result shapes (`types.ts`) and the internal `RepoInput`/`NumberInput` |
+
+## Notifier Module Maps
+
+`@chamvi/notify-openclaw` (`packages/notify-openclaw/src/notifier/`): `openclaw()` (`module.ts`); `OpenclawNotifierOptions`, `OpenclawDelivery`, `OpenclawHookBody` (`types.ts`, public between `#region public` markers the docs include) and the internal `ResolvedOpenclawOptions`; `DEFAULT_HOOKS_PATH`, `OPENCLAW_TIMEOUT_MS`, `OPENCLAW_REQUEST_ERROR_CODE`, `MESSAGE_BODY_MAX_LENGTH` (public) and `DEFAULT_NOTIFIER_NAME`, `HOOK_NAME`, `IDEMPOTENCY_KEY_MAX_LENGTH`, `ERROR_TEXT_MAX_LENGTH` (internal) (`constants.ts`); `resolveOptions()`, `hookUrl()`, `renderMessage()`, `transportKey()`, `cutText()`, `redact()`, `requestError()`, `responseError()` (`helpers.ts`).
+
+`@chamvi/notify-github` (`packages/notify-github/src/notifier/`): `githubNotifier()` (`module.ts`, the reconcile and the post); `GithubNotifierOptions`, `GithubNotifierTarget` (`types.ts`, public region) and the internal `CommentTarget`, `ResolvedGithubNotifierOptions`; `GITHUB_NOTIFIER_TIMEOUT_MS`, `COMMENT_BODY_MAX_LENGTH` (public) and `DEFAULT_NOTIFIER_NAME`, `LOGIN_PATTERN`, `RECONCILE_SKEW_MS`, `SAFE_KEY_PATTERN`, `BACKTICK_RUN_MAX_LENGTH` (internal) (`constants.ts`); `resolveOptions()`, `resolveTarget()`, `markerKey()`, `cutText()`, `fenceFor()`, `renderComment()`, `isSameLogin()` (`helpers.ts`).
 
 ## Sandbox Module Map (`packages/sandbox/src`)
 

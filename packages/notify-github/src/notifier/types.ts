@@ -8,6 +8,7 @@
 import type { IClock } from '@chamvi/core';
 import type { IGithubApp } from '@chamvi/github';
 
+// #region public
 /** The issue or pull request comments go to for runs not started by one. */
 export type GithubNotifierTarget = {
     /** `owner/name`. */
@@ -30,6 +31,7 @@ export type GithubNotifierOptions = {
     timeoutMs?: number;
     clock?: IClock;
 };
+// #endregion public
 
 export type CommentTarget = {
     owner: string;
