@@ -9,6 +9,7 @@ A notifier delivers messages from the engine to the owner: today approval reques
 | `kind` | `approval`, `stuck`, `result` or `info`. The core engine sends `approval` |
 | `agent`, `runId` | Who is asking |
 | `title`, `body` | Human-readable text. For approvals the body shows the tool name and its input as JSON |
+| `approvalId` | The wait point's approval id (approvals only), e.g. for a link to the approval in the UI |
 | `resumeToken` | The signed token for [`engine.resume()`](/guide/approvals) (approvals only) |
 | `expiresAt` | When the approval times out (approvals only) |
 
@@ -60,4 +61,4 @@ A store lock per approval keeps replicas from sending the same notification at t
 | [`@chamvi/notify-openclaw`](/reference/notify-openclaw) | An OpenClaw chat via `POST <hooks.path>/agent`. See [OpenClaw](/deployment/openclaw) | `Idempotency-Key` and a byte-identical message |
 | [`@chamvi/notify-github`](/reference/notify-github) | A comment on the run's issue or pull request (or a configured `target`) | A hidden marker, looked for before posting |
 
-Both transports bound one send to 30 s on the `IClock` (below the engine's 60 s notify lock) and cut the notification body (8 000 and 60 000 characters), so a stalled endpoint or a huge tool input never blocks `tick()` or turns into a permanent rejection. Neither carries the bare resume token by default: both hold it only inside the optional `resumeUrl` link, and only the OpenClaw message adds the token and a `resume_run` call when `resumeTool: true` is set.
+Both transports bound one send to 30 s on the `IClock` (below the engine's 60 s notify lock) and cut the notification body (8 000 and 60 000 characters), so a stalled endpoint or a huge tool input never blocks `tick()` or turns into a permanent rejection. Neither carries the resume token by default: the optional `approvalUrl` link opens the run's approval in the UI (run and approval id only, no token), where a signed-in principal with `agent:<name>:approve` answers it. Only the OpenClaw message adds the token and a `resume_run` call, when `resumeTool: true` is set; a GitHub comment never carries it.

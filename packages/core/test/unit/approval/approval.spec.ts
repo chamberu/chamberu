@@ -195,6 +195,7 @@ describe('approvals', () => {
             kind: 'approval',
             agent: 'release',
             runId,
+            approvalId,
             expiresAt: new Date(1_000_000 + TIMEOUT),
         });
         expect(n.title).toContain('deploy');

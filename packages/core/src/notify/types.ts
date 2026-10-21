@@ -13,6 +13,8 @@ export type Notification = {
     runId: string;
     title: string;
     body: string;
+    /** The wait point's approval id (kind 'approval'), e.g. for a link into the UI's approval. */
+    approvalId?: string;
     /** Signed token resuming the run (kind 'approval'). */
     resumeToken?: string;
     expiresAt?: Date;

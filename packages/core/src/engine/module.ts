@@ -597,6 +597,7 @@ export class Engine {
                 runId: run.id,
                 title: `Approval required: ${waiting.toolName}`,
                 body: `Agent "${run.agent}" wants to call "${waiting.toolName}" with:\n${JSON.stringify(waiting.input, null, 2)}`,
+                approvalId: waiting.approvalId,
                 resumeToken: createResumeToken(this.resumeSecret, {
                     runId: run.id,
                     approvalId: waiting.approvalId,
