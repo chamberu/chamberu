@@ -1,0 +1,89 @@
+import{_ as n,o as a,c as e,a2 as o}from"./chunks/framework.Di-jvWLj.js";const y=JSON.parse('{"title":"@chamvi/notify-openclaw","description":"","frontmatter":{},"headers":[],"relativePath":"reference/notify-openclaw.md","filePath":"reference/notify-openclaw.md","lastUpdated":1792596719000}'),l={name:"reference/notify-openclaw.md"};function p(t,s,c,r,i,d){return a(),e("div",null,[...s[0]||(s[0]=[o(`<h1 id="chamvi-notify-openclaw" tabindex="-1">@chamvi/notify-openclaw <a class="header-anchor" href="#chamvi-notify-openclaw" aria-label="Permalink to &quot;@chamvi/notify-openclaw&quot;">​</a></h1><p>The OpenClaw notifier. The public API of <code>packages/notify-openclaw/src/index.ts</code>.</p><div class="language-bash"><button title="Copy Code" class="copy"></button><span class="lang">bash</span><pre class="shiki chamvi vp-code" tabindex="0"><code><span class="line"><span style="color:#E6DFDE;">npm </span><span style="color:#E7C58C;">install</span><span style="color:#E7C58C;"> @chamvi/notify-openclaw</span><span style="color:#E7C58C;"> @chamvi/core</span><span style="color:#E7C58C;"> --save</span></span></code></pre></div><p><code>@chamvi/core</code> is a peer dependency; the notifier uses the global <code>fetch</code>. See <a href="/deployment/openclaw">OpenClaw</a> for the setup.</p><h2 id="openclaw" tabindex="-1">openclaw <a class="header-anchor" href="#openclaw" aria-label="Permalink to &quot;openclaw&quot;">​</a></h2><div class="language-ts"><button title="Copy Code" class="copy"></button><span class="lang">ts</span><pre class="shiki chamvi vp-code" tabindex="0"><code><span class="line"><span style="color:#FF7B84;">function</span><span style="color:#E6DFDE;"> openclaw(options: OpenclawNotifierOptions): INotifier;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B84;">const</span><span style="color:#E6DFDE;"> DEFAULT_HOOKS_PATH: </span><span style="color:#E7C58C;">&#39;/hooks&#39;</span><span style="color:#E6DFDE;">;</span></span>
+<span class="line"><span style="color:#FF7B84;">const</span><span style="color:#E6DFDE;"> OPENCLAW_TIMEOUT_MS: </span><span style="color:#E7C58C;">30_000</span><span style="color:#E6DFDE;">;</span></span>
+<span class="line"><span style="color:#FF7B84;">const</span><span style="color:#E6DFDE;"> OPENCLAW_REQUEST_ERROR_CODE: </span><span style="color:#E7C58C;">&#39;openclaw_request&#39;</span><span style="color:#E6DFDE;">;</span></span>
+<span class="line"><span style="color:#FF7B84;">const</span><span style="color:#E6DFDE;"> MESSAGE_BODY_MAX_LENGTH: </span><span style="color:#E7C58C;">8_000</span><span style="color:#E6DFDE;">;</span></span></code></pre></div><div class="language-ts"><button title="Copy Code" class="copy"></button><span class="lang">ts</span><pre class="shiki chamvi vp-code" tabindex="0"><code><span class="line"><span style="color:#958A8B;">/** Where OpenClaw delivers the agent turn&#39;s answer; both \`channel\` and \`to\` are concrete. */</span></span>
+<span class="line"><span style="color:#FF7B84;">export</span><span style="color:#FF7B84;"> type</span><span style="color:#E6DFDE;"> OpenclawDelivery = {</span></span>
+<span class="line"><span style="color:#958A8B;">    /** E.g. \`telegram\`, \`slack\`, \`whatsapp\`; \`last\` is refused by OpenClaw for hooks. */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    channel: string;</span></span>
+<span class="line"><span style="color:#958A8B;">    /** The recipient on that channel (chat id, user, number). */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    to: string;</span></span>
+<span class="line"><span style="color:#958A8B;">    /** Selects one of several accounts of the channel. */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    accountId?: string;</span></span>
+<span class="line"><span style="color:#E6DFDE;">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B84;">export</span><span style="color:#FF7B84;"> type</span><span style="color:#E6DFDE;"> OpenclawNotifierOptions = {</span></span>
+<span class="line"><span style="color:#958A8B;">    /** Default \`&#39;openclaw&#39;\`. */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    name?: string;</span></span>
+<span class="line"><span style="color:#958A8B;">    /** The OpenClaw gateway, e.g. \`http://openclaw:18789\`; a base path is kept. */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    baseUrl: string;</span></span>
+<span class="line"><span style="color:#958A8B;">    /** OpenClaw&#39;s \`hooks.token\` (a hook-dedicated token, not the gateway token). */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    hooksToken: string;</span></span>
+<span class="line"><span style="color:#958A8B;">    /** OpenClaw&#39;s \`hooks.path\`, default \`/hooks\`. */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    hooksPath?: string;</span></span>
+<span class="line"><span style="color:#958A8B;">    /** The OpenClaw agent that phrases the message (must be in \`hooks.allowedAgentIds\` when set). */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    agentId?: string;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    deliver: OpenclawDelivery;</span></span>
+<span class="line"><span style="color:#958A8B;">    /**</span></span>
+<span class="line"><span style="color:#958A8B;">     * A link to the approval in the chamvi UI, e.g.</span></span>
+<span class="line"><span style="color:#958A8B;">     * \`https://&lt;app&gt;/ui/approvals?run=&lt;runId&gt;&amp;approval=&lt;approvalId&gt;\`, where the</span></span>
+<span class="line"><span style="color:#958A8B;">     * signed-in owner answers it; it carries no token.</span></span>
+<span class="line"><span style="color:#958A8B;">     */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    approvalUrl?: (ref: {</span></span>
+<span class="line"><span style="color:#E6DFDE;">        runId: string; </span></span>
+<span class="line"><span style="color:#E6DFDE;">        approvalId: string; </span></span>
+<span class="line"><span style="color:#E6DFDE;">        agent: string </span></span>
+<span class="line"><span style="color:#E6DFDE;">    }) </span><span style="color:#FF7B84;">=&gt;</span><span style="color:#E6DFDE;"> string;</span></span>
+<span class="line"><span style="color:#958A8B;">    /**</span></span>
+<span class="line"><span style="color:#958A8B;">     * Also put the resume token and a ready-made \`resume_run\` MCP call into</span></span>
+<span class="line"><span style="color:#958A8B;">     * the message, default \`false\`: the OpenClaw agent then holds the token,</span></span>
+<span class="line"><span style="color:#958A8B;">     * and with \`agent:&lt;name&gt;:approve\` on its MCP principal a prompt injection</span></span>
+<span class="line"><span style="color:#958A8B;">     * in the body can make it approve.</span></span>
+<span class="line"><span style="color:#958A8B;">     */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    resumeTool?: boolean;</span></span>
+<span class="line"><span style="color:#958A8B;">    /** Default \`OPENCLAW_TIMEOUT_MS\` (30 s). */</span></span>
+<span class="line"><span style="color:#E6DFDE;">    timeoutMs?: number;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    clock?: IClock;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    fetch?: </span><span style="color:#FF7B84;">typeof</span><span style="color:#E6DFDE;"> globalThis.fetch;</span></span>
+<span class="line"><span style="color:#E6DFDE;">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#958A8B;">/** The body of \`POST &lt;hooksPath&gt;/agent\`. */</span></span>
+<span class="line"><span style="color:#FF7B84;">export</span><span style="color:#FF7B84;"> type</span><span style="color:#E6DFDE;"> OpenclawHookBody = {</span></span>
+<span class="line"><span style="color:#E6DFDE;">    message: string;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    name: </span><span style="color:#E7C58C;">&#39;chamvi&#39;</span><span style="color:#E6DFDE;">;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    agentId?: string;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    deliver: true;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    channel: string;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    to: string;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    accountId?: string;</span></span>
+<span class="line"><span style="color:#E6DFDE;">};</span></span></code></pre></div><p>Throws <code>InvalidAgentDefinitionError</code> for an empty <code>name</code>, <code>hooksToken</code>, <code>agentId</code>, <code>deliver.to</code> or <code>deliver.accountId</code>, a <code>deliver.channel</code> that is empty or <code>last</code>, a <code>baseUrl</code> that is no absolute <code>http:</code>/<code>https:</code> URL or carries credentials, a query or a hash, a <code>hooksToken</code> that <code>fetch</code> could not send as a header (a control character, a character above U+00FF, surrounding whitespace), a <code>hooksPath</code> that does not start with <code>/</code> or is <code>/</code> (trailing slashes are dropped, so <code>/hooks/</code> posts to <code>/hooks/agent</code>), an <code>approvalUrl</code> that is no function, a <code>resumeTool</code> that is no boolean and a <code>timeoutMs</code> that is no positive integer.</p><div class="language-ts"><button title="Copy Code" class="copy"></button><span class="lang">ts</span><pre class="shiki chamvi vp-code" tabindex="0"><code><span class="line"><span style="color:#FF7B84;">const</span><span style="color:#E6DFDE;"> notifier = openclaw({</span></span>
+<span class="line"><span style="color:#958A8B;">    // the OpenClaw gateway, reachable from the app</span></span>
+<span class="line"><span style="color:#E6DFDE;">    baseUrl: </span><span style="color:#E7C58C;">&#39;http://openclaw:18789&#39;</span><span style="color:#E6DFDE;">,</span></span>
+<span class="line"><span style="color:#958A8B;">    // OpenClaw&#39;s hooks.token, not the gateway token</span></span>
+<span class="line"><span style="color:#E6DFDE;">    hooksToken: process.env.OPENCLAW_HOOKS_TOKEN </span><span style="color:#FF7B84;">??</span><span style="color:#E7C58C;"> &#39;&#39;</span><span style="color:#E6DFDE;">,</span></span>
+<span class="line"><span style="color:#958A8B;">    // placeholders: the channel and recipient of your OpenClaw setup</span></span>
+<span class="line"><span style="color:#E6DFDE;">    deliver: { channel: </span><span style="color:#E7C58C;">&#39;&lt;channel&gt;&#39;</span><span style="color:#E6DFDE;">, to: </span><span style="color:#E7C58C;">&#39;&lt;recipient&gt;&#39;</span><span style="color:#E6DFDE;"> },</span></span>
+<span class="line"><span style="color:#958A8B;">    // optional: a link to the approval in the UI, without the token</span></span>
+<span class="line"><span style="color:#958A8B;">    // (only resumeTool: true puts the token and a resume_run call into the message)</span></span>
+<span class="line"><span style="color:#E6DFDE;">    approvalUrl: ({ runId, approvalId }) </span><span style="color:#FF7B84;">=&gt;</span><span style="color:#E7C58C;"> \`https://chamvi.example/ui/approvals?run=</span><span style="color:#E6DFDE;">\${</span><span style="color:#E7C58C;">encodeURIComponent</span><span style="color:#E6DFDE;">(</span><span style="color:#E7C58C;">runId</span><span style="color:#E6DFDE;">)</span><span style="color:#E6DFDE;">}</span><span style="color:#E7C58C;">&amp;approval=</span><span style="color:#E6DFDE;">\${</span><span style="color:#E7C58C;">encodeURIComponent</span><span style="color:#E6DFDE;">(</span><span style="color:#E7C58C;">approvalId</span><span style="color:#E6DFDE;">)</span><span style="color:#E6DFDE;">}</span><span style="color:#E7C58C;">\`</span><span style="color:#E6DFDE;">,</span></span>
+<span class="line"><span style="color:#E6DFDE;">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B84;">const</span><span style="color:#E6DFDE;"> engine = </span><span style="color:#FF7B84;">new</span><span style="color:#E6DFDE;"> Engine({</span></span>
+<span class="line"><span style="color:#E6DFDE;">    store: </span><span style="color:#FF7B84;">new</span><span style="color:#E6DFDE;"> MemoryStore(),</span></span>
+<span class="line"><span style="color:#E6DFDE;">    agents,</span></span>
+<span class="line"><span style="color:#958A8B;">    // agents name it with notify: &#39;openclaw&#39;</span></span>
+<span class="line"><span style="color:#E6DFDE;">    notifiers: { openclaw: notifier },</span></span>
+<span class="line"><span style="color:#E6DFDE;">    resumeSecret: process.env.RESUME_SECRET </span><span style="color:#FF7B84;">??</span><span style="color:#E7C58C;"> &#39;&#39;</span><span style="color:#E6DFDE;">,</span></span>
+<span class="line"><span style="color:#E6DFDE;">});</span></span></code></pre></div><h3 id="the-request" tabindex="-1">The request <a class="header-anchor" href="#the-request" aria-label="Permalink to &quot;The request&quot;">​</a></h3><p><code>notify(n, { idempotencyKey })</code> sends one <code>POST &lt;baseUrl&gt;&lt;hooksPath&gt;/agent</code>:</p><table tabindex="0"><thead><tr><th>Part</th><th>Value</th></tr></thead><tbody><tr><td><code>authorization</code></td><td><code>Bearer &lt;hooksToken&gt;</code></td></tr><tr><td><code>idempotency-key</code></td><td><code>idempotencyKey</code>, or <code>sha256:&lt;hex&gt;</code> of it when it is longer than 256 characters or holds anything but visible ASCII</td></tr><tr><td>body</td><td><code>OpenclawHookBody</code>: <code>{ message, name: &#39;chamvi&#39;, agentId?, deliver: true, channel, to, accountId? }</code></td></tr></tbody></table><p>The message is deterministic for one notification (no clock value, no random id), so a resend after a lost response is byte-identical and OpenClaw replays it:</p><div class="language-"><button title="Copy Code" class="copy"></button><span class="lang"></span><pre class="shiki chamvi vp-code" tabindex="0"><code><span class="line"><span>chamvi notification. Relay it to the user; keep every link and id exactly as written.</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>&lt;title&gt;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>&lt;body, cut to MESSAGE_BODY_MAX_LENGTH characters&gt;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Agent: &lt;agent&gt;</span></span>
+<span class="line"><span>Run: &lt;runId&gt;</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Expires: &lt;expiresAt ISO&gt;</span></span>
+<span class="line"><span>Approve or deny: &lt;approvalUrl({ runId, approvalId, agent })&gt;</span></span>
+<span class="line"><span>Or call the chamvi MCP tool resume_run with {&quot;token&quot;:&quot;&lt;token&gt;&quot;,&quot;approved&quot;:true} to approve, or &quot;approved&quot;:false to deny.</span></span></code></pre></div><p>For an approval with <code>resumeTool: true</code> the first line reads <code>keep every link, id and token exactly as written.</code> instead. The last block is sent for approvals only; <code>Approve or deny</code> only with <code>approvalUrl</code> (and a notification that carries an <code>approvalId</code>, as every engine approval does), the <code>resume_run</code> line only with <code>resumeTool: true</code>. With neither, the block ends with <code>Answer it in the chamvi UI (or through POST /runs/:id/approve); this message carries no resume token.</code> instead. <code>approvalUrl</code> gets the run id, the approval id and the agent, never the token, so by default (<code>resumeTool: false</code>) the token is nowhere in the request (URL, headers or body); see <a href="/deployment/openclaw#hooks-out">Deployment: OpenClaw</a>. A cut body ends with <code>… (cut, &lt;n&gt; more characters)</code> and never splits a surrogate pair.</p><h3 id="failures" tabindex="-1">Failures <a class="header-anchor" href="#failures" aria-label="Permalink to &quot;Failures&quot;">​</a></h3><p>Any 2xx resolves. Every other status throws a <code>ChamviError</code> with <code>code</code> <code>openclaw_request</code> and the message <code>OpenClaw &lt;status&gt;: &lt;response text&gt;</code> (plus <code>(retry after &lt;value&gt;)</code> for a <code>Retry-After</code> header); a network failure throws <code>OpenClaw request failed: &lt;message&gt; (&lt;cause message&gt;)</code> (undici keeps the detail, such as <code>ECONNREFUSED</code> or <code>ENOTFOUND</code>, in <code>cause</code>), a send that takes longer than <code>timeoutMs</code> <code>OpenClaw did not answer within &lt;ms&gt;ms.</code> (the timer runs on the <code>clock</code> and aborts the <code>fetch</code>). The response text and the network failure message are cut to 500 characters after the hooks token and the resume token (sent with <code>resumeTool</code> only) were replaced by <code>[redacted]</code>, so an endpoint that echoes the request never puts either into <code>onError</code>.</p>`,17)])])}const E=n(l,[["render",p]]);export{y as __pageData,E as default};
