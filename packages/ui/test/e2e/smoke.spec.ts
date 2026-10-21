@@ -206,3 +206,44 @@ test('a deep link (token in the fragment) answers through resume', async ({ page
     expect(await page.evaluate(() => sessionStorage.getItem('chamvi.resume'))).toBeNull();
     expect(errors).toEqual([]);
 });
+
+test('an approval link by run signs in, highlights the card and approves', async ({ page, request }) => {
+    const errors = watchErrors(page);
+    const runId = await dispatch(request);
+    let approvalId = '';
+    await expect.poll(async () => {
+        const run = await readRun(request, runId) as { status: string; waiting?: { approvalId: string } };
+        approvalId = run.waiting?.approvalId ?? '';
+        return run.status;
+    }, { timeout: 15_000 }).toBe('waiting');
+
+    const link = `approvals?run=${runId}&approval=${approvalId}`;
+    await page.goto(link);
+    await expect(page).toHaveURL(/\/ui\/login\?redirect=/);
+    expect(new URL(page.url()).searchParams.get('redirect')).toBe(`/${link}`);
+    await signIn(page);
+
+    await expect(page).toHaveURL(new RegExp(`/ui/approvals\\?run=${runId}&approval=${approvalId}$`));
+    const card = page.locator(`[data-testid="approval"][data-run="${runId}"]`);
+    await expect(card).toHaveCount(1);
+    await expect(card).toHaveAttribute('data-linked', 'true');
+    await expect(card).toHaveClass(/\blinked\b/);
+    await expect(card).toBeFocused();
+    await expect(card).toBeInViewport();
+    await expect(page.getByTestId('link-notice')).toHaveCount(0);
+    await card.getByRole('button', { name: 'Approve' }).click();
+
+    await expect(page.getByTestId('decided').filter({ hasText: runId.slice(0, 8) })).toContainText('Approved by e2e');
+    await expect.poll(async () => (await readRun(request, runId)).status, { timeout: 20_000 }).toBe('completed');
+    const wait = (await readRun(request, runId)).steps.find((step) => step.kind === 'wait');
+    expect(wait?.output).toMatchObject({ approved: true, approver: { id: 'e2e' } });
+
+    // the same link once answered: a notice linking the run, no card
+    await page.reload();
+    const notice = page.getByTestId('link-notice');
+    await expect(notice).toContainText('no longer waits');
+    await expect(card).toHaveCount(0);
+    await notice.getByTestId('link-notice-run').click();
+    await expect(page).toHaveURL(new RegExp(`/ui/runs/${runId}$`));
+    expect(errors).toEqual([]);
+});

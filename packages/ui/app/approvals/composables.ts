@@ -18,7 +18,7 @@ import { createPoller } from '../polling/module.ts';
 import { asApiError } from '../api/helpers.ts';
 import { INBOX_PAGE_SIZE, INBOX_POLL_MS } from './constants.ts';
 import { clearResumeToken, decodeResumeToken } from './helpers.ts';
-import type { AnswerResult } from './types.ts';
+import type { AnswerResult, ApprovalLink } from './types.ts';
 
 function reasonOf(reason: string | undefined): { reason?: string } {
     const trimmed = reason?.trim();
@@ -126,5 +126,59 @@ export function useDeepLinkApproval(client: IApiClient, token: Ref<string | unde
         error,
         claims,
         answer,
+    };
+}
+
+/**
+ * The run a token-less approval link (`?run=&approval=`) names, loaded
+ * with `getRun` (steps dropped) when the link changes, on `refresh()` and
+ * whenever `reload` changes (the view passes the inbox's runs, so the
+ * link follows every inbox poll). `link` is the given link with the
+ * approval pinned: a link without one keeps the approval the run waited
+ * on when first loaded, so answering it never jumps to the run's next
+ * approval. A failed reload keeps the run loaded earlier.
+ */
+export function useLinkedApproval(client: IApiClient, target: Ref<ApprovalLink | undefined>, reload?: Ref<unknown>) {
+    const run = shallowRef<RunWire>();
+    const error = shallowRef<ApiError>();
+    const pinned = shallowRef<string>();
+    let generation = 0;
+
+    const link = computed<ApprovalLink | undefined>(() => {
+        if (!target.value) return undefined;
+        const approvalId = target.value.approvalId ?? pinned.value;
+        return approvalId ? { runId: target.value.runId, approvalId } : { runId: target.value.runId };
+    });
+
+    async function load(): Promise<void> {
+        const { value } = target;
+        const current = ++generation;
+        if (!value) return;
+        try {
+            const detail: Partial<RunDetail> = { ...await client.getRun(value.runId) };
+            delete detail.steps;
+            if (current !== generation) return;
+            run.value = detail as RunWire;
+            error.value = undefined;
+            if (!value.approvalId && !pinned.value) pinned.value = run.value.waiting?.approvalId;
+        } catch (e) {
+            if (current !== generation) return;
+            error.value = asApiError(e);
+        }
+    }
+
+    watch(() => [target.value?.runId, target.value?.approvalId], () => {
+        run.value = undefined;
+        error.value = undefined;
+        pinned.value = undefined;
+        void load();
+    }, { immediate: true });
+    if (reload) watch(reload, () => { void load(); });
+
+    return {
+        run,
+        error,
+        link,
+        refresh: load,
     };
 }

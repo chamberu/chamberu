@@ -8,12 +8,18 @@
 
 import { useToast } from '@vuecs/overlays';
 import { computed, inject, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { useAgents } from '../agents/composables.ts';
 import type { RunWire } from '../api/types.ts';
-import { useApprovals, useDeepLinkApproval } from '../approvals/composables.ts';
+import { useApprovals, useDeepLinkApproval, useLinkedApproval } from '../approvals/composables.ts';
 import { INBOX, INBOX_POLL_MS  } from '../approvals/constants.ts';
-import { pendingApprovals, readResumeToken } from '../approvals/helpers.ts';
+import {
+    linkNotice,
+    linkedApprovalState,
+    pendingApprovals,
+    readApprovalLink,
+    readResumeToken,
+} from '../approvals/helpers.ts';
 import type { AnswerResult, DecidedApproval } from '../approvals/types.ts';
 import { hasPermission } from '../auth/helpers.ts';
 import ApprovalCallout from '../components/approval-callout/ApprovalCallout.vue';
@@ -45,7 +51,28 @@ const canAnswer = (agent: string) => hasPermission(permissions.value, `agent:${a
 
 const decided = ref<DecidedApproval[]>([]);
 const busy = ref<string>();
-const linkRunId = computed(() => (token.value ? deepLink.claims.value?.runId : undefined));
+
+// the token-less link `?run=&approval=`; a pending resume token (#token=) takes the page
+const route = useRoute();
+const approvalLink = computed(() => (token.value ? undefined : readApprovalLink(route.query)));
+const linked = useLinkedApproval(client, approvalLink, inbox.runs);
+const linkedState = computed(() => (linked.link.value ?
+    linkedApprovalState({
+        link: linked.link.value,
+        run: linked.run.value,
+        error: linked.error.value,
+        decided: decided.value,
+        permissions: permissions.value,
+        now: Date.now(),
+    }) :
+    undefined));
+const linkedRun = computed(() => {
+    const state = linkedState.value;
+    return state?.kind === 'pending' || state?.kind === 'forbidden' ? state.run : undefined;
+});
+const notice = computed(() => (linkedState.value && linked.link.value ? linkNotice(linkedState.value, linked.link.value) : undefined));
+
+const linkRunId = computed(() => (token.value ? deepLink.claims.value?.runId : linkedRun.value?.id));
 const pending = computed(() => pendingApprovals(inbox.runs.value, decided.value, linkRunId.value));
 
 const MESSAGES: Record<AnswerResult, (approved: boolean) => string> = {
@@ -67,6 +94,7 @@ async function answer(run: RunWire, approved: boolean, reason: string): Promise<
             at: new Date().toISOString(),
         }, ...decided.value.filter((d) => d.run.id !== run.id)];
         toast.add({ title: `${MESSAGES[result](approved)} · run ${shortId(run.id)}`, color: result === 'answered' ? 'success' : 'warning' });
+        if (run.id === linked.link.value?.runId) void linked.refresh();
     } catch (e) {
         toast.add({
             title: 'The answer failed',
@@ -180,6 +208,39 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
         </div>
 
         <div
+            v-if="notice"
+            class="card notice link-notice"
+            role="status"
+            data-testid="link-notice"
+            :data-kind="linkedState?.kind"
+        >
+            <span
+                v-if="notice.status"
+                class="status"
+            >{{ notice.status }}</span>
+            <span>{{ notice.text }}</span>
+            <RouterLink
+                v-if="notice.runId"
+                class="mono"
+                :to="{ name: RouteName.RUN, params: { id: notice.runId } }"
+                data-testid="link-notice-run"
+            >
+                Open run {{ shortId(notice.runId) }}
+            </RouterLink>
+        </div>
+
+        <ApprovalCallout
+            v-if="linkedRun"
+            :key="`linked-${linkedRun.id}-${linkedRun.waiting?.approvalId}`"
+            :run="linkedRun"
+            :can-answer="linkedState?.kind === 'pending'"
+            :summary="summaryOf(linkedRun.agent)"
+            :busy="busy === linkedRun.id"
+            :highlight="linkedState?.kind === 'pending'"
+            @answer="(approved, reason) => answer(linkedRun!, approved, reason)"
+        />
+
+        <div
             v-if="inbox.error.value?.status === 403"
             class="card notice"
         >
@@ -240,7 +301,7 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
         />
 
         <div
-            v-if="!inbox.error.value && pending.length === 0 && !token"
+            v-if="!inbox.error.value && pending.length === 0 && !token && !linkedRun && !notice && linkedState?.kind !== 'loading'"
             class="card"
         >
             <EmptyState

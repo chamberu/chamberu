@@ -25,3 +25,32 @@ export type NotifiedLine = { text: string; warn: boolean };
 
 /** The ids a resume token names, for display only: the server verifies the token. */
 export type ResumeClaims = { runId: string; approvalId: string };
+
+/** A token-less approval link: `/approvals?run=<runId>&approval=<approvalId>` (approval optional). */
+export type ApprovalLink = { runId: string; approvalId?: string };
+
+/** Why a linked approval can no longer be answered here. */
+export type MovedOnReason = 'not-waiting' | 'other-approval' | 'expired';
+
+/** Where a linked approval stands for the signed-in principal. */
+export type LinkedApprovalState =    { kind: 'loading' } |
+    { kind: 'pending'; run: RunWire } |
+    { kind: 'forbidden'; run: RunWire } |
+    { kind: 'answered'; run: RunWire } |
+    {
+        kind: 'moved-on'; 
+        reason: MovedOnReason; 
+        run: RunWire 
+    } |
+    { kind: 'unreadable' } |
+    { kind: 'not-found' } |
+    { kind: 'failed'; message: string };
+
+/** The notice above the inbox for a linked approval that cannot be answered. */
+export type LinkNotice = {
+    /** 403 for a missing grant. */
+    status?: 403;
+    text: string;
+    /** The run to link to, when the principal can open it. */
+    runId?: string;
+};

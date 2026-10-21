@@ -6,7 +6,13 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { computed, ref } from 'vue';
+import {
+    computed,
+    nextTick,
+    onMounted,
+    ref,
+    watch,
+} from 'vue';
 import { RouterLink } from 'vue-router';
 import type { AgentWire, RunWire } from '../../api/types.ts';
 import { notifiedLine } from '../../approvals/helpers.ts';
@@ -24,6 +30,8 @@ const props = defineProps<{
     busy?: boolean;
     /** The run's agent (`GET /agents`), for its notifier; `undefined` while unknown. */
     summary?: AgentWire;
+    /** The approval a link opened: highlighted, scrolled into view and focused. */
+    highlight?: boolean;
 }>();
 
 const emit = defineEmits<{ answer: [approved: boolean, reason: string] }>();
@@ -35,14 +43,28 @@ function send(approved: boolean): void {
 
 const id = `reason-${props.run.id}`;
 const notified = computed(() => notifiedLine(props.run, props.summary));
+
+const root = ref<globalThis.HTMLElement>();
+async function reveal(): Promise<void> {
+    if (!props.highlight) return;
+    await nextTick();
+    root.value?.scrollIntoView({ block: 'center' });
+    root.value?.focus({ preventScroll: true });
+}
+onMounted(reveal);
+watch(() => props.highlight, reveal);
 </script>
 
 <template>
     <article
         v-if="run.waiting"
-        class="callout"
+        ref="root"
+        :class="['callout', { linked: highlight }]"
         data-testid="approval"
         :data-run="run.id"
+        :data-linked="highlight ? 'true' : undefined"
+        :tabindex="highlight ? -1 : undefined"
+        :aria-label="highlight ? `Linked approval: ${run.waiting.toolName}, run ${shortId(run.id)}` : undefined"
     >
         <div class="callout-head">
             <span class="callout-icon"><NavIcon name="hand" /></span>

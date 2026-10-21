@@ -80,7 +80,9 @@ Open `http://<host>/ui/` and sign in with a bearer token of the app.
 
 The 24 h figures are counted from the newest 100 runs (the API has no time filter) and read `100+` beyond.
 
-A notifier's deep link `/ui/approvals#token=<resume token>` opens the approval of that token (the fragment never reaches the server or a proxy log; `?token=` works too). The SPA moves the token out of the address bar before anything renders (into the tab's `sessionStorage`, kept across a sign-out so another principal can answer it, removed once answered or refused as spent) and answers it through `POST /resume`, so it works with only `agent:<name>:approve`.
+A notifier links an approval by run: `/ui/approvals?run=<runId>&approval=<approvalId>` (`approval` optional, then the run's current one). The link carries no token. Signed out, it goes through sign-in (token form or authup) and comes back to the same URL; signed in, the dashboard scrolls to that run's approval card, highlights and focuses it, and the answer goes through `POST /runs/:id/approve` as the signed-in principal. A run that no longer waits on that approval (answered, expired, moved on to another one) shows a notice linking the run; a principal without `agent:<name>:approve` (or unable to read the run) gets a 403 notice. The run page and the agent page link waiting runs the same way.
+
+The resume-token deep link `/ui/approvals#token=<resume token>` still opens the approval of that token (the fragment never reaches the server or a proxy log; `?token=` works too). The SPA moves the token out of the address bar before anything renders (into the tab's `sessionStorage`, kept across a sign-out so another principal can answer it, removed once answered or refused as spent) and answers it through `POST /resume`, so it works with only `agent:<name>:approve`.
 
 ## Sign-in
 

@@ -19,6 +19,7 @@ import {
     triggerChips,
 } from '../agents/helpers.ts';
 import type { StartRunResult } from '../api/types.ts';
+import { approvalLinkQuery } from '../approvals/helpers.ts';
 import { hasPermission } from '../auth/helpers.ts';
 import AgentRuns from '../components/agent-runs/AgentRuns.vue';
 import AgentStatePanel from '../components/agent-state/AgentStatePanel.vue';
@@ -366,7 +367,7 @@ function scheduleOf(trigger: string) {
                                 >
                                     <RouterLink
                                         class="aprow"
-                                        :to="{ name: RouteName.APPROVALS }"
+                                        :to="{ name: RouteName.APPROVALS, query: approvalLinkQuery(run) }"
                                     >
                                         <b>{{ run.waiting?.toolName }}</b>
                                         <span class="aprow-timer"><ExpiryCountdown :until="run.waiting!.expiresAt" /></span>

@@ -11,6 +11,7 @@ import { computed, onScopeDispose, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { useAgents } from '../agents/composables.ts';
 import { ApiError } from '../api/error.ts';
+import { approvalLinkQuery } from '../approvals/helpers.ts';
 import JsonBlock from '../components/json-block/JsonBlock.vue';
 import NavIcon from '../components/nav-icon/NavIcon.vue';
 import StatusChip from '../components/status-chip/StatusChip.vue';
@@ -224,7 +225,7 @@ async function onCancel(): Promise<void> {
                 </div>
                 <RouterLink
                     class="btn btn-sm"
-                    :to="{ name: RouteName.APPROVALS }"
+                    :to="{ name: RouteName.APPROVALS, query: approvalLinkQuery(run) }"
                 >
                     Open approvals
                 </RouterLink>

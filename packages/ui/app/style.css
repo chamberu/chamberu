@@ -526,6 +526,11 @@ table.t { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 
 .callout-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; padding: 12px 20px; background: var(--ch-sunken); border-top: 1px solid var(--ch-line); }
 .callout-foot p { font-size: 12.5px; color: var(--ch-muted); }
 .callout-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.callout.linked { border-color: var(--ch-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ch-accent) 28%, transparent), var(--ch-shadow-2); scroll-margin: 24px; }
+.callout.linked:focus { outline: none; }
+.callout.linked:focus-visible { box-shadow: var(--ch-ring), var(--ch-shadow-2); }
+.link-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: var(--ch-ink); }
+.link-notice .status { font: 500 12px/1 var(--ch-font-mono); color: var(--ch-accent); }
 .callout.decided { border-color: var(--ch-line); box-shadow: var(--ch-shadow-1); }
 .callout.decided .callout-head { background: var(--ch-surface); border-bottom: 0; }
 .callout.decided .callout-head::before { background: var(--ch-ok); }
