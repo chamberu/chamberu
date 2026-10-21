@@ -45,7 +45,12 @@ const id = `reason-${props.run.id}`;
             <div class="callout-title">
                 <h2>{{ run.waiting.toolName }}<StatusChip status="waiting" /></h2>
                 <p>
-                    {{ run.agent }}
+                    <RouterLink
+                        :to="{ name: RouteName.AGENT, params: { name: run.agent } }"
+                        data-testid="agent-link"
+                    >
+                        {{ run.agent }}
+                    </RouterLink>
                     · run
                     <RouterLink
                         class="mono"

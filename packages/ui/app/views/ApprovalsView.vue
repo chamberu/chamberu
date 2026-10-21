@@ -195,7 +195,12 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
                         />
                     </h2>
                     <p>
-                        {{ entry.run.agent }} · run
+                        <RouterLink
+                            :to="{ name: RouteName.AGENT, params: { name: entry.run.agent } }"
+                            data-testid="agent-link"
+                        >
+                            {{ entry.run.agent }}
+                        </RouterLink> · run
                         <RouterLink
                             class="mono"
                             :to="{ name: RouteName.RUN, params: { id: entry.run.id } }"

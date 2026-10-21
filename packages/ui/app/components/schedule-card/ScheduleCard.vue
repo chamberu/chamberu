@@ -7,7 +7,9 @@
  */
 
 import { computed } from 'vue';
+import { RouterLink } from 'vue-router';
 import type { RunWire, ScheduleWire } from '../../api/types.ts';
+import { RouteName } from '../../router/constants.ts';
 import { describeCron, formatFireTime } from '../../schedules/helpers.ts';
 import ExpiryCountdown from '../expiry-countdown/ExpiryCountdown.vue';
 import StatusChip from '../status-chip/StatusChip.vue';
@@ -31,7 +33,10 @@ const reading = computed(() => {
         data-testid="schedule"
     >
         <div class="sched-top">
-            <b><slot name="agent">{{ schedule.agent }}</slot></b>
+            <b><RouterLink
+                :to="{ name: RouteName.AGENT, params: { name: schedule.agent } }"
+                data-testid="agent-link"
+            >{{ schedule.agent }}</RouterLink></b>
             <span>{{ schedule.trigger }}</span>
         </div>
         <div class="sched-expr">

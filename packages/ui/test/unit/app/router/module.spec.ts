@@ -15,7 +15,7 @@ import { createUiRouter } from '../../../../app/router/module.ts';
 describe('createUiRouter', () => {
     it('resolves the named routes under uiBase', () => {
         const router = createUiRouter(DEV_CONFIG, [], createMemoryHistory('/ui'));
-        expect(router.resolve({ name: RouteName.RUNS }).href).toBe('/ui/');
+        expect(router.resolve({ name: RouteName.RUNS }).href).toBe('/ui/runs');
         expect(router.resolve({ name: RouteName.RUN, params: { id: 'abc' } }).href).toBe('/ui/runs/abc');
         expect(router.resolve({ name: RouteName.APPROVALS }).href).toBe('/ui/approvals');
         expect(router.resolve({ name: RouteName.AGENTS }).href).toBe('/ui/agents');
@@ -25,8 +25,6 @@ describe('createUiRouter', () => {
             params: { name: 'triage' }, 
             query: { tab: 'state' }, 
         }).href).toBe('/ui/agents/triage?tab=state');
-        expect(router.resolve({ name: RouteName.STATE }).href).toBe('/ui/state');
-        expect(router.resolve({ name: RouteName.STATE, params: { agent: 'triage' } }).href).toBe('/ui/state/triage');
         expect(router.resolve({ name: RouteName.SCHEDULES }).href).toBe('/ui/schedules');
         expect(router.resolve({ name: RouteName.LOGIN }).href).toBe('/ui/login');
         expect(router.resolve({ name: RouteName.LOGIN_CALLBACK }).href).toBe('/ui/login/callback');
@@ -43,9 +41,15 @@ describe('createUiRouter', () => {
         expect(router.currentRoute.value.name).toBe(RouteName.SCHEDULES);
     });
 
-    it('sends an unknown path to the runs list', async () => {
+    it('opens on the agents overview and sends an unknown path there', async () => {
         const router = createUiRouter(DEV_CONFIG, [], createMemoryHistory('/ui'));
+        await router.push('/');
+        expect(router.currentRoute.value.name).toBe(RouteName.AGENTS);
         await router.push('/nope/x');
-        expect(router.currentRoute.value.name).toBe(RouteName.RUNS);
+        expect(router.currentRoute.value.name).toBe(RouteName.AGENTS);
+        // the state page moved into the agent page
+        await router.push('/state/triage');
+        expect(router.currentRoute.value.name).toBe(RouteName.AGENTS);
+        expect(Object.values(RouteName)).not.toContain('state');
     });
 });

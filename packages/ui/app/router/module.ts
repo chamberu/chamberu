@@ -31,8 +31,9 @@ export function createUiRouter(config: UiConfig, guards: NavigationGuard[] = [],
                 component: () => import('../views/LoginCallbackView.vue'),
                 meta: { public: true },
             },
+            { path: '/', redirect: { name: RouteName.AGENTS } },
             {
-                path: '/',
+                path: '/runs',
                 name: RouteName.RUNS,
                 component: () => import('../views/RunsView.vue'),
             },
@@ -57,16 +58,11 @@ export function createUiRouter(config: UiConfig, guards: NavigationGuard[] = [],
                 component: () => import('../views/ApprovalsView.vue'),
             },
             {
-                path: '/state/:agent?',
-                name: RouteName.STATE,
-                component: () => import('../views/StateView.vue'),
-            },
-            {
                 path: '/schedules',
                 name: RouteName.SCHEDULES,
                 component: () => import('../views/SchedulesView.vue'),
             },
-            { path: '/:rest(.*)*', redirect: { name: RouteName.RUNS } },
+            { path: '/:rest(.*)*', redirect: { name: RouteName.AGENTS } },
         ],
     });
     for (const guard of guards) router.beforeEach(guard);

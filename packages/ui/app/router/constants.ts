@@ -13,7 +13,6 @@ export const RouteName = {
     RUNS: 'runs',
     RUN: 'run',
     APPROVALS: 'approvals',
-    STATE: 'state',
     SCHEDULES: 'schedules',
 } as const;
 

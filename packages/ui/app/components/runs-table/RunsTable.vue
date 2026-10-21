@@ -7,7 +7,7 @@
  */
 
 import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import type { AgentWire, RunPage, RunWire } from '../../api/types.ts';
 import { RouteName } from '../../router/constants.ts';
 import { RUN_LIST_PAGE_SIZE } from '../../runs/constants.ts';
@@ -24,7 +24,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ page: [offset: number] }>();
-defineSlots<{ empty?: () => unknown; agent?: (props: { run: RunWire }) => unknown }>();
+defineSlots<{ empty?: () => unknown }>();
 
 const router = useRouter();
 
@@ -100,12 +100,13 @@ const row = (value: unknown) => value as RunWire;
                     </div>
                 </template>
                 <template #cell-agent="{ row: value }">
-                    <slot
-                        name="agent"
-                        :run="row(value)"
+                    <RouterLink
+                        :to="{ name: RouteName.AGENT, params: { name: row(value).agent } }"
+                        data-testid="agent-link"
+                        @click.stop
                     >
                         {{ row(value).agent }}
-                    </slot>
+                    </RouterLink>
                     <div class="sub">
                         {{ row(value).trigger.trigger }}
                     </div>

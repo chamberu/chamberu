@@ -68,7 +68,7 @@ describe('auth guard', () => {
         const { router, meCalls } = setup(storage);
         await router.push('/schedules');
         await router.push('/approvals');
-        await router.push('/');
+        await router.push('/runs');
         expect(router.currentRoute.value.name).toBe(RouteName.RUNS);
         expect(meCalls()).toBe(1);
     });

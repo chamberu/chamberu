@@ -141,7 +141,12 @@ async function onCancel(): Promise<void> {
                     <div>
                         <dt>agent</dt>
                         <dd data-testid="run-agent">
-                            {{ run.agent }}
+                            <RouterLink
+                                :to="{ name: RouteName.AGENT, params: { name: run.agent } }"
+                                data-testid="agent-link"
+                            >
+                                {{ run.agent }}
+                            </RouterLink>
                         </dd>
                     </div>
                     <div>

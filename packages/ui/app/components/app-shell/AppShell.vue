@@ -33,6 +33,12 @@ const colorMode = useColorMode();
 
 const items = [
     {
+        name: RouteName.AGENTS,
+        label: 'Agents',
+        icon: 'agents',
+        also: [RouteName.AGENT],
+    },
+    {
         name: RouteName.RUNS,
         label: 'Runs',
         icon: 'runs',
@@ -42,12 +48,6 @@ const items = [
         name: RouteName.APPROVALS,
         label: 'Approvals',
         icon: 'approvals',
-        also: [],
-    },
-    {
-        name: RouteName.STATE,
-        label: 'Agent state',
-        icon: 'state',
         also: [],
     },
     {
