@@ -24,12 +24,16 @@ async function signOut(): Promise<void> {
 </script>
 
 <template>
-    <RouterView v-if="bare" />
-    <AppShell
-        v-else
-        :principal="session.principal.value"
-        @sign-out="signOut"
-    >
-        <RouterView />
-    </AppShell>
+    <VCToastProvider>
+        <RouterView v-if="bare" />
+        <AppShell
+            v-else
+            :principal="session.principal.value"
+            @sign-out="signOut"
+        >
+            <RouterView />
+        </AppShell>
+        <VCToaster position="bottom-right" />
+    </VCToastProvider>
+    <VCAlertDialogProvider />
 </template>

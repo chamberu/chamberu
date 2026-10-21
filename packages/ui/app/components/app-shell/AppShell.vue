@@ -93,8 +93,13 @@ const grants = computed(() => {
                 </RouterLink>
             </nav>
             <div class="who">
-                <VCAvatar class="avatar">
-                    <VCAvatarFallback>{{ initials }}</VCAvatarFallback>
+                <VCAvatar
+                    class="avatar"
+                    :alt="displayName"
+                >
+                    <template #fallback>
+                        {{ initials }}
+                    </template>
                 </VCAvatar>
                 <div class="who-text">
                     <div
@@ -105,7 +110,7 @@ const grants = computed(() => {
                     </div>
                     <div
                         class="muted mono"
-                        style="font-size: 11px"
+                        style="font-size: 11px; white-space: nowrap"
                     >
                         {{ grants }}
                     </div>
