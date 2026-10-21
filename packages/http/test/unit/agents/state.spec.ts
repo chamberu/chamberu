@@ -74,6 +74,51 @@ describe('state kv', () => {
     });
 });
 
+describe('state kv listing', () => {
+    const LIST = '/agents/intake/state/kv';
+
+    it('lists kv entries in key order with a page', async () => {
+        const { app, store } = setup();
+        await store.kvSet('intake', 'b', 2);
+        await store.kvSet('intake', 'B', 'upper');
+        await store.kvSet('intake', 'a', { n: 1 });
+        await store.kvSet('echo', 'x', true);
+
+        const all = await call(app, 'GET', LIST, { token: tokenFor('state:read') });
+        expect(all.status).toBe(200);
+        expect(await all.json()).toEqual({
+            data: [
+                { key: 'B', value: 'upper' },
+                { key: 'a', value: { n: 1 } },
+                { key: 'b', value: 2 },
+            ],
+        });
+
+        const page = await call(app, 'GET', `${LIST}?page[limit]=1&page[offset]=1`, { token: tokenFor('state:read') });
+        expect(await page.json()).toEqual({ data: [{ key: 'a', value: { n: 1 } }] });
+    });
+
+    it('403 without state:read', async () => {
+        const { app } = setup();
+        expect((await call(app, 'GET', LIST, { token: READER_TOKEN })).status).toBe(403);
+    });
+
+    it('404 for an unknown agent', async () => {
+        const { app } = setup();
+        expect((await call(app, 'GET', '/agents/nope/state/kv', { token: ADMIN_TOKEN })).status).toBe(404);
+    });
+
+    it.each([
+        'page[limit]=101',
+        'page[offset]=-1',
+        'filter[key]=a',
+        'sort=key',
+    ])('400 for %s', async (query) => {
+        const { app } = setup();
+        expect((await call(app, 'GET', `${LIST}?${query}`, { token: ADMIN_TOKEN })).status).toBe(400);
+    });
+});
+
 describe('state collections', () => {
     async function seeded() {
         const ctx = setup();

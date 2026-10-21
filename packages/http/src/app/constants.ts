@@ -41,6 +41,7 @@ export const RESERVED_ROUTE_SEGMENTS: readonly string[] = [
     'healthz',
     'hooks',
     'mcp',
+    'me',
     'readyz',
     'resume',
     'runs',

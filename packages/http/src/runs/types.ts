@@ -30,6 +30,8 @@ export type RunListQuery = {
     status?: RunStatusLiteral[];
     limit: number;
     offset: number;
+    /** `sort=createdAt` (default) or `sort=-createdAt`. */
+    order: 'asc' | 'desc';
 };
 
 /** Body of `POST /agents/:name/runs`; internal. */
@@ -39,6 +41,14 @@ export type StartRunBody = {
     thread?: string;
     /** Decoded from base64 by the validator; unknown item keys are dropped by the route. */
     attachments?: ArtifactInput[];
+};
+
+/** Body of `POST /runs/:id/approve`. */
+export type ApproveBody = {
+    /** The wait point being answered; another one than the run's current is 409. */
+    approvalId: string;
+    approved: boolean;
+    reason?: string;
 };
 
 /** Body of `POST /resume`; internal. */

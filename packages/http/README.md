@@ -114,19 +114,22 @@ Paths are relative to `basePath` (default none).
 | `GET /runs/:id/artifacts` | as `GET /runs/:id` | `200 { data: Artifact[] }`: the run's attachments and the files its tools stored |
 | `GET /runs/:id/artifacts/:artifactId` | as `GET /runs/:id` | `200` the bytes: stored media type, `content-disposition: attachment` (RFC 5987 `filename*` when named), `nosniff`, `private, no-store`; `404 artifact_not_found` for an unknown artifact or one of another run |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
+| `POST /runs/:id/approve` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ approvalId, approved, reason? }`; answers the run's current wait point without a token (409 for another `approvalId`, an expired wait point or a run not waiting) |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
 | `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }`; the whole body is the payload |
 | `GET /agents` | `run:read` | `200 { data: AgentSummary[] }`: triggers (with each webhook's `hook` path), budget, approvals, state collections |
 | `GET /schedules` | `run:read` | `200 { data: ScheduleSummary[] }`: every `cron()` trigger with its next fire time (from the definitions, not from a running scheduler) |
+| `GET /agents/:name/state/kv` | `state:read` | `200 { data: Array<{ key, value }> }` in key code-point order; `page[limit]` (default 50, at most 100), `page[offset]` |
 | `GET /agents/:name/state/kv/:key` | `state:read` | `200 { key, value }` (`null` when unset) |
 | `PATCH /agents/:name/state/kv/:key` | `state:write` | `200 { key, value }`; body `{ value }` |
 | `GET /agents/:name/state/collections/:collection` | `state:read` | `200 { data }`, each document `{ id, ...fields }` (a non-object document as `{ id, doc }`); top-level equality filters (`filter[status]=open`; rapiq turns `42`, `007`, `true` and `null` into a number, boolean or null, so double-quote a value to match it as a string: `filter[issue]="42"`), `page[limit]`; `id` is the store id, not a document field, so `filter[id]` is 400; a `page[offset]` above 0 is 400 (the store pages by limit only) |
+| `GET /me` | authenticated | `200 { id, kind, name?, permissions }`: the caller itself (the name as an invoker records it), with its own permissions only |
 | `/mcp` | authenticated | The MCP endpoint (see [MCP tools](#mcp-tools)) |
 | `GET /healthz` | none | `200 { status: 'ok' }` |
 | `GET /readyz` | none | `200`, or `503 { status: 'unavailable', reason }` with `shutting-down`, `draining` or `store-unreachable` |
 | `GET /metrics` | none | Prometheus text format |
 
-`GET /runs` takes the [rapiq](https://www.npmjs.com/package/@rapiq/codec-url) URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]=20` (default 50, at most 100), `page[offset]=40` and `sort=createdAt` (the only order, oldest first). The expression dialect works too (`filter=eq(agent,'triage')`); only filters joined with `and` are supported. Unknown keys, operators and sorts answer 400.
+`GET /runs` takes the [rapiq](https://www.npmjs.com/package/@rapiq/codec-url) URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]=20` (default 50, at most 100), `page[offset]=40` and `sort=createdAt` (oldest first, the default) or `sort=-createdAt` (newest first). The expression dialect works too (`filter=eq(agent,'triage')`); only filters joined with `and` are supported. Unknown keys, operators and sorts answer 400.
 
 Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413 above, 415 for another media type). A refused body is drained (at most `bodyLimit` more bytes) so a keep-alive connection serves the next request; a longer one closes the connection. A protected route checks the bearer token before it reads the body, so an unauthenticated client cannot make the server buffer it. Unknown body keys are dropped without an error. A NUL character (U+0000, which Postgres text columns refuse) in the URL, in an `idempotencyKey`, `thread` or other string field, or in a key a webhook derives from its payload answers 400.
 
@@ -134,7 +137,7 @@ Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413
 
 `GET /runs/:id` answers 404 before 403, so any authenticated principal can tell whether a run id exists; run ids are random UUIDs. Runs on the wire never carry the internal `claim` (owner and lease).
 
-`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`: `id`, `kind`, `permissions`, and a `name` from the `name` or `preferred_username` claim, never `email`, since every reader of the run sees it; static tokens have none), so tool code and a core `toolPolicy` can tell who started the run. `POST /resume` and MCP `resume_run` record the approver on the `wait` step (`output.approver`). Both come only from the authenticator, never from a body. Webhook runs have no invoker. The invoker and approver leave the package (REST, SSE, MCP) without their `permissions`, so a `run:read` holder never learns another principal's grants.
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`: `id`, `kind`, `permissions`, and a `name` from the `name` or `preferred_username` claim, never `email`, since every reader of the run sees it; static tokens have none), so tool code and a core `toolPolicy` can tell who started the run. `POST /runs/:id/approve`, `POST /resume` and MCP `resume_run` record the approver on the `wait` step (`output.approver`). Both come only from the authenticator, never from a body. Webhook runs have no invoker. The invoker and approver leave the package (REST, SSE, MCP) without their `permissions`, so a `run:read` holder never learns another principal's grants.
 
 The SSE stream follows the run through `engine.on` and polls the store every `stream.pollMs` (default 2 s), so it also sees a run executing on another replica. `delta` events (`data: { step, kind: 'text' | 'reasoning', text }`) forward the engine's `run.delta` while the model writes (`step` is the checkpoint step index of the `llm` step being generated (one per model call), not the `step.appended` `id`, which also counts `tool` and `wait` rows); they have no `id` (`Last-Event-ID` stays a step index), are never replayed and come only from the replica executing the run. `Last-Event-ID` resumes after a step index; the query `?after=<step index>` does the same for clients that cannot set the header (a non-negative integer, given once, else 400). When both are present a valid `Last-Event-ID` wins, since it carries the client's progress on a reconnect while the URL stays the one of the first connect; a malformed `Last-Event-ID` reads as absent and `?after` applies.
 
@@ -147,7 +150,7 @@ Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`
 | Permission | Grants |
 |---|---|
 | `agent:<name>:run` | Start runs of the agent (REST, webhooks, MCP `run_<name>`) and read them |
-| `agent:<name>:approve` | Answer the agent's approvals (`POST /resume`, MCP `resume_run`) |
+| `agent:<name>:approve` | Answer the agent's approvals (`POST /runs/:id/approve`, `POST /resume`, MCP `resume_run`) |
 | `run:read` | Read and list every run, the agents and the schedules |
 | `run:cancel` | Cancel runs |
 | `state:read`, `state:write` | Read and write agent state |
@@ -155,7 +158,7 @@ Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`
 
 A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:run` but not `agent:triage:approve`, and `agent:*` grants neither. Matching is case-sensitive. `agentPermission(agent, action)` is exported; to check a principal yourself, use `hasPermission(principal.permissions, permission)` from `@chamvi/core`, the matcher the routes use.
 
-`POST /resume` needs authentication **and** the approve permission: the resume token alone is not enough. The token's signature and expiry are checked before any store lookup (a forged or expired token answers 400 without touching the store).
+`POST /resume` needs authentication **and** the approve permission: the resume token alone is not enough. The token's signature and expiry are checked before any store lookup (a forged or expired token answers 400 without touching the store). `POST /runs/:id/approve { approvalId, approved, reason? }` answers the current wait point without a token, with the approve permission alone; another `approvalId` than the run's current one, an expired wait point or a run that is not waiting is 409, and the notified token is spent either way.
 
 ## Authenticators
 
@@ -256,7 +259,7 @@ process.once('SIGTERM', () => {
 | `metrics` | `false \| Partial<PrometheusOptions>` | `/metrics` | `@routup/prometheus` options |
 | `readyTimeoutMs` | `number` | `2_000` | How long `/readyz` waits for the store |
 | `onError` | `(error) => void` | `console.error` | 5xx causes and background failures |
-| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamvi/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter |
+| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamvi/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter; `prefix: true` also serves every path below `path/` (the rest as `request.subpath`, raw and case kept; metrics label `<path>/*`; no other route of that method at or under it, never at or above the metrics path); a result may carry `headers` and a `Uint8Array` body (sent as is, `application/octet-stream` by default); the route context has `basePath` |
 
 `createShutdown(options)`:
 

@@ -44,12 +44,14 @@ import {
 } from '../request/validators.ts';
 import { KEY_MAX_LENGTH } from '../request/constants.ts';
 import {
+    APPROVAL_ID_MAX_LENGTH,
     ATTACHMENT_FILENAME_MAX_LENGTH,
     MAX_ATTACHMENTS,
     RESUME_REASON_MAX_LENGTH,
     RESUME_TOKEN_MAX_LENGTH,
 } from './constants.ts';
 import type {
+    ApproveBody,
     InvokerView,
     ResumeBody,
     RunListQuery,
@@ -212,6 +214,7 @@ export function parseRunListQuery(searchParams: URLSearchParams, agentNames: Ite
     const query: RunListQuery = {
         limit: decoded.limit ?? DEFAULT_PAGE_LIMIT,
         offset: decoded.offset ?? 0,
+        order: 'asc',
     };
     for (const filter of decoded.filters) {
         if (seen.has(filter.field)) {
@@ -223,9 +226,10 @@ export function parseRunListQuery(searchParams: URLSearchParams, agentNames: Ite
     }
 
     const [sort, ...others] = decoded.sorts;
-    if (others.length > 0 || (sort && (sort.name !== 'createdAt' || sort.operator !== 'ASC'))) {
-        throw new BadRequestError({ message: 'Only sort=createdAt is supported.' });
+    if (others.length > 0 || (sort && sort.name !== 'createdAt')) {
+        throw new BadRequestError({ message: 'Only sort=createdAt or sort=-createdAt is supported.' });
     }
+    if (sort?.operator === 'DESC') query.order = 'desc';
 
     return query;
 }
@@ -238,6 +242,32 @@ export function createResumeContainer(): Container<ResumeBody> {
     return container;
 }
 
+export function createApproveContainer(): Container<ApproveBody> {
+    const container = new Container<ApproveBody>();
+    container.mount('approvalId', isString({ min: 1, max: APPROVAL_ID_MAX_LENGTH }));
+    container.mount('approved', isBoolean());
+    container.mount('reason', { optional: true }, isString({ max: RESUME_REASON_MAX_LENGTH }));
+    return container;
+}
+
+/**
+ * A run the principal may answer approvals of: 404 for a missing run (no
+ * read permission needed), 403 without `agent:<agent>:approve`.
+ */
+export async function loadApprovableRun(ctx: HttpContext, principal: Principal, id: string): Promise<Run> {
+    const run = await ctx.store.getRun(id);
+    if (!run) throw new RunNotFoundError(id);
+    assertCanApprove(principal, run);
+    return run;
+}
+
+function assertCanApprove(principal: Principal, run: Run): void {
+    const permission = agentPermission(run.agent, 'approve');
+    if (!hasPermission(principal.permissions, permission)) {
+        throw new ForbiddenError({ message: `Missing permission "${permission}".` });
+    }
+}
+
 /**
  * The run a resume token answers, once the principal may approve for its
  * agent: the signature and expiry are checked before any store lookup
@@ -248,10 +278,6 @@ export async function resolveResumeTarget(ctx: HttpContext, principal: Principal
     const claims = ctx.engine.inspectResumeToken(token);
     const run = await ctx.store.getRun(claims.runId);
     if (!run) throw new InvalidResumeTokenError();
-
-    const permission = agentPermission(run.agent, 'approve');
-    if (!hasPermission(principal.permissions, permission)) {
-        throw new ForbiddenError({ message: `Missing permission "${permission}".` });
-    }
+    assertCanApprove(principal, run);
     return run;
 }

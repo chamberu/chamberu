@@ -31,3 +31,9 @@ Only `test/unit/**/*.{test,spec}.{js,ts}` is picked up; a new test directory nee
 - Every store implementation runs `describeStoreContract()` from `@chamvi/test-kit` (the `MemoryStore` run lives in `packages/test-kit/test/unit/memory-store.spec.ts`).
 - `test/unit/smoke.spec.ts` checks that the package entry resolves.
 - `test/unit/exports.spec.ts` pins the public exports; `test/unit/readme.spec.ts` runs `test/fixtures/readme-example.ts` and checks that the package's `README.md` contains that file verbatim. Change the example in the fixture, then copy it into the README.
+
+## Dashboard (`@chamvi/ui`)
+
+- `nx` runs `@chamvi/ui:test` after its build (`dependsOn: ["build"]`): `readme.spec.ts` serves the real `dist/app`. Running vitest by hand needs `npx nx run @chamvi/ui:build` first.
+- Unit tests live in `test/unit/routes/` (the route against `test/fixtures/build/`, a fake build with the config marker) and `test/unit/app/<module>/` (the SPA modules, in Node: fake `fetch` (`test/utils/fetch.ts`), fake client (`test/utils/client.ts`), in-memory `Storage` (`test/utils/storage.ts`), fake timers for the poller (`test/utils/timers.ts`), composables run inside `effectScope()`, routers on `createMemoryHistory`). The vitest config has the Vue plugin so a module that lazily imports a `.vue` file loads; `app/tsconfig.json` (vue-tsc) typechecks `test/unit/app`.
+- e2e: `npm run build && npm run test:e2e -w @chamvi/ui` (once: `npx playwright install chromium`). Playwright starts `node test/e2e/demo/server.ts` (type stripping, so Node >= 22.18 or 24; no `enum`, explicit `.ts` imports) on port 4173 against the built packages and reuses a running one outside CI. The specs fail on any console error, which is how a CSP violation shows up. `test/e2e/**` never runs under vitest (its `include` is `test/unit/**`).

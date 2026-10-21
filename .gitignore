@@ -18,3 +18,7 @@ docs/superpowers/
 # VitePress
 packages/docs/src/.vitepress/cache
 packages/docs/src/.vitepress/dist
+
+# Playwright
+packages/ui/test-results/
+packages/ui/playwright-report/

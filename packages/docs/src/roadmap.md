@@ -17,6 +17,7 @@ chamvi is built milestone by milestone, each defined by one real agent that has 
 | `@chamvi/notify-openclaw` | The OpenClaw notifier: approval requests into an OpenClaw chat through its hooks endpoint, with an `Idempotency-Key`. See [OpenClaw](/deployment/openclaw) |
 | `@chamvi/notify-github` | The GitHub notifier: approval requests as a comment on the run's issue or pull request, deduplicated by a hidden marker |
 | `@chamvi/coding` | Coding tools (`read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash`, `git_diff`) over a run's workspaces and the `ICodingBackend` contract |
+| `@chamvi/ui` | Vue 3 dashboard served by `uiRoutes()`: an agents overview, runs started from the agent page, runs with live steps, an approvals inbox, agent state, schedules |
 
 ## Milestones
 
@@ -41,7 +42,6 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 | Coding backend on the own tools | Planned (M1) | An `ICodingBackend` that runs the coding tools in a nested tool loop |
 | Workspace re-attach | Planned | A run resumed on another replica or after a restart finds its container or pod by label instead of a fresh workspace |
 | `@chamvi/coding-claude-code` | Planned (M3) | A coding backend that runs Claude Code inside the sandbox |
-| `@chamvi/ui` | Planned (M1) | Vue 3 dashboard: runs with live steps, approvals inbox, agent state, schedules |
 | `chamvi` (CLI and deploy kit) | Planned (M1) | Umbrella package with `createApp()` and the `dev`, `build`, `start`, `run-job` and `migrate` commands, plus a base image, a Helm chart and a template repository. See [Deployment](/deployment/) |
 | `@chamvi/mail` | Planned (M2) | IMAP connector and tools |
 

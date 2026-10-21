@@ -37,7 +37,7 @@ On shutdown, drain the engine before destroying the data source:
 | `chamvi_idempotency_keys` | Intake keys | PK `(scope, key)`; `expires_at` |
 | `chamvi_locks` | Keyed leases | PK `key`; `expires_at` |
 | `chamvi_effects` | Recorded effect results | PK `key` |
-| `chamvi_kv` | Agent key-value state | PK `(agent, key)` |
+| `chamvi_kv` | Agent key-value state | PK `(agent, key)`, `key` `COLLATE "C"` (migration `1792540800000-kv-key-collation.ts`) |
 | `chamvi_docs` | Agent document collections | PK `(agent, collection, id)`; GIN index on `doc` |
 | `chamvi_artifacts` | Artifact metadata and bytes (`data` `bytea`) | PK `id`; `run_id` |
 
@@ -71,4 +71,4 @@ Expired idempotency keys and locks never block anyone, but they stay in their ta
 - **Identifiers have length limits** (`MemoryStore` has none): run and artifact ids 128 characters; `concurrencyKey`, `thread`, claim owners, step names, document collections and document ids 255; idempotency, lock, effect and state keys 512; idempotency scopes 1024 (`<agent>:<source>:<kind>:<id>` with the invoker URI-encoded, leaving about 950 characters for the encoded `kind` and `id`). A longer value makes the write fail with the driver's `value too long` error, so validate user-supplied keys before they reach `dispatch` (a rejected run with an `idempotencyKey` keeps its key reserved until the key expires).
 - **`null` in an optional property reads back as absent:** a run `output` of `null`, and a step `input`, `output` or `error` of `null`, are stored as SQL `NULL`. `putEffect(key, undefined)` reads back `{ result: null }` and `docUpsert(..., undefined)` reads back `doc: null`.
 - **`docList` `where` uses `jsonb` containment (`@>`).** Primitive values match by top-level equality; a nested object or array matches by containment, where `MemoryStore` never matches. A key whose value is `undefined` matches documents that lack the key, as in `MemoryStore`. Documents come back ordered by `id`, not by insertion.
-- **`listRuns` ties** on `createdAt` are broken by the byte order of `id` (`COLLATE "C"`, so `'B' < 'a'`); identical to `MemoryStore` for lowercase ids and UUIDs.
+- **`listRuns` ties** on `createdAt` are broken by the byte order of `id` (`COLLATE "C"`, so `'B' < 'a'`, reversed for `order: 'desc'`); identical to `MemoryStore` for lowercase ids and UUIDs.

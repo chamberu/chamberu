@@ -197,6 +197,15 @@ describe('error handler', () => {
             message: 'The requested route does not exist.',
         });
     });
+
+    it('reads a basePath of "/" as no prefix', async () => {
+        const { app } = createTestApp({ basePath: '/' });
+        expect((await call(app, 'GET', '/healthz')).status).toBe(200);
+    });
+
+    it.each(['api', '/api/:id', '/a b', '/api//v1'])('refuses the basePath %j', (basePath) => {
+        expect(() => createTestApp({ basePath })).toThrow(InvalidAgentDefinitionError);
+    });
 });
 
 describe('createHttpApp', () => {

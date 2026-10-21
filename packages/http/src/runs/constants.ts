@@ -8,6 +8,9 @@
 /** Longest resume token `POST /resume` reads. */
 export const RESUME_TOKEN_MAX_LENGTH = 4_096;
 
+/** Longest `approvalId` `POST /runs/:id/approve` reads. */
+export const APPROVAL_ID_MAX_LENGTH = 255;
+
 /** Longest approval `reason`. */
 export const RESUME_REASON_MAX_LENGTH = 1_000;
 

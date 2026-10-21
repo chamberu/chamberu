@@ -12,7 +12,7 @@ import type { IClock } from '../../clock/index.ts';
 import { InvalidRunStateError, RunNotFoundError } from '../../errors/index.ts';
 import type { Checkpoint, Run, Step } from '../../run/types.ts';
 import type { IStore } from '../types.ts';
-import { copy } from './helpers.ts';
+import { compareCodePoints, copy } from './helpers.ts';
 import type { Expiring } from './types.ts';
 
 /**
@@ -94,12 +94,14 @@ export class MemoryStore implements IStore {
         concurrencyKey?: string;
         limit?: number;
         offset?: number;
+        order?: 'asc' | 'desc';
     }): Promise<{ data: Run[]; total: number }> {
+        const direction = q.order === 'desc' ? -1 : 1;
         const matched = this.runs.values().toArray()
             .filter((r) => (q.agent === undefined || r.agent === q.agent) &&
                 (q.status === undefined || q.status.includes(r.status)) &&
                 (q.concurrencyKey === undefined || r.concurrencyKey === q.concurrencyKey))
-            .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id, 'en'));
+            .sort((a, b) => direction * (a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id, 'en')));
         const offset = q.offset ?? 0;
         const end = q.limit === undefined ? undefined : offset + q.limit;
         return { data: matched.slice(offset, end).map((r) => copy(r)), total: matched.length };
@@ -193,7 +195,22 @@ export class MemoryStore implements IStore {
     }
 
     async kvSet(agent: string, key: string, value: unknown): Promise<void> {
+        if (value === undefined) {
+            this.kv.delete(`${agent}\u0000${key}`);
+            return;
+        }
         this.kv.set(`${agent}\u0000${key}`, copy(value));
+    }
+
+    async kvList(agent: string, q: { limit?: number; offset?: number } = {}): Promise<Array<{ key: string; value: unknown }>> {
+        const prefix = `${agent}\u0000`;
+        const entries = this.kv.entries().toArray()
+            .filter(([id]) => id.startsWith(prefix))
+            .map(([id, value]) => ({ key: id.slice(prefix.length), value }))
+            .sort((a, b) => compareCodePoints(a.key, b.key));
+        const offset = q.offset ?? 0;
+        const end = q.limit === undefined ? undefined : offset + q.limit;
+        return entries.slice(offset, end).map((entry) => ({ key: entry.key, value: copy(entry.value) }));
     }
 
     async docList(

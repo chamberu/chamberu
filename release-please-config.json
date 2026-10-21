@@ -16,7 +16,8 @@
         "packages/sandbox-local": {"component": "sandbox-local"},
         "packages/scheduler": {"component": "scheduler"},
         "packages/store-typeorm": {"component": "store-typeorm"},
-        "packages/test-kit": {"component": "test-kit"}
+        "packages/test-kit": {"component": "test-kit"},
+        "packages/ui": {"component": "ui"}
     },
     "plugins": [
         {

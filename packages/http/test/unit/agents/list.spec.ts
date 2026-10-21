@@ -48,6 +48,12 @@ describe('GET /agents', () => {
         expect(data[1].triggers[0].hook).toBe('/api/hooks/intake/issues');
     });
 
+    it('builds the hook path from a basePath given with a trailing slash', async () => {
+        const { app } = createTestApp({ agents: inventoryAgents(), basePath: '/api/' });
+        const { data } = await (await call(app, 'GET', '/api/agents', { token: READER_TOKEN })).json();
+        expect(data[1].triggers[0].hook).toBe('/api/hooks/intake/issues');
+    });
+
     it('needs run:read', async () => {
         const { app } = createTestApp({ agents: inventoryAgents() });
         expect((await call(app, 'GET', '/agents', { token: tokenFor() })).status).toBe(403);

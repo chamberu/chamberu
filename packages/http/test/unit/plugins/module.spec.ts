@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { HttpRoute } from '@chamvi/http';
 import type { App, IAppEvent } from 'routup';
 import { isOperationalPath, isStreamRequest, routeLabel } from '../../../src/plugins/helpers.ts';
 import {
@@ -78,8 +79,11 @@ describe('metrics', () => {
         for (let i = 0; i < 5; i++) {
             await send(app, `/api/runs/${crypto.randomUUID()}`, { token: ADMIN_TOKEN });
             await send(app, `/api/runs/${crypto.randomUUID()}/cancel`, { method: 'POST' });
+            await send(app, `/api/runs/${crypto.randomUUID()}/approve`, { method: 'POST' });
             await send(app, `/api/nope/${crypto.randomUUID()}`);
             await send(app, `/api/agents/echo/state/kv/k${i}`, { token: ADMIN_TOKEN });
+            await send(app, '/api/agents/echo/state/kv', { token: ADMIN_TOKEN });
+            await send(app, '/api/me', { token: ADMIN_TOKEN });
             await send(app, `/api/hooks/hooked/x${i}/y`, { method: 'POST' });
             await send(app, `/api/runs/${crypto.randomUUID()}/artifacts`, { token: ADMIN_TOKEN });
             await send(app, `/api/runs/${crypto.randomUUID()}/artifacts/${crypto.randomUUID()}`, { token: ADMIN_TOKEN });
@@ -87,9 +91,12 @@ describe('metrics', () => {
         const labels = pathLabels(await (await send(app, '/api/metrics')).text());
         expect([...labels].sort()).toEqual([
             '/_unmatched',
+            '/agents/:name/state/kv',
             '/agents/:name/state/kv/:key',
             '/hooks/:agent/*',
+            '/me',
             '/runs/:id',
+            '/runs/:id/approve',
             '/runs/:id/artifacts',
             '/runs/:id/artifacts/:artifactId',
             '/runs/:id/cancel',
@@ -187,6 +194,31 @@ describe('rate limit', () => {
         for (let i = 0; i < 3; i++) expect((await send(app, '/api/healthz')).status).toBe(200);
     });
 
+    it('skips health under a basePath given with a trailing slash', async () => {
+        const { app } = createTestApp({ rateLimit: { max: 1 }, basePath: '/api/' });
+        for (let i = 0; i < 3; i++) expect((await send(app, '/api/healthz')).status).toBe(200);
+    });
+
+    it('skips the limiter for every path of an unlimited prefix route', async () => {
+        const { app } = createTestApp({
+            rateLimit: { max: 1 },
+            basePath: '/api',
+            routes: [{
+                method: 'GET',
+                path: '/ui',
+                prefix: true,
+                rateLimit: false,
+                handler: async () => ({ status: 200, body: 'ok' }),
+            }],
+        });
+        for (let i = 0; i < 3; i++) {
+            expect((await send(app, '/api/ui')).status).toBe(200);
+            expect((await send(app, `/api/UI/assets/a${i}.js`)).status).toBe(200);
+        }
+        expect((await send(app, '/api/agents', { token: ADMIN_TOKEN })).status).toBe(200);
+        expect((await send(app, '/api/agents', { token: ADMIN_TOKEN })).status).toBe(429);
+    });
+
     it('is off with rateLimit: false', async () => {
         const { app } = createTestApp({ rateLimit: false });
         for (let i = 0; i < 10; i++) expect((await send(app, '/agents', { token: ADMIN_TOKEN })).status).toBe(200);
@@ -210,21 +242,38 @@ describe('rate limit', () => {
 });
 
 describe('route labels', () => {
+    const extra = (path: string, prefix?: true): HttpRoute => ({
+        method: 'POST',
+        path,
+        ...(prefix ? { prefix } : {}),
+        handler: async () => ({ status: 204 }),
+    });
+
     it('labels an extra route by its path', () => {
         const event = { method: 'POST', path: '/webhooks/github' } as IAppEvent;
-        expect(routeLabel(event, '', '/metrics', ['/webhooks/github'])).toBe('/webhooks/github');
+        expect(routeLabel(event, '', '/metrics', [extra('/webhooks/github')])).toBe('/webhooks/github');
         expect(routeLabel(event, '', '/metrics', [])).toBe('/_unmatched');
     });
 
     it('labels an extra route under basePath', () => {
         const event = { method: 'POST', path: '/api/webhooks/github' } as IAppEvent;
-        expect(routeLabel(event, '/api', '/metrics', ['/webhooks/github'])).toBe('/webhooks/github');
+        expect(routeLabel(event, '/api', '/metrics', [extra('/webhooks/github')])).toBe('/webhooks/github');
+    });
+
+    it('labels a prefix route <path>/*', () => {
+        const label = (path: string) => routeLabel({ method: 'GET', path } as IAppEvent, '/api', '/metrics', [extra('/ui', true)]);
+        expect(label('/api/ui')).toBe('/ui/*');
+        expect(label('/api/ui/')).toBe('/ui/*');
+        expect(label('/api/UI/assets/app-1.js')).toBe('/ui/*');
+        expect(label('/api/uix')).toBe('/_unmatched');
+        // a plain route matches its path only
+        expect(routeLabel({ method: 'GET', path: '/api/ui/x' } as IAppEvent, '/api', '/metrics', [extra('/ui')])).toBe('/_unmatched');
     });
 
     it('labels a path in another case like routup matches it', () => {
-        const label = (path: string, basePath = '', extra: string[] = []) => routeLabel({ method: 'POST', path } as IAppEvent, basePath, '/metrics', extra);
-        expect(label('/Webhooks/GitHub', '', ['/webhooks/github'])).toBe('/webhooks/github');
-        expect(label('/API/webhooks/github', '/api', ['/webhooks/github'])).toBe('/webhooks/github');
+        const label = (path: string, basePath = '', routes: HttpRoute[] = []) => routeLabel({ method: 'POST', path } as IAppEvent, basePath, '/metrics', routes);
+        expect(label('/Webhooks/GitHub', '', [extra('/webhooks/github')])).toBe('/webhooks/github');
+        expect(label('/API/webhooks/github', '/api', [extra('/webhooks/github')])).toBe('/webhooks/github');
         expect(label('/RUNS/abc')).toBe('/runs/:id');
         expect(label('/HEALTHZ')).toBe('/healthz');
     });

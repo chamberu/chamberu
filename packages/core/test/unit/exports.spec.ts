@@ -5,7 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { describe, expect, it } from 'vitest';
+import {
+    describe,
+    expect,
+    expectTypeOf,
+    it,
+} from 'vitest';
 import * as core from '@chamvi/core';
 
 describe('public api', () => {
@@ -58,5 +63,9 @@ describe('public api', () => {
 
     it('exports the RunStatus enum', () => {
         expect(core.RunStatus.QUEUED).toBe('queued');
+    });
+
+    it('exports the ApprovalAnswer type', () => {
+        expectTypeOf<core.ApprovalAnswer>().toEqualTypeOf<core.ResumeDecision & { approvalId: string }>();
     });
 });

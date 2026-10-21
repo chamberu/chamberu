@@ -28,7 +28,7 @@
 
 ---
 
-> chamvi is at an early stage. The engine, HTTP, scheduler, TypeORM store, GitHub, sandbox, coding and notifier packages exist; the dashboard and the CLI are planned.
+> chamvi is at an early stage. The engine, HTTP, scheduler, TypeORM store, GitHub, sandbox, coding, notifier and dashboard packages exist; the CLI is planned.
 
 ## Why chamvi?
 
@@ -72,7 +72,7 @@ Other tools also make agent runs durable. They differ in where the runs live and
 | **Tools restricted per caller** | `requireToolPermission()` reads the run's invoker | No | Tool-level checks are Enterprise | No | No |
 | **License** | Apache-2.0 | Apache-2.0 | Apache-2.0, `ee/` source-available | Server SSPL (delayed Apache-2.0) | Apache-2.0 |
 
-Pick one of the others when you want what chamvi does not have yet: a hosted service, a run dashboard (chamvi's is planned), or Mastra's memory, RAG and evals. Pick chamvi when the agent lives next to your app and its database, and when a webhook that fires twice must not post twice.
+Pick one of the others when you want what chamvi does not have yet: a hosted service, a hosted run dashboard, or Mastra's memory, RAG and evals. Pick chamvi when the agent lives next to your app and its database, and when a webhook that fires twice must not post twice.
 
 [wf]: https://workflow-sdk.dev/docs/ai/human-in-the-loop
 [mastra]: https://mastra.ai/docs/long-running-agents/durable-agents
@@ -93,6 +93,7 @@ Pick one of the others when you want what chamvi does not have yet: a hosted ser
 | [`@chamvi/sandbox-docker`](./packages/sandbox-docker) | [![npm](https://img.shields.io/npm/v/@chamvi/sandbox-docker)](https://www.npmjs.com/package/@chamvi/sandbox-docker) | One hardened container per workspace: non-root, read-only root, no capabilities, resource limits |
 | [`@chamvi/sandbox-k8s`](./packages/sandbox-k8s) | [![npm](https://img.shields.io/npm/v/@chamvi/sandbox-k8s)](https://www.npmjs.com/package/@chamvi/sandbox-k8s) | One hardened pod per workspace, without a service account token |
 | [`@chamvi/coding`](./packages/coding) | [![npm](https://img.shields.io/npm/v/@chamvi/coding)](https://www.npmjs.com/package/@chamvi/coding) | `read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash` and `git_diff` inside a workspace |
+| [`@chamvi/ui`](./packages/ui) | [![npm](https://img.shields.io/npm/v/@chamvi/ui)](https://www.npmjs.com/package/@chamvi/ui) | The dashboard: an agents overview with runs started from the agent page, runs with live steps, an approvals inbox, agent state and schedules, served by `uiRoutes()` |
 | [`@chamvi/test-kit`](./packages/test-kit) | [![npm](https://img.shields.io/npm/v/@chamvi/test-kit)](https://www.npmjs.com/package/@chamvi/test-kit) | `ControllableClock`, the store and workspace contract suites, and a git fixture |
 
 ## Quick start

@@ -43,9 +43,11 @@ import {
 } from './constants.ts';
 import { toRunError } from './execute/helpers.ts';
 import { executeRun } from './execute/module.ts';
+import { staleToken } from './helpers.ts';
 import type { ApprovalRequest } from './execute/types.ts';
 import { RunQueue } from './queue/module.ts';
 import type {
+    ApprovalAnswer,
     DispatchEnvelope,
     EngineOptions,
     ResumeDecision,
@@ -424,7 +426,39 @@ export class Engine {
         if (run.waiting.tokenId !== claims.tokenId || run.waiting.approvalId !== claims.approvalId) {
             throw new InvalidResumeTokenError('The resume token does not belong to the current approval.');
         }
-        await this.answer(run, run.waiting, decision);
+        await this.answer(run, run.waiting, decision, staleToken);
+    }
+
+    /**
+     * Answers the current wait point of a `waiting` run without a resume token
+     * (the caller authorized the approver) and requeues it, on the same path as
+     * `resume()`: the token notified earlier is spent by the same transition.
+     * Throws InvalidRunStateError when the run is not waiting, waits on another
+     * approval or its wait point expired (`tick()` denies that one).
+     */
+    async approve(runId: string, answer: ApprovalAnswer): Promise<void> {
+        const decision: ResumeDecision = {
+            approved: answer.approved,
+            ...(answer.reason !== undefined ? { reason: answer.reason } : {}),
+            ...(answer.approver !== undefined ? { approver: toInvoker(answer.approver, 'approver') } : {}),
+        };
+        const run = await this.store.getRun(runId);
+        if (!run) throw new RunNotFoundError(runId);
+        if (run.status !== RunStatus.WAITING || !run.waiting) {
+            throw new InvalidRunStateError(`Run "${run.id}" is ${run.status} and not waiting for an approval.`);
+        }
+        if (run.waiting.approvalId !== answer.approvalId) {
+            throw new InvalidRunStateError(`Run "${run.id}" does not wait on approval "${answer.approvalId}".`);
+        }
+        if (this.clock.now().getTime() >= run.waiting.expiresAt.getTime()) {
+            throw new InvalidRunStateError(`Approval "${answer.approvalId}" of run "${run.id}" expired.`);
+        }
+        await this.answer(
+            run,
+            run.waiting,
+            decision,
+            () => new InvalidRunStateError(`Run "${run.id}" moved on to another approval.`),
+        );
     }
 
     /**
@@ -446,7 +480,7 @@ export class Engine {
                 // the listing may be stale by now: the run could wait on a newer approval
                 const run = await this.store.getRun(listed.id);
                 if (run?.status !== RunStatus.WAITING || !run.waiting || run.waiting.expiresAt.getTime() > now) continue;
-                await this.answer(run, run.waiting, { approved: false, reason: APPROVAL_TIMED_OUT });
+                await this.answer(run, run.waiting, { approved: false, reason: APPROVAL_TIMED_OUT }, staleToken);
             } catch (error) {
                 // answered meanwhile (resume, another replica)
                 if (!(error instanceof InvalidRunStateError) && !(error instanceof InvalidResumeTokenError)) {
@@ -466,7 +500,12 @@ export class Engine {
      * landed: if we die in between, the run re-pauses on the same wait point, so
      * the token the owner already holds stays valid.
      */
-    protected async answer(run: Run, waiting: WaitPoint, decision: ResumeDecision): Promise<void> {
+    protected async answer(
+        run: Run,
+        waiting: WaitPoint,
+        decision: ResumeDecision,
+        stale: () => Error,
+    ): Promise<void> {
         const now = this.clock.now();
         const transitioned = await this.store.updateRun(run.id, {
             status: RunStatus.QUEUED,
@@ -478,7 +517,7 @@ export class Engine {
         try {
             // the run may have moved on to another approval since `waiting` was read
             if (transitioned.waiting?.tokenId !== waiting.tokenId) {
-                throw new InvalidResumeTokenError('The resume token does not belong to the current approval.');
+                throw stale();
             }
             const checkpoint = await this.store.latestCheckpoint(run.id);
             if (!checkpoint) throw new InvalidRunStateError(`Run "${run.id}" has no checkpoint to resume from.`);

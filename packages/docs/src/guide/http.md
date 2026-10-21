@@ -30,15 +30,18 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 | `GET /runs/:id/artifacts` | as `GET /runs/:id` | `200 { data: Artifact[] }` |
 | `GET /runs/:id/artifacts/:artifactId` | as `GET /runs/:id` | The bytes, as a download |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
+| `POST /runs/:id/approve` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ approvalId, approved, reason? }`; answers the run's current wait point without a token (409 for another `approvalId`, an expired wait point or a run not waiting) |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
 | `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }` |
 | `GET /agents`, `GET /schedules` | `run:read` | Agent summaries; `cron()` triggers with their next fire time |
+| `GET /agents/:name/state/kv` | `state:read` | `200 { data: Array<{ key, value }> }` in key code-point order; `page[limit]` (default 50, at most 100), `page[offset]` |
 | `GET`, `PATCH /agents/:name/state/kv/:key` | `state:read`, `state:write` | `{ key, value }` |
 | `GET /agents/:name/state/collections/:collection` | `state:read` | Documents (`{ id, ...fields }`, or `{ id, doc }` for a non-object); top-level equality filters (`filter[issue]=42` matches a number, `filter[issue]="42"` the string; `filter[id]` is 400, `id` being the store id), `page[limit]` (no offset) |
+| `GET /me` | authenticated | `200 { id, kind, name?, permissions }`: the caller itself, with its own permissions |
 | `/mcp` | authenticated | MCP endpoint |
 | `GET /healthz`, `/readyz`, `/metrics` | none | Liveness, readiness, Prometheus |
 
-`GET /runs` takes rapiq's URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]` (default 50, at most 100), `page[offset]`, `sort=createdAt`. Bodies are JSON of at most `bodyLimit` bytes (default 1 MiB). A protected route checks the bearer token before it reads the body. Runs leave the API without their internal `claim`, and the run's invoker and a `wait` step's approver without their `permissions` (see [Invoker](#invoker)).
+`GET /runs` takes rapiq's URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]` (default 50, at most 100), `page[offset]`, `sort=createdAt` (oldest first, the default) or `sort=-createdAt` (newest first). Bodies are JSON of at most `bodyLimit` bytes (default 1 MiB). A protected route checks the bearer token before it reads the body. Runs leave the API without their internal `claim`, and the run's invoker and a `wait` step's approver without their `permissions` (see [Invoker](#invoker)).
 
 ## Files
 
@@ -73,7 +76,7 @@ An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_
 | Permission | Grants |
 |---|---|
 | `agent:<name>:run` | Start the agent's runs and read them |
-| `agent:<name>:approve` | Answer the agent's approvals |
+| `agent:<name>:approve` | Answer the agent's approvals (`POST /runs/:id/approve`, `POST /resume`, MCP `resume_run`) |
 | `run:read` | Read and list every run, agents and schedules |
 | `run:cancel` | Cancel runs |
 | `state:read`, `state:write` | Agent state |
@@ -82,11 +85,11 @@ An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_
 
 A `*` segment matches exactly one segment (`agent:*:run`). A client that may start an agent's runs can follow them without `run:read`, but to list runs it must filter to that agent.
 
-`POST /resume` needs the approve permission for the run's agent as well as the [resume token](/guide/approvals): a leaked token alone does nothing. The token's signature and expiry are checked before any store lookup.
+`POST /resume` needs the approve permission for the run's agent as well as the [resume token](/guide/approvals): a leaked token alone does nothing. The token's signature and expiry are checked before any store lookup. `POST /runs/:id/approve` needs only the approve permission (no token, no read permission); it loads the run (404), checks the permission (403) and only then reads the body, and passes the `approvalId` it was shown, so a stale or concurrent answer is a 409 rather than an answer to a newer call. Either way the other one is spent.
 
 ## Invoker
 
-`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name` or `preferred_username` claim (never `email`, since every reader of the run sees the name; static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook runs have no invoker, and neither ever comes from a request body.
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name` or `preferred_username` claim (never `email`, since every reader of the run sees the name; static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /runs/:id/approve`, `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook runs have no invoker, and neither ever comes from a request body.
 
 The invoker is a snapshot: a run keeps the grants it was started with, even when a grant is revoked while it waits on an approval. Responses (REST, SSE, MCP) carry the invoker and the approver without their `permissions`, so a `run:read` holder never learns another principal's grants.
 
@@ -107,6 +110,10 @@ This is the "MCP in" half of the [OpenClaw](/deployment/openclaw) integration.
 ## Extra routes
 
 `routes` adds routes that other packages provide, served under `basePath` beside the built-in ones. A route is a static path with a method and a fetch-style handler: it gets the request (URL, method, headers and signal, without the body) and a `readBody()` that returns the raw bytes (the app's `bodyLimit`, 413 and 415 apply; repeated calls return the same bytes), and answers `{ status, body? }` (an object, array, number or boolean as JSON, a string as `text/plain`, no `body` or `null` as an empty body). Extra routes are not authenticated by `auth`: they check their own credentials, as a webhook checks its signature. Thrown errors render like those of every other route. `rateLimit: false` takes a route out of the rate limit, for senders that never retry a refused request. Paths match case-insensitively, like routup's routing: a route may not differ from a built-in segment or another route only by case.
+
+A route can also answer headers and bytes: `headers` is set on the response (a `content-type` there wins over the body's default) and a `Uint8Array` body is sent as is (`application/octet-stream` unless `headers` names a type), with the CORS and rate limit headers kept. `prefix: true` makes the route serve its `path` and everything below `path/` for its method (a static file server, such as a dashboard's assets): the handler reads the rest as `request.subpath` (`''` for the path itself, else the raw, still percent-encoded rest with its case, never the query), and metrics label it `<path>/*`. A route of the same method at or under a prefix route, or a prefix route at or above the metrics path, is refused at construction. The route context carries the app's `basePath` to build links with.
+
+`@chamvi/ui` is such a route: `routes: uiRoutes()` serves the [dashboard](/guide/ui) at `/ui`.
 
 ## Operations
 

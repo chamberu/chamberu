@@ -40,6 +40,7 @@
         "@chamvi/scheduler": "*",
         "@chamvi/store-typeorm": "*",
         "@chamvi/test-kit": "*",
+        "@chamvi/ui": "*",
         "@tailwindcss/vite": "^4.3.3",
         "ai": "^7.0.143",
         "routup": "^6.1.0",

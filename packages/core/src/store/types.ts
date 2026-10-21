@@ -35,9 +35,10 @@ export interface IRunStore {
      */
     updateRun(id: string, patch: Partial<Run>, opts?: { expectStatus?: RunStatusLiteral[]; expectOwner?: string }): Promise<Run>;
     /**
-     * Ordered by createdAt ascending, ties broken by id ascending. `total`
-     * ignores limit/offset. Without `limit`, every matching run (from `offset`)
-     * is returned: there is no default page size.
+     * Ordered by createdAt, ties broken by id, both ascending (`order` `asc`,
+     * the default) or both descending (`desc`). `total` ignores limit/offset.
+     * Without `limit`, every matching run (from `offset`) is returned: there is
+     * no default page size.
      */
     listRuns(q: {
         agent?: string;
@@ -45,6 +46,7 @@ export interface IRunStore {
         concurrencyKey?: string;
         limit?: number;
         offset?: number;
+        order?: 'asc' | 'desc';
     }): Promise<{ data: Run[]; total: number }>;
     /** Atomic: only succeeds when unleased or the lease expired. */
     claimRun(id: string, owner: string, ttlMs: number): Promise<boolean>;
@@ -80,7 +82,13 @@ export interface IEffectStore {
 
 export interface IStateStore {
     kvGet(agent: string, key: string): Promise<unknown>;
+    /** `undefined` removes the key. */
     kvSet(agent: string, key: string, value: unknown): Promise<void>;
+    /**
+     * One agent's entries ordered by key in code-point order (`COLLATE "C"`),
+     * values copied out; every entry (from `offset`) without `limit`.
+     */
+    kvList(agent: string, q?: { limit?: number; offset?: number }): Promise<Array<{ key: string; value: unknown }>>;
     /** `where` matches by top-level equality. */
     docList(
         agent: string,

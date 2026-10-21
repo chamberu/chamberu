@@ -22,9 +22,10 @@ export class KvEntity {
     agent!: string;
 
     @PrimaryColumn({
-        name: 'key', 
-        type: 'varchar', 
-        length: 512, 
+        name: 'key',
+        type: 'varchar',
+        length: 512,
+        collation: 'C',
     })
     key!: string;
 

@@ -57,3 +57,9 @@ export type ResumeDecision = {
     /** Who answered; recorded on the wait step (\`output.approver\`). */
     approver?: Invoker;
 };
+
+/** A token-less answer to the run's current wait point (`Engine.approve()`). */
+export type ApprovalAnswer = ResumeDecision & {
+    /** Must equal `run.waiting.approvalId`, else InvalidRunStateError. */
+    approvalId: string;
+};

@@ -24,6 +24,12 @@ import type { AgentSummary, KvBody, ScheduleSummary } from './types.ts';
  */
 const COLLECTION_QUERY_SCHEMA = defineSchema({ sorts: { allowed: [] }, throwOnFailure: true });
 
+const KV_LIST_QUERY_SCHEMA = defineSchema({
+    filters: { allowed: [] },
+    sorts: { allowed: [] },
+    throwOnFailure: true,
+});
+
 export function summarizeAgent(agent: Agent, basePath: string): AgentSummary {
     const { definition } = agent;
     const summary: AgentSummary = {
@@ -100,6 +106,15 @@ function filterValue(value: unknown): unknown {
         return value.slice(1, -1);
     }
     return value;
+}
+
+/** A KV list query: `page[limit]` (default 50, at most 100) and `page[offset]`, no filter, no sort. */
+export function parseKvListQuery(searchParams: URLSearchParams): { limit: number; offset: number } {
+    const decoded = decodeQuery(searchParams, KV_LIST_QUERY_SCHEMA);
+    if (decoded.filters.length > 0) {
+        throw new BadRequestError({ message: 'The kv listing takes no filter.' });
+    }
+    return { limit: decoded.limit ?? DEFAULT_PAGE_LIMIT, offset: decoded.offset ?? 0 };
 }
 
 /** A collection list query: top-level `eq` filters as `where`, a limit, no offset, no sort. */

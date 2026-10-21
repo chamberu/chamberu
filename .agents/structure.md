@@ -29,6 +29,10 @@ chamvi/
 │   │   └── test/global-setup.ts     # dockerode ping() gate, builds images/sandbox-node as chamvi/sandbox-node:test
 │   ├── sandbox-k8s/                 # @chamvi/sandbox-k8s (same aliases; tests drive a fake IPodClient, test/utils/client.ts)
 │   ├── coding/                      # @chamvi/coding (aliases core, sandbox, sandbox-local, test-kit and itself)
+│   ├── ui/                          # @chamvi/ui (aliases core, http, test-kit and itself to src)
+│   │   ├── src/                     # Node entry (tsdown -> dist/index.mjs): uiRoutes()
+│   │   ├── app/                     # The SPA (Vite root -> dist/app), own tsconfig for vue-tsc
+│   │   └── test/{unit,e2e}/         # Vitest (routes, app modules), Playwright smoke spec + demo server
 │   ├── store-typeorm/               # @chamvi/store-typeorm (same layout)
 │   │   ├── src/{entities,migrations,schema,store}/
 │   │   └── test/global-setup.ts     # Starts postgres:18-alpine via testcontainers for the suite
@@ -41,7 +45,7 @@ chamvi/
 ├── .github/
 │   ├── assets/                      # logo.svg (+ test-kit and organisation variants), run-lifecycle.svg
 │   ├── actions/{install,build}/     # Composite actions
-│   ├── workflows/{ci,release,docs,images}.yml # CI (Node 22, 24), release-please + npm publish, docs to GitHub Pages, sandbox image (craneship, amd64 + arm64)
+│   ├── workflows/{ci,release,docs,images}.yml # CI (Node 22, 24, plus the Chromium e2e job), release-please + npm publish, docs to GitHub Pages, sandbox image (craneship, amd64 + arm64)
 │   ├── ISSUE_TEMPLATE/              # Bug report and feature request templates
 │   ├── FUNDING.yml                  # GitHub Sponsors
 │   └── dependabot.yml               # Daily npm + github-actions updates, docker for images/sandbox-node
@@ -70,11 +74,11 @@ chamvi/
 | `@chamvi/sandbox-docker` | Exists (0.1.0) | `createDockerSandbox()`: one hardened container per workspace; depends on `dockerode` + `@types/dockerode`, `smob`, peer on core and sandbox |
 | `@chamvi/sandbox-k8s` | Exists (0.1.0) | `createKubernetesSandbox()`, `createPodClient()`: one hardened pod per workspace; depends on `@kubernetes/client-node`, `smob`, peer on core and sandbox |
 | `@chamvi/coding` | Exists (0.1.0) | `codingTools()` (read_file, write_file, edit_file, grep, list_files, bash, git_diff), the `ICodingBackend` contract; depends on `smob`, peer on core, sandbox and `ai` |
+| `@chamvi/ui` | Exists (0.1.0) | `uiRoutes()`: serves the prebuilt Vue 3 + vuecs dashboard (runs, run detail, approvals, agent state, schedules) as one extra route of `createHttpApp({ routes })`; peer on core and http (types only), every SPA library a bundled devDependency |
 | `@chamvi/coding-claude-code` | Planned | Claude Code coding backend |
 | `@chamvi/github` | Exists (0.1.0) | `createGithubApp()` (App JWT, `IClock` installation-token cache, Octokit per installation), `githubWebhook()` trigger, the signed webhook route for `createHttpApp({ routes })`, read tools and effect write tools; depends on `@octokit/core` + `plugin-paginate-rest`, peer on core, http (types only) and `ai` |
 | `@chamvi/notify-openclaw` | Exists (0.1.0) | `openclaw()`: `POST <hooksPath>/agent` with `Idempotency-Key`, a deterministic message, an `IClock` timeout; no runtime dependencies, peer on core |
 | `@chamvi/notify-github` | Exists (0.1.0) | `githubNotifier()`: one comment on the run's issue/PR (or `target`), deduplicated by `effectMarker()` found before posting; depends on `smob`, peer on core and github |
-| `@chamvi/ui` | Planned | Vue 3 dashboard |
 | `chamvi` | Planned | Umbrella package and CLI |
 
 The memory store lives inside `@chamvi/core` (no separate `store-memory` package), because every test needs it.
@@ -122,10 +126,11 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | `auth/` | `Principal`, `Authenticator` (`types.ts`), `Permission` (`constants.ts`), `agentPermission()` (`module.ts`; permission matching is core's `hasPermission(principal.permissions, ...)`), `authenticate()`, `authorize()`, `readBearerToken()`, `toInvoker()` (`helpers.ts`, internal; display name from `name` or `preferred_username`, never `email`); `static-tokens/`, `authup/`, `oidc/` hold the built-in authenticators |
 | `request/` | No barrel: `readJsonBody()`, `validateBody()`, `validatePayload()`, `decodeQuery()` (rapiq), `readIdempotencyHeader()`, `boundReceived()`, `boundIssues()` (`helpers.ts`); `KEY_MAX_LENGTH`, `RECEIVED_MAX_LENGTH` (`constants.ts`); validup validators `isString()`, `isBoolean()`, `isDefined()`, `isArrayOf()`, `isMediaType()`, `isBase64()` (`validators.ts`) |
 | `health/` | No barrel: `/healthz`, `/readyz` |
-| `runs/` | Run and artifact routes (`module.ts`), `serializeRun()`, `serializeStep()`, `canReadRun()`, `loadReadableRun()`, `loadRunArtifact()`, `contentDisposition()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()` (`helpers.ts`), `MAX_ATTACHMENTS` (`constants.ts`, internal), `RunView`, `InvokerView`, `RunListQuery` (`types.ts`); `stream/` holds `streamRun()` (SSE, incl. `delta`) |
+| `runs/` | Run and artifact routes (`module.ts`), `serializeRun()`, `serializeStep()`, `canReadRun()`, `loadReadableRun()`, `loadRunArtifact()`, `contentDisposition()`, `assertCanListRuns()`, `parseRunListQuery()`, `resolveResumeTarget()`, `loadApprovableRun()`, `createApproveContainer()` (`helpers.ts`), `MAX_ATTACHMENTS`, `APPROVAL_ID_MAX_LENGTH` (`constants.ts`, internal), `RunView`, `InvokerView`, `RunListQuery`, `ApproveBody` (`types.ts`); `stream/` holds `streamRun()` (SSE, incl. `delta`) |
 | `hooks/` | No barrel: `POST /hooks/:agent<path>` |
-| `routes/` | No barrel: `registerRoutes()` serves `HttpAppOptions.routes` (extra routes of other packages) |
-| `agents/` | `/agents`, `/schedules` and state routes (`module.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
+| `routes/` | No barrel: `registerRoutes()` serves `HttpAppOptions.routes` (extra routes of other packages; prefix routes, headers, byte bodies), `routeSubpath()` (`helpers.ts`) |
+| `agents/` | `/agents`, `/schedules` and state routes (`module.ts`, incl. the KV listing via `parseKvListQuery()` in `helpers.ts`), `AgentSummary`, `ScheduleSummary` (`types.ts`) |
+| `me/` | `GET /me` (`registerMeRoutes()`, `module.ts`), `MeView` (`types.ts`, the only export) |
 | `mcp/` | `createMcpEndpoint()`, `registerMcpRoutes()` (`module.ts`), the tools (`tools.ts`), `waitForRun()`, `toJsonSchema()` (`helpers.ts`), `RunSummary`, `RunToolResult` (`types.ts`) |
 | `plugins/` | No barrel: `installPlugins()` (CORS, Prometheus, rate limit) |
 | `shutdown/` | `createShutdown()`, `IShutdown`, `ShutdownOptions`, the timeout defaults |
@@ -189,6 +194,29 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 | Path | Purpose |
 |------|---------|
 | `entities/` | One TypeORM entity per table, the repositories the store queries through; `TableName` and the jsonb transformers (`JSON_VALUE_TRANSFORMER`, `OPTIONAL_JSON_TRANSFORMER`) in `constants.ts`, `toJsonParameter()` (jsonb sanitizing) in `helpers.ts` |
-| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), `1792368000000-artifacts.ts` (table `chamvi_artifacts`), generated from the entities; `1792454400000-idempotency-scope.ts` (`scope` varchar(1024), hand-written) |
+| `migrations/` | `1792195200000-init.ts` (`Init1792195200000`), `1792368000000-artifacts.ts` (table `chamvi_artifacts`), generated from the entities; `1792454400000-idempotency-scope.ts` (`scope` varchar(1024), hand-written), `1792540800000-kv-key-collation.ts` (`chamvi_kv.key` `COLLATE "C"`, hand-written) |
 | `schema/` | `migrateStore()` (`module.ts`), `STORE_ENTITIES`, `STORE_MIGRATIONS`, `MIGRATION_LOCK_NAME` |
 | `store/` | `TypeormStore` (`module.ts`), entity to domain mapping, value builders and `RETURNING` row hydration (`helpers.ts`), `TypeormStoreOptions`, `PurgeResult` |
+
+## UI Module Map (`packages/ui`)
+
+| Path | Purpose |
+|------|---------|
+| `src/config/` | `UiConfig`, `UiAuthupConfig` (`types.ts`), `CONFIG_ELEMENT_ID` (public), `CONFIG_MARKER` (`constants.ts`); shared with the SPA as types and constants |
+| `src/routes/` | `uiRoutes()` (`module.ts`), `resolveBuildPath()`, `loadBuild()`, `renderIndex()`, `buildCsp()`, `defaultRoot()`, `isFileLike()` (`helpers.ts`, internal), `DEFAULT_UI_BASE_PATH`, `ASSET_CACHE_CONTROL`, `DOCUMENT_CACHE_CONTROL` (public), `BUILD_RETRY_MS`, `MEDIA_TYPES`, `SECURITY_HEADERS`, `UI_BASE_PATH_PATTERN` (`constants.ts`), `UiRoutesOptions`, `BuildFile` (`types.ts`) |
+| `app/` | The SPA: `main.ts` (install order: icons, authup when configured, vuecs, component plugins, router), `App.vue`, `style.css` (Crimson tokens and classes of the approved mockup version 3, light and dark), `index.html` (with `CONFIG_MARKER`), `shims.d.ts`, `tsconfig.json` (vue-tsc, also checks `test/unit/app`) |
+| `app/config/` | `readConfig()`, `DEV_CONFIG` |
+| `app/router/` | `createUiRouter()`, `RouteName` |
+| `app/context/` | `AppContext` (config, client, session, storage), `APP_CONTEXT`, `useAppContext()` |
+| `app/api/` | `createApiClient()`, `ApiError` (`error.ts`), query and error helpers (`toApiError()` for a response, `asApiError()` for any thrown value, `retryDelayOf()` for a 429/503, `helpers.ts`), `RATE_LIMIT_BACKOFF_MS` (`constants.ts`), wire types (`Wire<T>`, `RunWire`, `IApiClient`, ...) |
+| `app/sse/` | `openRunStream()`, `parseEventStream()`, `sleep()`, `RECONNECT_DELAYS_MS` |
+| `app/auth/` | `createSession()`, `createAuthGuard()` (`guard.ts`), `createAuthupAdapter()` (`authup.ts`, lazily imported), `hasPermission()`, `safeReturnPath()`, `clearStorage()`, `createSessionCookies()` (`helpers.ts`), storage keys |
+| `app/polling/` | `createPoller()`, `documentVisibility()` (`helpers.ts`), `IPageVisibility` |
+| `app/runs/` | `useRunList()`, `useRunCounts()`, `useRunActivity()`, `useRunDetail()` (`composables.ts`), `mergeRunEvent()`, `canCancel()`, formatters (`helpers.ts`), route-query mapping (`query.ts`), constants |
+| `app/approvals/` | `useApprovals()`, `useDeepLinkApproval()`, `decodeResumeToken()`, `stripResumeToken()`, `readResumeToken()`, `pendingApprovals()`, `RESUME_STORAGE_KEY`, `INBOX` |
+| `app/agents/` | `useAgents()`, `useAgentRollups()` (overview), `useAgentDetail()` (agent page, `start()`) (`composables.ts`); `triggerChips()`, `summarizeActivity()`, `buildRollups()`, `activityLabel()`, `createStartKeys()`, `newIdempotencyKey()`, `failedSummary()`, `tokenShares()`, `nextFireOf()`, `lastRunOf()`, `oldestWaiting()`, `hasHttpTrigger()`, `matchesName()`, `parsePayload()`, `formatBudgetTime()` (`helpers.ts`); `ACTIVITY_WINDOW_MS`, `ACTIVITY_LIMIT`, `ACTIVE_LIMIT`, `AGENTS_POLL_MS`, `RECENT_RUNS`, `AGENT_WAITING_LIMIT` (`constants.ts`); `TriggerChip`, `Activity`, `AgentRollup` (`types.ts`) |
+| `app/state/`, `app/schedules/` | `useAgentState()`, `useSchedules()` and their helpers (`describeCron()` in `schedules/helpers.ts`) |
+| `app/components/` | One folder per component: `app-shell`, `brand-logo`, `nav-icon` (`IconName`, the mockup's glyphs), `page-head`, `empty-state`, `status-chip`, `trigger-chip`, `json-block`, `step-item`, `usage-meter`, `approval-callout`, `expiry-countdown`, `runs-table`, `schedule-card`, `activity-strip`, `agent-card`, `agent-runs`, `agent-state` (`AgentStatePanel`), `start-run` (`StartRunModal`), `tab-list` (`TabList`, the ARIA tabs pattern: roving tabindex, arrow keys, `tabForKey()`) |
+| `app/views/` | `LoginView`, `LoginCallbackView`, `AgentsView`, `AgentView`, `RunsView`, `RunView`, `ApprovalsView`, `SchedulesView` |
+| `vite.config.ts` | Root `app`, out `dist/app`, `base: './'` for the build, the dev proxy to port 3000, the `virtual:chamvi-icons` plugin |
+| `test/e2e/` | `smoke.spec.ts` (Playwright), `demo/` (`server.ts`, `model.ts`, `constants.ts`) |

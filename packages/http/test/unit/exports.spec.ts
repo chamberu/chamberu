@@ -5,7 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { describe, expect, it } from 'vitest';
+import {
+    describe,
+    expect,
+    expectTypeOf,
+    it,
+} from 'vitest';
 import * as http from '@chamvi/http';
 
 describe('public api', () => {
@@ -39,5 +44,19 @@ describe('public api', () => {
             STATE_READ: 'state:read',
             STATE_WRITE: 'state:write',
         });
+    });
+
+    it('exports the MeView and ApproveBody types', () => {
+        expectTypeOf<http.MeView>().toEqualTypeOf<{
+            id: string;
+            kind: string;
+            name?: string;
+            permissions: string[];
+        }>();
+        expectTypeOf<http.ApproveBody>().toEqualTypeOf<{
+            approvalId: string;
+            approved: boolean;
+            reason?: string;
+        }>();
     });
 });
