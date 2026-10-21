@@ -6,16 +6,6 @@
  */
 
 import { isObject } from 'smob';
-import type { Env } from '../env/types.ts';
-
-/** An env value; empty counts as unset. */
-export function envValue(env: Env, name: string | undefined): string | undefined {
-    if (!name) {
-        return undefined;
-    }
-    const value = env[name];
-    return value === undefined || value === '' ? undefined : value;
-}
 
 /**
  * True when the package itself is not installed, not when something it

@@ -18,7 +18,6 @@ import type {
     IShutdown,
 } from '@chamvi/http';
 import type { IScheduler } from '@chamvi/scheduler';
-import type { serve } from 'routup/node';
 import type { DataSource } from 'typeorm';
 import type { AppConfig } from '../config/types.ts';
 import type { Env } from '../env/types.ts';
@@ -60,8 +59,15 @@ export type AuthenticatorEntry = {
     authenticator: Authenticator;
 };
 
-/** The HTTP server `serve()` of routup returns (srvx). */
-export type Server = ReturnType<typeof serve>;
+/**
+ * The part of the HTTP server (srvx, from routup's `serve()`) the app uses,
+ * typed structurally so srvx's declarations stay out of the package's types.
+ */
+export type Server = {
+    readonly url?: string;
+    ready(): Promise<unknown>;
+    close(closeActiveConnections?: boolean): Promise<void>;
+};
 
 export type AppTokens = {
     CONTEXT: AppContext;

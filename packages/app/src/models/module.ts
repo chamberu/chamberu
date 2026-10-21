@@ -10,7 +10,8 @@ import { createProviderRegistry } from 'ai';
 import type { ProviderRegistryProvider } from 'ai';
 import { isObject } from 'smob';
 import { BUILTIN_PROVIDERS, MODEL_SEPARATOR } from './constants.ts';
-import { defaultImporter, envValue, isPackageNotFound } from './helpers.ts';
+import { envString } from '../env/module.ts';
+import { defaultImporter, isPackageNotFound } from './helpers.ts';
 import type {
     BuiltinProvider,
     ModelProviders,
@@ -44,11 +45,11 @@ async function discover(
     }
 
     const settings: Record<string, string> = {};
-    const apiKey = envValue(options.env, provider.apiKey);
+    const apiKey = envString(options.env, provider.apiKey);
     if (apiKey !== undefined) {
         settings.apiKey = apiKey;
     }
-    const baseURL = envValue(options.env, provider.baseUrl);
+    const baseURL = provider.baseUrl ? envString(options.env, provider.baseUrl) : undefined;
     if (baseURL !== undefined) {
         settings.baseURL = baseURL;
     }
@@ -84,7 +85,7 @@ function checkModel(
                 `Agent "${agent}": model "${model}" needs the ${id} provider; install ${builtin.provider.package}.`,
             );
         }
-        if (envValue(options.env, builtin.provider.apiKey) === undefined) {
+        if (envString(options.env, builtin.provider.apiKey) === undefined) {
             throw new InvalidAgentDefinitionError(
                 `Agent "${agent}": model "${model}" needs an API key; set ${builtin.provider.apiKey}.`,
             );
