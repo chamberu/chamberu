@@ -1,0 +1,118 @@
+/*
+ * Violet: the parked alternative to the Crimson brand (see .agents/design.md,
+ * "Alternative palette: Violet"). Not loaded anywhere; copy the blocks into
+ * packages/docs/src/.vitepress/theme/style.css and the UI's token file to switch.
+ */
+
+/* ---------- docs site: replaces the --ch-* values in theme/style.css ---------- */
+:root {
+    --ch-hero-bg: #f2f0f6;
+    --ch-paper: #ffffff;
+    --ch-ink: #1a1523;
+    --ch-muted: #5c546a;
+    --ch-line: #e5e0ed;
+    --ch-chip: #efecf4;
+    --ch-accent: #7c3aed;
+    --ch-accent-text: #6d28d9;
+
+    /* white on #7c3aed is 5.7:1; the dark accent #a78bfa would be 2.7:1 */
+    --ch-button-bg: #7c3aed;
+
+    --ch-night-bg: #15111b;
+    --ch-night-fg: #ece6f5;
+    --ch-night-muted: #a79db9;
+    --ch-night-line: #2e2639;
+
+    --ch-code-bg: #15111b;
+    --ch-code-ink: #e8e2f2;
+    --ch-code-line: #2e2639;
+}
+
+.dark {
+    --ch-hero-bg: #15111b;
+    --ch-paper: #1c1724;
+    --ch-ink: #ece6f5;
+    --ch-muted: #a79db9;
+    --ch-line: #2e2639;
+    --ch-chip: #2a2236;
+    --ch-accent: #a78bfa;
+    --ch-accent-text: #c4b5fd;
+
+    --ch-code-bg: #0a0710;
+    --ch-code-line: #2a2236;
+}
+
+/* ---------- @chamvi/ui: the dashboard token set (light, then dark) ---------- */
+:root {
+    --ch-bg: #f2f0f6;
+    --ch-canvas: #faf9fc;
+    --ch-surface: #ffffff;
+    --ch-sunken: #f5f3f8;
+    --ch-hover: #f2eff7;
+    --ch-line: #e5e0ed;
+    --ch-line-strong: #cfc7dd;
+    --ch-ink: #1a1523;
+    --ch-muted: #5c546a;
+    --ch-accent: #7c3aed;
+    --ch-btn: #7c3aed;
+    --ch-btn-hover: #6d28d9;
+    --ch-btn-ink: #ffffff;
+    --ch-accent-text: #6d28d9;
+    --ch-accent-tint: #f1eafd;
+    --ch-run: #0b6a86;
+    --ch-run-tint: #e2f3f7;
+    --ch-wait: #875300;
+    --ch-wait-tint: #fbf1dd;
+    --ch-ok: #2a7348;
+    --ch-ok-tint: #e6f3eb;
+    --ch-fail: #c1272d;
+    --ch-fail-ink: #ffffff;
+    --ch-fail-tint: #fde8e8;
+    --ch-code-bg: #17121f;
+    --ch-code-ink: #e8e2f2;
+    --ch-code-key: #c4a5ff;
+    --ch-code-str: #f2cf8e;
+    --ch-code-com: #968cab;
+    --ch-code-line: #271f34;
+    --ch-shadow-c: rgba(30, 16, 50, 0.07);
+    --ch-shadow-c2: rgba(30, 16, 50, 0.15);
+    --ch-highlight: rgba(255, 255, 255, 0.7);
+    --ch-scrim: rgba(20, 12, 32, 0.45);
+}
+
+.dark {
+    --ch-bg: #0e0b13;
+    --ch-canvas: #15111b;
+    --ch-surface: #1c1724;
+    --ch-sunken: #110e17;
+    --ch-hover: #231c2d;
+    --ch-line: #2e2639;
+    --ch-line-strong: #3e344d;
+    --ch-ink: #ece6f5;
+    --ch-muted: #a79db9;
+    --ch-accent: #a78bfa;
+    --ch-btn: #7c3aed;
+    --ch-btn-hover: #7330e0;
+    --ch-btn-ink: #ffffff;
+    --ch-accent-text: #c4b5fd;
+    --ch-accent-tint: #291e45;
+    --ch-run: #5fcae7;
+    --ch-run-tint: #0f262e;
+    --ch-wait: #f0c06a;
+    --ch-wait-tint: #2a2312;
+    --ch-ok: #6fc493;
+    --ch-ok-tint: #14281d;
+    --ch-fail: #d23a3f;
+    --ch-fail-ink: #ffffff;
+    --ch-fail-tint: #3a1719;
+    --ch-code-bg: #0a0710;
+    --ch-code-ink: #e8e2f2;
+    --ch-code-key: #c4a5ff;
+    --ch-code-str: #f2cf8e;
+    --ch-code-com: #9186a6;
+    --ch-code-line: #1f182b;
+    --ch-shadow-c: rgba(0, 0, 0, 0.38);
+    --ch-shadow-c2: rgba(0, 0, 0, 0.58);
+    --ch-highlight: rgba(230, 210, 255, 0.045);
+    --ch-scrim: rgba(6, 3, 12, 0.62);
+}
