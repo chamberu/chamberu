@@ -10,8 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { createGithubApp } from '@chamvi/github';
 import type { GithubAppOptions } from '@chamvi/github';
-import { ControllableClock } from '@chamvi/test-kit';
-import { createFakeGithub } from '../../utils/github.ts';
+import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
 
 const clock = new ControllableClock(new Date('2026-10-20T10:00:00Z'));
 const fake = createFakeGithub({ appId: '123', clock });

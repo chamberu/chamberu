@@ -1,8 +1,4 @@
-# OpenClaw <Badge type="warning" text="Planned" />
-
-::: warning Planned
-The OpenClaw notifier is planned (`@chamvi/notify-openclaw`). The MCP endpoint ships in [`@chamvi/http`](/guide/http#mcp).
-:::
+# OpenClaw
 
 OpenClaw is a personal assistant gateway that connects chat channels to agents. chamvi's integration contract is **"MCP in, hooks out"**.
 
@@ -14,17 +10,38 @@ Each chamvi app serves an MCP endpoint at `/mcp` (Streamable HTTP, from [`@chamv
 - `get_run` and `list_runs` for status,
 - `resume_run` to answer an approval with its token and a decision.
 
-The endpoint uses the same bearer-token authentication as the REST API; give OpenClaw a principal with `agent:<name>:run` (and `agent:<name>:approve` where it may answer approvals), which also lets it read the runs it starts. This is how the owner says "what's relevant in my mail today?" in a chat and gets a run started.
+The endpoint uses the same bearer-token authentication as the REST API; give OpenClaw a principal with `agent:<name>:run`, which also lets it read the runs it starts. The owner answers approvals in the chamvi UI, signed in as a principal of their own. Add `agent:<name>:approve` only alongside `resumeTool: true`, accepting that the OpenClaw agent can then approve on its own (see the warning under [Hooks out](#hooks-out)). This is how the owner says "what's relevant in my mail today?" in a chat and gets a run started.
 
 ## Hooks out
 
-Results, approval requests and "stuck" pings flow back through the OpenClaw notifier: `POST <openclaw>/hooks/agent` with OpenClaw's hooks token as bearer token, the notifier's `idempotencyKey` as `Idempotency-Key` header, and the delivery target (channel and recipient). OpenClaw lets one of its agents phrase the message before delivering it.
+Approval requests flow back through [`@chamvi/notify-openclaw`](/reference/notify-openclaw): `POST <openclaw><hooks.path>/agent` with OpenClaw's hooks token as bearer token, the notification's `idempotencyKey` as `Idempotency-Key` header and the delivery target (channel and recipient):
 
-For approvals the message includes how to answer: a link into the planned UI's approvals inbox, and the `resume_run` MCP tool, so the owner can approve from the chat.
+<<< @/snippets/notify-openclaw.ts#notifier
 
-## What works today
+In the OpenClaw configuration:
 
-The MCP side is in place ([`@chamvi/http`](/guide/http)), and so is the core side: approval notifications go through any [`INotifier`](/guide/notifiers) with a stable idempotency key and are retried until delivered, and [`engine.resume()`](/guide/approvals) answers them. The OpenClaw notifier itself is still planned.
+| Key | Value |
+|---|---|
+| `hooks.enabled` | `true` (hooks are off by default) |
+| `hooks.token` | A dedicated token, passed as `hooksToken`; not the gateway token |
+| `hooks.path` | `/hooks` (the default `hooksPath`), or the same value on both sides |
+| `hooks.allowedAgentIds` | Lists the `agentId` you pass, if any |
+| `mcp.servers` | The app's `/mcp` endpoint with a token of a principal holding `agent:<name>:run`; add `agent:<name>:approve` only alongside `resumeTool: true` (see the warning below) |
+
+`deliver.channel` and `deliver.to` must name a concrete destination of your OpenClaw setup (OpenClaw refuses `channel: 'last'` and a partial destination for hooks); the examples use placeholders.
+
+For approvals the message includes how to answer: the `approvalUrl` link when configured, e.g. `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`, which opens the run's approval in the UI, where the signed-in owner answers it through the token-less `POST /runs/:id/approve` (the owner's principal needs `agent:<agent>:approve` to answer and `run:read` or `agent:<agent>:run` for the UI to show the run's approval); else a line saying to answer in the chamvi UI or through `POST /runs/:id/approve`. By default the message carries no resume token (neither the link, the body nor a header). With `resumeTool: true` it also carries the token and a ready-made `resume_run` MCP call, so the owner can approve from the chat.
+
+::: warning With resumeTool the relay agent holds the token
+The notification body is the tool input as the model wrote it and may repeat untrusted text (an issue body, a mail). OpenClaw wraps hook content as external, but that does not take tools away. By default the message carries no token, so a relay agent whose principal holds only `agent:<name>:run` cannot approve, whatever an injected instruction says. With `resumeTool: true` the relay agent holds the token, and with `agent:<name>:approve` (which `resume_run` needs) a turn that follows an injected instruction approves without the owner; the run then records the OpenClaw principal as approver. Turn `resumeTool` on only when you accept that.
+:::
+
+### Caveats
+
+- OpenClaw runs an agent turn on the message (it does not post raw text) and treats it as external content; the message asks that agent to keep every link and id verbatim (and the token, with `resumeTool`).
+- OpenClaw's idempotency replay is in memory and lasts 5 minutes after completion; a restart clears it. chamvi's `waiting.notifiedAt` and its per-approval lock are the primary dedupe, the key covers a response lost within those minutes.
+- A misconfigured hook (400, 401, 404) fails on every poll and reaches `onError` each time.
+- Keys over 256 characters (which OpenClaw ignores) or with characters outside visible ASCII are sent as `sha256:<hex>`.
 
 ## In the cluster
 

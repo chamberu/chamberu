@@ -29,6 +29,7 @@ import type {
     EngineOptions,
     INotifier,
     Notification,
+    NotifyOptions,
 } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
@@ -66,11 +67,11 @@ const text = (t: string): MockResponse => ({ parts: [{ type: 'text', text: t }] 
 class RecordingNotifier implements INotifier {
     readonly name = 'owner';
 
-    calls: Array<{ n: Notification; opts: { idempotencyKey: string } }> = [];
+    calls: Array<{ n: Notification; opts: NotifyOptions }> = [];
 
     fail = false;
 
-    async notify(n: Notification, opts: { idempotencyKey: string }): Promise<void> {
+    async notify(n: Notification, opts: NotifyOptions): Promise<void> {
         this.calls.push({ n, opts });
         if (this.fail) throw new Error('notifier down');
     }
@@ -182,11 +183,19 @@ describe('approvals', () => {
 
         expect(ctx.notifier.calls).toHaveLength(1);
         const [{ n, opts }] = ctx.notifier.calls as [RecordingNotifier['calls'][number]];
-        expect(opts).toEqual({ idempotencyKey: `${runId}:${approvalId}` });
+        expect(opts).toEqual({
+            idempotencyKey: `${runId}:${approvalId}`,
+            trigger: expect.objectContaining({
+                agent: 'release',
+                source: 'http',
+                id: run!.trigger.id,
+            }),
+        });
         expect(n).toMatchObject({
             kind: 'approval',
             agent: 'release',
             runId,
+            approvalId,
             expiresAt: new Date(1_000_000 + TIMEOUT),
         });
         expect(n.title).toContain('deploy');
@@ -593,6 +602,7 @@ describe('approvals', () => {
         await poll(ctx);
         expect(ctx.notifier.calls).toHaveLength(2);
         expect(ctx.notifier.calls[1]!.opts).toEqual(ctx.notifier.calls[0]!.opts);
+        expect(ctx.notifier.calls[1]!.opts.trigger.id).toBe(run!.trigger.id);
         expect(ctx.notifier.calls[1]!.n.resumeToken).toBe(tokenOf(ctx));
         expect((await ctx.store.getRun(runId))?.waiting?.notifiedAt).toBeInstanceOf(Date);
 
@@ -769,9 +779,9 @@ describe('approvals', () => {
 
 describe('Engine.inspectResumeToken', () => {
     const claims = {
-        runId: 'r1', 
-        approvalId: 'a1', 
-        tokenId: 't1', 
+        runId: 'r1',
+        approvalId: 'a1',
+        tokenId: 't1',
     };
 
     it('returns the claims of a valid token without touching the store', () => {

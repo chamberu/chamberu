@@ -2,7 +2,7 @@
     "name": "@chamvi/test-kit",
     "version": "0.1.0",
     "type": "module",
-    "description": "Test helpers for chamvi: a controllable clock, the store and workspace contract suites and a git fixture.",
+    "description": "Test helpers for chamvi: a controllable clock, the store and workspace contract suites, a git fixture and a fake GitHub.",
     "author": {
         "name": "Peter Placzek",
         "email": "contact@tada5hi.net",
@@ -42,7 +42,9 @@
         "chamvi",
         "testing",
         "store",
-        "contract"
+        "contract",
+        "github",
+        "fake"
     ],
     "publishConfig": {
         "access": "public"

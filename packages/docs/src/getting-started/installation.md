@@ -56,6 +56,7 @@ npm install @chamvi/sandbox @chamvi/coding @chamvi/sandbox-local    # developmen
 | `@chamvi/github` | Shipped (0.x), GitHub App webhooks and tools |
 | `@chamvi/sandbox`, `@chamvi/sandbox-local`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s` | Shipped (0.x), disposable workspaces |
 | `@chamvi/coding` | Shipped (0.x), coding tools over a workspace |
-| notifiers, `@chamvi/ui`, `chamvi` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
+| `@chamvi/notify-openclaw`, `@chamvi/notify-github` | Shipped (0.x), approval notifications to OpenClaw and GitHub |
+| `@chamvi/ui`, `chamvi` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
 
 chamvi is pre-1.0: a minor version may contain breaking changes, including changes to the store schema.

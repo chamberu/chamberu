@@ -6,14 +6,16 @@ chamvi is built milestone by milestone, each defined by one real agent that has 
 
 | Package | Contents |
 |---|---|
-| `@chamvi/core` | `defineAgent()`, trigger definitions, `Engine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore` |
-| `@chamvi/test-kit` | `describeStoreContract`, `ControllableClock` |
+| `@chamvi/core` | `defineAgent()`, trigger definitions, `Engine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore`, `consoleNotifier()` |
+| `@chamvi/test-kit` | `describeStoreContract`, `describeWorkspaceContract`, `ControllableClock`, `createGitFixture`, `createFakeGithub` |
 | `@chamvi/scheduler` | `createScheduler()` (one locked hubwire component per `cron()` trigger, overlap policies, timezones), `runJob()` for one-shot jobs |
 | `@chamvi/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |
 | `@chamvi/http` | REST control API, server-sent events, webhook intake, `/healthz`, `/readyz`, `/metrics`, the MCP endpoint, static-token, authup and OIDC authentication, graceful shutdown. See [HTTP API & MCP](/guide/http) |
 | `@chamvi/github` | GitHub App auth with an installation-token cache, the signed webhook route, `githubWebhook()` triggers deduplicated by delivery id, read tools and effect write tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
 | `@chamvi/sandbox` | Sandbox contracts, path, repository and limit rules, the run-scoped workspace manager with `create_workspace` and `dispose_workspace`. See [Workspaces & Coding](/guide/workspaces) |
 | `@chamvi/sandbox-local`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s` | Workspace providers: a temporary directory (development), a hardened container per workspace, a hardened pod per workspace; the `ghcr.io/chamvi/sandbox-node` image |
+| `@chamvi/notify-openclaw` | The OpenClaw notifier: approval requests into an OpenClaw chat through its hooks endpoint, with an `Idempotency-Key`. See [OpenClaw](/deployment/openclaw) |
+| `@chamvi/notify-github` | The GitHub notifier: approval requests as a comment on the run's issue or pull request, deduplicated by a hidden marker |
 | `@chamvi/coding` | Coding tools (`read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash`, `git_diff`) over a run's workspaces and the `ICodingBackend` contract |
 
 ## Milestones
@@ -39,8 +41,6 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 | Coding backend on the own tools | Planned (M1) | An `ICodingBackend` that runs the coding tools in a nested tool loop |
 | Workspace re-attach | Planned | A run resumed on another replica or after a restart finds its container or pod by label instead of a fresh workspace |
 | `@chamvi/coding-claude-code` | Planned (M3) | A coding backend that runs Claude Code inside the sandbox |
-| `@chamvi/notify-openclaw` | Planned (M1) | Notifications into OpenClaw chats. See [OpenClaw](/deployment/openclaw) |
-| `@chamvi/notify-github` | Planned (M1) | Notifications as issue or pull request comments |
 | `@chamvi/ui` | Planned (M1) | Vue 3 dashboard: runs with live steps, approvals inbox, agent state, schedules |
 | `chamvi` (CLI and deploy kit) | Planned (M1) | Umbrella package with `createApp()` and the `dev`, `build`, `start`, `run-job` and `migrate` commands, plus a base image, a Helm chart and a template repository. See [Deployment](/deployment/) |
 | `@chamvi/mail` | Planned (M2) | IMAP connector and tools |
