@@ -21,6 +21,7 @@ export function createPurgeTimer(options: PurgeTimerOptions): IPurgeTimer {
     } = options;
     let timer: { clear(): void } | undefined;
     let stopped = false;
+    let inFlight: Promise<void> | undefined;
 
     const arm = () => {
         if (stopped) {
@@ -29,14 +30,17 @@ export function createPurgeTimer(options: PurgeTimerOptions): IPurgeTimer {
 
         timer = clock.setTimeout(() => {
             timer = undefined;
-            store.purgeExpired()
+            inFlight = store.purgeExpired()
                 .then((result) => {
                     logger.debug('Purged expired idempotency keys and locks.', isObject(result) ? result : {});
                 })
                 .catch((error: unknown) => {
                     logger.error('Purging expired idempotency keys and locks failed.', error);
                 })
-                .finally(arm);
+                .finally(() => {
+                    inFlight = undefined;
+                    arm();
+                });
         }, intervalMs, { keepAlive: false });
     };
 
@@ -48,10 +52,11 @@ export function createPurgeTimer(options: PurgeTimerOptions): IPurgeTimer {
 
             arm();
         },
-        stop() {
+        async stop() {
             stopped = true;
             timer?.clear();
             timer = undefined;
+            await inFlight;
         },
     };
 }

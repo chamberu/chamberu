@@ -153,12 +153,34 @@ describe('storeModule', () => {
         clock.advance(DEFAULT_PURGE_INTERVAL_MS);
         expect(calls).toHaveLength(1);
 
-        await runHooks(harness.container, 'stopping');
-        await runHooks(harness.container, 'stopping');
+        const stopping = Promise.all([
+            runHooks(harness.container, 'stopping'),
+            runHooks(harness.container, 'stopping'),
+        ]);
         calls[0]!.resolve({ idempotencyKeys: 0, locks: 0 });
-        await flush();
+        await stopping;
         clock.advance(DEFAULT_PURGE_INTERVAL_MS * 3);
         expect(calls).toHaveLength(1);
+        await harness.stop();
+    });
+
+    it('stopping waits for a call in flight', async () => {
+        const { store, calls } = purgingStore();
+        const { harness, clock } = await setup({ store });
+        await runHooks(harness.container, 'started');
+        clock.advance(DEFAULT_PURGE_INTERVAL_MS);
+        expect(calls).toHaveLength(1);
+
+        let stopped = false;
+        const stopping = runHooks(harness.container, 'stopping').then(() => {
+            stopped = true;
+        });
+        await flush();
+        expect(stopped).toBe(false);
+
+        calls[0]!.resolve({});
+        await stopping;
+        expect(stopped).toBe(true);
         await harness.stop();
     });
 

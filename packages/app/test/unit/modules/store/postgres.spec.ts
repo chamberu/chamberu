@@ -5,10 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { randomUUID } from 'node:crypto';
 import { inspect } from 'node:util';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { STORE_ENTITIES, STORE_MIGRATIONS, TypeormStore } from '@chamvi/store-typeorm';
 import { ControllableClock } from '@chamvi/test-kit';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import {
     describe,
     expect,
@@ -50,6 +52,40 @@ function build(options: {
     };
 }
 
+let admin: DataSource | undefined;
+
+async function openAdmin(url: string): Promise<DataSource> {
+    admin = new DataSource({ type: 'postgres', url });
+    await admin.initialize();
+    return admin;
+}
+
+async function closeAdmin(): Promise<void> {
+    if (admin?.isInitialized) {
+        await admin.destroy();
+    }
+    admin = undefined;
+}
+
+/** A fresh database owned by a new role whose password is `password`, as a URL of that role. */
+async function createUrlWithPassword(password: string): Promise<string> {
+    const url = new URL(await createTestDatabaseUrl());
+    const role = `chamvi_role_${randomUUID().replaceAll('-', '')}`;
+    const database = url.pathname.slice(1);
+    const seed = new DataSource({ type: 'postgres', url: url.href });
+    await seed.initialize();
+    try {
+        await seed.query(`CREATE ROLE "${role}" LOGIN PASSWORD '${password}'`);
+        await seed.query(`ALTER DATABASE "${database}" OWNER TO "${role}"`);
+    } finally {
+        await seed.destroy();
+    }
+
+    url.username = role;
+    url.password = password;
+    return url.href;
+}
+
 async function tableExists(dataSource: DataSource, table: string): Promise<boolean> {
     const rows: Array<{ exists: string | null }> = await dataSource.query('SELECT to_regclass($1) AS exists', [table]);
     return rows[0]?.exists !== null;
@@ -64,6 +100,14 @@ describe('storeModule on a database URL', () => {
         expect(inspect(error, { depth: 5 })).not.toContain('sekr3t');
         expect(logger.lines.join('\n')).not.toContain('sekr3t');
         expect(inspect(harness.reported, { depth: 5 })).not.toContain('sekr3t');
+        expect(harness.container.has(AppToken.STORE)).toBe(false);
+    });
+
+    it('an uninitialized dataSource is a definition error', async () => {
+        const dataSource = new DataSource({ type: 'postgres', url: 'postgres://u:p@127.0.0.1:1/x' });
+        const { harness } = build({ store: { dataSource } });
+
+        await expect(harness.setup()).rejects.toBeInstanceOf(InvalidAgentDefinitionError);
         expect(harness.container.has(AppToken.STORE)).toBe(false);
     });
 
@@ -129,9 +173,48 @@ describePostgres('storeModule on Postgres', () => {
         await seed.destroy();
 
         const { harness } = build({ env: { DATABASE_URL: url } });
-        await expect(harness.setup()).rejects.toThrow(/chamvi_checkpoints/);
+        const error = await harness.setup().then(() => undefined, (e: unknown) => e);
+        expect(error).toBeInstanceOf(QueryFailedError);
+        expect(error).toMatchObject({ driverError: { code: '42P07' } });
+        expect((error as Error).message).toMatch(/chamvi_checkpoints/);
         expect(harness.container.resolve(AppToken.DATA_SOURCE).isInitialized).toBe(false);
         expect(harness.container.has(AppToken.STORE)).toBe(false);
+    });
+
+    it('a failed migration keeps the TypeORM error for a password found in the stack', async () => {
+        const url = await createUrlWithPassword('postgres');
+        const seed = new DataSource({ type: 'postgres', url });
+        await seed.initialize();
+        await seed.query('CREATE TABLE "chamvi_checkpoints" ("id" int)');
+        await seed.destroy();
+
+        const { harness } = build({ env: { DATABASE_URL: url } });
+        const error = await harness.setup().then(() => undefined, (e: unknown) => e);
+        expect(error).toBeInstanceOf(QueryFailedError);
+        expect(error).toMatchObject({ driverError: { code: '42P07' } });
+        expect((error as Error).message).toBe('relation "chamvi_checkpoints" already exists');
+    });
+
+    it('a stop after initialize rejects app_stopped, also for a password like "app"', async () => {
+        const url = await createUrlWithPassword('app');
+        const { harness } = build({ mode: 'migrate', env: { DATABASE_URL: url } });
+        const { initialize } = DataSource.prototype;
+        const spy = vi.spyOn(DataSource.prototype, 'initialize').mockImplementation(async function (this: DataSource) {
+            const result = await initialize.call(this);
+            harness.controller.abort(createStoppedError());
+            return result;
+        });
+
+        try {
+            const error = await harness.setup().then(() => undefined, (e: unknown) => e);
+            expect(error).toMatchObject({ code: APP_ERROR_CODE.STOPPED, message: 'The app was stopped.' });
+            const dataSource = harness.container.resolve(AppToken.DATA_SOURCE);
+            expect(dataSource.isInitialized).toBe(false);
+            expect(await tableExists(await openAdmin(url), 'chamvi_runs')).toBe(false);
+        } finally {
+            spy.mockRestore();
+            await closeAdmin();
+        }
     });
 
     it('a given dataSource is used and not destroyed', async () => {

@@ -32,6 +32,6 @@ export type PurgeTimerOptions = {
 
 export interface IPurgeTimer {
     start(): void;
-    /** Idempotent; also keeps a call in flight from re-arming. */
-    stop(): void;
+    /** Idempotent; keeps a call in flight from re-arming and resolves once it settled. */
+    stop(): Promise<void>;
 }

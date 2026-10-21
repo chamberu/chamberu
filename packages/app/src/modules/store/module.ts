@@ -5,38 +5,22 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { MemoryStore } from '@chamvi/core';
+import { InvalidAgentDefinitionError, MemoryStore } from '@chamvi/core';
 import type { IClock, IStore } from '@chamvi/core';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import type { DataSource } from 'typeorm';
 import { AppToken, ModuleName } from '../../module/constants.ts';
 import { throwIfStopped } from '../../module/helpers.ts';
+import type { ILogger } from '../../logger/types.ts';
 import type { AppContext } from '../../module/types.ts';
 import { MEMORY_STORE_WARNING, PURGE_HOOK_NAME } from './constants.ts';
-import { maskPassword } from './helpers.ts';
+import { destroyQuietly, isPurgingStore, maskPassword } from './helpers.ts';
 import { createPurgeTimer } from './purge.ts';
 import type {
     IPurgeTimer,
-    PurgingStore,
     StoreModuleOptions,
 } from './types.ts';
-
-async function destroyQuietly(dataSource: DataSource): Promise<void> {
-    if (!dataSource.isInitialized) {
-        return;
-    }
-
-    try {
-        await dataSource.destroy();
-    } catch {
-        // the setup error is the one that matters
-    }
-}
-
-function isPurgingStore(store: IStore): store is IStore & PurgingStore {
-    return typeof (store as Partial<PurgingStore>).purgeExpired === 'function';
-}
 
 /**
  * Registers `AppToken.STORE`: the given store; else a TypeormStore over the
@@ -74,10 +58,13 @@ export class StoreModule implements IModule {
         if (this.options.store) {
             ({ store } = this.options);
         } else if (this.options.dataSource) {
+            if (!this.options.dataSource.isInitialized) {
+                throw new InvalidAgentDefinitionError('storeModule({ dataSource }) needs an initialized data source.');
+            }
             container.register(AppToken.DATA_SOURCE, { useValue: this.options.dataSource });
             store = await this.typeormStore(context, this.options.dataSource, clock, migrate);
         } else if (typeof url === 'string') {
-            store = await this.connect(container, context, url, clock, migrate);
+            store = await this.connect(container, logger, context, url, clock, migrate);
         } else {
             store = new MemoryStore({ clock });
             if (!config.dev) {
@@ -106,8 +93,9 @@ export class StoreModule implements IModule {
     }
 
     async teardown(): Promise<void> {
-        this.purge?.stop();
+        const { purge } = this;
         this.purge = undefined;
+        await purge?.stop();
 
         const dataSource = this.created;
         this.created = undefined;
@@ -118,6 +106,7 @@ export class StoreModule implements IModule {
 
     protected async connect(
         container: IContainer,
+        logger: ILogger,
         context: AppContext,
         url: string,
         clock: IClock,
@@ -138,7 +127,7 @@ export class StoreModule implements IModule {
         try {
             await dataSource.initialize();
         } catch (error) {
-            await destroyQuietly(dataSource);
+            await destroyQuietly(dataSource, logger, url);
             throw maskPassword(error, url);
         }
         container.register(AppToken.DATA_SOURCE, { useValue: dataSource });
@@ -149,7 +138,7 @@ export class StoreModule implements IModule {
             this.created = dataSource;
             return store;
         } catch (error) {
-            await destroyQuietly(dataSource);
+            await destroyQuietly(dataSource, logger, url);
             throw maskPassword(error, url);
         }
     }
