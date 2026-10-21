@@ -9,11 +9,11 @@ import { EventEmitter } from 'node:events';
 import type { Env } from '@chamvi/app';
 import { ControllableClock } from '@chamvi/test-kit';
 import type { CliContext } from '../../src/run/types.ts';
-import type { ISignalTarget } from '../../src/signals/types.ts';
+import type { ISignalTarget, ProcessEvent } from '../../src/signals/types.ts';
 
 export type FakeProcess = {
-    /** An EventEmitter-backed signal target: `emit('SIGTERM')` delivers a signal. */
-    signals: ISignalTarget & { emit(signal: 'SIGTERM' | 'SIGINT'): void; listenerCount(signal: string): number };
+    /** An EventEmitter-backed signal target: `emit('SIGTERM')` delivers a signal, `emit('exit')` the process exit. */
+    signals: ISignalTarget & { emit(event: ProcessEvent): void; listenerCount(event: string): number };
     clock: ControllableClock;
     /** Every setExitCode call, in order. */
     exitCodes: number[];
@@ -34,17 +34,17 @@ export function createFakeProcess(): FakeProcess {
     const stderr: string[] = [];
 
     const signals: FakeProcess['signals'] = {
-        on(signal, fn) {
-            emitter.on(signal, fn);
+        on(event, fn) {
+            emitter.on(event, fn);
         },
-        off(signal, fn) {
-            emitter.off(signal, fn);
+        off(event, fn) {
+            emitter.off(event, fn);
         },
-        emit(signal) {
-            emitter.emit(signal);
+        emit(event) {
+            emitter.emit(event);
         },
-        listenerCount(signal) {
-            return emitter.listenerCount(signal);
+        listenerCount(event) {
+            return emitter.listenerCount(event);
         },
     };
 

@@ -112,8 +112,8 @@ export function processContext(): CliContext {
         env: process.env,
         clock: systemClock,
         signals: {
-            on: (signal, fn) => process.on(signal, fn),
-            off: (signal, fn) => process.off(signal, fn),
+            on: (event, fn) => process.on(event, fn),
+            off: (event, fn) => process.off(event, fn),
         },
         setExitCode: (code) => {
             process.exitCode = code;

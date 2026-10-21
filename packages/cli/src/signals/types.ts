@@ -9,10 +9,13 @@ import type { IClock } from '@chamvi/app';
 
 export type StopSignal = 'SIGTERM' | 'SIGINT';
 
+/** What a command listens for: the stop signals, SIGHUP (the terminal closed) and the process `exit` (`chamvi dev`). */
+export type ProcessEvent = StopSignal | 'SIGHUP' | 'exit';
+
 /** Where signals arrive: `process`, or a fake in tests. */
 export interface ISignalTarget {
-    on(signal: StopSignal, fn: () => void): void;
-    off(signal: StopSignal, fn: () => void): void;
+    on(event: ProcessEvent, fn: () => void): void;
+    off(event: ProcessEvent, fn: () => void): void;
 }
 
 export type SignalHandlersInput = {

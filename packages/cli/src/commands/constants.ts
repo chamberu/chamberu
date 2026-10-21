@@ -23,3 +23,11 @@ export const ENTRY_ARG = {
     description: 'The app entry (default: dist/index.mjs, src/index.ts for the source commands)',
     valueHint: 'path',
 } as const;
+
+/** The output folder of `chamvi build` (C2). */
+export const BUILD_OUT_DIR = 'dist';
+
+/** The optional peer `chamvi build` drives. */
+export const TSDOWN_PACKAGE = 'tsdown';
+
+export const MODULE_NOT_FOUND_CODE = 'ERR_MODULE_NOT_FOUND';
