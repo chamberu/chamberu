@@ -13,7 +13,7 @@ import {
     it,
     vi,
 } from 'vitest';
-import { ControllableClock, createFakeGithub  } from '@chamvi/test-kit';
+import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
 import { createTriageServer } from '../fixtures/readme-example.ts';
 import { START, deliver } from '../utils/app.ts';
 import { textModel } from '../utils/model.ts';
