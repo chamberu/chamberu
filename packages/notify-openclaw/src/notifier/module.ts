@@ -35,7 +35,7 @@ export function openclaw(options: OpenclawNotifierOptions): INotifier {
             const secrets = [resolved.hooksToken, n.resumeToken];
             try {
                 const body: OpenclawHookBody = {
-                    message: renderMessage(n, resolved.resumeUrl),
+                    message: renderMessage(n, resolved),
                     name: HOOK_NAME,
                     ...(resolved.agentId === undefined ? {} : { agentId: resolved.agentId }),
                     deliver: true,

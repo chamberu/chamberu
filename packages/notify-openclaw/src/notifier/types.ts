@@ -32,6 +32,13 @@ export type OpenclawNotifierOptions = {
     deliver: OpenclawDelivery;
     /** A link that answers an approval (the chamvi UI); holds the token. */
     resumeUrl?: (token: string) => string;
+    /**
+     * Also put the resume token and a ready-made `resume_run` MCP call into
+     * the message, default `false`: the OpenClaw agent then holds the token,
+     * and with `agent:<name>:approve` on its MCP principal a prompt injection
+     * in the body can make it approve.
+     */
+    resumeTool?: boolean;
     /** Default `OPENCLAW_TIMEOUT_MS` (30 s). */
     timeoutMs?: number;
     clock?: IClock;
@@ -57,6 +64,7 @@ export type ResolvedOpenclawOptions = {
     agentId?: string;
     deliver: OpenclawDelivery;
     resumeUrl?: (token: string) => string;
+    resumeTool: boolean;
     timeoutMs: number;
     clock: IClock;
     fetch: typeof globalThis.fetch;

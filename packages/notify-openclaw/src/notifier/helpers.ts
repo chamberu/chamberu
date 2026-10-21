@@ -14,6 +14,7 @@ import {
     ERROR_TEXT_MAX_LENGTH,
     IDEMPOTENCY_KEY_MAX_LENGTH,
     MESSAGE_BODY_MAX_LENGTH,
+    NO_TOKEN_HINT,
     OPENCLAW_REQUEST_ERROR_CODE,
     OPENCLAW_TIMEOUT_MS,
 } from './constants.ts';
@@ -86,6 +87,8 @@ export function resolveOptions(options: OpenclawNotifierOptions): ResolvedOpencl
     if (options.resumeUrl !== undefined && typeof options.resumeUrl !== 'function') {
         throw invalid('resumeUrl must be a function.');
     }
+    const resumeTool = options.resumeTool ?? false;
+    if (typeof resumeTool !== 'boolean') throw invalid('resumeTool must be a boolean.');
     const timeoutMs = options.timeoutMs ?? OPENCLAW_TIMEOUT_MS;
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw invalid('timeoutMs must be a positive integer.');
     return {
@@ -99,6 +102,7 @@ export function resolveOptions(options: OpenclawNotifierOptions): ResolvedOpencl
             ...(accountId === undefined ? {} : { accountId }),
         },
         ...(options.resumeUrl ? { resumeUrl: options.resumeUrl } : {}),
+        resumeTool,
         timeoutMs,
         clock: options.clock ?? systemClock,
         fetch: options.fetch ?? globalThis.fetch,
@@ -121,9 +125,14 @@ export function cutText(text: string, max: number): string {
 /**
  * The text OpenClaw's agent turn relays: deterministic for one notification
  * (no clock value, no random id), so a resend replays instead of starting a
- * second run.
+ * second run. An approval carries the token only inside the `resumeUrl` link,
+ * and as a `resume_run` call only with `resumeTool`.
  */
-export function renderMessage(n: Notification, resumeUrl?: (token: string) => string): string {
+export function renderMessage(
+    n: Notification,
+    options: Pick<ResolvedOpenclawOptions, 'resumeUrl' | 'resumeTool'>,
+): string {
+    const { resumeUrl, resumeTool } = options;
     const sections = [
         'chamvi notification. Relay it to the user; keep every link, id and token exactly as written.',
         n.title,
@@ -134,7 +143,11 @@ export function renderMessage(n: Notification, resumeUrl?: (token: string) => st
         const lines: string[] = [];
         if (n.expiresAt) lines.push(`Expires: ${n.expiresAt.toISOString()}`);
         if (resumeUrl) lines.push(`Approve or deny: ${resumeUrl(n.resumeToken)}`);
-        lines.push(`Or call the chamvi MCP tool resume_run with ${JSON.stringify({ token: n.resumeToken, approved: true })} to approve, or "approved":false to deny.`);
+        if (resumeTool) {
+            lines.push(`Or call the chamvi MCP tool resume_run with ${JSON.stringify({ token: n.resumeToken, approved: true })} to approve, or "approved":false to deny.`);
+        } else if (!resumeUrl) {
+            lines.push(NO_TOKEN_HINT);
+        }
         sections.push(lines.join('\n'));
     }
     return sections.join('\n\n');

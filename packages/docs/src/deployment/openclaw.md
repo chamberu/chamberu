@@ -30,10 +30,10 @@ In the OpenClaw configuration:
 
 `deliver.channel` and `deliver.to` must name a concrete destination of your OpenClaw setup (OpenClaw refuses `channel: 'last'` and a partial destination for hooks); the examples use placeholders.
 
-For approvals the message includes how to answer: the `resumeUrl` link when configured (a link into the UI's approvals inbox), and the `resume_run` MCP tool call with the token, so the owner can approve from the chat.
+For approvals the message includes how to answer: the `resumeUrl` link when configured (a link into the UI's approvals inbox), else a line saying to answer in the chamvi UI or through its MCP server. By default it never carries the resume token or a `resume_run` call. With `resumeTool: true` it also carries the token and a ready-made `resume_run` MCP call, so the owner can approve from the chat.
 
-::: warning The relay agent holds the token
-The notification body is the tool input as the model wrote it and may repeat untrusted text (an issue body, a mail). OpenClaw wraps hook content as external, but that does not take tools away: an injected instruction reaches the OpenClaw agent next to the token and the `resume_run` call. If that agent's MCP principal holds `agent:<name>:approve`, a turn that follows the instruction approves without the owner. Grant it only when you accept that, or relay hooks through a separate, restricted OpenClaw agent (`agentId`, without the chamvi MCP server) and answer through the `resumeUrl` link.
+::: warning With resumeTool the relay agent holds the token
+The notification body is the tool input as the model wrote it and may repeat untrusted text (an issue body, a mail). OpenClaw wraps hook content as external, but that does not take tools away: with `resumeTool: true` an injected instruction reaches the OpenClaw agent next to the token and the `resume_run` call. If that agent's MCP principal holds `agent:<name>:approve`, a turn that follows the instruction approves without the owner. Turn `resumeTool` on only when you accept that; otherwise keep the default, or relay hooks through a separate, restricted OpenClaw agent (`agentId`, without the chamvi MCP server) and answer through the `resumeUrl` link.
 :::
 
 ### Caveats

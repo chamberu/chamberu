@@ -21,7 +21,7 @@ const MESSAGE_BODY_MAX_LENGTH: 8_000;
 
 <<< ../../../notify-openclaw/src/notifier/types.ts#public{ts}
 
-Throws `InvalidAgentDefinitionError` for an empty `name`, `hooksToken`, `agentId`, `deliver.to` or `deliver.accountId`, a `deliver.channel` that is empty or `last`, a `baseUrl` that is no absolute `http:`/`https:` URL or carries credentials, a query or a hash, a `hooksToken` that `fetch` could not send as a header (a control character, a character above U+00FF, surrounding whitespace), a `hooksPath` that does not start with `/` or is `/` (trailing slashes are dropped, so `/hooks/` posts to `/hooks/agent`), a `resumeUrl` that is no function and a `timeoutMs` that is no positive integer.
+Throws `InvalidAgentDefinitionError` for an empty `name`, `hooksToken`, `agentId`, `deliver.to` or `deliver.accountId`, a `deliver.channel` that is empty or `last`, a `baseUrl` that is no absolute `http:`/`https:` URL or carries credentials, a query or a hash, a `hooksToken` that `fetch` could not send as a header (a control character, a character above U+00FF, surrounding whitespace), a `hooksPath` that does not start with `/` or is `/` (trailing slashes are dropped, so `/hooks/` posts to `/hooks/agent`), a `resumeUrl` that is no function, a `resumeTool` that is no boolean and a `timeoutMs` that is no positive integer.
 
 <<< @/snippets/notify-openclaw.ts#notifier
 
@@ -52,7 +52,7 @@ Approve or deny: <resumeUrl(token)>
 Or call the chamvi MCP tool resume_run with {"token":"<token>","approved":true} to approve, or "approved":false to deny.
 ```
 
-The last block is sent for approvals only; `Approve or deny` only with `resumeUrl`. A cut body ends with `… (cut, <n> more characters)` and never splits a surrogate pair.
+The last block is sent for approvals only; `Approve or deny` only with `resumeUrl`, the `resume_run` line only with `resumeTool: true`. With neither, the block ends with `Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.` instead. By default (`resumeTool: false`) the token is therefore in the request only inside the `resumeUrl` link, and without `resumeUrl` nowhere (body or headers). A cut body ends with `… (cut, <n> more characters)` and never splits a surrogate pair.
 
 ### Failures
 

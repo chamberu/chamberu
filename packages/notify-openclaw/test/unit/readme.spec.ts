@@ -58,7 +58,10 @@ describe('README example', () => {
             await engine.idle();
             expect((await engine.getRun(runId))?.status).toBe('waiting');
             expect(fake.dispatched).toHaveLength(1);
-            expect(fake.dispatched[0]!.message).toContain('https://chamvi.example/ui/approvals?token=');
+            const { message } = fake.dispatched[0]!;
+            expect(message).toContain('https://chamvi.example/ui/approvals?token=');
+            expect(message).not.toContain('resume_run');
+            expect(message).not.toContain('"token"');
         } finally {
             await engine.stop();
         }

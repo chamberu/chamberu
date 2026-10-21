@@ -22,6 +22,7 @@ import {
     http,
 } from '@chamvi/core';
 import { openclaw } from '@chamvi/notify-openclaw';
+import type { OpenclawNotifierOptions } from '@chamvi/notify-openclaw';
 import { ControllableClock } from '@chamvi/test-kit';
 import { approvalModel } from '../../utils/model.ts';
 import { createFakeOpenclaw } from '../../utils/openclaw.ts';
@@ -35,7 +36,10 @@ afterEach(async () => {
     engines.length = 0;
 });
 
-function setup(model: LanguageModel = approvalModel('deploy', { env: 'prod' })) {
+function setup(
+    model: LanguageModel = approvalModel('deploy', { env: 'prod' }),
+    patch: Partial<OpenclawNotifierOptions> = {},
+) {
     const clock = new ControllableClock(new Date('2026-10-21T09:00:00Z'));
     const fake = createFakeOpenclaw({ token: TOKEN, clock });
     const executed: unknown[] = [];
@@ -66,6 +70,7 @@ function setup(model: LanguageModel = approvalModel('deploy', { env: 'prod' })) 
                 deliver: { channel: 'telegram', to: '12345' },
                 clock,
                 fetch: fake.fetch,
+                ...patch,
             }),
         },
         resumeSecret: 'resume-secret',
@@ -147,8 +152,8 @@ describe('openclaw with the engine', () => {
         expect((await ctx.engine.getRun(runId))?.waiting?.notifiedAt).toBeInstanceOf(Date);
     });
 
-    it('answers through the token in the message', async () => {
-        const ctx = setup();
+    it('answers through the token in the message with resumeTool', async () => {
+        const ctx = setup(undefined, { resumeTool: true });
         const runId = await dispatchToWaiting(ctx);
         const token = /"token":"([^"]+)"/.exec(ctx.fake.dispatched[0]!.message)?.[1];
         expect(token).toBeTypeOf('string');

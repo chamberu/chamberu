@@ -137,8 +137,51 @@ describe('openclaw notify', () => {
         expect(fake.requests[0]!.url).toBe('http://openclaw:18789/hooks/agent');
     });
 
-    it('renders an approval', async () => {
+    it('renders an approval without the token by default', async () => {
         const { fake, notifier } = setup();
+        await notifier.notify(approval, opts);
+        expect(messageOf(fake.requests[0]!.body)).toBe([
+            'chamvi notification. Relay it to the user; keep every link, id and token exactly as written.',
+            '',
+            'Approval required: deploy',
+            '',
+            approval.body,
+            '',
+            'Agent: release',
+            'Run: r1',
+            '',
+            'Expires: 2026-10-21T10:00:00.000Z',
+            'Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.',
+        ].join('\n'));
+    });
+
+    it('never sends the token by default', async () => {
+        const { fake, notifier } = setup();
+        const secret = 'resume-token-c8f1e2d4';
+        await notifier.notify({ ...approval, resumeToken: secret }, opts);
+        const [request] = fake.requests;
+        const sent = JSON.stringify({
+            url: request!.url,
+            headers: request!.headers,
+            body: request!.body,
+        });
+        expect(sent).not.toContain(secret);
+        expect(sent).not.toContain(encodeURIComponent(secret));
+        expect(sent).not.toContain('resume_run');
+    });
+
+    it('renders only the resume link when configured', async () => {
+        const { fake, notifier } = setup({ resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}` });
+        await notifier.notify(approval, opts);
+        const message = messageOf(fake.requests[0]!.body);
+        expect(message.endsWith('Expires: 2026-10-21T10:00:00.000Z\nApprove or deny: https://app.example/ui/approvals?token=tok')).toBe(true);
+        expect(message).not.toContain('"token"');
+        expect(message).not.toContain('resume_run');
+        expect(message).not.toContain('carries no resume token');
+    });
+
+    it('renders the token and the resume_run call with resumeTool', async () => {
+        const { fake, notifier } = setup({ resumeTool: true });
         await notifier.notify(approval, opts);
         expect(messageOf(fake.requests[0]!.body)).toBe([
             'chamvi notification. Relay it to the user; keep every link, id and token exactly as written.',
@@ -155,13 +198,14 @@ describe('openclaw notify', () => {
         ].join('\n'));
     });
 
-    it('renders the resume link when configured', async () => {
-        const { fake, notifier } = setup({ resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}` });
+    it('renders the link and the resume_run call with resumeTool and resumeUrl', async () => {
+        const { fake, notifier } = setup({
+            resumeTool: true,
+            resumeUrl: (token) => `https://app.example/ui/approvals?token=${token}`,
+        });
         await notifier.notify(approval, opts);
         const message = messageOf(fake.requests[0]!.body);
-        expect(message).toContain('Approve or deny: https://app.example/ui/approvals?token=tok');
-        expect(message).toContain('"token":"tok"');
-        expect(message).toContain('resume_run');
+        expect(message).toContain('Approve or deny: https://app.example/ui/approvals?token=tok\nOr call the chamvi MCP tool resume_run with {"token":"tok","approved":true}');
     });
 
     it('renders other kinds without approval lines', async () => {

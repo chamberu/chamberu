@@ -54,8 +54,15 @@ describe('openclaw options', () => {
         ['a zero timeoutMs', { timeoutMs: 0 }],
         ['a fractional timeoutMs', { timeoutMs: 1.5 }],
         ['a non-function resumeUrl', { resumeUrl: 'x' as unknown as OpenclawNotifierOptions['resumeUrl'] }],
+        ['a non-boolean resumeTool', { resumeTool: 'yes' as unknown as boolean }],
+        ['a resumeTool of 1', { resumeTool: 1 as unknown as boolean }],
     ])('rejects %s', (_label, patch) => {
         expect(() => openclaw({ ...valid, ...patch })).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('accepts a boolean resumeTool', () => {
+        expect(() => openclaw({ ...valid, resumeTool: true })).not.toThrow();
+        expect(() => openclaw({ ...valid, resumeTool: false })).not.toThrow();
     });
 
     it('builds the hook url', () => {
