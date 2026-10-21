@@ -78,6 +78,7 @@ describe('metrics', () => {
         for (let i = 0; i < 5; i++) {
             await send(app, `/api/runs/${crypto.randomUUID()}`, { token: ADMIN_TOKEN });
             await send(app, `/api/runs/${crypto.randomUUID()}/cancel`, { method: 'POST' });
+            await send(app, `/api/runs/${crypto.randomUUID()}/approve`, { method: 'POST' });
             await send(app, `/api/nope/${crypto.randomUUID()}`);
             await send(app, `/api/agents/echo/state/kv/k${i}`, { token: ADMIN_TOKEN });
             await send(app, `/api/hooks/hooked/x${i}/y`, { method: 'POST' });
@@ -90,6 +91,7 @@ describe('metrics', () => {
             '/agents/:name/state/kv/:key',
             '/hooks/:agent/*',
             '/runs/:id',
+            '/runs/:id/approve',
             '/runs/:id/artifacts',
             '/runs/:id/artifacts/:artifactId',
             '/runs/:id/cancel',

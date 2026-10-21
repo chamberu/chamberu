@@ -5,4 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export type { InvokerView, RunListQuery, RunView } from './types.ts';
+export type {
+    ApproveBody,
+    InvokerView,
+    RunListQuery,
+    RunView,
+} from './types.ts';

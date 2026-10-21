@@ -41,6 +41,14 @@ export type StartRunBody = {
     attachments?: ArtifactInput[];
 };
 
+/** Body of `POST /runs/:id/approve`. */
+export type ApproveBody = {
+    /** The wait point being answered; another one than the run's current is 409. */
+    approvalId: string;
+    approved: boolean;
+    reason?: string;
+};
+
 /** Body of `POST /resume`; internal. */
 export type ResumeBody = {
     token: string;
