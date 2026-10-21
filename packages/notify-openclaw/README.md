@@ -117,7 +117,7 @@ export function createApprovalEngine(
 }
 ```
 
-Each approval becomes one `POST <baseUrl><hooksPath>/agent` with the body `{ message, name: 'chamvi', agentId?, deliver: true, channel, to, accountId? }`, the hooks token as bearer token and the engine's idempotency key (`<runId>:<approvalId>`) as `Idempotency-Key`. The message holds the notification's title, its body (cut to 8 000 characters), the agent and the run id; for an approval also the expiry and the `approvalUrl` link when configured (without it, a line saying to answer in the chamvi UI or through its MCP server). The resume token is never in the request (neither the URL, the headers nor the body), unless `resumeTool: true` adds it with a ready-made `resume_run` call.
+Each approval becomes one `POST <baseUrl><hooksPath>/agent` with the body `{ message, name: 'chamvi', agentId?, deliver: true, channel, to, accountId? }`, the hooks token as bearer token and the engine's idempotency key (`<runId>:<approvalId>`) as `Idempotency-Key`. The message holds the notification's title, its body (cut to 8 000 characters), the agent and the run id; for an approval also the expiry and the `approvalUrl` link when configured (without it, a line saying to answer in the chamvi UI or through `POST /runs/:id/approve`). The resume token is never in the request (neither the URL, the headers nor the body), unless `resumeTool: true` adds it with a ready-made `resume_run` call.
 
 Any 2xx response counts as sent (OpenClaw answers `200 { ok: true, runId }` once it admitted the hook). Every other answer throws a `ChamviError` with code `openclaw_request` (`OpenClaw <status>: <response text>`, with `retry after <s>` for a `Retry-After`), as does a network failure (`OpenClaw request failed: <message> (<cause>)`, the cause naming e.g. `ECONNREFUSED` or `ENOTFOUND`) and a gateway that does not answer within `timeoutMs` (30 s). The engine reports it to `onError` and sends again on the next poll, with the same key and a byte-identical body, until one send succeeds.
 
@@ -125,8 +125,8 @@ Any 2xx response counts as sent (OpenClaw answers `200 { ok: true, runId }` once
 
 By default the message carries no resume token and no `resume_run` call:
 
-- **A link** (`approvalUrl({ runId, approvalId, agent })`), when configured, to the run's approval in the chamvi UI, e.g. `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`. The link holds ids only; the owner opens it, signs in and answers through the token-less `POST /runs/:id/approve`, which requires `agent:<agent>:approve` of the signed-in principal.
-- Without `approvalUrl`, the message says to answer in the chamvi UI or through its MCP server.
+- **A link** (`approvalUrl({ runId, approvalId, agent })`), when configured, to the run's approval in the chamvi UI, e.g. `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`. The link holds ids only; the owner opens it, signs in and answers through the token-less `POST /runs/:id/approve`. The signed-in principal needs `agent:<agent>:approve` to answer and `run:read` or `agent:<agent>:run` for the UI to load the run and show its approval.
+- Without `approvalUrl`, the message says to answer in the chamvi UI or through `POST /runs/:id/approve` (MCP `resume_run` needs the token, which only `resumeTool: true` adds).
 
 With **`resumeTool: true`** the message also carries the MCP call `resume_run` with `{"token":"<token>","approved":true}` (or `"approved":false`), so OpenClaw's agent can answer through its MCP connection to the app. The message then asks the OpenClaw agent to keep every link, id and token exactly as written (else every link and id).
 

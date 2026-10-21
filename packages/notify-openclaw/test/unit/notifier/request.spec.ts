@@ -154,8 +154,10 @@ describe('openclaw notify', () => {
             'Run: r1',
             '',
             'Expires: 2026-10-21T10:00:00.000Z',
-            'Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.',
+            'Answer it in the chamvi UI (or through POST /runs/:id/approve); this message carries no resume token.',
         ].join('\n'));
+        // the token-less hint names no path that needs the token (MCP resume_run)
+        expect(messageOf(fake.requests[0]!.body)).not.toMatch(/MCP|resume_run/);
     });
 
     it.each<[string, Partial<OpenclawNotifierOptions>]>([

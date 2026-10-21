@@ -207,7 +207,7 @@ export function renderComment(
             undefined;
         footer.push(link ?
             `${until} Approve or deny: ${link}` :
-            `${until} Answer it in the chamvi UI, the REST API or the MCP tool resume_run.`);
+            `${until} Answer it in the chamvi UI or through POST /runs/:id/approve.`);
     }
     footer.push(`Run \`${n.runId}\` of agent \`${n.agent}\`.`);
     sections.push(footer.join('\n'), input.marker);

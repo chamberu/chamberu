@@ -29,4 +29,4 @@ export const IDEMPOTENCY_KEY_MAX_LENGTH = 256;
 export const ERROR_TEXT_MAX_LENGTH = 500;
 
 /** An approval line without `approvalUrl` and `resumeTool`: how to answer, without the token. */
-export const NO_TOKEN_HINT = 'Answer it in the chamvi UI or through the chamvi MCP server; this message carries no resume token.';
+export const NO_TOKEN_HINT = 'Answer it in the chamvi UI (or through POST /runs/:id/approve); this message carries no resume token.';

@@ -58,8 +58,10 @@ describe('renderComment', () => {
     it('never includes the token', () => {
         const comment = renderComment(approval, { mentions: [], marker: '<!-- chamvi:effect=r1:a1 -->' });
         expect(comment).not.toContain('secret-token');
-        expect(comment).toContain('Answer it in the chamvi UI, the REST API or the MCP tool resume_run.');
+        expect(comment).toContain('Answer it in the chamvi UI or through POST /runs/:id/approve.');
         expect(comment.startsWith('### ')).toBe(true);
+        // the comment holds no token, so it names no path that needs one
+        expect(comment).not.toMatch(/MCP|resume_run|REST API/);
         const linked = renderComment(approval, {
             mentions: [],
             approvalUrl: (ref) => `https://app.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}`,
@@ -82,7 +84,7 @@ describe('renderComment', () => {
         });
         expect(urls).toEqual([]);
         expect(comment).not.toContain('Approve or deny');
-        expect(comment).toContain('Answer it in the chamvi UI, the REST API or the MCP tool resume_run.');
+        expect(comment).toContain('Answer it in the chamvi UI or through POST /runs/:id/approve.');
     });
 
     it('renders other kinds without the approval line', () => {
