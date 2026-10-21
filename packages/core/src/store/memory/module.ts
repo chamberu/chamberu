@@ -12,7 +12,7 @@ import type { IClock } from '../../clock/index.ts';
 import { InvalidRunStateError, RunNotFoundError } from '../../errors/index.ts';
 import type { Checkpoint, Run, Step } from '../../run/types.ts';
 import type { IStore } from '../types.ts';
-import { copy } from './helpers.ts';
+import { compareCodePoints, copy } from './helpers.ts';
 import type { Expiring } from './types.ts';
 
 /**
@@ -207,10 +207,7 @@ export class MemoryStore implements IStore {
         const entries = this.kv.entries().toArray()
             .filter(([id]) => id.startsWith(prefix))
             .map(([id, value]) => ({ key: id.slice(prefix.length), value }))
-            .sort((a, b) => {
-                if (a.key < b.key) return -1;
-                return a.key > b.key ? 1 : 0;
-            });
+            .sort((a, b) => compareCodePoints(a.key, b.key));
         const offset = q.offset ?? 0;
         const end = q.limit === undefined ? undefined : offset + q.limit;
         return entries.slice(offset, end).map((entry) => ({ key: entry.key, value: copy(entry.value) }));

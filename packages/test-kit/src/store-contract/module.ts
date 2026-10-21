@@ -179,6 +179,15 @@ export function describeStoreContract(
             expect((await store.kvList('triage'))[1]!.value).toEqual([1]);
         });
 
+        it('kvList orders an astral key after every BMP key (code points, not UTF-16 units)', async () => {
+            const { store } = await setup();
+            await store.kvSet('triage', '\u{1F600}', 'emoji');
+            await store.kvSet('triage', '\uFFFD', 'replacement');
+            await store.kvSet('triage', 'z', 'ascii');
+            expect((await store.kvList('triage')).map((e) => e.key)).toEqual(['z', '\uFFFD', '\u{1F600}']);
+            expect((await store.kvList('triage', { offset: 1, limit: 1 })).map((e) => e.key)).toEqual(['\uFFFD']);
+        });
+
         it('kvSet with undefined removes the key', async () => {
             const { store } = await setup();
             await store.kvSet('a', 'k', 1);
