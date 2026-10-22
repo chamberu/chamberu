@@ -31,7 +31,8 @@ type EnvOption = keyof typeof VARIABLES;
 /**
  * createGithubApp() over env (C4), explicit options winning; only the options
  * not given are read. An option error for a value read from env names the
- * variable instead (createGithubApp's messages never echo a key or secret).
+ * variable instead and drops createGithubApp's `got "<value>"` tail, so it
+ * never echoes the value.
  */
 export function createGithubAppFromEnv(env: Env, options: Partial<GithubAppOptions>): IGithubApp {
     const fromEnv = new Set<EnvOption>();
@@ -64,7 +65,9 @@ export function createGithubAppFromEnv(env: Env, options: Partial<GithubAppOptio
         if (error instanceof InvalidAgentDefinitionError) {
             const key = [...fromEnv].find((option) => error.message.startsWith(`${option} `));
             if (key) {
-                throw new InvalidAgentDefinitionError(`${VARIABLES[key]}${error.message.slice(key.length)}`);
+                // createGithubApp ends some messages with `, got "<value>".`; an env value is never echoed
+                const rule = error.message.slice(key.length).replace(/, got [\s\S]*$/, '.');
+                throw new InvalidAgentDefinitionError(`${VARIABLES[key]}${rule}`);
             }
         }
         throw error;

@@ -72,6 +72,22 @@ describe('githubModule', () => {
             .toThrow('GITHUB_APP_ID is required.');
     });
 
+    it.each([
+        ['GITHUB_API_URL', 'https://ghe.example.com/api/v3?access_token=s3cr3t', 's3cr3t'],
+        ['GITHUB_APP_SLUG', 'Secret-Slug', 'Secret-Slug'],
+    ])('a malformed %s names it and never echoes the value', (name, value, secret) => {
+        let error: unknown;
+        try {
+            githubModule({ env: githubEnv({ [name]: value }) });
+        } catch (e) {
+            error = e;
+        }
+        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((error as Error).message).toMatch(new RegExp(`^${name} must `));
+        expect((error as Error).message).not.toContain(secret);
+        expect((error as Error).message).toMatch(/\.$/);
+    });
+
     it('a private key error never echoes the key', () => {
         const key = 'not-a-key-but-a-secret-value';
         let error: unknown;
