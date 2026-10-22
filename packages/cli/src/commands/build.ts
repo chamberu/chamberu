@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { Dirent } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { defineCommand } from 'citty';
@@ -81,14 +82,14 @@ async function assertOutDir(cwd: string, outDir: string, entry: string): Promise
         throw refuse('holds the entry');
     }
 
-    let names: Awaited<ReturnType<typeof readdir>>;
+    let items: Dirent[];
     try {
-        names = await readdir(dir, { withFileTypes: true });
+        items = await readdir(dir, { withFileTypes: true });
     } catch {
         // missing: tsdown creates it
         return;
     }
-    const foreign = names.some((item) => !item.isFile() || !BUILD_OUTPUT_PATTERN.test(item.name));
+    const foreign = items.some((item) => !item.isFile() || !BUILD_OUTPUT_PATTERN.test(item.name));
     if (foreign) {
         throw refuse('holds files the build did not write');
     }
