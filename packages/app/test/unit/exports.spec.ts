@@ -8,7 +8,6 @@
 import { describe, expect, it } from 'vitest';
 import * as app from '@chamvi/app';
 import * as authup from '@chamvi/app/authup';
-import * as sandbox from '@chamvi/app/sandbox';
 import * as testing from '@chamvi/app/testing';
 
 describe('public api', () => {
@@ -118,7 +117,6 @@ describe('public api', () => {
     });
 
     it.each([
-        ['sandbox', sandbox, ['sandboxModule']],
         ['authup', authup, ['authupModule', 'oidcModule']],
     ] as const)('@chamvi/app/%s exports its modules', (_, entry, names) => {
         for (const name of names) {

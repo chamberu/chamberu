@@ -25,12 +25,8 @@ export default defineConfig({
             { find: /^@chamvi\/scheduler$/, replacement: fileURLToPath(new URL('../../scheduler/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/store-typeorm$/, replacement: fileURLToPath(new URL('../../store-typeorm/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/test-kit$/, replacement: fileURLToPath(new URL('../../test-kit/src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/sandbox$/, replacement: fileURLToPath(new URL('../../sandbox/src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/sandbox-local$/, replacement: fileURLToPath(new URL('../../sandbox-local/src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/sandbox-docker$/, replacement: fileURLToPath(new URL('../../sandbox-docker/src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/sandbox-k8s$/, replacement: fileURLToPath(new URL('../../sandbox-k8s/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/app$/, replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/app\/(sandbox|authup|testing)$/, replacement: `${fileURLToPath(new URL('../src/', import.meta.url))}$1/index.ts` },
+            { find: /^@chamvi\/app\/(authup|testing)$/, replacement: `${fileURLToPath(new URL('../src/', import.meta.url))}$1/index.ts` },
         ],
     },
     test: {

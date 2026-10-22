@@ -5,26 +5,32 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { AppToken, envOneOf, envString } from '@chamvi/app';
+import type { AppContext, IContainer, IModule } from '@chamvi/app';
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import type { Engine } from '@chamvi/core';
-import { DEFAULT_SANDBOX_IMAGE, createWorkspaceManager } from '@chamvi/sandbox';
-import type { ISandboxProvider, IWorkspaceManager } from '@chamvi/sandbox';
-import type { IContainer } from 'eldin';
-import type { IModule } from 'orkos';
 import { isObject } from 'smob';
-import { envOneOf, envString } from '../env/module.ts';
-import { isPackageNotFound } from '../models/helpers.ts';
-import { AppToken } from '../module/constants.ts';
-import type { AppContext } from '../module/types.ts';
+import { provideSandboxContext } from '../context/module.ts';
+import { createWorkspaceManager } from '../manager/module.ts';
+import type { IWorkspaceManager } from '../manager/types.ts';
+import { DEFAULT_SANDBOX_IMAGE } from '../provider/constants.ts';
+import type { ISandboxProvider } from '../provider/types.ts';
 import {
     SANDBOX_MODULE_NAME,
     SANDBOX_PROVIDER_IDS,
     SANDBOX_PROVIDER_NAMES,
     SANDBOX_PROVIDER_PACKAGES,
 } from './constants.ts';
+import { isPackageNotFound, loadPackage } from './helpers.ts';
 import { createLazyProvider } from './provider.ts';
-import type { LazyProvider } from './provider.ts';
-import type { SandboxModuleOptions, SandboxProviderName } from './types.ts';
+import type {
+    DockerProviderPackage,
+    KubernetesProviderPackage,
+    LazyProvider,
+    LocalProviderPackage,
+    SandboxModuleOptions,
+    SandboxProviderName,
+} from './types.ts';
 
 /**
  * Run-scoped workspaces (`.manager`, built when the factory is called). In
@@ -103,6 +109,7 @@ export class SandboxModule implements IModule {
                 name: SANDBOX_MODULE_NAME,
                 engineCreated: (engine: Engine) => {
                     detach = this.manager.attach(engine);
+                    provideSandboxContext(engine, this.manager);
                 },
                 drained: async () => {
                     detach?.();
@@ -118,17 +125,18 @@ export class SandboxModule implements IModule {
         name: SandboxProviderName,
         options: { image: string; namespace?: string },
     ): Promise<ISandboxProvider> {
+        const specifier = SANDBOX_PROVIDER_PACKAGES[name];
         switch (name) {
             case 'docker': {
-                const { createDockerSandbox } = await import('@chamvi/sandbox-docker');
+                const { createDockerSandbox } = await loadPackage<DockerProviderPackage>(specifier);
                 return createDockerSandbox({ image: options.image });
             }
             case 'kubernetes': {
-                const { createKubernetesSandbox } = await import('@chamvi/sandbox-k8s');
+                const { createKubernetesSandbox } = await loadPackage<KubernetesProviderPackage>(specifier);
                 return createKubernetesSandbox({ namespace: options.namespace!, image: options.image });
             }
             default: {
-                const { createLocalSandbox } = await import('@chamvi/sandbox-local');
+                const { createLocalSandbox } = await loadPackage<LocalProviderPackage>(specifier);
                 return createLocalSandbox();
             }
         }

@@ -5,12 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { ISandboxProvider } from '@chamvi/sandbox';
-
-export type LazyProvider = ISandboxProvider & {
-    /** Loads the provider once (concurrent callers share it); a failure is not cached. */
-    load(): Promise<void>;
-};
+import type { ISandboxProvider } from '../provider/types.ts';
+import type { LazyProvider } from './types.ts';
 
 /**
  * A provider that loads the real one on first use, so an app imports only

@@ -8,11 +8,16 @@
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { InvalidAgentDefinitionError, defineAgent, http } from '@chamvi/core';
+import {
+    InvalidAgentDefinitionError,
+    defineAgent,
+    defineTool,
+    http,
+} from '@chamvi/core';
 import type { Agent, Engine } from '@chamvi/core';
+import { injectSandboxContext } from '@chamvi/sandbox';
 import type { ISandboxProvider, IWorkspaceManager } from '@chamvi/sandbox';
 import { createLocalSandbox } from '@chamvi/sandbox-local';
-import type { IModule } from 'orkos';
 import {
     afterEach,
     describe,
@@ -20,20 +25,20 @@ import {
     it,
     vi,
 } from 'vitest';
+import { z } from 'zod';
 import {
     AppToken,
     configModule,
     engineModule,
     storeModule,
 } from '@chamvi/app';
-import type { AppMode } from '@chamvi/app';
-import { SandboxModule, sandboxModule } from '@chamvi/app/sandbox';
-import type { SandboxModuleOptions, SandboxProviderName } from '@chamvi/app/sandbox';
-import { SECRET, rejectionOf } from '../../utils/app.ts';
-import { createHarness } from '../../utils/harness.ts';
-import type { Harness } from '../../utils/harness.ts';
-import { createRecordingLogger } from '../../utils/logger.ts';
+import type { AppMode, IModule } from '@chamvi/app';
+import { createModuleHarness } from '@chamvi/app/testing';
+import type { ModuleHarness } from '@chamvi/app/testing';
+import { SandboxModule, sandboxModule } from '@chamvi/sandbox/module';
+import type { SandboxModuleOptions, SandboxProviderName } from '@chamvi/sandbox/module';
 import { mockModel, textModel } from '../../utils/model.ts';
+import { SECRET, createRecordingLogger, rejectionOf } from '../../utils/module.ts';
 
 /** Records which provider the module imports instead of importing it. */
 class RecordingSandboxModule extends SandboxModule {
@@ -84,12 +89,15 @@ function agent(extra: Partial<Parameters<typeof defineAgent>[0]> = {}): Agent {
     });
 }
 
-let harnesses: Harness[] = [];
+let harnesses: ModuleHarness[] = [];
 let roots: string[] = [];
+let managers: IWorkspaceManager[] = [];
 
 afterEach(async () => {
     await Promise.all(harnesses.map((h) => h.stop()));
     harnesses = [];
+    await Promise.all(managers.map((manager) => manager.close()));
+    managers = [];
     await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
     roots = [];
     globalThis.AI_SDK_DEFAULT_PROVIDER = undefined;
@@ -100,7 +108,7 @@ async function harnessWith(module: IModule, options: {
     agents?: Agent[];
     events?: string[]
 } = {}) {
-    const harness = await createHarness({
+    const harness = await createModuleHarness({
         mode: options.mode ?? 'start',
         env: { RESUME_SECRET: SECRET },
         agents: options.agents ?? [agent()],
@@ -213,7 +221,7 @@ describe('sandboxModule', () => {
 
     it('migrate mode loads nothing', async () => {
         const module = new RecordingSandboxModule({ env: {} });
-        const harness = await createHarness({
+        const harness = await createModuleHarness({
             mode: 'migrate',
             env: { DATABASE_URL: 'postgres://u:p@127.0.0.1:1/db' },
             modules: [configModule({ logger: createRecordingLogger() }), module],
@@ -229,7 +237,7 @@ describe('sandboxModule', () => {
     });
 
     it('a given provider is used as is', async () => {
-        const root = await mkdtemp(join(tmpdir(), 'chamvi-app-sandbox-'));
+        const root = await mkdtemp(join(tmpdir(), 'chamvi-sandbox-module-'));
         roots.push(root);
         const module = sandboxModule({ env: {}, provider: createLocalSandbox({ root }) });
         const { workspace } = await module.manager.acquire('run-1', {});
@@ -238,7 +246,7 @@ describe('sandboxModule', () => {
     });
 
     it('local end to end', async () => {
-        const root = await mkdtemp(join(tmpdir(), 'chamvi-app-sandbox-'));
+        const root = await mkdtemp(join(tmpdir(), 'chamvi-sandbox-module-'));
         roots.push(root);
         const module = sandboxModule({ env: {}, provider: createLocalSandbox({ root }) });
         const coder = agent({
@@ -275,5 +283,52 @@ describe('sandboxModule', () => {
         await vi.waitFor(async () => {
             expect(await readdir(root)).toEqual([]);
         });
+    });
+
+    it('provides the manager as context', async () => {
+        const module = sandboxModule({ manager: fakeManager([]), env: {} });
+        const seen: boolean[] = [];
+        const probe = defineTool({
+            inputSchema: z.object({}),
+            execute: async (_input, { context }) => {
+                seen.push(injectSandboxContext(context) === module.manager);
+                return 'ok';
+            },
+        });
+        const coder = agent({
+            model: mockModel([
+                {
+                    parts: [{
+                        type: 'tool-call',
+                        toolName: 'probe',
+                        input: {},
+                    }],
+                },
+                { parts: [{ type: 'text', text: 'done' }] },
+            ]),
+            tools: { probe },
+        });
+        const harness = await harnessWith(module, { agents: [coder] });
+
+        const engine = harness.container.resolve(AppToken.ENGINE);
+        const { runId } = await engine.dispatch({
+            agent: 'coder',
+            trigger: 'http',
+            source: 'http',
+            payload: {},
+        });
+        await engine.idle();
+
+        expect((await engine.getRun(runId))?.status).toBe('completed');
+        expect(seen).toEqual([true]);
+    });
+
+    it('the real local provider loads', async () => {
+        const module = sandboxModule({ env: {} });
+        managers.push(module.manager);
+        await harnessWith(module);
+
+        const { workspace } = await module.manager.acquire('run-1', {});
+        expect(workspace.info.provider).toBe('local');
     });
 });

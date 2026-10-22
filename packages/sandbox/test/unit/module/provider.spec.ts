@@ -7,7 +7,7 @@
 
 import type { ISandboxProvider, IWorkspace } from '@chamvi/sandbox';
 import { describe, expect, it } from 'vitest';
-import { createLazyProvider } from '../../../src/sandbox/provider.ts';
+import { createLazyProvider } from '../../../src/module/provider.ts';
 
 function inner(): ISandboxProvider & { creates: number } {
     const provider = {

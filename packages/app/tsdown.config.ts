@@ -3,7 +3,6 @@ import { defineConfig } from 'tsdown';
 export default defineConfig({
     entry: {
         index: 'src/index.ts',
-        sandbox: 'src/sandbox/index.ts',
         authup: 'src/authup/index.ts',
         testing: 'src/testing/index.ts',
     },

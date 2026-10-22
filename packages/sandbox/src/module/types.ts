@@ -5,13 +5,11 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type {
-    ISandboxProvider,
-    IWorkspaceManager,
-    WorkspaceManagerOptions,
-} from '@chamvi/sandbox';
-import type { Env } from '../env/types.ts';
+import type { Env } from '@chamvi/app';
+import type { IWorkspaceManager, WorkspaceManagerOptions } from '../manager/types.ts';
+import type { ISandboxProvider } from '../provider/types.ts';
 
+// #region public
 export type SandboxProviderName = 'local' | 'docker' | 'kubernetes';
 
 /**
@@ -31,4 +29,22 @@ export type SandboxModuleOptions = Omit<WorkspaceManagerOptions, 'provider' | 'e
     workspaceEnv?: Record<string, string>;
     /** Default `process.env`, read when the factory is called. */
     env?: Env;
+};
+// #endregion public
+
+export type LazyProvider = ISandboxProvider & {
+    /** Loads the provider once (concurrent callers share it); a failure is not cached. */
+    load(): Promise<void>;
+};
+
+/*
+ * Structural types of the provider packages: they peer on @chamvi/sandbox, so
+ * this package never resolves their types at build time (internal).
+ */
+export type LocalProviderPackage = { createLocalSandbox(): ISandboxProvider };
+
+export type DockerProviderPackage = { createDockerSandbox(options: { image: string }): ISandboxProvider };
+
+export type KubernetesProviderPackage = {
+    createKubernetesSandbox(options: { namespace: string; image: string }): ISandboxProvider;
 };

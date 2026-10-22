@@ -7,4 +7,4 @@
 
 export { SANDBOX_MODULE_NAME, SANDBOX_PROVIDER_NAMES } from './constants.ts';
 export * from './module.ts';
-export type * from './types.ts';
+export type { SandboxModuleOptions, SandboxProviderName } from './types.ts';

@@ -22,10 +22,6 @@
             "types": "./dist/index.d.mts",
             "import": "./dist/index.mjs"
         },
-        "./sandbox": {
-            "types": "./dist/sandbox.d.mts",
-            "import": "./dist/sandbox.mjs"
-        },
         "./authup": {
             "types": "./dist/authup.d.mts",
             "import": "./dist/authup.mjs"
@@ -75,10 +71,6 @@
         "@ai-sdk/anthropic": "^4.0.85",
         "@authup/core-http-kit": "^1.0.0-beta.70",
         "@authup/server-adapter-kit": "^1.0.0-beta.70",
-        "@chamvi/sandbox": "^0.1.0",
-        "@chamvi/sandbox-docker": "^0.1.0",
-        "@chamvi/sandbox-k8s": "^0.1.0",
-        "@chamvi/sandbox-local": "^0.1.0",
         "@chamvi/test-kit": "^0.1.0",
         "@swc/core": "^1.16.18",
         "@testcontainers/postgresql": "^12.2.1",
@@ -97,10 +89,6 @@
         "@ai-sdk/xai": "^5",
         "@authup/core-http-kit": "^1.0.0-beta.70",
         "@authup/server-adapter-kit": "^1.0.0-beta.70",
-        "@chamvi/sandbox": "^0.1.0",
-        "@chamvi/sandbox-docker": "^0.1.0",
-        "@chamvi/sandbox-k8s": "^0.1.0",
-        "@chamvi/sandbox-local": "^0.1.0",
         "ai": "^7.0.143",
         "pg": "^8",
         "typeorm": "^1.1.2"
@@ -126,18 +114,11 @@
         },
         "@authup/server-adapter-kit": {
             "optional": true
-        },
-        "@chamvi/sandbox": {
-            "optional": true
-        },
-        "@chamvi/sandbox-docker": {
-            "optional": true
-        },
-        "@chamvi/sandbox-k8s": {
-            "optional": true
-        },
-        "@chamvi/sandbox-local": {
-            "optional": true
         }
+    },
+    "nx": {
+        "implicitDependencies": [
+            "!@chamvi/test-kit"
+        ]
     }
 }
