@@ -13,6 +13,7 @@ import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { isObject } from 'smob';
 import { envOneOf, envString } from '../env/module.ts';
+import { isPackageNotFound } from '../models/helpers.ts';
 import { AppToken } from '../module/constants.ts';
 import type { AppContext } from '../module/types.ts';
 import {
@@ -140,7 +141,8 @@ export class SandboxModule implements IModule {
         try {
             return await this.importProvider(name, options);
         } catch (error) {
-            if (isObject(error) && error.code === 'ERR_MODULE_NOT_FOUND') {
+            // only the provider package itself, not a module it imports (dockerode, @kubernetes/client-node)
+            if (isPackageNotFound(error, SANDBOX_PROVIDER_PACKAGES[name])) {
                 throw new InvalidAgentDefinitionError(`CHAMVI_SANDBOX_PROVIDER=${name} needs ${SANDBOX_PROVIDER_PACKAGES[name]} installed.`);
             }
             throw error;

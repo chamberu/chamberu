@@ -115,6 +115,15 @@ async function harnessWith(module: IModule, options: {
     return harness;
 }
 
+/** Records `drain` into `events` when the engine module drains the engine (C5: before the manager closes). */
+function recordDrain(engine: Engine, events: string[]): void {
+    const drain = engine.drain.bind(engine);
+    engine.drain = async (options) => {
+        events.push('drain');
+        return drain(options);
+    };
+}
+
 describe('sandboxModule', () => {
     it('local by default, exposes the manager synchronously', async () => {
         const module = new RecordingSandboxModule({ env: {} });
@@ -166,6 +175,13 @@ describe('sandboxModule', () => {
         expect(error.message).toBe('CHAMVI_SANDBOX_PROVIDER=kubernetes needs @chamvi/sandbox-k8s installed.');
     });
 
+    it('a module missing inside an installed provider package is kept', async () => {
+        const failure = Object.assign(new Error('Cannot find package \'dockerode\' imported from /app/node_modules/@chamvi/sandbox-docker/dist/index.mjs'), { code: 'ERR_MODULE_NOT_FOUND' });
+        const module = new RecordingSandboxModule({ env: { CHAMVI_SANDBOX_PROVIDER: 'docker' } }, failure);
+
+        expect(await rejectionOf(harnessWith(module))).toBe(failure);
+    });
+
     it('another load failure is kept', async () => {
         const module = new RecordingSandboxModule({ env: {} }, new Error('boom'));
         const error = await rejectionOf(harnessWith(module));
@@ -180,17 +196,19 @@ describe('sandboxModule', () => {
         const engine: Engine = harness.container.resolve(AppToken.ENGINE);
         expect(manager.engines).toEqual([engine]);
         expect(events).toEqual(['attach']);
+        recordDrain(engine, events);
 
         await harness.stop();
-        expect(events).toEqual(['attach', 'detach', 'close']);
+        expect(events).toEqual(['attach', 'drain', 'detach', 'close']);
     });
 
     it('job mode attaches too', async () => {
         const events: string[] = [];
         const harness = await harnessWith(sandboxModule({ manager: fakeManager(events), env: {} }), { mode: 'job' });
         expect(events).toEqual(['attach']);
+        recordDrain(harness.container.resolve(AppToken.ENGINE), events);
         await harness.stop();
-        expect(events).toEqual(['attach', 'detach', 'close']);
+        expect(events).toEqual(['attach', 'drain', 'detach', 'close']);
     });
 
     it('migrate mode loads nothing', async () => {
