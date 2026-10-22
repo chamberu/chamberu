@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { pid } from 'node:process';
 import type { Agent } from '../agent/types.ts';
-import { createResumeToken, verifyResumeToken } from '../approval/module.ts';
+import { verifyResumeToken } from '../approval/module.ts';
 import { assertArtifactInput } from '../artifact/helpers.ts';
 import { attachmentIds, storeArtifact } from '../artifact/module.ts';
 import { assertChannelName, createChannelContext } from '../channel/helpers.ts';
@@ -28,7 +28,6 @@ import {
     RunNotFoundError,
     ValidationError,
 } from '../errors/index.ts';
-import type { INotifier } from '../notify/types.ts';
 import { RunStatus } from '../run/constants.ts';
 import type {
     Run,
@@ -77,8 +76,6 @@ export class Engine implements IContextProvider {
     /** Agents removed here whose store cleanup is still to finish, with the revision they had. */
     protected readonly removals = new Map<string, string | undefined>();
 
-    protected readonly notifiers: Record<string, INotifier>;
-
     /** The registered channels by name, in registration order. */
     protected readonly channels: Map<string, IChannel<any, any>>;
 
@@ -126,7 +123,6 @@ export class Engine implements IContextProvider {
     constructor(opts: EngineOptions) {
         this.store = opts.store;
         this.agents = new Map(opts.agents.map((a) => [a.name, a]));
-        this.notifiers = opts.notifiers ?? {};
         const channels = opts.channels ?? [];
         this.channels = new Map();
         for (const channel of channels) {
@@ -638,21 +634,13 @@ export class Engine implements IContextProvider {
         );
     }
 
-    /**
-     * Denies every approval past its expiresAt ('approval timed out') and
-     * re-sends the notification of every other approval not delivered yet
-     * (a failed send, or a crash mid-send). Also runs on every poll.
-     */
+    /** Denies every approval past its expiresAt ('approval timed out'). Also runs on every poll. */
     async tick(): Promise<void> {
         const now = this.clock.now().getTime();
         const { data } = await this.store.listRuns({ status: [RunStatus.WAITING] });
         for (const listed of data) {
             if (!listed.waiting) continue;
-            if (listed.waiting.expiresAt.getTime() > now) {
-                const agent = this.agents.get(listed.agent);
-                if (!listed.waiting.notifiedAt && agent) await this.notifyApproval(listed, agent, listed.waiting);
-                continue;
-            }
+            if (listed.waiting.expiresAt.getTime() > now) continue;
             try {
                 // the listing may be stale by now: the run could wait on a newer approval
                 const run = await this.store.getRun(listed.id);
@@ -752,7 +740,7 @@ export class Engine implements IContextProvider {
     /**
      * running → waiting on `request`, releasing claim and slot (a keyed run keeps
      * its key blocked while waiting). Re-pausing on the same approval keeps the
-     * wait point, so tokens sent earlier stay valid; the owner is notified once.
+     * wait point, so tokens handed out earlier stay valid.
      */
     protected async pause(run: Run, agent: Agent, request: ApprovalRequest, usage: Usage): Promise<void> {
         const now = this.clock.now();
@@ -773,69 +761,11 @@ export class Engine implements IContextProvider {
         });
         if (!updated) return;
         this.emit({ type: 'run.updated', run: updated });
-        // a cancel arrived while pausing (an abort cannot interrupt this write): settle, do not notify
+        // a cancel arrived while pausing (an abort cannot interrupt this write): settle
         if (updated.cancelRequested || this.executions.get(run.id)?.stop === 'cancel') {
             await this.cancelStored(run.id, [RunStatus.WAITING]).catch((error: unknown) => {
                 if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
             });
-            return;
-        }
-        await this.notifyApproval(updated, agent, waiting);
-    }
-
-    /**
-     * Sends the approval notification unless it was delivered already: a
-     * successful send records `waiting.notifiedAt`. A store lock (held for one
-     * attempt, at most claimTtlMs) keeps replicas from sending concurrently;
-     * the notifier's idempotencyKey dedupes a send whose record was lost. A
-     * failed or crashed attempt goes to onError and is retried by tick() on the
-     * next poll; the run keeps waiting.
-     */
-    protected async notifyApproval(run: Run, agent: Agent, waiting: WaitPoint): Promise<void> {
-        const name = agent.definition.notify;
-        const notifier = name === undefined ? undefined : this.notifiers[name];
-        if (!notifier) return;
-        const idempotencyKey = `${run.id}:${waiting.approvalId}`;
-        const lockKey = `notify:${idempotencyKey}`;
-        const attempt = randomUUID();
-        let acquired = false;
-        const isCurrent = (current: Run | undefined) => current?.status === RunStatus.WAITING &&
-            current.waiting?.tokenId === waiting.tokenId;
-        try {
-            acquired = await this.store.acquire(lockKey, attempt, this.claimTtlMs);
-            if (!acquired) return;
-            // another attempt may have delivered it since `run` was read
-            const current = await this.store.getRun(run.id);
-            if (!isCurrent(current) || current?.waiting?.notifiedAt) return;
-            await notifier.notify({
-                kind: 'approval',
-                agent: run.agent,
-                runId: run.id,
-                title: `Approval required: ${waiting.toolName}`,
-                body: `Agent "${run.agent}" wants to call "${waiting.toolName}" with:\n${JSON.stringify(waiting.input, null, 2)}`,
-                approvalId: waiting.approvalId,
-                resumeToken: createResumeToken(this.resumeSecret, {
-                    runId: run.id,
-                    approvalId: waiting.approvalId,
-                    tokenId: waiting.tokenId,
-                    expiresAt: waiting.expiresAt,
-                }),
-                expiresAt: waiting.expiresAt,
-            }, { idempotencyKey, trigger: run.trigger });
-            // answered meanwhile: nothing left to record
-            if (!isCurrent(await this.store.getRun(run.id))) return;
-            const notified = await this.store.updateRun(
-                run.id,
-                { waiting: { ...waiting, notifiedAt: this.clock.now() } },
-                { expectStatus: [RunStatus.WAITING] },
-            );
-            this.emit({ type: 'run.updated', run: notified });
-        } catch (error) {
-            if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
-        } finally {
-            if (acquired) {
-                await this.store.release(lockKey, attempt).catch((releaseError: unknown) => this.onError(releaseError, run));
-            }
         }
     }
 
@@ -880,6 +810,7 @@ export class Engine implements IContextProvider {
             toolApprovalSecret: this.resumeSecret,
             ownsRun: () => this.ownsRun(run.id),
             provided: this.provided,
+            channels: this.channels,
         });
     }
 
@@ -992,16 +923,12 @@ export class Engine implements IContextProvider {
         this.onError(new LeaseLostError(id));
     }
 
-    /** Refuses an agent the engine cannot run: a notifier or a channel it does not have. */
+    /** Refuses an agent the engine cannot run: one subscribing to a channel it does not have. */
     protected assertRegistrable(agent: Agent): void {
         for (const subscription of agent.definition.channels ?? []) {
             if (!this.channels.has(subscription.channel)) {
                 throw new InvalidAgentDefinitionError(`Agent "${agent.name}" subscribes to unknown channel "${subscription.channel}".`);
             }
-        }
-        const { notify } = agent.definition;
-        if (notify !== undefined && !this.notifiers[notify]) {
-            throw new InvalidAgentDefinitionError(`Agent "${agent.name}" uses unknown notifier "${notify}".`);
         }
     }
 

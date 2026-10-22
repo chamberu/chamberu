@@ -29,13 +29,12 @@ import {
 } from '@chamvi/core';
 import type {
     AgentDefinition,
-    INotifier,
     Invoker,
-    Notification,
     ToolContext,
 } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
+import { recordApprovals } from '../../utils/approvals.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
@@ -45,16 +44,6 @@ afterEach(() => {
     for (const e of engines) e.stop();
     engines.length = 0;
 });
-
-class RecordingNotifier implements INotifier {
-    readonly name = 'owner';
-
-    calls: Notification[] = [];
-
-    async notify(n: Notification): Promise<void> {
-        this.calls.push(n);
-    }
-}
 
 const alice: Invoker = {
     id: 'u-alice',
@@ -107,7 +96,6 @@ type Setup = {
 function setup(s: Setup) {
     const clock = new ControllableClock(new Date(1_000_000));
     const store = s.store ?? new MemoryStore({ clock });
-    const notifier = new RecordingNotifier();
     const agent = defineAgent({
         name: 'release',
         instructions: 'You release.',
@@ -117,12 +105,10 @@ function setup(s: Setup) {
         toolPolicy: s.toolPolicy,
         approvals: s.approvals,
         toolsContext: s.toolsContext,
-        notify: 'owner',
     });
     const engine = new Engine({
         store,
         agents: [agent],
-        notifiers: { owner: notifier },
         resumeSecret: 'secret',
         clock: s.store ? undefined : clock,
         claimTtlMs: s.claimTtlMs ?? 30,
@@ -130,6 +116,7 @@ function setup(s: Setup) {
         onError: () => {},
     });
     engines.push(engine);
+    const notifier = recordApprovals(engine, 'secret');
     return {
         clock,
         store,

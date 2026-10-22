@@ -260,7 +260,8 @@ describe('effect tools', () => {
         let runs = 0;
         const plain = tool({ inputSchema: schema, execute: async () => ++runs });
         const tools = wrapToolsForRun({ plain }, ctx, new MemoryStore());
-        expect(tools.plain).toBe(plain);
+        // wrapped only to run inside its tool-call frame
+        expect(tools.plain).toMatchObject({ inputSchema: plain.inputSchema });
         await call(tools, 'plain', { body: 'hi' });
         await call(tools, 'plain', { body: 'hi' });
         expect(runs).toBe(2);

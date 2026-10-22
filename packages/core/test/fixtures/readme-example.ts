@@ -3,12 +3,15 @@ import { z } from 'zod';
 import {
     Engine,
     MemoryStore,
+    consoleChannel,
     defineAgent,
     defineEffectTool,
+    replyChannel,
 } from '@chamvi/core';
 
 export async function triageIssue(model: LanguageModel) {
     const labels: string[] = [];
+    const lines: string[] = [];
 
     const triage = defineAgent({
         name: 'triage',
@@ -20,8 +23,10 @@ export async function triageIssue(model: LanguageModel) {
             addLabel: defineEffectTool({
                 description: 'Adds a label to the issue.',
                 inputSchema: z.object({ label: z.enum(['bug', 'feature', 'question']) }),
-                execute: async ({ label }) => {
+                execute: async ({ label }, { context }) => {
                     labels.push(label);
+                    // answers where the run came from, at most once per message
+                    await replyChannel(context)?.emit({ body: `Labelled as ${label}.` });
                     return { added: label };
                 },
             }),
@@ -31,19 +36,29 @@ export async function triageIssue(model: LanguageModel) {
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage],
+        channels: [consoleChannel({
+            write: (line) => {
+                lines.push(line);
+            },
+        })],
         resumeSecret: 'change-me',
     });
     await engine.start();
 
     const { runId } = await engine.dispatch({
         agent: 'triage',
-        trigger: 'http',
-        channel: 'http',
+        trigger: 'manual',
+        channel: 'console',
+        address: 'issue-1',
         payload: { title: 'App crashes on start' },
     });
 
     await engine.idle();
     engine.stop();
 
-    return { run: await engine.getRun(runId), labels };
+    return {
+        run: await engine.getRun(runId), 
+        labels, 
+        lines, 
+    };
 }

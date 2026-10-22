@@ -11,6 +11,7 @@ import { ToolNotAllowedError } from '../errors/index.ts';
 import type { IEffectStore } from '../store/types.ts';
 import type { ToolContext } from '../tool/types.ts';
 import { EFFECT, EFFECT_HOOKS } from './constants.ts';
+import { runToolCall } from './frame.ts';
 import { stableHash } from './helpers.ts';
 import type { EffectHooks } from './types.ts';
 
@@ -24,7 +25,8 @@ type Execute = (input: unknown, options: any) => unknown;
  * A throwing execute (or alreadyApplied) records nothing, so a retry can still apply.
  * With \`allow\`, every call (effect tool or not) is re-checked first: a refused
  * call throws ToolNotAllowedError, which the AI SDK returns to the model as a
- * tool error.
+ * tool error. Every execute runs inside its tool-call frame (`runToolCall`),
+ * so emit() and approve() know the call they belong to.
  */
 export function wrapToolsForRun(
     tools: ToolSet,
@@ -42,16 +44,20 @@ export function wrapToolsForRun(
             wrapped[name] = def;
             continue;
         }
+        const inFrame = (options: unknown, fn: () => unknown) => runToolCall({
+            runId: ctx.run.runId,
+            toolCallId: String((options as { toolCallId?: unknown } | undefined)?.toolCallId ?? ''),
+            toolName: name,
+            approvals: 0,
+        }, fn);
         if (!(EFFECT in def)) {
-            wrapped[name] = allow ?
-                {
-                    ...def,
-                    execute: (input: unknown, options: unknown) => {
-                        if (!allow(name)) throw new ToolNotAllowedError(name);
-                        return execute.call(def, input, options);
-                    },
-                } as ToolSet[string] :
-                def;
+            wrapped[name] = {
+                ...def,
+                execute: (input: unknown, options: unknown) => inFrame(options, () => {
+                    if (allow && !allow(name)) throw new ToolNotAllowedError(name);
+                    return execute.call(def, input, options);
+                }),
+            } as ToolSet[string];
             continue;
         }
 
@@ -85,7 +91,7 @@ export function wrapToolsForRun(
 
         wrapped[name] = {
             ...def,
-            execute: async (input: unknown, options: unknown) => {
+            execute: (input: unknown, options: unknown) => inFrame(options, async () => {
                 if (allow && !allow(name)) throw new ToolNotAllowedError(name);
                 const key = hooks?.effectKey ?
                     hooks.effectKey(input, ctx, options as ToolExecutionOptions<ToolContext>) :
@@ -97,7 +103,7 @@ export function wrapToolsForRun(
                     inflight.set(key, pending);
                 }
                 return pending;
-            },
+            }),
         } as ToolSet[string];
     }
     return wrapped;

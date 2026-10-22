@@ -71,8 +71,6 @@ export type AgentDefinition<S extends StateSchema = StateSchema> = {
     approvals?: Record<string, ApprovalPolicy>;
     /** Default 24h; on timeout the call is denied. */
     approvalTimeoutMs?: number;
-    /** Notifier name registered on the engine. */
-    notify?: string;
     /**
      * Structured output (AI SDK `Output`, e.g. `Output.object({ schema })`):
      * a completed run's `output` is the parsed value instead of the text; a

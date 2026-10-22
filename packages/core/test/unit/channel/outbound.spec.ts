@@ -1,0 +1,377 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import type { LanguageModel, ToolSet } from 'ai';
+import {
+    afterEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
+import { z } from 'zod';
+import {
+    ChannelNotFoundError,
+    Engine,
+    InvalidRunStateError,
+    defineAgent,
+    defineTool,
+    injectChannel,
+    replyChannel,
+} from '@chamvi/core';
+import type {
+    AgentDefinition,
+    ChannelHandle,
+    ChannelMessage,
+    ChannelSendOptions,
+    IChannel,
+    ToolContext,
+} from '@chamvi/core';
+import { ControllableClock } from '../../utils/clock.ts';
+import { MemoryStore } from '../../../src/store/index.ts';
+import { stableHash } from '../../../src/effect/helpers.ts';
+import { mockModel } from '../../utils/mock-model.ts';
+import type { MockResponse } from '../../utils/mock-model.ts';
+
+type Sent = {
+    message: ChannelMessage; 
+    address: string; 
+    opts: ChannelSendOptions 
+};
+
+function recorder(name: string) {
+    const calls: Sent[] = [];
+    const state = { failures: 0 };
+    const channel: IChannel = {
+        name,
+        async out(message, address, opts) {
+            calls.push({
+                message, 
+                address, 
+                opts, 
+            });
+            if (state.failures > 0) {
+                state.failures -= 1;
+                throw new Error('channel down');
+            }
+        },
+    };
+    return {
+        channel, 
+        calls, 
+        state, 
+    };
+}
+
+/** A channel without out (inbound only). */
+const web: IChannel = { name: 'web', in: async () => new Response(null) };
+
+const text = (t: string): MockResponse => ({ parts: [{ type: 'text', text: t }] });
+const call = (toolName: string, input: unknown = {}, toolCallId?: string): MockResponse => ({
+    parts: [{
+        type: 'tool-call',
+        toolName,
+        input,
+        toolCallId,
+    }],
+});
+
+const engines: Engine[] = [];
+
+afterEach(() => {
+    for (const e of engines) e.stop();
+    engines.length = 0;
+});
+
+function setup(
+    model: LanguageModel,
+    tools: AgentDefinition['tools'],
+    opts: {
+        store?: MemoryStore; 
+        clock?: ControllableClock; 
+        channels?: IChannel[] 
+    } = {},
+) {
+    const clock = opts.clock ?? new ControllableClock(new Date(1_000_000));
+    const store = opts.store ?? new MemoryStore({ clock });
+    const slack = recorder('slack');
+    const errors: unknown[] = [];
+    const engine = new Engine({
+        store,
+        agents: [defineAgent({
+            name: 'ops',
+            instructions: 'You operate.',
+            model,
+            tools,
+        })],
+        channels: opts.channels ?? [slack.channel, web],
+        resumeSecret: 'secret',
+        clock,
+        claimTtlMs: 30,
+        onError: (error) => {
+            errors.push(error);
+        },
+    });
+    engines.push(engine);
+    return {
+        engine,
+        store,
+        clock,
+        slack,
+        errors,
+    };
+}
+
+async function run(
+    ctx: { engine: Engine; store: MemoryStore },
+    envelope: { channel?: string; address?: string } = {},
+) {
+    await ctx.engine.start();
+    const { runId } = await ctx.engine.dispatch({
+        agent: 'ops',
+        trigger: 'test',
+        channel: envelope.channel ?? 'web',
+        address: envelope.address,
+        payload: {},
+    });
+    await ctx.engine.idle();
+    return {
+        runId,
+        run: await ctx.store.getRun(runId),
+        steps: await ctx.store.listSteps(runId),
+    };
+}
+
+const emitTool = (fn: (ctx: ToolContext, input: { body: string }) => Promise<unknown>) => defineTool({
+    inputSchema: z.object({ body: z.string() }),
+    execute: async (input, { context }) => {
+        await fn(context, input);
+        return 'sent';
+    },
+});
+
+describe('channel outbound', () => {
+    it('emit sends through out with the content key', async () => {
+        const tools: ToolSet = { notify: emitTool((ctx, { body }) => injectChannel(ctx, 'slack').emit({ title: 't', body }, 'C1')) };
+        const ctx = setup(mockModel([call('notify', { body: 'b' }), text('done')]), tools);
+        const { runId, run: stored } = await run(ctx);
+        expect(stored?.status).toBe('completed');
+        expect(ctx.slack.calls).toHaveLength(1);
+        const [sent] = ctx.slack.calls as [Sent];
+        expect(sent.message).toEqual({
+            kind: 'message',
+            key: `${runId}:emit:slack:${stableHash({
+                address: 'C1', 
+                title: 't', 
+                body: 'b', 
+            })}`,
+            runId,
+            agent: 'ops',
+            title: 't',
+            body: 'b',
+        });
+        expect(sent.address).toBe('C1');
+        expect(sent.opts.trigger).toEqual(stored?.trigger);
+        expect(sent.opts.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('identical emits in one step reach out once', async () => {
+        const tools: ToolSet = { notify: emitTool((ctx, { body }) => injectChannel(ctx, 'slack').emit({ body }, 'C1')) };
+        const model = mockModel([
+            {
+                parts: [
+                    {
+                        type: 'tool-call', 
+                        toolName: 'notify', 
+                        input: { body: 'b' }, 
+                        toolCallId: 'a',
+                    },
+                    {
+                        type: 'tool-call', 
+                        toolName: 'notify', 
+                        input: { body: 'b' }, 
+                        toolCallId: 'b',
+                    },
+                ],
+            },
+            call('notify', { body: 'b' }),
+            text('done'),
+        ]);
+        const ctx = setup(model, tools);
+        const { run: stored } = await run(ctx);
+        expect(stored?.status).toBe('completed');
+        expect(ctx.slack.calls).toHaveLength(1);
+    });
+
+    it('identical emits in one step and after a recovery reach out once', async () => {
+        const storeClock = new ControllableClock(new Date(1_000_000));
+        const store = new MemoryStore({ clock: storeClock });
+        const slack = recorder('slack');
+        const parallel: MockResponse = {
+            parts: [
+                {
+                    type: 'tool-call', 
+                    toolName: 'notify', 
+                    input: { body: 'b' }, 
+                    toolCallId: 'a',
+                },
+                {
+                    type: 'tool-call', 
+                    toolName: 'notify', 
+                    input: { body: 'b' }, 
+                    toolCallId: 'b',
+                },
+            ],
+        };
+        let hung = 0;
+        const tools = (hang: boolean): ToolSet => ({
+            notify: emitTool(async (ctx, { body }) => {
+                await injectChannel(ctx, 'slack').emit({ body }, 'C1');
+                if (hang) {
+                    hung += 1;
+                    // the replica dies here: the step's checkpoint never lands
+                    await new Promise(() => {});
+                }
+            }),
+        });
+
+        // replica A: its own clock, so its claim is never renewed
+        const a = setup(mockModel([parallel]), tools(true), {
+            store,
+            clock: new ControllableClock(new Date(1_000_000)),
+            channels: [slack.channel, web],
+        });
+        await a.engine.start();
+        const { runId } = await a.engine.dispatch({
+            agent: 'ops',
+            trigger: 'test',
+            channel: 'web',
+            payload: {},
+        });
+        await vi.waitFor(() => expect(hung).toBe(2));
+        expect(slack.calls).toHaveLength(1);
+        a.engine.stop();
+
+        // replica B recovers the run once A's claim expired and redoes the step
+        storeClock.advance(1000);
+        const b = setup(mockModel([parallel, text('done')]), tools(false), {
+            store,
+            clock: storeClock,
+            channels: [slack.channel, web],
+        });
+        await b.engine.start();
+        await vi.waitFor(async () => expect((await store.getRun(runId))?.status).toBe('completed'));
+        expect(slack.calls).toHaveLength(1);
+    });
+
+    it('an explicit key overrides the content key', async () => {
+        const tools: ToolSet = { notify: emitTool((ctx, { body }) => injectChannel(ctx, 'slack').emit({ body, key: 'deploy-1' }, 'C1')) };
+        const ctx = setup(mockModel([call('notify', { body: 'b' }), call('notify', { body: 'other' }), text('done')]), tools);
+        await run(ctx);
+        expect(ctx.slack.calls).toHaveLength(1);
+        expect(ctx.slack.calls[0]?.message.key).toBe('deploy-1');
+    });
+
+    it('emit without an address on a non-source channel is a ValidationError tool error', async () => {
+        const tools: ToolSet = { notify: emitTool((ctx, { body }) => injectChannel(ctx, 'slack').emit({ body })) };
+        const ctx = setup(mockModel([call('notify', { body: 'b' }), text('done')]), tools);
+        const { run: stored, steps } = await run(ctx);
+        expect(stored?.status).toBe('completed');
+        expect(ctx.slack.calls).toHaveLength(0);
+        expect(steps.find((s) => s.kind === 'tool')?.error).toMatchObject({ code: 'validation_error' });
+    });
+
+    it('emit without an address on the source channel uses trigger.address', async () => {
+        const tools: ToolSet = { notify: emitTool((ctx, { body }) => injectChannel(ctx, 'slack').emit({ body })) };
+        const ctx = setup(mockModel([call('notify', { body: 'b' }), text('done')]), tools);
+        await run(ctx, { channel: 'slack', address: 'C9' });
+        expect(ctx.slack.calls).toHaveLength(1);
+        expect(ctx.slack.calls[0]?.address).toBe('C9');
+    });
+
+    it('a throwing out records nothing and is a tool error; the next identical emit sends again', async () => {
+        const tools: ToolSet = { notify: emitTool((ctx, { body }) => injectChannel(ctx, 'slack').emit({ body }, 'C1')) };
+        const ctx = setup(mockModel([call('notify', { body: 'b' }), call('notify', { body: 'b' }), text('done')]), tools);
+        ctx.slack.state.failures = 1;
+        const { run: stored, steps } = await run(ctx);
+        expect(stored?.status).toBe('completed');
+        expect(ctx.slack.calls).toHaveLength(2);
+        const toolSteps = steps.filter((s) => s.kind === 'tool');
+        expect(toolSteps[0]?.error).toMatchObject({ message: 'channel down' });
+        expect(toolSteps[1]?.error).toBeUndefined();
+    });
+
+    it('emit outside a tool call (in the tools factory) throws InvalidRunStateError', async () => {
+        let pending: Promise<void> | undefined;
+        const ctx = setup(mockModel([text('done')]), (toolContext) => {
+            pending = injectChannel(toolContext, 'slack').emit({ body: 'b' }, 'C1');
+            pending.catch(() => {});
+            return {};
+        });
+        const { run: stored } = await run(ctx);
+        expect(stored?.status).toBe('completed');
+        await expect(pending).rejects.toBeInstanceOf(InvalidRunStateError);
+        expect(ctx.slack.calls).toHaveLength(0);
+    });
+
+    it('injectChannel of an unknown channel or one without out throws ChannelNotFoundError', async () => {
+        const thrown: unknown[] = [];
+        const ctx = setup(mockModel([text('done')]), (toolContext) => {
+            for (const name of ['nope', 'web']) {
+                try {
+                    injectChannel(toolContext, name);
+                } catch (error) {
+                    thrown.push(error);
+                }
+            }
+            return {};
+        });
+        await run(ctx);
+        expect(thrown).toHaveLength(2);
+        for (const error of thrown) {
+            expect(error).toBeInstanceOf(ChannelNotFoundError);
+            expect(error).toMatchObject({ code: 'channel_not_found' });
+        }
+        expect((thrown[0] as Error).message).toContain('"nope"');
+    });
+
+    it('injectChannel without an engine binding throws ChannelNotFoundError', () => {
+        const toolContext = { run: { runId: 'r', agent: 'ops' } } as unknown as ToolContext;
+        expect(() => injectChannel(toolContext, 'slack')).toThrow(ChannelNotFoundError);
+        expect(replyChannel(toolContext)).toBeUndefined();
+    });
+
+    it('replyChannel is undefined for a run whose channel has no out, and bound to trigger.address otherwise', async () => {
+        const seen: Array<ChannelHandle | undefined> = [];
+        const tools = (toolContext: ToolContext) => {
+            seen.push(replyChannel(toolContext));
+            return {};
+        };
+        await run(setup(mockModel([text('done')]), tools), { channel: 'web', address: 'x' });
+        await run(setup(mockModel([text('done')]), tools), { channel: 'slack' });
+        await run(setup(mockModel([text('done')]), tools), { channel: 'slack', address: 'C9' });
+        expect(seen[0]).toBeUndefined();
+        expect(seen[1]).toBeUndefined();
+        expect(seen[2]?.name).toBe('slack');
+        expect(seen[2]?.address).toBe('C9');
+    });
+
+    it('replyChannel emits to the source address', async () => {
+        const tools: ToolSet = { notify: emitTool((ctx, { body }) => replyChannel(ctx)!.emit({ body })) };
+        const ctx = setup(mockModel([call('notify', { body: 'Done.' }), text('done')]), tools);
+        await run(ctx, { channel: 'slack', address: 'C9' });
+        expect(ctx.slack.calls.map((c) => [c.address, c.message.body])).toEqual([['C9', 'Done.']]);
+    });
+
+    it('emit refuses a message without a string body', async () => {
+        const tools: ToolSet = { notify: emitTool((ctx) => injectChannel(ctx, 'slack').emit({ body: 42 } as never, 'C1')) };
+        const ctx = setup(mockModel([call('notify', { body: 'b' }), text('done')]), tools);
+        const { steps } = await run(ctx);
+        expect(ctx.slack.calls).toHaveLength(0);
+        expect(steps.find((s) => s.kind === 'tool')?.error).toMatchObject({ code: 'validation_error' });
+    });
+});

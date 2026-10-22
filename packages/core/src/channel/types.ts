@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { ApprovalDecision, ApprovalRequestInput } from '../approval/types.ts';
 import type { Engine } from '../engine/module.ts';
 import type { DispatchEnvelope } from '../engine/types.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
@@ -84,4 +85,34 @@ export type ChannelSubscription<P = unknown> = {
 export type ReadRequestBodyOptions = {
     /** Most bytes accepted; more is a ValidationError with code `payload_too_large`. */
     limit: number;
+};
+
+/** A message a tool emits; `key` overrides the content-addressed dedupe key. */
+export type EmitMessage = {
+    title?: string;
+    body: string;
+    key?: string;
+};
+
+/**
+ * A channel bound to the run (`injectChannel`, `replyChannel`). `address` is
+ * the run's source address when this is the run's source channel.
+ */
+export type ChannelHandle = {
+    readonly name: string;
+    readonly address?: string;
+    /**
+     * Sends `message` through the channel's `out` to `address` (default: the
+     * bound address), at most once per key; only inside a tool call.
+     */
+    emit(message: EmitMessage, address?: string): Promise<void>;
+    /** Asks the owner to approve, durably (suspends the tool call until answered). */
+    approve(request: ApprovalRequestInput & { address?: string }): Promise<ApprovalDecision>;
+};
+
+export type ConsoleChannelOptions = {
+    /** Default `'console'`. */
+    name?: string;
+    /** Receives each line; default `console.log`. */
+    write?: (line: string) => void;
 };

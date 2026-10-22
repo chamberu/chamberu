@@ -22,7 +22,7 @@ import { assertToolsContext } from '../../agent/helpers.ts';
 import type { ApprovalPolicy } from '../../agent/types.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
-import { bindProvided } from '../../context/helpers.ts';
+import { bindChannels, bindProvided } from '../../context/helpers.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
 import {
     BudgetExceededError,
@@ -147,8 +147,9 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         state: createAgentState(ctx.agent.name, schema, ctx.store),
         artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
     };
-    // before the factory, so inject() works there, in execute and in the effect hooks
+    // before the factory, so inject() and injectChannel() work there, in execute and in the effect hooks
     if (ctx.provided) bindProvided(toolContext, ctx.provided);
+    if (ctx.channels) bindChannels(toolContext, ctx.channels, ctx.store);
     const tools: ToolSet = {
         ...(schema ? createStateTools(schema) : {}),
         ...(typeof userTools === 'function' ? userTools(toolContext) : userTools),

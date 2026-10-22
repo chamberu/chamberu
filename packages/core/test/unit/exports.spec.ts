@@ -37,7 +37,10 @@ describe('public api', () => {
         'requireToolPermission',
         'isArtifactMediaType',
         'assertTriggerKey',
-        'consoleNotifier',
+        'consoleChannel',
+        'injectChannel',
+        'replyChannel',
+        'ChannelNotFoundError',
         'defineContextKey',
         'inject',
         'tryInject',
@@ -69,6 +72,13 @@ describe('public api', () => {
     it('keeps the channel context factory internal', () => {
         expect(core).not.toHaveProperty('createChannelContext');
         expect(core).not.toHaveProperty('assertChannelName');
+        expect(core).not.toHaveProperty('createChannelHandle');
+        expect(core).not.toHaveProperty('runToolCall');
+        expect(core).not.toHaveProperty('currentToolCall');
+    });
+
+    it('removes the notifiers', () => {
+        expect(core).not.toHaveProperty('consoleNotifier');
     });
 
     it('exports the payload too large error code', () => {
@@ -86,6 +96,14 @@ describe('public api', () => {
         expectTypeOf<core.TriggerEnvelope>().toHaveProperty('channel').toEqualTypeOf<string>();
         expectTypeOf<core.Run>().toHaveProperty('address').toEqualTypeOf<string | undefined>();
         expectTypeOf<core.EngineStartOptions>().toEqualTypeOf<{ channels?: boolean }>();
+        expectTypeOf<core.EmitMessage>().toEqualTypeOf<{
+            title?: string; 
+            body: string; 
+            key?: string 
+        }>();
+        expectTypeOf<core.ChannelHandle['emit']>().returns.toEqualTypeOf<Promise<void>>();
+        expectTypeOf<core.ChannelHandle['approve']>().returns.toEqualTypeOf<Promise<core.ApprovalDecision>>();
+        expectTypeOf<core.ConsoleChannelOptions>().toHaveProperty('name').toEqualTypeOf<string | undefined>();
     });
 
     it('exports the sandbox error code', () => {

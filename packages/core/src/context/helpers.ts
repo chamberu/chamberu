@@ -6,6 +6,8 @@
  */
 
 import { isObject } from 'smob';
+import type { IChannel } from '../channel/types.ts';
+import type { IEffectStore } from '../store/types.ts';
 import type { ContextKey } from './types.ts';
 
 /** Every key defineContextKey() made in this copy of @chamvi/core. */
@@ -35,4 +37,34 @@ export function providedOf(ctx: object): ReadonlyMap<ContextKey<unknown>, unknow
 export function contextKeyName(key: unknown): string {
     if (isObject(key) && typeof key.name === 'string') return key.name;
     return '<unnamed>';
+}
+
+/** What a ToolContext's channel handles send through (internal). */
+type ChannelBinding = {
+    /** The engine's registered channels by name, by reference. */
+    channels: ReadonlyMap<string, IChannel<any, any>>;
+    /** Where emits are recorded. */
+    effects: IEffectStore;
+    /** Emits in flight in this execution by key: parallel identical emits share one send. */
+    inflight: Map<string, Promise<void>>;
+};
+
+/** Each execution's ToolContext -> its engine's channels. */
+const channelBindings = new WeakMap<object, ChannelBinding>();
+
+/** Binds the engine's channels to `ctx` without adding any property to it. */
+export function bindChannels(
+    ctx: object,
+    channels: ReadonlyMap<string, IChannel<any, any>>,
+    effects: IEffectStore,
+): void {
+    channelBindings.set(ctx, {
+        channels, 
+        effects, 
+        inflight: new Map(), 
+    });
+}
+
+export function channelsOf(ctx: object): ChannelBinding | undefined {
+    return channelBindings.get(ctx);
 }

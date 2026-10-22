@@ -41,7 +41,7 @@ export type WaitPoint = {
     input: unknown;
     expiresAt: Date;
     tokenId: string;
-    /** Set once the agent's notifier accepted the approval request; tick() re-sends until then. */
+    /** Set once the approval message was sent (unused until approvals deliver through channels). */
     notifiedAt?: Date;
 };
 

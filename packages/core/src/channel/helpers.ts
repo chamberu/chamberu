@@ -5,10 +5,22 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { isObject } from 'smob';
+import type { channelsOf } from '../context/helpers.ts';
+import { currentToolCall } from '../effect/frame.ts';
+import { stableHash } from '../effect/helpers.ts';
 import type { Engine } from '../engine/module.ts';
-import { InvalidAgentDefinitionError } from '../errors/index.ts';
+import { InvalidAgentDefinitionError, InvalidRunStateError, ValidationError } from '../errors/index.ts';
 import { NAME_MAX_LENGTH, NAME_PATTERN } from '../agent/constants.ts';
-import type { ChannelContext, IChannel } from './types.ts';
+import type { ToolContext } from '../tool/types.ts';
+import type {
+    ChannelContext,
+    ChannelHandle,
+    EmitMessage,
+    IChannel,
+} from './types.ts';
+
+type Binding = NonNullable<ReturnType<typeof channelsOf>>;
 
 /** The context a channel's `start` and `in` get: its dispatch always carries the channel's own name. */
 export function createChannelContext(engine: Engine, channel: Pick<IChannel, 'name'>): ChannelContext {
@@ -25,4 +37,90 @@ export function assertChannelName(name: unknown): asserts name is string {
             `Invalid channel name "${String(name)}": must match ${NAME_PATTERN} and be at most ${NAME_MAX_LENGTH} characters.`,
         );
     }
+}
+
+function assertEmitMessage(message: unknown): asserts message is EmitMessage {
+    if (!isObject(message) || typeof message.body !== 'string') {
+        throw new ValidationError('An emitted message needs a string body.');
+    }
+    if (message.title !== undefined && typeof message.title !== 'string') {
+        throw new ValidationError('An emitted message title must be a string.');
+    }
+    if (message.key !== undefined && (typeof message.key !== 'string' || message.key.length === 0)) {
+        throw new ValidationError('An emitted message key must be a non-empty string.');
+    }
+}
+
+/**
+ * A handle on `channel` (which has `out`) for the execution `ctx` belongs
+ * to. `emit` is an effect: recorded under its key in the effect store, so a
+ * redone step (or a parallel identical call) sends once; a throwing `out`
+ * records nothing. `approve` arrives with the durable approvals.
+ */
+export function createChannelHandle(
+    ctx: ToolContext,
+    binding: Binding,
+    channel: IChannel<any, any>,
+    address?: string,
+): ChannelHandle {
+    const { name } = channel;
+    const send = async (effectKey: string, key: string, message: EmitMessage, target: string) => {
+        const stored = await binding.effects.getEffect(effectKey);
+        if (stored) return;
+        await channel.out!({
+            kind: 'message',
+            key,
+            runId: ctx.run.runId,
+            agent: ctx.run.agent,
+            ...(message.title !== undefined ? { title: message.title } : {}),
+            body: message.body,
+        }, target, { signal: ctx.run.signal, trigger: ctx.run.trigger });
+        // The message went out: a failing write must not fail the call (as for effect tools).
+        try {
+            await binding.effects.putEffect(effectKey, {
+                channel: name, 
+                address: target, 
+                key, 
+            });
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error(`chamvi: failed to record emit ${effectKey}`, error);
+        }
+    };
+
+    const emit = async (message: EmitMessage, to?: string): Promise<void> => {
+        if (!currentToolCall()) {
+            throw new InvalidRunStateError(`emit() on channel "${name}" runs inside a tool call, not in the tools factory.`);
+        }
+        assertEmitMessage(message);
+        const target = to ?? address;
+        if (target === undefined) {
+            throw new ValidationError(`Channel "${name}" needs an address: only the run's source channel has a default one.`);
+        }
+        if (typeof target !== 'string' || target.length === 0) {
+            throw new ValidationError('The address must be a non-empty string.');
+        }
+        const prefix = `${ctx.run.runId}:emit:${name}:`;
+        const effectKey = message.key !== undefined ?
+            `${prefix}key:${message.key}` :
+            `${prefix}${stableHash({
+                address: target, 
+                title: message.title, 
+                body: message.body, 
+            })}`;
+        const key = message.key ?? effectKey;
+        let pending = binding.inflight.get(effectKey);
+        if (!pending) {
+            pending = send(effectKey, key, message, target).finally(() => binding.inflight.delete(effectKey));
+            binding.inflight.set(effectKey, pending);
+        }
+        return pending;
+    };
+
+    // approve() is added with the durable approvals
+    return {
+        name,
+        ...(address !== undefined ? { address } : {}),
+        emit,
+    } as ChannelHandle;
 }

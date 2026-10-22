@@ -19,3 +19,12 @@ export type EffectTool<I, O, S extends StateSchema = StateSchema> = Tool<I, O, T
     [EFFECT]: true;
     [EFFECT_HOOKS]: EffectHooks;
 };
+
+/** The tool call an execute runs for (internal): approve() and emit() read it. */
+export type ToolCallFrame = {
+    runId: string;
+    toolCallId: string;
+    toolName: string;
+    /** How many approve() calls this tool call made so far. */
+    approvals: number;
+};

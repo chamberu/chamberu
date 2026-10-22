@@ -6,6 +6,7 @@
  */
 
 import type { Agent } from '../../agent/types.ts';
+import type { IChannel } from '../../channel/types.ts';
 import type { IClock } from '../../clock/index.ts';
 import type { ContextKey } from '../../context/types.ts';
 import type { Run, Step, Usage } from '../../run/types.ts';
@@ -31,7 +32,7 @@ export type ExecuteContext = {
     onDelta: (delta: RunDelta) => void;
     /**
      * Moves the still `running` run to `waiting` on `request` (releasing its
-     * claim and slot) and notifies the owner.
+     * claim and slot).
      */
     pause: (request: ApprovalRequest, usage: Usage) => Promise<void>;
     /** HMAC secret the AI SDK signs approval requests with. */
@@ -46,6 +47,11 @@ export type ExecuteContext = {
      * ToolContext for inject() before the tools factory runs.
      */
     provided?: ReadonlyMap<ContextKey<unknown>, unknown>;
+    /**
+     * The engine's registered channels by name (by reference), bound to the
+     * execution's ToolContext for injectChannel() and replyChannel().
+     */
+    channels?: ReadonlyMap<string, IChannel<any, any>>;
 };
 
 /** A tool call waiting for the owner's decision. */

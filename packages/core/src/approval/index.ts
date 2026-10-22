@@ -6,4 +6,4 @@
  */
 
 export * from './module.ts';
-export type { ResumeTokenClaims } from './types.ts';
+export type { ApprovalDecision, ApprovalRequestInput, ResumeTokenClaims } from './types.ts';

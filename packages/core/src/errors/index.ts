@@ -10,6 +10,7 @@ export * from './agent-not-found.ts';
 export * from './artifact-not-found.ts';
 export * from './base.ts';
 export * from './budget-exceeded.ts';
+export * from './channel-not-found.ts';
 export * from './constants.ts';
 export * from './context-not-provided.ts';
 export * from './fatal-tool.ts';

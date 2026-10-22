@@ -23,12 +23,11 @@ import {
 } from '@chamvi/core';
 import type {
     AgentDefinition,
-    INotifier,
     IRunArtifacts,
-    Notification,
 } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
+import { recordApprovals } from '../../utils/approvals.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
@@ -43,16 +42,6 @@ const text = (t: string): MockResponse => ({ parts: [{ type: 'text', text: t }] 
 
 const PNG = new Uint8Array([137, 80, 78, 71]);
 
-class RecordingNotifier implements INotifier {
-    readonly name = 'owner';
-
-    calls: Notification[] = [];
-
-    async notify(n: Notification): Promise<void> {
-        this.calls.push(n);
-    }
-}
-
 function setup(
     responses: MockResponse[],
     opts: { store?: MemoryStore; definition?: Partial<AgentDefinition> } = {},
@@ -60,19 +49,16 @@ function setup(
     const clock = new ControllableClock(new Date(1_000_000));
     const store = opts.store ?? new MemoryStore({ clock });
     const model = mockModel(responses);
-    const notifier = new RecordingNotifier();
     const agent = defineAgent({
         name: 'vision',
         instructions: 'You look at files.',
         model,
-        notify: 'owner',
         ...opts.definition,
     });
     const errors: unknown[] = [];
     const engine = new Engine({
         store,
         agents: [agent],
-        notifiers: { owner: notifier },
         resumeSecret: 's',
         clock,
         onError: (error) => {
@@ -80,6 +66,7 @@ function setup(
         },
     });
     engines.push(engine);
+    const notifier = recordApprovals(engine, 's');
     return {
         clock,
         store,
