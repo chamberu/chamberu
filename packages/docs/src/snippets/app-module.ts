@@ -32,8 +32,13 @@ export function auditModule(): IModule {
             });
         },
 
-        // onReady consumes: the engine exists, the server is not listening yet
+        // onReady consumes: the engine exists but has not started, the server is not listening yet
         async onReady(container: IContainer) {
+            // migrate builds config and store only: no ENGINE to resolve
+            if (container.resolve(AppToken.CONTEXT).mode === 'migrate') {
+                return;
+            }
+
             const logger = container.resolve(AppToken.LOGGER);
             unsubscribe = container.resolve(AppToken.ENGINE).on('run.updated', ({ run }) => {
                 logger.info('run updated', { run: run.id, status: run.status });

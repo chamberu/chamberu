@@ -67,7 +67,7 @@ Relative imports carry `.ts` and there is no `enum`, so `chamvi dev` (Node's typ
 | Command | Arguments and flags | Does |
 |---------|---------------------|------|
 | `dev` | `--entry` | Runs `node --watch --env-file-if-exists=.env <cli> start --dev --entry <source entry>`: restarts on a change of the entry, its imports or `.env` (Node watches the env file itself, so no `--watch-path` is needed) |
-| `build` | `--entry`, `--out-dir <dir>` (default `dist`) | Bundles the entry with tsdown into `<out-dir>/index.mjs` plus its source map: ESM, `node22`, every `dependencies` and `peerDependencies` package external, the app's own modules inlined |
+| `build` | `--entry`, `--out-dir <dir>` (default `dist`) | Bundles the entry with tsdown into `<out-dir>/index.mjs` plus its source map: ESM, `node22`, every `dependencies` and `peerDependencies` package external, the app's own modules inlined. The out dir is emptied first, so one that is the project folder or above it, holds the entry, or holds anything but `.mjs` and `.mjs.map` files exits 2 |
 | `start` | `--entry` | Starts the app: store (and migrations), engine, scheduler, then HTTP |
 | `run-job` | `<agent>`, `[triggerId]`, `--entry` | Fires one cron trigger once and waits for its run (a Kubernetes CronJob); `triggerId` defaults to the agent's only cron trigger |
 | `migrate` | `--entry` | Migrates the Postgres store (`DATABASE_URL` required) |
@@ -91,14 +91,14 @@ The CLI sets `process.exitCode` and lets Node exit; it calls `process.exit()` on
 `start` and `run-job`:
 
 - The first SIGTERM or SIGINT stops the app (`/readyz` 503, scheduler stop, HTTP close, engine drain up to `CHAMVI_DRAIN_TIMEOUT_MS`, store close), then exits 0, or 1 when the stop reported an error.
-- A second signal exits 1 at once.
+- A second signal exits 1 at once. A signal within 1 s of the first counts as the same one, since `npm run dev` and `npm start` deliver one Ctrl-C twice (npm forwards SIGINT to the script while the terminal signals the whole group).
 - `CHAMVI_FORCE_EXIT_MS` (default 90000) after the first signal, a stop still running exits 1.
 
 `migrate` installs no handlers: Node's default ends it.
 
 On Kubernetes keep `preStop + CHAMVI_FORCE_EXIT_MS < terminationGracePeriodSeconds`. With a 5 s `preStop` sleep and a grace period of 120 s the worst case is 5 + 30 (drain) + 5 (close) + 30 (workspaces) = 70 s, the forced exit comes at 95 s and SIGKILL at 120 s.
 
-`chamvi dev` runs its child in a process group of its own, so a terminal Ctrl-C reaches only the CLI, which forwards that one signal (the app then stops once, instead of getting the terminal's SIGINT plus the one `node --watch` forwards). SIGHUP (the terminal closed) and the CLI's own exit stop the child with SIGTERM, so it never outlives the CLI. The exit code is the child's, 0 when it ended by a forwarded signal.
+`chamvi dev` runs its child in a process group of its own, so a terminal Ctrl-C reaches only the CLI, which forwards that one signal (the app then stops once, instead of getting the terminal's SIGINT plus the one `node --watch` forwards). SIGHUP (the terminal closed) and the CLI's own exit stop the child with SIGTERM, and the child's stdin is a pipe only the CLI writes: when the CLI dies without its exit hook (SIGKILL, the OOM killer), the pipe closes and the app ends the whole group, so it never outlives the CLI. The exit code is the child's, 0 when it ended by a forwarded signal.
 
 ## License
 

@@ -85,7 +85,7 @@ export default createApp({
 
 ## Environment
 
-Every variable is read once per lifecycle. An empty string counts as unset, integers are digits only, booleans `true`, `false`, `1` or `0`. A malformed value throws `InvalidAgentDefinitionError` naming the variable, never echoing its value.
+Every variable is read once per lifecycle. An empty string counts as unset, integers are digits only (every `*_MS` variable at most `TIMER_MAX_MS`, Node's timer limit), booleans `true`, `false`, `1` or `0`. A malformed value throws `InvalidAgentDefinitionError` naming the variable, never echoing its value.
 
 | Variable | Read by | Value | Default |
 |---|---|---|---|
@@ -123,7 +123,7 @@ githubModule({ env: { GITHUB_APP_ID: '1', GITHUB_APP_PRIVATE_KEY: pem, GITHUB_WE
 
 ## Modules
 
-Modules are orkos `IModule`s on an eldin container. The built-in ones are always there; listing a module with a built-in's name (`ModuleName`) in `modules` replaces it. Two modules sharing any other name throw `InvalidAgentDefinitionError`.
+Modules are orkos `IModule`s on an eldin container. The built-in ones are always there; listing a module with a built-in's name (`ModuleName`) in `modules` replaces it. Two modules of one name, a built-in's included, throw `InvalidAgentDefinitionError`.
 
 | Module | Name | Entry | Does |
 |---|---|---|---|
@@ -148,10 +148,11 @@ Modules are orkos `IModule`s on an eldin container. The built-in ones are always
 
 1. config
 2. store (and the migrations)
-3. `engine.start()`
-4. `scheduler.start()`
-5. the purge timer
-6. `serve()` on `HOST`:`PORT`
+3. every `onReady`: the engine, the scheduler and the HTTP app are built, nothing runs yet (a configuration error starts nothing)
+4. `engine.start()`
+5. `scheduler.start()`
+6. the purge timer
+7. `serve()` on `HOST`:`PORT`
 
 `stop()` (also during a start still setting up, which then never listens):
 
@@ -190,6 +191,10 @@ export function auditModule(): IModule {
             });
         },
         async onReady(container: IContainer) {
+            // migrate builds config and store only: no ENGINE to resolve
+            if (container.resolve(AppToken.CONTEXT).mode === 'migrate') {
+                return;
+            }
             const logger = container.resolve(AppToken.LOGGER);
             container.resolve(AppToken.ENGINE).on('run.updated', ({ run }) => {
                 logger.info('run updated', { run: run.id, status: run.status });
@@ -200,7 +205,8 @@ export function auditModule(): IModule {
 ```
 
 - **Tokens** (`AppToken`): `CONTEXT`, `CONFIG`, `LOGGER`, `CLOCK`, `STORE`, `DATA_SOURCE`, `ENGINE`, `SCHEDULER`, `SHUTDOWN` and `SERVER` hold one value; `HTTP_ROUTES`, `AUTHENTICATORS` (`{ name, order, authenticator }`, lowest `order` first, `AUTHENTICATOR_ORDER`), `NOTIFIERS` and `LIFECYCLE_HOOKS` are collections (`registerMany(token, { useValue })` in `setup`, `resolveAll` in `onReady`).
-- **Order**: contributions need none, since every consumer builds in `onReady`. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in `onReady` lists that module in `dependencies`.
+- **Order**: contributions need none, since every consumer builds in `onReady`. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in `onReady` lists that module in `dependencies`; a dependency the app does not register, a cycle or a version mismatch is an `InvalidAgentDefinitionError` before any module set up.
+- **Modes**: `CONTEXT.mode` is `start` (everything), `job` (config, store, engine) or `migrate` (config and store only), so a module resolving `ENGINE` in `onReady` returns early in `migrate`.
 - **Hooks** (`LIFECYCLE_HOOKS`, `ILifecycleHook`): `engineCreated(engine)` before `engine.start()`, `started()` before the server listens, `stopping()` after the scheduler stopped, `drained()` after the engine drained, before the store closes.
 - **Failures**: orkos never tears down a module whose `setup` threw, so a `setup` that throws closes what it opened first. A module whose `onReady` threw is torn down, so `teardown` tolerates state `onReady` never built.
 - **Stopping**: `CONTEXT.signal` aborts once `stop()` is called; `throwIfStopped(context)` before a long step keeps a stopped start from going on. `context.report(error)` logs, and during `stop()` makes it reject.

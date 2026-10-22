@@ -26,13 +26,13 @@ function isApp(value: unknown): value is IApp;
 const APP_BRAND: unique symbol; // Symbol.for('chamvi.app')
 ```
 
-Synchronous and side-effect free. Throws `InvalidAgentDefinitionError` for two modules of one name that is not a built-in's. `isApp` checks the brand, so an app of another installed copy matches.
+Synchronous and side-effect free. Throws `InvalidAgentDefinitionError` for a module list entry that is no `IModule` and for two modules of one name (a built-in's name included: list one module to replace a built-in). `isApp` checks the brand, so an app of another installed copy matches.
 
 <<< ../../../app/src/app/types.ts{ts}
 
 | Method | Builds | Rejects with |
 |---|---|---|
-| `start` | config, store (migrated unless `CHAMVI_MIGRATE=false`), engine, scheduler (unless `CHAMVI_SCHEDULER=false`), http; resolves once listening | the setup error; `app_in_use` for a second lifecycle; `app_stopped` when `stop()` came first |
+| `start` | config, store (migrated unless `CHAMVI_MIGRATE=false`), engine, scheduler (unless `CHAMVI_SCHEDULER=false`), http; starts the engine and scheduler once every module built, resolves once listening | the setup error (a module graph error as `InvalidAgentDefinitionError`); `app_stopped` when `stop()` interrupted the setup (the setup's own error is logged); `app_in_use` for a second lifecycle or after `stop()` |
 | `stop` | the shutdown sequence (see [Start and stop](/guide/app#start-and-stop)); memoized, waits for a setup in flight | `app_stop_failed` when a teardown failed (each failure is logged) |
 | `runJob` | config, store (migrated), engine (not started: `@chamvi/scheduler` `runJob` starts, ticks and drains it); no scheduler, no http | the job's error; `app_in_use` |
 | `migrate` | config, store (`migrateStore`), store teardown | `InvalidAgentDefinitionError` without `DATABASE_URL`; `app_in_use` |
@@ -53,7 +53,7 @@ Configuration errors (a malformed or missing variable, a model string without it
 
 ## Environment
 
-Read by `readConfig(env, { mode, dev })` once per lifecycle; the optional module factories read their own variables when they are called. Empty string is unset, integers are `/^\d+$/`, booleans `true`, `false`, `1` or `0`.
+Read by `readConfig(env, { mode, dev })` once per lifecycle; the optional module factories read their own variables when they are called. Empty string is unset, integers are `/^\d+$/` (every `*_MS` variable at most `TIMER_MAX_MS`, 2147483647, since a larger Node timer fires after 1 ms), booleans `true`, `false`, `1` or `0`.
 
 | Variable | Module | Type | Default | Required when |
 |---|---|---|---|---|
@@ -121,7 +121,7 @@ Listing one of them in `createApp({ modules })` replaces the default instance.
 
 <<< ../../../app/src/modules/config/types.ts{ts}
 
-`StoreModuleOptions` (`store` is used as is and never closed; `dataSource` must be initialized, is migrated like a built one and never destroyed; `url` wins over `DATABASE_URL`):
+`StoreModuleOptions` (`store` is used as is and never closed; `dataSource` must be initialized, is migrated like a built one and never destroyed; `url` wins over `DATABASE_URL`; a data source built from a URL waits at most 10 s for Postgres to accept the first connection):
 
 <<< ../../../app/src/modules/store/types.ts{ts}
 

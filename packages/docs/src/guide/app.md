@@ -37,7 +37,7 @@ An agent's `model` may be a string `'<provider>:<model>'`. It resolves through a
 
 ## Modules
 
-Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](https://github.com/tada5hi/eldin) container, unwrapped. Six built-in modules are always there; listing a module with a built-in's name (`ModuleName`) replaces it, which is also how you configure one (`storeModule({ dataSource })`, `httpModule({ cors })`). Two modules sharing any other name throw `InvalidAgentDefinitionError` from `createApp`.
+Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](https://github.com/tada5hi/eldin) container, unwrapped. Six built-in modules are always there; listing a module with a built-in's name (`ModuleName`) replaces it, which is also how you configure one (`storeModule({ dataSource })`, `httpModule({ cors })`). Two modules of one name, a built-in's included, throw `InvalidAgentDefinitionError` from `createApp`.
 
 | Module | Does |
 |---|---|
@@ -71,7 +71,7 @@ orkos sets every module up in dependency order, then calls every `onReady`. cham
 - In **`setup`**, a module registers what it contributes on the container's collection tokens: `AppToken.HTTP_ROUTES`, `NOTIFIERS`, `AUTHENTICATORS` (with an `order`, lowest first) and `LIFECYCLE_HOOKS`.
 - In **`onReady`**, the consumers build: the engine module collects the notifiers, the http module the routes and authenticators.
 
-So a contribution never depends on module order. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in its own `onReady` lists that module in `dependencies`.
+So a contribution never depends on module order. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in its own `onReady` lists that module in `dependencies`. The engine and the scheduler start only after the http module built its app (authenticators, routes) and the scheduler its definitions, so a configuration error in any of them starts nothing: no queued run of the shared store executes on a replica that then exits 2.
 
 ## Start and stop
 
@@ -79,10 +79,11 @@ So a contribution never depends on module order. A module that resolves `ENGINE`
 
 1. config
 2. store (and the migrations, advisory-locked, so every replica may run them)
-3. `engine.start()`
-4. `scheduler.start()`
-5. the purge timer
-6. `serve()` on `HOST`:`PORT`, listening last
+3. every `onReady`: the engine, the scheduler and the HTTP app are built, nothing runs yet
+4. `engine.start()`
+5. `scheduler.start()`
+6. the purge timer
+7. `serve()` on `HOST`:`PORT`, listening last
 
 `app.stop()` is memoized and also stops a start still setting up (which then never listens):
 
@@ -106,7 +107,8 @@ orkos swallows teardown errors; chamvi does not: every teardown error is logged,
 - **Hooks** (`LIFECYCLE_HOOKS`): `engineCreated(engine)` before `engine.start()`, `started()` before the server listens, `stopping()` after the scheduler stopped, `drained()` after the engine drained and before the store closes.
 - **Failures:** orkos never tears down a module whose `setup` threw, so such a `setup` closes what it opened before rethrowing. A module whose `onReady` threw is torn down, so `teardown` tolerates state that `onReady` never built.
 - **Stopping:** `AppToken.CONTEXT` holds the lifecycle's `signal`, aborted once `stop()` is called; `throwIfStopped(context)` before a long step keeps a stopped start from going on. `context.report(error)` logs an error and, during `stop()`, makes it reject.
-- **Names:** a module name is a plain string (`'audit'`); never an npm package name, since orkos would try to `import()` it.
+- **Modes:** `AppToken.CONTEXT` holds the `mode`: `start` builds everything, `job` (`runJob`) config, store and engine, `migrate` only config and store. A module that resolves `ENGINE` in `onReady` returns early in `migrate` mode, as the sample does, or `chamvi migrate` fails.
+- **Dependencies:** `dependencies` name modules the app registers (`{ name, optional: true }` for one it may lack). A missing one, a cycle or a version mismatch throws `InvalidAgentDefinitionError` from `start`, `runJob` and `migrate` before any module set up (the CLI exits 2).
 
 ## Testing an app
 
