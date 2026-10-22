@@ -27,6 +27,9 @@ export const ENTRY_ARG = {
 /** The output folder of `chamvi build` (C2). */
 export const BUILD_OUT_DIR = 'dist';
 
+/** The files `chamvi build` writes (the bundle, chunks and their source maps); an out dir holding others is refused. */
+export const BUILD_OUTPUT_PATTERN = /\.mjs(?:\.map)?$/;
+
 /** The optional peer `chamvi build` drives. */
 export const TSDOWN_PACKAGE = 'tsdown';
 

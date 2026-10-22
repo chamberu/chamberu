@@ -5,7 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import {
+    mkdir,
+    readFile,
+    stat,
+    writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import {
     afterEach,
@@ -60,6 +65,31 @@ describe('build', () => {
         expect(fake.exitCodes).toEqual([]);
         expect(await exists(path.join(app.cwd, 'build/index.mjs'))).toBe(true);
         expect(await exists(path.join(app.cwd, 'dist'))).toBe(false);
+    });
+
+    it('builds again over its own output', async () => {
+        await runCli(['build'], fake.context({ cwd: app.cwd }));
+        await runCli(['build'], fake.context({ cwd: app.cwd }));
+        expect(fake.exitCodes).toEqual([]);
+        expect(await exists(path.join(app.cwd, 'dist/index.mjs'))).toBe(true);
+    });
+
+    it.each([
+        ['src', 'holds the entry'],
+        ['.', 'is the project folder or above it'],
+        ['..', 'is the project folder or above it'],
+        ['notes', 'holds files the build did not write'],
+    ])('--out-dir %s exits 2 and deletes nothing', async (outDir, reason) => {
+        await mkdir(path.join(app.cwd, 'notes'));
+        await writeFile(path.join(app.cwd, 'notes/todo.md'), 'keep me');
+
+        await runCli(['build', '--out-dir', outDir], fake.context({ cwd: app.cwd }));
+
+        expect(fake.exitCodes).toEqual([2]);
+        expect(fake.stderr.join('')).toContain(reason);
+        expect(await exists(path.join(app.cwd, 'src/index.ts'))).toBe(true);
+        expect(await exists(path.join(app.cwd, 'src/agents.ts'))).toBe(true);
+        expect(await exists(path.join(app.cwd, 'notes/todo.md'))).toBe(true);
     });
 
     it('--entry', async () => {
