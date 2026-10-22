@@ -13,6 +13,7 @@ import {
     expect,
     it,
 } from 'vitest';
+import { SIGNAL_REPEAT_MS } from '../../../src/signals/constants.ts';
 import { TOKEN, startEnv } from '../../utils/env.ts';
 import { freePort } from '../../utils/port.ts';
 import {
@@ -109,8 +110,23 @@ describe('bin start', () => {
 
         cli.child.kill('SIGTERM');
         await cli.waitForOutput((output) => output.includes('received SIGTERM, stopping'));
+        // a repeat within SIGNAL_REPEAT_MS is the same signal delivered twice
+        await new Promise((resolve) => { setTimeout(resolve, SIGNAL_REPEAT_MS + 100); });
         cli.child.kill('SIGTERM');
         expect(await cli.exited(5_000)).toEqual({ code: 1, signal: null });
+    });
+
+    it('one Ctrl-C delivered twice (npm and the terminal) still drains and exits 0', async () => {
+        cli = spawnCli(['start', '--entry', fixtureEntry('hang')], { env: startEnv(port, { CHAMVI_DRAIN_TIMEOUT_MS: '1000' }) });
+        await waitForOk(`http://127.0.0.1:${port}/readyz`);
+        await startHangingRun();
+
+        cli.child.kill('SIGINT');
+        cli.child.kill('SIGINT');
+        const started = Date.now();
+        expect(await cli.exited(10_000)).toEqual({ code: 0, signal: null });
+        expect(Date.now() - started).toBeGreaterThanOrEqual(900);
+        expect(cli.stderr()).not.toContain('forced exit');
     });
 
     it('CHAMVI_FORCE_EXIT_MS forces exit 1', async () => {

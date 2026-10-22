@@ -11,6 +11,7 @@ import {
     expect,
     it,
 } from 'vitest';
+import { SIGNAL_REPEAT_MS } from '../../../src/signals/constants.ts';
 import { installSignalHandlers } from '../../../src/signals/module.ts';
 import { createFakeProcess } from '../../utils/process.ts';
 import type { FakeProcess } from '../../utils/process.ts';
@@ -88,9 +89,36 @@ describe('installSignalHandlers', () => {
     it('second signal exits 1 at once', async () => {
         install();
         fake.signals.emit('SIGTERM');
+        fake.clock.advance(SIGNAL_REPEAT_MS);
         fake.signals.emit('SIGTERM');
         expect(fake.exits).toEqual([1]);
         expect(stops).toBe(1);
+    });
+
+    it('a repeat within SIGNAL_REPEAT_MS is the same signal (npm and the terminal both send one Ctrl-C)', async () => {
+        install();
+        fake.signals.emit('SIGINT');
+        fake.signals.emit('SIGINT');
+        fake.clock.advance(SIGNAL_REPEAT_MS - 1);
+        fake.signals.emit('SIGINT');
+        expect(fake.exits).toEqual([]);
+        expect(stops).toBe(1);
+
+        fake.clock.advance(1);
+        fake.signals.emit('SIGINT');
+        expect(fake.exits).toEqual([1]);
+    });
+
+    it('the force timer keeps the process alive until it fired or was cleared', () => {
+        const options: unknown[] = [];
+        const setTimeout = fake.clock.setTimeout.bind(fake.clock);
+        fake.clock.setTimeout = (fn, ms, opts?: unknown) => {
+            options.push(opts);
+            return setTimeout(fn, ms);
+        };
+        install();
+        fake.signals.emit('SIGTERM');
+        expect(options).toEqual([{ keepAlive: true }]);
     });
 
     it('force timer exits 1 after forceExitMs', async () => {
@@ -125,6 +153,7 @@ describe('installSignalHandlers', () => {
     it('a SIGINT after a SIGTERM exits 1 at once', () => {
         install();
         fake.signals.emit('SIGTERM');
+        fake.clock.advance(SIGNAL_REPEAT_MS);
         fake.signals.emit('SIGINT');
         expect(fake.exits).toEqual([1]);
     });
