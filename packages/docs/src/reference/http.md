@@ -48,7 +48,10 @@ const Permission: {
 };
 
 function agentPermission(agent: string, action: 'run' | 'approve'): string; // agent:<agent>:<action>
+function assertMcpRunTool(agent: Agent): void; // throws InvalidAgentDefinitionError like createHttpApp
 ```
+
+`assertMcpRunTool` builds the agent's `run_<agent>` MCP tool definition and throws what `createHttpApp` would throw for it (a tool name above 64 characters, a payload schema MCP cannot compile); the app runs it on every folder agent before registering it. `createHttpApp` reports a folder agent's failure (one the engine holds at a revision) to `onError` and skips its tool instead of throwing.
 
 Matching uses core's [`hasPermission(principal.permissions, permission)`](/reference/#permissions): true for a granted `*`, or for a grant with the same number of `:` segments whose every segment is equal or `*`.
 

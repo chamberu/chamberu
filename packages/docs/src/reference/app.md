@@ -117,7 +117,7 @@ function httpModule(options?: HttpModuleOptions): IModule;                // 'ch
 function consoleNotifierModule(options?: ConsoleNotifierModuleOptions): IModule; // 'chamvi:notifier:<name>'
 ```
 
-Listing one of them in `createApp({ modules })` replaces the default instance. `agentsModule()` (no options) reads `CHAMVI_AGENTS_DIR`: in `start` and `job` mode its `onReady` loads every folder into the engine before any start step (a dir that is no directory is `InvalidAgentDefinitionError`), and in `start` mode a lifecycle hook polls the dir from `started` until `stopping`; it registers `AppToken.AGENT_ISSUES`, which the http module passes on as `agentIssues`. Without a dir it only refuses an app without agents.
+Listing one of them in `createApp({ modules })` replaces the default instance. `agentsModule()` (no options) reads `CHAMVI_AGENTS_DIR`: in `start` and `job` mode its `onReady` loads every folder into the engine before any start step (a dir that is no directory is `InvalidAgentDefinitionError`), and in `start` mode a lifecycle hook polls the dir from `started` until `stopping`; it registers `AppToken.AGENT_ISSUES`, which the http module passes on as `agentIssues`. A folder agent passes `AppToken.MODEL_CHECK` and every `AppToken.AGENT_CHECKS` contribution (the scheduler module's `assertSchedulable`, the http module's `assertMcpRunTool` unless `mcp: false`) and the engine's notifier check before it is registered; a refusal is a load issue, never a failed boot. Only `start` mode removes an agent whose marker has no folder; a job never does. Without a dir it only refuses an app without agents.
 
 <<< ../../../app/src/modules/config/types.ts{ts}
 
@@ -206,7 +206,7 @@ function listAgentFolders(root: string): Promise<string[]>;
 function hashAgentFolder(dir: string): Promise<string>;
 ```
 
-`loadAgent` builds one folder's agent (the [layout](/guide/agent-folders#the-layout)) and its content hash, and throws `InvalidAgentDefinitionError` naming the file relative to the agents dir. `loadAgents` loads every folder `listAgentFolders` names (the direct subfolders not starting with `.` or `_`, in code-point order) and returns the failures as `issues` instead of throwing. `hashAgentFolder` is sha256 (hex) over every file below the folder, dot-entries skipped, by relative POSIX path. The loader holds the only `jiti` and `locter` imports of chamvi.
+`loadAgent` builds one folder's agent (the [layout](/guide/agent-folders#the-layout)) and its content hash, and throws `InvalidAgentDefinitionError` naming the file relative to the agents dir. `loadAgents` loads every folder `listAgentFolders` names (the direct subfolders not starting with `.` or `_`, `node_modules` left out, in code-point order) and returns the failures as `issues` instead of throwing. `hashAgentFolder` is sha256 (hex) over every file below the folder, dot-entries skipped, by relative POSIX path. `loadAgent` also refuses a folder that changed while it was read (`<agent>: changed while loading; load it again.`), a `node_modules` folder in the agent folder or the agents dir, and a JavaScript helper (a `.js`, `.mjs` or `.cjs` file the loader does not read itself). The default reader transpiles every module file on every load and resolves `@chamvi/*`, `ai` and `@ai-sdk/*` to the copies `@chamvi/app` resolves. The loader holds the only `jiti` and `locter` imports of chamvi.
 
 <<< ../../../app/src/loader/types.ts{ts}
 

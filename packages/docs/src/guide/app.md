@@ -77,7 +77,7 @@ With `CHAMVI_PUBLIC_URL` set, the notifier modules link approvals to the dashboa
 
 orkos sets every module up in dependency order, then calls every `onReady`. chamvi splits the work along that line:
 
-- In **`setup`**, a module registers what it contributes on the container's collection tokens: `AppToken.HTTP_ROUTES`, `NOTIFIERS`, `AUTHENTICATORS` (with an `order`, lowest first) and `LIFECYCLE_HOOKS`.
+- In **`setup`**, a module registers what it contributes on the container's collection tokens: `AppToken.HTTP_ROUTES`, `NOTIFIERS`, `AUTHENTICATORS` (with an `order`, lowest first), `LIFECYCLE_HOOKS` and `AGENT_CHECKS` (an `(agent) => void` that throws `InvalidAgentDefinitionError` for a folder agent the module could not serve, run before the agent is registered).
 - In **`onReady`**, the consumers build: the engine module collects the notifiers, the http module the routes and authenticators.
 
 So a contribution never depends on module order. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in its own `onReady` lists that module in `dependencies`. Nothing starts in `onReady`: the engine, the scheduler and the http module register start steps, which the app runs (engine, scheduler, then the `started` hooks and listening) only once every module's `onReady` ran, user modules included. So a configuration error any of them finds starts nothing: no queued run of the shared store executes on a replica that then exits 2.
