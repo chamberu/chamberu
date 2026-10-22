@@ -6,12 +6,12 @@
     "packages": {
         "packages/app": {"component": "app"},
         "packages/channel-cron": {"component": "channel-cron"},
+        "packages/channel-openclaw": {"component": "channel-openclaw"},
         "packages/cli": {"component": "cli"},
         "packages/coding": {"component": "coding"},
         "packages/core": {"component": "core"},
         "packages/github": {"component": "github"},
         "packages/http": {"component": "http"},
-        "packages/notify-openclaw": {"component": "notify-openclaw"},
         "packages/sandbox": {"component": "sandbox"},
         "packages/sandbox-docker": {"component": "sandbox-docker"},
         "packages/sandbox-k8s": {"component": "sandbox-k8s"},
