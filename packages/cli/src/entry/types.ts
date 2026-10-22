@@ -9,7 +9,7 @@ export type EntryKind = 'source' | 'built';
 
 export type ResolveEntryInput = {
     cwd: string;
-    /** `--entry`, relative to `cwd` or absolute. */
-    entry?: string;
+    /** `--entry`, relative to `cwd` or absolute; citty gives `''` for a bare `--entry` and `false` for `--no-entry`. */
+    entry?: string | boolean;
     kind: EntryKind;
 };

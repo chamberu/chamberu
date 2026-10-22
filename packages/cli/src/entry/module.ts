@@ -55,11 +55,15 @@ async function readPackageEntry(cwd: string): Promise<string | undefined> {
  * The absolute entry path: `--entry`, else for a source command
  * `package.json` `chamvi.entry`, else `src/index.ts` (source) or
  * `dist/index.mjs` (built; the built commands never read `chamvi.entry`, so
- * an image built from a repo setting it still starts). A missing file is a
- * `cli_usage` error.
+ * an image built from a repo setting it still starts). A missing file, and
+ * an `--entry` without a path, is a `cli_usage` error.
  */
 export async function resolveEntry(input: ResolveEntryInput): Promise<string> {
-    if (typeof input.entry === 'string' && input.entry.length > 0) {
+    if (typeof input.entry !== 'undefined' && (typeof input.entry !== 'string' || input.entry.length === 0)) {
+        throw createUsageError('--entry needs a path.');
+    }
+
+    if (typeof input.entry === 'string') {
         const file = path.resolve(input.cwd, input.entry);
         if (!(await isFile(file))) {
             throw createUsageError(`${input.entry} not found.`);
