@@ -44,6 +44,7 @@ describe('public api', () => {
         'inject',
         'tryInject',
         'ContextNotProvidedError',
+        'AgentNotFoundError',
     ])('exports %s', (name) => {
         expect(core).toHaveProperty(name);
         expect(core[name as keyof typeof core]).toBeTypeOf('function');
@@ -67,6 +68,30 @@ describe('public api', () => {
 
     it('exports the context error code', () => {
         expect(core.ErrorCode.CONTEXT_NOT_PROVIDED).toBe('context_not_provided');
+    });
+
+    it('exports the agent not found error code', () => {
+        expect(core.ErrorCode.AGENT_NOT_FOUND).toBe('agent_not_found');
+    });
+
+    it('keeps the agent registry internals internal', () => {
+        expect(core).not.toHaveProperty('AGENT_LOCK_TTL_MS');
+        expect(core).not.toHaveProperty('cancelAgentRuns');
+        expect(core).not.toHaveProperty('syncRevision');
+    });
+
+    it('exports the agent change event types', () => {
+        expectTypeOf<core.AgentChange>().toEqualTypeOf<{
+            type: 'agents.changed';
+            name: string;
+            kind: 'added' | 'replaced' | 'removed';
+        }>();
+        expectTypeOf<core.EngineEvent>().toEqualTypeOf<core.RunEvent | core.AgentChange>();
+    });
+
+    it('exports the agent folder types', () => {
+        expectTypeOf<core.AgentRevision>().toHaveProperty('hash').toEqualTypeOf<string>();
+        expectTypeOf<core.AgentConfig>().not.toHaveProperty('name');
     });
 
     it('keeps the context binding internal', () => {
