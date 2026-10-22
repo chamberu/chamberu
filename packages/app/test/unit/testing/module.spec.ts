@@ -115,7 +115,7 @@ describe('module harness', () => {
 
         const error = await rejectionOf(harness.setup());
 
-        expect(error === failure || error.cause === failure).toBe(true);
+        expect(error).toBe(failure);
         expect(events).toContain('config teardown');
     });
 
