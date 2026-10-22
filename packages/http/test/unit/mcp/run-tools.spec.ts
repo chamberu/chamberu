@@ -17,9 +17,8 @@ import {
     InvalidAgentDefinitionError,
     MemoryStore,
     defineAgent,
-    http,
 } from '@chamvi/core';
-import { assertMcpRunTool } from '@chamvi/http';
+import { assertMcpRunTool, http, httpChannel } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     call,
@@ -42,7 +41,7 @@ function recursiveAgent() {
         name: 'tree',
         model: textModel(),
         instructions: 'Tree runs.',
-        triggers: [http({ schema: z.object({ root: TreeNodeSchema, alias: TreeNodeSchema }) })],
+        channels: [http.on({ schema: z.object({ root: TreeNodeSchema, alias: TreeNodeSchema }) })],
     });
 }
 
@@ -70,12 +69,12 @@ function typedAgent() {
         name: 'typed',
         model: textModel(),
         instructions: 'Typed runs.\nSecond line.',
-        triggers: [http({ schema: z.object({ n: z.number() }) })],
+        channels: [http.on({ schema: z.object({ n: z.number() }) })],
     });
 }
 
 describe('mcp run_<agent>', () => {
-    it('lists one tool per agent with an http() trigger', async () => {
+    it('lists one tool per agent with an http subscription', async () => {
         const { app } = createRunTestApp();
         const client = await connectMcp(app, ADMIN_TOKEN);
         const names = (await client.listTools()).tools.map((t) => t.name);
@@ -111,7 +110,7 @@ describe('mcp run_<agent>', () => {
         await client.close();
     });
 
-    it('dispatches through the http() trigger with source mcp', async () => {
+    it('dispatches through the http subscription as channel mcp', async () => {
         const { app, store } = createRunTestApp();
         const client = await connectMcp(app, ADMIN_TOKEN);
         const result = await callTool(client, 'run_echo', { payload: { n: 1 } });
@@ -125,7 +124,7 @@ describe('mcp run_<agent>', () => {
         expect((await store.getRun(content.runId))?.trigger).toMatchObject({
             agent: 'echo',
             trigger: 'http',
-            source: 'mcp',
+            channel: 'mcp',
             payload: { n: 1 },
         });
         await client.close();
@@ -196,7 +195,7 @@ describe('mcp run_<agent>', () => {
             name: 'counted',
             model: textModel(),
             instructions: 'Counted.',
-            triggers: [http({ schema })],
+            channels: [http.on({ schema })],
         });
         const { app } = createRunTestApp({ agents: [...createRunAgents(), agent] });
         for (let i = 0; i < 3; i++) {
@@ -213,7 +212,7 @@ describe('mcp run_<agent>', () => {
             name: 'a'.repeat(61),
             model: textModel(),
             instructions: 'Long.',
-            triggers: [http()],
+            channels: [http.on()],
         });
         expect(() => createRunTestApp({ agents: [long] })).toThrow(InvalidAgentDefinitionError);
         expect(() => createRunTestApp({ agents: [long], mcp: false })).not.toThrow();
@@ -226,12 +225,13 @@ describe('mcp run_<agent>', () => {
             name: 'a'.repeat(61),
             model: textModel(),
             instructions: 'Long.',
-            triggers: [http()],
+            channels: [http.on()],
         });
         const engine = new Engine({
             store: new MemoryStore(), 
             agents: [], 
             resumeSecret: 's', 
+            channels: [httpChannel()],
         });
         await engine.putAgent(long, { revision: 'h1' });
         const errors: unknown[] = [];
@@ -249,7 +249,7 @@ describe('mcp run_<agent>', () => {
             name,
             model: textModel(),
             instructions: 'x',
-            triggers: [http()],
+            channels: [http.on()],
         });
         expect(() => assertMcpRunTool(agent('a'.repeat(61)))).toThrow(InvalidAgentDefinitionError);
         expect(() => assertMcpRunTool(agent('a'.repeat(60)))).not.toThrow();
@@ -287,7 +287,7 @@ describe('mcp run_<agent>', () => {
             name: 'typed',
             model: textModel(),
             instructions: 'Retyped runs.',
-            triggers: [http({ schema })],
+            channels: [http.on({ schema })],
         }));
         for (let i = 0; i < 3; i++) {
             const client = await connectMcp(app, ADMIN_TOKEN);
@@ -308,13 +308,13 @@ describe('mcp run_<agent>', () => {
             name: 'broken',
             model: textModel(),
             instructions: 'Broken.',
-            triggers: [http({ schema })],
+            channels: [http.on({ schema })],
         }));
         await engine.putAgent(defineAgent({
             name: 'a'.repeat(61),
             model: textModel(),
             instructions: 'Long.',
-            triggers: [http()],
+            channels: [http.on()],
         }));
         for (let i = 0; i < 2; i++) {
             const client = await connectMcp(app, ADMIN_TOKEN);

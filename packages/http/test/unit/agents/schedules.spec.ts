@@ -6,12 +6,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { cron, defineAgent, http } from '@chamvi/core';
+import { defineAgent } from '@chamvi/core';
+import { http } from '@chamvi/http';
 import { ControllableClock } from '@chamvi/test-kit';
 import {
     READER_TOKEN,
     call,
     createTestApp,
+    cronOn,
     tokenFor,
 } from '../../utils/app.ts';
 import { textModel } from '../../utils/model.ts';
@@ -23,29 +25,30 @@ function setup() {
             name: 'sweep',
             model: textModel(),
             instructions: 'Sweep.',
-            triggers: [
-                cron('0 * * * *', { timezone: 'Europe/Berlin' }),
-                cron('0 9 * * *', { timezone: 'Europe/Berlin', overlap: 'queue-one' }),
+            channels: [
+                cronOn('0 * * * *', { timezone: 'Europe/Berlin' }),
+                cronOn('0 9 * * *', { timezone: 'Europe/Berlin', overlap: 'queue-one' }),
             ],
         }),
         defineAgent({
             name: 'echo',
             model: textModel(),
             instructions: 'Echo.',
-            triggers: [http(), cron('*/15 * * * *')],
+            channels: [http.on(), cronOn('*/15 * * * *')],
         }),
     ];
     return createTestApp({ agents, clock });
 }
 
 describe('GET /schedules', () => {
-    it('lists every cron trigger with its next fire time', async () => {
+    it('lists every cron subscription with its next fire time', async () => {
         const { app } = setup();
         const response = await call(app, 'GET', '/schedules', { token: READER_TOKEN });
         expect(response.status).toBe(200);
         expect((await response.json()).data).toEqual([
             {
                 agent: 'sweep',
+                channel: 'cron',
                 trigger: 'cron:0 * * * *',
                 expression: '0 * * * *',
                 timezone: 'Europe/Berlin',
@@ -54,6 +57,7 @@ describe('GET /schedules', () => {
             },
             {
                 agent: 'sweep',
+                channel: 'cron',
                 trigger: 'cron:0 9 * * *',
                 expression: '0 9 * * *',
                 timezone: 'Europe/Berlin',
@@ -63,6 +67,7 @@ describe('GET /schedules', () => {
             },
             {
                 agent: 'echo',
+                channel: 'cron',
                 trigger: 'cron:*/15 * * * *',
                 expression: '*/15 * * * *',
                 overlap: 'skip',

@@ -20,11 +20,22 @@ describe('public api', () => {
         'authup',
         'createHttpApp',
         'createShutdown',
+        'httpChannel',
+        'mcpChannel',
         'oidc',
         'staticTokens',
+        'webhookChannel',
     ])('exports %s', (name) => {
         expect(http).toHaveProperty(name);
         expect(http[name as keyof typeof http]).toBeTypeOf('function');
+    });
+
+    it('exports the subscription builders and channel names', () => {
+        expect(http.http.on).toBeTypeOf('function');
+        expect(http.webhook.on).toBeTypeOf('function');
+        expect(http.HTTP_CHANNEL_NAME).toBe('http');
+        expect(http.MCP_CHANNEL_NAME).toBe('mcp');
+        expect(http.WEBHOOK_CHANNEL_NAME).toBe('webhook');
     });
 
     it('leaves permission matching to core', () => {

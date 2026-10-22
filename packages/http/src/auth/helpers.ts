@@ -11,7 +11,7 @@ import { ForbiddenError, UnauthorizedError } from '@ebec/http';
 import type { IAppEvent } from 'routup';
 import type { HttpContext } from '../app/types.ts';
 import { PRINCIPAL } from './constants.ts';
-import type { Principal } from './types.ts';
+import type { Authenticator, Principal } from './types.ts';
 
 /**
  * Claims read as the invoker's display name, first non-empty string wins.
@@ -58,12 +58,19 @@ export function isPrincipal(value: Principal): boolean {
         value.permissions.every((permission) => typeof permission === 'string');
 }
 
-async function resolvePrincipal(event: IAppEvent, ctx: HttpContext): Promise<Principal> {
+/**
+ * Runs `authenticators` in order over `request`: the first principal wins;
+ * a throw is remembered (and rethrown when no later one resolves), so the
+ * chain goes on; none at all is a 401. A principal without a non-empty `id`
+ * and `kind` and a `permissions` array of strings is a server
+ * misconfiguration (InvalidAgentDefinitionError).
+ */
+export async function resolvePrincipal(request: Request, authenticators: readonly Authenticator[]): Promise<Principal> {
     let rejection: unknown;
-    for (const authenticator of ctx.authenticators) {
+    for (const authenticator of authenticators) {
         let principal: Principal | undefined;
         try {
-            principal = await authenticator(event.request);
+            principal = await authenticator(request);
         } catch (error) {
             rejection ??= error;
             continue;
@@ -82,7 +89,7 @@ async function resolvePrincipal(event: IAppEvent, ctx: HttpContext): Promise<Pri
 export function authenticate(event: IAppEvent, ctx: HttpContext): Promise<Principal> {
     let pending = event.store[PRINCIPAL] as Promise<Principal> | undefined;
     if (!pending) {
-        pending = resolvePrincipal(event, ctx);
+        pending = resolvePrincipal(event.request, ctx.authenticators);
         event.store[PRINCIPAL] = pending;
     }
     return pending;

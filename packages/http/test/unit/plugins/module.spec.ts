@@ -84,6 +84,7 @@ describe('metrics', () => {
             await send(app, `/api/agents/echo/state/kv/k${i}`, { token: ADMIN_TOKEN });
             await send(app, '/api/agents/echo/state/kv', { token: ADMIN_TOKEN });
             await send(app, '/api/me', { token: ADMIN_TOKEN });
+            await send(app, `/api/channels/webhook/hooked/x${i}/y`, { method: 'POST' });
             await send(app, `/api/hooks/hooked/x${i}/y`, { method: 'POST' });
             await send(app, `/api/runs/${crypto.randomUUID()}/artifacts`, { token: ADMIN_TOKEN });
             await send(app, `/api/runs/${crypto.randomUUID()}/artifacts/${crypto.randomUUID()}`, { token: ADMIN_TOKEN });
@@ -93,7 +94,7 @@ describe('metrics', () => {
             '/_unmatched',
             '/agents/:name/state/kv',
             '/agents/:name/state/kv/:key',
-            '/hooks/:agent/*',
+            '/channels/:name/*',
             '/me',
             '/runs/:id',
             '/runs/:id/approve',

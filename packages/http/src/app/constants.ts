@@ -38,8 +38,8 @@ export const DEFAULT_METRICS_PATH = '/metrics';
 /** First path segments of the built-in routes: an extra route may not start with one. */
 export const RESERVED_ROUTE_SEGMENTS: readonly string[] = [
     'agents',
+    'channels',
     'healthz',
-    'hooks',
     'mcp',
     'me',
     'readyz',

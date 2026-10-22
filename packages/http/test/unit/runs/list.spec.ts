@@ -6,7 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { defineAgent, http } from '@chamvi/core';
+import { defineAgent } from '@chamvi/core';
+import { http } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
@@ -85,7 +86,7 @@ describe('GET /runs', () => {
                 name: '007',
                 model: textModel(),
                 instructions: 'Count.',
-                triggers: [http()],
+                channels: [http.on()],
             })],
         });
         const token = tokenFor('agent:007:run');

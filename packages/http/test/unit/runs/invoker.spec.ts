@@ -6,7 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { defineAgent, webhook } from '@chamvi/core';
+import { defineAgent } from '@chamvi/core';
+import { webhook } from '@chamvi/http';
 import type { Principal } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
@@ -106,11 +107,11 @@ describe('run invoker over REST', () => {
                 name: 'intake',
                 model: textModel(),
                 instructions: 'Intake.',
-                triggers: [webhook({ path: '/in' })],
+                channels: [webhook.on('/in')],
             }),
         ];
         const { app, store } = createRunTestApp({ agents });
-        const response = await call(app, 'POST', '/hooks/intake/in', { token: ADMIN_TOKEN, body: {} });
+        const response = await call(app, 'POST', '/channels/webhook/intake/in', { token: ADMIN_TOKEN, body: {} });
         expect(response.status).toBe(202);
         const { runId } = await response.json() as { runId: string };
         expect((await store.getRun(runId))?.trigger).not.toHaveProperty('invoker');
@@ -140,14 +141,14 @@ describe('run invoker over REST', () => {
             app,
             engine,
             store,
-            notifier,
+            tokenOf,
         } = setup();
         const runId = await startRun(app, ALICE_TOKEN);
         await engine.start();
         await engine.idle();
         expect((await store.getRun(runId))?.status).toBe('waiting');
 
-        const response = await call(app, 'POST', '/resume', { token: ALICE_TOKEN, body: { token: notifier.lastToken, approved: true } });
+        const response = await call(app, 'POST', '/resume', { token: ALICE_TOKEN, body: { token: await tokenOf(runId), approved: true } });
         expect(response.status).toBe(202);
         await engine.idle();
 

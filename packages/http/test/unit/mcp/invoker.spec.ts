@@ -46,7 +46,7 @@ describe('mcp invoker', () => {
 
         const client = await connectMcp(setup.app, tokenFor('agent:gate:approve'));
         const result = await callTool(client, 'resume_run', {
-            token: setup.notifier.lastToken, 
+            token: await setup.tokenOf(runId), 
             approved: false, 
             reason: 'no', 
         });

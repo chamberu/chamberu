@@ -140,7 +140,8 @@ export function toRunToolResult(run: Run, deduplicated: boolean): RunToolResult 
     if (run.waiting) {
         result.waiting = {
             toolName: run.waiting.toolName,
-            input: run.waiting.input,
+            title: run.waiting.title,
+            ...(run.waiting.body !== undefined ? { body: run.waiting.body } : {}),
             expiresAt: run.waiting.expiresAt.toISOString(),
         };
     }

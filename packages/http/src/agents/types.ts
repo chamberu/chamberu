@@ -5,24 +5,28 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { Budget, OverlapPolicy, TriggerSource } from '@chamvi/core';
+import type { Budget } from '@chamvi/core';
+
+/** What a cron tick does while a run of the same subscription is active (as `@chamvi/channel-cron` defines it). */
+export type ScheduleOverlap = 'skip' | 'queue-one' | 'allow';
 
 // #region summaries
 /** An agent as `GET /agents` lists it. */
 export type AgentSummary = {
     name: string;
-    /** `hook` is the ready-made path of a `webhook()` trigger. */
-    triggers: Array<{
-        source: TriggerSource;
+    /**
+     * The agent's subscriptions: the channel name and the subscription id;
+     * `hook` is the ready-made path of a subscription to a webhook channel
+     * this app mounts.
+     */
+    channels: Array<{
+        channel: string;
         id: string;
-        hook?: string
+        hook?: string;
     }>;
     budget: Budget;
-    /** Tool names that need an approval. */
-    approvals: string[];
     /** Declared state collections. */
     state: string[];
-    notify?: string;
 };
 
 /** An agent that failed to load, as `GET /agents` lists it next to the agents. */
@@ -32,13 +36,16 @@ export type AgentIssue = {
     at: Date;
 };
 
-/** A `cron()` trigger as `GET /schedules` lists it (definitions only, not scheduler health). */
+/** A cron subscription as `GET /schedules` lists it (definitions only, not scheduler health). */
 export type ScheduleSummary = {
     agent: string;
+    /** The cron channel's name. */
+    channel: string;
+    /** The subscription id. */
     trigger: string;
     expression: string;
     timezone?: string;
-    overlap: OverlapPolicy;
+    overlap: ScheduleOverlap;
     /** ISO time of the next fire after now. */
     nextAt: string;
 };

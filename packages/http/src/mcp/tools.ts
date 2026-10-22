@@ -19,8 +19,10 @@ import type { Principal } from '../auth/types.ts';
 import { KEY_MAX_LENGTH } from '../request/constants.ts';
 import { validatePayload } from '../request/helpers.ts';
 import { RESUME_REASON_MAX_LENGTH, RESUME_TOKEN_MAX_LENGTH } from '../runs/constants.ts';
+import { MCP_CHANNEL_NAME } from '../channels/constants.ts';
 import {
     assertCanListRuns,
+    findHttpSubscription,
     loadReadableRun,
     resolveResumeTarget,
     serializeRun,
@@ -157,20 +159,20 @@ function describeAgent(agent: Agent): string {
 }
 
 /**
- * The `run_<agent>` tool of an agent with an `http()` trigger (`undefined`
+ * The `run_<agent>` tool of an agent with an `http.on()` subscription (`undefined`
  * without one): the payload's JSON Schema is converted and compiled here, not
  * per request. A schema the MCP validator cannot compile, or a tool name above
  * 64 characters, throws InvalidAgentDefinitionError.
  */
 export function buildRunTool(agent: Agent, options: McpEndpointOptions): McpRunTool | undefined {
-    const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
-    if (!trigger) return undefined;
+    const subscription = findHttpSubscription(agent);
+    if (!subscription) return undefined;
     if (`run_${agent.name}`.length > MCP_TOOL_NAME_MAX_LENGTH) {
         throw new InvalidAgentDefinitionError(
             `The MCP tool "run_${agent.name}" exceeds ${MCP_TOOL_NAME_MAX_LENGTH} characters: shorten the agent name to ${MCP_TOOL_NAME_MAX_LENGTH - 4} or set mcp: false.`,
         );
     }
-    const schema = trigger.options.schema as StandardSchemaV1 | undefined;
+    const schema = subscription.options.schema as StandardSchemaV1 | undefined;
     let inputSchema: McpRunTool['inputSchema'];
     try {
         inputSchema = fromJsonSchema<RunAgentArgs>({
@@ -184,7 +186,7 @@ export function buildRunTool(agent: Agent, options: McpEndpointOptions): McpRunT
                     pattern: NO_NUL,
                     description: 'Dedupes starts over MCP; a key used over REST is a different scope.',
                 },
-                thread: {
+                address: {
                     type: 'string',
                     minLength: 1,
                     maxLength: KEY_MAX_LENGTH,
@@ -205,7 +207,7 @@ export function buildRunTool(agent: Agent, options: McpEndpointOptions): McpRunT
     }
     return {
         agent,
-        trigger,
+        subscription,
         ...(schema ? { schema } : {}),
         description: describeAgent(agent),
         inputSchema,
@@ -235,7 +237,7 @@ export function assertMcpRunTool(agent: Agent): void {
  * then is reported to `onError` once and its tool skipped.
  */
 export function createRunToolSource(ctx: HttpContext, options: McpEndpointOptions): () => McpRunTool[] {
-    // null: no http() trigger, or a definition that failed to build
+    // null: no http subscription, or a definition that failed to build
     const built = new WeakMap<Agent, McpRunTool | null>();
     const toolOf = (agent: Agent): McpRunTool | null => {
         const cached = built.get(agent);
@@ -270,7 +272,7 @@ function registerRunTool(
 ): void {
     const {
         agent, 
-        trigger, 
+        subscription, 
         schema, 
     } = tool;
     if (!hasPermission(extra.principal.permissions, agentPermission(agent.name, 'run'))) return;
@@ -283,11 +285,11 @@ function registerRunTool(
         const payload = await validatePayload(schema, args.payload);
         const { runId, deduplicated } = await ctx.engine.dispatch({
             agent: agent.name,
-            trigger: trigger.id,
-            source: 'mcp',
+            trigger: subscription.id,
+            channel: MCP_CHANNEL_NAME,
             payload,
             ...(args.idempotencyKey !== undefined ? { idempotencyKey: args.idempotencyKey } : {}),
-            ...(args.thread !== undefined ? { thread: args.thread } : {}),
+            ...(args.address !== undefined ? { address: args.address } : {}),
             invoker: toInvoker(extra.principal),
         });
 

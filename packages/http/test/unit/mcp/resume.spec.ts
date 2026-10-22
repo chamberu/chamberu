@@ -39,14 +39,15 @@ describe('mcp resume_run', () => {
     it('resumes a waiting run', async () => {
         const setup = await waitingGate();
         const client = await connectMcp(setup.app, tokenFor('agent:gate:approve'));
-        const result = await callTool(client, 'resume_run', { token: setup.notifier.lastToken, approved: true });
+        const token = await setup.tokenOf(setup.runId);
+        const result = await callTool(client, 'resume_run', { token, approved: true });
         expect(result.isError).toBeFalsy();
         expect(result.structuredContent).toEqual({ runId: setup.runId, status: 'queued' });
 
         await setup.engine.idle();
         expect((await setup.store.getRun(setup.runId))?.status).toBe('completed');
 
-        const again = await callTool(client, 'resume_run', { token: setup.notifier.lastToken, approved: true });
+        const again = await callTool(client, 'resume_run', { token, approved: true });
         expect(again.isError).toBe(true);
         await client.close();
         await setup.engine.drain();
@@ -55,7 +56,7 @@ describe('mcp resume_run', () => {
     it('needs agent:<agent>:approve', async () => {
         const setup = await waitingGate();
         const client = await connectMcp(setup.app, tokenFor('agent:echo:approve', 'run:read'));
-        const result = await callTool(client, 'resume_run', { token: setup.notifier.lastToken, approved: true });
+        const result = await callTool(client, 'resume_run', { token: await setup.tokenOf(setup.runId), approved: true });
         expect(result.isError).toBe(true);
         expect(textOf(result)).toBe('Missing permission "agent:gate:approve".');
         expect((await setup.store.getRun(setup.runId))?.status).toBe('waiting');

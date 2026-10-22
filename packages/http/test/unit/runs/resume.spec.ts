@@ -30,7 +30,7 @@ async function pausedGate() {
     return {
         ...ctx,
         runId,
-        token: ctx.notifier.lastToken,
+        token: await ctx.tokenOf(runId),
         waiting: run!.waiting!,
     };
 }

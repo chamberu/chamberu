@@ -8,5 +8,6 @@
 export type {
     AgentIssue,
     AgentSummary,
+    ScheduleOverlap,
     ScheduleSummary,
 } from './types.ts';

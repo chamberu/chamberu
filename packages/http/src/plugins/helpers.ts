@@ -58,7 +58,7 @@ const ROUTE_TEMPLATES: Array<[RegExp, string]> = [
     [/^\/agents\/[^/]+\/state\/kv$/, '/agents/:name/state/kv'],
     [/^\/agents\/[^/]+\/state\/kv\/[^/]+$/, '/agents/:name/state/kv/:key'],
     [/^\/agents\/[^/]+\/state\/collections\/[^/]+$/, '/agents/:name/state/collections/:collection'],
-    [/^\/hooks\/[^/]+(?:\/.*)?$/, '/hooks/:agent/*'],
+    [/^\/channels\/[^/]+(?:\/.*)?$/, '/channels/:name/*'],
 ];
 
 /** Every request that matches no route shares this label. */

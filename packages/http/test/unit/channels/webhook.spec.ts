@@ -7,17 +7,23 @@
 
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { defineAgent, http, webhook } from '@chamvi/core';
+import { InvalidAgentDefinitionError, defineAgent } from '@chamvi/core';
+import {
+    http,
+    webhook,
+    webhookChannel,
+} from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
     call,
     createTestApp,
+    testAuth,
 } from '../../utils/app.ts';
 import { textModel } from '../../utils/model.ts';
 
-const ISSUES = '/hooks/intake/issues';
-const RAW = '/hooks/raw/raw';
+const ISSUES = '/channels/webhook/intake/issues';
+const RAW = '/channels/webhook/raw/raw';
 
 function setup() {
     const agents = [
@@ -25,10 +31,9 @@ function setup() {
             name: 'intake',
             model: textModel(),
             instructions: 'Intake.',
-            triggers: [
-                http(),
-                webhook({
-                    path: '/issues',
+            channels: [
+                http.on(),
+                webhook.on('/issues', {
                     schema: z.object({ id: z.string() }),
                     idempotencyKey: (p) => `issue-${(p as { id: string }).id}`,
                     concurrencyKey: (p) => (p as { id: string }).id,
@@ -39,7 +44,7 @@ function setup() {
             name: 'raw',
             model: textModel(),
             instructions: 'Raw.',
-            triggers: [webhook({ path: '/raw' }), webhook({ path: '/v1/deep/path' }), webhook({ path: '/' })],
+            channels: [webhook.on('/raw'), webhook.on('/v1/deep/path'), webhook.on('/')],
         }),
     ];
     return createTestApp({ agents });
@@ -47,8 +52,8 @@ function setup() {
 
 type Accepted = { runId: string; deduplicated: boolean };
 
-describe('POST /hooks/:agent/<path>', () => {
-    it('dispatches through the webhook trigger without executing', async () => {
+describe('POST /channels/webhook/:agent/<path>', () => {
+    it('dispatches through the webhook subscription without executing', async () => {
         const { app, store } = setup();
         const response = await call(app, 'POST', ISSUES, { token: ADMIN_TOKEN, body: { id: '7' } });
         expect(response.status).toBe(202);
@@ -58,8 +63,9 @@ describe('POST /hooks/:agent/<path>', () => {
         const run = await store.getRun(runId);
         expect(run?.status).toBe('queued');
         expect(run?.concurrencyKey).toBe('7');
+        expect(run?.trigger.invoker).toBeUndefined();
         expect(run?.trigger).toMatchObject({
-            source: 'webhook',
+            channel: 'webhook',
             trigger: 'webhook:/issues',
             idempotencyKey: 'issue-7',
             concurrencyKey: '7',
@@ -74,7 +80,7 @@ describe('POST /hooks/:agent/<path>', () => {
         expect((await store.listRuns({})).total).toBe(0);
     });
 
-    it('dedupes a retried delivery by the trigger key', async () => {
+    it('dedupes a retried delivery by the subscription key', async () => {
         const { app, store } = setup();
         const first = await (await call(app, 'POST', ISSUES, { token: ADMIN_TOKEN, body: { id: '7' } })).json() as Accepted;
         const second = await (await call(app, 'POST', ISSUES, { token: ADMIN_TOKEN, body: { id: '7' } })).json() as Accepted;
@@ -101,7 +107,7 @@ describe('POST /hooks/:agent/<path>', () => {
         expect(data[0]?.trigger.idempotencyKey).toBe('d-1');
     });
 
-    it('validates the payload with the trigger schema', async () => {
+    it('validates the payload with the subscription schema', async () => {
         const { app, store } = setup();
         const response = await call(app, 'POST', ISSUES, { token: ADMIN_TOKEN, body: { id: 7 } });
         expect(response.status).toBe(400);
@@ -148,28 +154,31 @@ describe('POST /hooks/:agent/<path>', () => {
     });
 
     it.each([
-        '/hooks/intake/http',
-        '/hooks/intake/webhook:/issues',
-        '/hooks/intake/webhook%3A%2Fissues',
-        '/hooks/intake/issues/',
-        '/hooks/intake',
-        '/hooks/nope/x',
+        '/channels/webhook/intake/http',
+        '/channels/webhook/intake/webhook:/issues',
+        '/channels/webhook/intake/webhook%3A%2Fissues',
+        '/channels/webhook/intake/issues/',
+        '/channels/webhook/intake',
+        '/channels/webhook/nope/x',
+        '/channels/webhook',
+        '/channels/webhook/',
+        '/channels/webhook/intake/%E0%A4%A',
     ])('answers 404 for %s', async (path) => {
         const { app } = setup();
         const response = await call(app, 'POST', path, { token: ADMIN_TOKEN, body: { id: '1' } });
         expect(response.status).toBe(404);
     });
 
-    it('names the trigger and agent in the 404', async () => {
+    it('names the path and agent in the 404', async () => {
         const { app } = setup();
-        const response = await call(app, 'POST', '/hooks/intake/http', { token: ADMIN_TOKEN, body: {} });
+        const response = await call(app, 'POST', '/channels/webhook/intake/http', { token: ADMIN_TOKEN, body: {} });
         expect((await response.json()).message).toBe('No webhook "/http" on agent "intake".');
     });
 
     it.each([
-        ['/hooks/raw/v1/deep/path', 'webhook:/v1/deep/path'],
-        ['/hooks/raw', 'webhook:/'],
-        ['/hooks/raw/', 'webhook:/'],
+        ['/channels/webhook/raw/v1/deep/path', 'webhook:/v1/deep/path'],
+        ['/channels/webhook/raw', 'webhook:/'],
+        ['/channels/webhook/raw/', 'webhook:/'],
     ])('routes %s on the webhook path to %s', async (path, trigger) => {
         const { app, store } = setup();
         const response = await call(app, 'POST', path, { token: ADMIN_TOKEN, body: {} });
@@ -182,5 +191,83 @@ describe('POST /hooks/:agent/<path>', () => {
         const { app } = setup();
         expect((await call(app, 'POST', ISSUES, { token: READER_TOKEN, body: { id: '1' } })).status).toBe(403);
         expect((await call(app, 'POST', ISSUES, { body: { id: '1' } })).status).toBe(401);
+    });
+
+    it('answers 404 while the http app does not mount the channel', async () => {
+        const { app } = createTestApp({
+            agents: [defineAgent({
+                name: 'raw', 
+                model: textModel(), 
+                instructions: 'Raw.', 
+                channels: [webhook.on('/raw')], 
+            })],
+            channels: [],
+        });
+        const response = await call(app, 'POST', RAW, { token: ADMIN_TOKEN, body: {} });
+        expect(response.status).toBe(404);
+    });
+});
+
+describe('webhookChannel()', () => {
+    function limitedApp(bodyLimit: number) {
+        const hooks = webhookChannel({
+            name: 'hooks', 
+            auth: testAuth, 
+            bodyLimit, 
+        });
+        return createTestApp({
+            agents: [defineAgent({
+                name: 'raw', 
+                model: textModel(), 
+                instructions: 'Raw.', 
+                channels: [hooks.on('/raw')], 
+            })],
+            engineChannels: [hooks],
+            channels: [hooks],
+        });
+    }
+
+    it('serves a second instance under its own name, with on() bound to it', async () => {
+        const { app, store } = limitedApp(1024);
+        const response = await call(app, 'POST', '/channels/hooks/raw/raw', { token: ADMIN_TOKEN, body: { a: 1 } });
+        expect(response.status).toBe(202);
+        const { runId } = await response.json() as Accepted;
+        expect((await store.getRun(runId))?.trigger).toMatchObject({ channel: 'hooks', trigger: 'webhook:/raw' });
+    });
+
+    it('answers 413 above its bodyLimit', async () => {
+        const { app, store } = limitedApp(16);
+        const response = await call(app, 'POST', '/channels/hooks/raw/raw', { token: ADMIN_TOKEN, body: { blob: 'x'.repeat(64) } });
+        expect(response.status).toBe(413);
+        expect((await response.json()).code).toBe('payload_too_large');
+        expect((await store.listRuns({})).total).toBe(0);
+    });
+
+    it('needs authenticators', () => {
+        expect(() => webhookChannel({ auth: [] })).toThrow(InvalidAgentDefinitionError);
+        expect(() => webhookChannel({} as never)).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('refuses a bodyLimit that is no positive integer', () => {
+        expect(() => webhookChannel({ auth: testAuth, bodyLimit: 0 })).toThrow(InvalidAgentDefinitionError);
+        expect(() => webhookChannel({ auth: testAuth, bodyLimit: 1.5 })).toThrow(InvalidAgentDefinitionError);
+    });
+});
+
+describe('webhook.on()', () => {
+    it('builds the subscription of the default webhook channel', () => {
+        const idempotencyKey = (p: unknown) => String(p);
+        const subscription = webhook.on('/issues', { idempotencyKey });
+        expect(subscription).toMatchObject({
+            channel: 'webhook',
+            id: 'webhook:/issues',
+            options: { path: '/issues' },
+        });
+        expect(subscription.idempotencyKey).toBe(idempotencyKey);
+        expect(subscription.concurrencyKey).toBeUndefined();
+    });
+
+    it.each(['', 'issues', 42])('refuses the path %j', (path) => {
+        expect(() => webhook.on(path as string)).toThrow(InvalidAgentDefinitionError);
     });
 });

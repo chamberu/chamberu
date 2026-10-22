@@ -14,14 +14,15 @@ import {
     expect,
     it,
 } from 'vitest';
-import { defineAgent, webhook } from '@chamvi/core';
-import type { Run, Step } from '@chamvi/core';
-import {
-    authup,
-    createShutdown,
-    oidc,
-    staticTokens,
+import { defineAgent } from '@chamvi/core';
+import { 
+    authup, 
+    createShutdown, 
+    oidc, 
+    staticTokens, 
+    webhook, 
 } from '@chamvi/http';
+import type { Run, Step } from '@chamvi/core';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
@@ -80,7 +81,7 @@ describe('acceptance flows', () => {
                     name: 'intake',
                     model: textModel(),
                     instructions: 'Intake.',
-                    triggers: [webhook({ path: '/issues' })],
+                    channels: [webhook.on('/issues')],
                 }),
             ],
             auth: [
@@ -137,7 +138,7 @@ describe('acceptance flows', () => {
         const {
             app,
             engine,
-            notifier,
+            tokenOf,
         } = setup();
         const started = await call(app, 'POST', '/agents/gate/runs', { token: ADMIN_TOKEN });
         const { runId } = await started.json() as { runId: string };
@@ -145,7 +146,7 @@ describe('acceptance flows', () => {
         await engine.idle();
         expect((await engine.getRun(runId))?.status).toBe('waiting');
 
-        const resumed = await call(app, 'POST', '/resume', { token: 'approver', body: { token: notifier.lastToken, approved: true } });
+        const resumed = await call(app, 'POST', '/resume', { token: 'approver', body: { token: await tokenOf(runId), approved: true } });
         expect(resumed.status).toBe(202);
         await engine.idle();
 
@@ -162,7 +163,7 @@ describe('acceptance flows', () => {
             engine,
             store,
         } = setup();
-        const deliver = () => call(app, 'POST', '/hooks/intake/issues', {
+        const deliver = () => call(app, 'POST', '/channels/webhook/intake/issues', {
             token: ADMIN_TOKEN,
             body: { id: 7 },
             headers: { 'idempotency-key': 'delivery-1' },
