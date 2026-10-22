@@ -46,3 +46,15 @@ updates:
             update-types: ["version-update:semver-major"]
       commit-message:
           prefix: "build"
+
+    # Maintain the base image of the app runtime image
+    - package-ecosystem: "docker"
+      directory: "/images/node"
+      schedule:
+          interval: "daily"
+      # the image is published as `24`: a Node.js major is a new image, not a bump
+      ignore:
+          - dependency-name: "node"
+            update-types: ["version-update:semver-major"]
+      commit-message:
+          prefix: "build"
