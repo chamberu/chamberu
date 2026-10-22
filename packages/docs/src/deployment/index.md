@@ -1,7 +1,7 @@
 # Deployment <Badge type="warning" text="Planned" />
 
 ::: warning Planned
-The app and the CLI exist: [`@chamvi/app`](/guide/app) boots an agent repository from env and [`@chamvi/cli`](/reference/cli) runs it with `chamvi start`, draining on `SIGTERM`. The base image, the Helm chart and the template repository do not exist yet; these pages describe the planned setup so you can see where chamvi is going.
+The app and the CLI exist: [`@chamvi/app`](/guide/app) boots an agent repository from env and [`@chamvi/cli`](/reference/cli) runs it with `chamvi start`, draining on `SIGTERM`. The [base image](/deployment/docker) `ghcr.io/chamvi/node` exists too. The Helm chart and the template repository do not exist yet; these pages describe the planned setup so you can see where chamvi is going.
 :::
 
 The target workflow: agents live in their own GitHub repository, CI builds a Docker image, and Flux deploys it to your Kubernetes cluster. Every agent repository is an app with one or more agents, its own store connection, its own GitHub App and its own notifiers.
@@ -18,7 +18,7 @@ agent repo --push--> CI --image--> registry --Flux image automation--> HelmRelea
 | Piece | Built as |
 |---|---|
 | [`@chamvi/app`](/reference/app) + [`@chamvi/cli`](/reference/cli) (exist) | `createApp({ agents, modules })` boots config, store, engine, scheduler and HTTP in order and tears them down in reverse, draining on `SIGTERM`. The `chamvi` bin with `dev`, `build`, `start`, `run-job` and `migrate`. See [Apps & Modules](/guide/app) |
-| [Base image](/deployment/docker) | A slim Node 24 runtime image; agent repositories use a two-stage Dockerfile |
+| [Base image](/deployment/docker) (exists) | `ghcr.io/chamvi/node`: Node 24 on Debian trixie slim, tini, uid 1000, `linux/amd64` and `linux/arm64`; agent repositories use a two-stage Dockerfile |
 | [Helm chart](/deployment/kubernetes) | One shared OCI chart for every agent app; each repository gets a small `HelmRelease` |
 | Template repository | A GitHub template with an example agent, Dockerfile, CI that builds and tags images for Flux, and example Flux manifests |
 

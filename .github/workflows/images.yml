@@ -60,3 +60,61 @@ jobs:
                   registryRepository: chamvi/sandbox-node
                   registryTag: ${{ steps.tags.outputs.list }}
                   platforms: linux/amd64,linux/arm64
+
+    node:
+        name: node
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Smoke test
+              run: |
+                  set -eu
+                  IMAGE=chamvi-node:smoke
+                  docker build -t "$IMAGE" images/node
+                  # the numeric non-root user, also as Node sees it
+                  test "$(docker run --rm "$IMAGE" id -u)" = "1000"
+                  test "$(docker run --rm "$IMAGE" id -g)" = "1000"
+                  docker run --rm "$IMAGE" node -e 'process.exit(process.getuid() === 1000 ? 0 : 1)'
+                  # image config: tini entrypoint, node cmd, /app, production
+                  test "$(docker image inspect -f '{{json .Config.Entrypoint}}' "$IMAGE")" = '["/usr/bin/tini","--"]'
+                  test "$(docker image inspect -f '{{json .Config.Cmd}}' "$IMAGE")" = '["node"]'
+                  test "$(docker image inspect -f '{{.Config.WorkingDir}}' "$IMAGE")" = '/app'
+                  test "$(docker image inspect -f '{{.Config.User}}' "$IMAGE")" = '1000:1000'
+                  docker run --rm "$IMAGE" node -e 'process.exit(process.env.NODE_ENV === "production" && process.cwd() === "/app" ? 0 : 1)'
+                  # Node 24, the CA bundle, /app root-owned and read-only for uid 1000
+                  docker run --rm "$IMAGE" sh -c 'node --version | grep -q "^v24\." && test -s /etc/ssl/certs/ca-certificates.crt && test "$(stat -c %u /app)" = 0 && test ! -w /app'
+                  # starts on a read-only root filesystem with only /tmp writable (the chart's pod)
+                  docker run --rm --read-only --tmpfs /tmp "$IMAGE" node -e 'require("node:fs").writeFileSync("/tmp/probe", "ok")'
+                  # SIGTERM reaches Node through tini (docker stop = the kubelet's SIGTERM);
+                  # a container left by an earlier failed run must not block this one
+                  docker rm -f node-smoke-term >/dev/null 2>&1 || true
+                  docker run -d --name node-smoke-term "$IMAGE" node -e 'process.on("SIGTERM", () => { console.log("sigterm"); process.exit(0); }); setInterval(() => {}, 1000)'
+                  sleep 1
+                  docker stop -t 10 node-smoke-term
+                  test "$(docker inspect -f '{{.State.ExitCode}}' node-smoke-term)" = "0"
+                  docker logs node-smoke-term | grep -qx sigterm
+                  docker rm node-smoke-term
+                  echo 'smoke ok'
+
+            # 24-<short sha> only for the push of a commit: a scheduled or
+            # manual rebuild of the same commit would move it to a new digest
+            - name: Tags
+              id: tags
+              run: |
+                  {
+                      echo 'list<<TAGS'
+                      echo '24'
+                      if [ "$GITHUB_EVENT_NAME" = 'push' ]; then echo "24-$(git rev-parse --short HEAD)"; fi
+                      echo 'TAGS'
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Publish
+              if: github.event_name != 'pull_request'
+              uses: tada5hi/craneship@v4
+              with:
+                  dockerFilePath: images/node
+                  registryRepository: chamvi/node
+                  registryTag: ${{ steps.tags.outputs.list }}
+                  platforms: linux/amd64,linux/arm64
