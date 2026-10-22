@@ -71,6 +71,13 @@ const tokens = computed(() => (run.value ? run.value.usage.inputTokens + run.val
 const llmSteps = computed(() => (state.value ? landedModelSteps(state.value.steps) : 0));
 const startedAt = computed(() => (run.value ? new Date(run.value.startedAt ?? run.value.createdAt).toLocaleTimeString() : ''));
 const elapsed = computed(() => (run.value ? runDuration(run.value, now.value) : undefined));
+/** The envelope as the model reads it: channel, subscription, address and payload. */
+const envelope = computed(() => (run.value ? {
+    channel: run.value.trigger.channel,
+    trigger: run.value.trigger.trigger,
+    address: run.value.trigger.address,
+    payload: run.value.trigger.payload,
+} : undefined));
 const timeValue = computed(() => {
     if (elapsed.value === undefined) return '—';
     const timeout = budget.value?.timeoutMs;
@@ -252,7 +259,7 @@ async function onCancel(): Promise<void> {
                         <span class="meta">received <VCTimeago :datetime="run.trigger.receivedAt" /></span>
                     </VCCollapseTrigger>
                     <VCCollapseContent class="step-body">
-                        <JsonBlock :value="{ source: run.trigger.source, trigger: run.trigger.trigger, payload: run.trigger.payload }" />
+                        <JsonBlock :value="envelope" />
                     </VCCollapseContent>
                 </VCCollapse>
             </li>

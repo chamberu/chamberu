@@ -9,7 +9,6 @@
 import { useToast } from '@vuecs/overlays';
 import { computed, inject, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { useAgents } from '../agents/composables.ts';
 import type { RunWire } from '../api/types.ts';
 import { useApprovals, useDeepLinkApproval, useLinkedApproval } from '../approvals/composables.ts';
 import { INBOX, INBOX_POLL_MS  } from '../approvals/constants.ts';
@@ -44,8 +43,6 @@ const inbox = inject(INBOX, undefined) ?? useApprovals(client);
 const token = ref(readResumeToken(storage));
 const deepLink = useDeepLinkApproval(client, token, storage);
 
-const { agents } = useAgents(client);
-const summaryOf = (agent: string) => agents.value.find((a) => a.name === agent);
 const principalName = computed(() => session.principal.value?.name ?? session.principal.value?.id);
 
 const permissions = computed(() => session.principal.value?.permissions ?? []);
@@ -173,7 +170,6 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
                 v-if="deepLink.run.value?.waiting && deepLink.run.value.waiting.approvalId === deepLink.claims.value.approvalId"
                 :run="deepLink.run.value"
                 :can-answer="true"
-                :summary="summaryOf(deepLink.run.value.agent)"
                 :busy="busy === 'link'"
                 data-testid="deep-link"
                 @answer="answerLink"
@@ -266,7 +262,6 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
             :key="`linked-${linkedRun.id}-${linkedRun.waiting?.approvalId}`"
             :run="linkedRun"
             :can-answer="linkedState?.kind === 'pending'"
-            :summary="summaryOf(linkedRun.agent)"
             :busy="busy === linkedRun.id"
             :highlight="linkedState?.kind === 'pending'"
             @answer="(approved, reason) => answer(linkedRun!, approved, reason)"
@@ -333,7 +328,6 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
             :key="`${run.id}-${run.waiting?.approvalId}`"
             :run="run"
             :can-answer="canAnswer(run.agent)"
-            :summary="summaryOf(run.agent)"
             :busy="busy === run.id"
             @answer="(approved, reason) => answer(run, approved, reason)"
         />

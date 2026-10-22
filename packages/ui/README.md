@@ -71,16 +71,16 @@ Open `http://<host>/ui/` and sign in with a bearer token of the app.
 
 | View | Shows | Needs |
 |---|---|---|
-| Agents | A card per agent: triggers, running and waiting runs, next cron fire, 24 h activity, last run, notifier, approval tools; the landing page | `run:read` |
-| Agent | Budget, notifier, approval tools, Start run (with an `http()` trigger), and the tabs Overview, Runs, State, Schedules | `run:read`; `agent:<name>:run` to start; `state:read` for State |
+| Agents | A card per agent: channel chips (its subscriptions), running and waiting runs, next cron fire, 24 h activity, last run, budget, state collections; the landing page | `run:read` |
+| Agent | Budget, state collections, channel chips, Start run (with an `http.on()` subscription), and the tabs Overview, Runs, State, Schedules | `run:read`; `agent:<name>:run` to start; `state:read` for State |
 | Runs | Every run, newest first, filtered by agent and status, with status and tokens; refreshes every 5 s | `run:read` |
-| Run | Header with budgets, the trigger envelope and the step timeline (llm, tool, wait), live over SSE with streamed text; cancel | `run:read` or `agent:<name>:run`; `run:cancel` to cancel |
-| Approvals | Waiting runs with the tool and its input; Approve or Deny with a reason | `run:read` to list, `agent:<name>:approve` to answer |
-| Schedules | Cron triggers per agent with the next fire time | `run:read` |
+| Run | Header with budgets, the envelope (channel, subscription, address, payload) and the step timeline (llm, tool, wait), live over SSE with streamed text; cancel | `run:read` or `agent:<name>:run`; `run:cancel` to cancel |
+| Approvals | Waiting runs with the request's title and body, the tool and the channel it went out through; Approve or Deny with a reason | `run:read` to list, `agent:<name>:approve` to answer |
+| Schedules | Cron subscriptions per agent with the next fire time | `run:read` |
 
 The 24 h figures are counted from the newest 100 runs (the API has no time filter) and read `100+` beyond.
 
-A notifier links an approval by run: `/ui/approvals?run=<runId>&approval=<approvalId>` (`approval` optional, then the run's current one). The link carries no token. Signed out, it goes through sign-in (token form or authup) and comes back to the same URL; signed in, the dashboard scrolls to that run's approval card, highlights and focuses it, and the answer goes through `POST /runs/:id/approve` as the signed-in principal. A run that no longer waits on that approval (answered, expired, moved on to another one) shows a notice linking the run; the link needs read access to the run (`run:read` or `agent:<name>:run`) besides `agent:<name>:approve`: without the approve grant the card shows read-only under a 403 notice, without read access only a 403 notice shows. The run page and the agent page link waiting runs the same way.
+A channel's approval message links an approval by run: `/ui/approvals?run=<runId>&approval=<approvalId>` (`approval` optional, then the run's current one). The link carries no token. Signed out, it goes through sign-in (token form or authup) and comes back to the same URL; signed in, the dashboard scrolls to that run's approval card, highlights and focuses it, and the answer goes through `POST /runs/:id/approve` as the signed-in principal. A run that no longer waits on that approval (answered, expired, moved on to another one) shows a notice linking the run; the link needs read access to the run (`run:read` or `agent:<name>:run`) besides `agent:<name>:approve`: without the approve grant the card shows read-only under a 403 notice, without read access only a 403 notice shows. The run page and the agent page link waiting runs the same way.
 
 The resume-token deep link `/ui/approvals#token=<resume token>` still opens the approval of that token (the fragment never reaches the server or a proxy log; `?token=` works too). The SPA moves the token out of the address bar before anything renders (into the tab's `sessionStorage`, kept across a sign-out so another principal can answer it, removed once answered or refused as spent) and answers it through `POST /resume`, so it works with only `agent:<name>:approve`. While such a token is pending in the tab it takes the page; a token-less link opened meanwhile shows a notice with a button that discards the pending token.
 

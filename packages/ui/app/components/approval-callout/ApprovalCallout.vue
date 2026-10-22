@@ -14,12 +14,11 @@ import {
     watch,
 } from 'vue';
 import { RouterLink } from 'vue-router';
-import type { AgentWire, RunWire } from '../../api/types.ts';
+import type { RunWire } from '../../api/types.ts';
 import { notifiedLine } from '../../approvals/helpers.ts';
 import { RouteName } from '../../router/constants.ts';
 import { shortId } from '../../runs/helpers.ts';
 import ExpiryCountdown from '../expiry-countdown/ExpiryCountdown.vue';
-import JsonBlock from '../json-block/JsonBlock.vue';
 import NavIcon from '../nav-icon/NavIcon.vue';
 import StatusChip from '../status-chip/StatusChip.vue';
 
@@ -28,8 +27,6 @@ const props = defineProps<{
     /** The principal holds `agent:<agent>:approve`. */
     canAnswer: boolean;
     busy?: boolean;
-    /** The run's agent (`GET /agents`), for its notifier; `undefined` while unknown. */
-    summary?: AgentWire;
     /** The approval a link opened: highlighted, scrolled into view and focused. */
     highlight?: boolean;
 }>();
@@ -42,7 +39,7 @@ function send(approved: boolean): void {
 }
 
 const id = `reason-${props.run.id}`;
-const notified = computed(() => notifiedLine(props.run, props.summary));
+const notified = computed(() => notifiedLine(props.run));
 
 const root = ref<globalThis.HTMLElement>();
 async function reveal(): Promise<void> {
@@ -64,12 +61,12 @@ watch(() => props.highlight, reveal);
         :data-run="run.id"
         :data-linked="highlight ? 'true' : undefined"
         :tabindex="highlight ? -1 : undefined"
-        :aria-label="highlight ? `Linked approval: ${run.waiting.toolName}, run ${shortId(run.id)}` : undefined"
+        :aria-label="highlight ? `Linked approval: ${run.waiting.title}, run ${shortId(run.id)}` : undefined"
     >
         <div class="callout-head">
             <span class="callout-icon"><NavIcon name="hand" /></span>
             <div class="callout-title">
-                <h2>{{ run.waiting.toolName }}<StatusChip status="waiting" /></h2>
+                <h2><span data-testid="approval-title">{{ run.waiting.title }}</span><StatusChip status="waiting" /></h2>
                 <p>
                     <RouterLink
                         :to="{ name: RouteName.AGENT, params: { name: run.agent } }"
@@ -97,11 +94,28 @@ watch(() => props.highlight, reveal);
         </div>
         <div class="callout-body">
             <div>
-                <span class="field-label">Tool input</span>
-                <JsonBlock :value="run.waiting.input" />
+                <p
+                    v-if="run.waiting.body"
+                    class="callout-text"
+                    data-testid="approval-body"
+                    v-text="run.waiting.body"
+                />
+                <p
+                    v-else
+                    class="callout-text muted"
+                >
+                    No details given.
+                </p>
             </div>
             <div>
                 <dl class="callout-meta">
+                    <dt>tool</dt>
+                    <dd
+                        class="mono"
+                        data-testid="approval-tool"
+                    >
+                        {{ run.waiting.toolName }}
+                    </dd>
                     <dt>requested</dt>
                     <dd><VCTimeago :datetime="run.updatedAt" /></dd>
                     <dt>notified</dt>

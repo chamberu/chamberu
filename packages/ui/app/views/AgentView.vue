@@ -11,18 +11,20 @@ import { computed, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useAgentDetail } from '../agents/composables.ts';
 import {
+    channelChips,
     failedSummary,
     formatBudgetTime,
-    hasHttpTrigger,
+    hasHttpSubscription,
     lastRunOf,
     oldestWaiting,
-    triggerChips,
 } from '../agents/helpers.ts';
+import type { ChannelChip as Chip } from '../agents/types.ts';
 import type { StartRunResult } from '../api/types.ts';
 import { approvalLinkQuery } from '../approvals/helpers.ts';
 import { hasPermission } from '../auth/helpers.ts';
 import AgentRuns from '../components/agent-runs/AgentRuns.vue';
 import AgentStatePanel from '../components/agent-state/AgentStatePanel.vue';
+import ChannelChip from '../components/channel-chip/ChannelChip.vue';
 import EmptyState from '../components/empty-state/EmptyState.vue';
 import ExpiryCountdown from '../components/expiry-countdown/ExpiryCountdown.vue';
 import NavIcon from '../components/nav-icon/NavIcon.vue';
@@ -31,7 +33,6 @@ import StartRunModal from '../components/start-run/StartRunModal.vue';
 import StatusChip from '../components/status-chip/StatusChip.vue';
 import { panelId, tabId } from '../components/tab-list/helpers.ts';
 import TabList from '../components/tab-list/TabList.vue';
-import TriggerChip from '../components/trigger-chip/TriggerChip.vue';
 import { useAppContext } from '../context/module.ts';
 import { RouteName } from '../router/constants.ts';
 import { formatTokens, shortId } from '../runs/helpers.ts';
@@ -66,9 +67,9 @@ const tab = computed<Tab>({
     set: (value) => { void router.replace({ query: value === 'overview' ? {} : { tab: value } }); },
 });
 
-const chips = computed(() => (agent.value ? triggerChips(agent.value, schedules.value) : []));
+const chips = computed(() => (agent.value ? channelChips(agent.value, schedules.value) : []));
 const permissions = computed(() => session.principal.value?.permissions ?? []);
-const canStart = computed(() => !!agent.value && hasHttpTrigger(agent.value) &&
+const canStart = computed(() => !!agent.value && hasHttpSubscription(agent.value) &&
     hasPermission(permissions.value, `agent:${agent.value.name}:run`));
 const invoker = computed(() => session.principal.value?.name ?? session.principal.value?.id);
 const stateCount = computed(() => (state.error.value ? undefined :
@@ -90,8 +91,9 @@ function runSub(run: { trigger: { trigger: string; invoker?: { id: string; name?
     return run.trigger.trigger;
 }
 
-function scheduleOf(trigger: string) {
-    return schedules.value.find((s) => s.trigger === trigger);
+/** The cron schedule of a chip's subscription, if it is one. */
+function scheduleOf(chip: Chip) {
+    return schedules.value.find((s) => s.channel === chip.channel && s.trigger === chip.id);
 }
 </script>
 
@@ -153,9 +155,9 @@ function scheduleOf(trigger: string) {
                     </div>
                 </div>
                 <div class="trigs">
-                    <TriggerChip
+                    <ChannelChip
                         v-for="chip in chips"
-                        :key="chip.id"
+                        :key="`${chip.channel}:${chip.id}`"
                         :chip="chip"
                     />
                 </div>
@@ -177,23 +179,19 @@ function scheduleOf(trigger: string) {
                         </dd>
                     </div>
                     <div>
-                        <dt>notifies</dt>
-                        <dd>{{ agent.notify ?? 'nobody' }}</dd>
-                    </div>
-                    <div>
-                        <dt>needs approval</dt>
-                        <dd v-if="agent.approvals.length">
+                        <dt>state</dt>
+                        <dd v-if="agent.state.length">
                             <span
-                                v-for="tool in agent.approvals"
-                                :key="tool"
-                                class="tag tag-approve"
-                            >{{ tool }}</span>
+                                v-for="collection in agent.state"
+                                :key="collection"
+                                class="tag"
+                            >{{ collection }}</span>
                         </dd>
                         <dd
                             v-else
                             class="muted"
                         >
-                            no tools
+                            no collections
                         </dd>
                     </div>
                 </dl>
@@ -245,12 +243,12 @@ function scheduleOf(trigger: string) {
             <template v-else-if="tab === 'schedules'">
                 <template v-if="schedules.length">
                     <div class="tab-lede">
-                        <p>Cron triggers of {{ agent.name }}. Times are in each trigger's time zone.</p>
+                        <p>Cron subscriptions of {{ agent.name }}. Times are in each subscription's time zone.</p>
                     </div>
                     <div class="sched-cards">
                         <ScheduleCard
                             v-for="schedule in schedules"
-                            :key="schedule.trigger"
+                            :key="`${schedule.channel}:${schedule.trigger}`"
                             :schedule="schedule"
                             :last="lastRunOf(detail.runs.value, schedule.trigger)"
                         />
@@ -262,8 +260,8 @@ function scheduleOf(trigger: string) {
                 >
                     <EmptyState
                         icon="schedules"
-                        title="No cron triggers"
-                        :text="`${agent.name} has no cron() trigger, so nothing starts it on a schedule.`"
+                        title="No cron subscriptions"
+                        :text="`${agent.name} has no cron.on() subscription, so nothing starts it on a schedule.`"
                     />
                 </div>
             </template>
@@ -384,27 +382,27 @@ function scheduleOf(trigger: string) {
                         </section>
                         <section class="card panel">
                             <div class="panel-head">
-                                <h3>Triggers</h3>
+                                <h3>Channels</h3>
                                 <span>{{ chips.length }}</span>
                             </div>
                             <ul class="rows tlist">
                                 <li
                                     v-for="chip in chips"
-                                    :key="chip.id"
+                                    :key="`${chip.channel}:${chip.id}`"
                                 >
                                     <div class="tlist-top">
-                                        <TriggerChip :chip="chip" />
-                                        <code v-if="chip.source !== 'http' && chip.id !== `${chip.source}:${chip.detail}`">{{ chip.id }}</code>
+                                        <ChannelChip :chip="chip" />
+                                        <code v-if="chip.id !== chip.channel && chip.id !== `${chip.channel}:${chip.detail}`">{{ chip.id }}</code>
                                     </div>
                                     <div
-                                        v-if="chip.source === 'cron' && scheduleOf(chip.id)"
+                                        v-if="scheduleOf(chip)"
                                         class="endpoint"
                                     >
                                         <em>next</em>
                                         <code><ExpiryCountdown
-                                            :until="scheduleOf(chip.id)!.nextAt"
+                                            :until="scheduleOf(chip)!.nextAt"
                                             :soon-ms="0"
-                                        /> · {{ formatFireTime(scheduleOf(chip.id)!.nextAt, scheduleOf(chip.id)!.timezone) }}</code>
+                                        /> · {{ formatFireTime(scheduleOf(chip)!.nextAt, scheduleOf(chip)!.timezone) }}</code>
                                     </div>
                                     <div
                                         v-else-if="chip.hook"
@@ -413,7 +411,7 @@ function scheduleOf(trigger: string) {
                                         <em>hook</em><code>POST {{ chip.hook }}</code>
                                     </div>
                                     <div
-                                        v-else-if="chip.source === 'http'"
+                                        v-else-if="chip.channel === 'http'"
                                         class="endpoint"
                                     >
                                         <em>route</em><code>POST {{ config.apiBase }}/agents/{{ agent.name }}/runs</code>

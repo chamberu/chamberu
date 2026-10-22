@@ -520,6 +520,7 @@ table.t { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 
 .callout-meta dt { font: 400 11.5px/1.6 var(--ch-font-mono); color: var(--ch-muted); }
 .callout-meta dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
 .callout-meta dd.warn { color: var(--ch-wait); }
+.callout-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.55; }
 .callout-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; padding: 12px 20px; background: var(--ch-sunken); border-top: 1px solid var(--ch-line); }
 .callout-foot p { font-size: 12.5px; color: var(--ch-muted); }
 .callout-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
@@ -578,7 +579,7 @@ tr.expansion td { background: var(--ch-sunken); padding: 12px 14px; cursor: defa
 .sched-foot b { color: var(--ch-ink); font-weight: 500; font-family: var(--ch-font-mono); font-size: 12px; }
 .sched-foot > span { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
-/* trigger chips: square, a source label then the detail */
+/* channel chips: square, a channel label then the detail */
 .trigs { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .trig { display: inline-flex; align-items: stretch; height: 22px; max-width: 100%; border-radius: var(--ch-radius-chip); background: var(--ch-surface); box-shadow: inset 0 0 0 1px var(--ch-line-strong); font: 400 11.5px/22px var(--ch-font-mono); white-space: nowrap; overflow: hidden; }
 .trig b { flex: none; font-weight: 500; font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; padding: 0 6px; color: var(--ch-muted); background: var(--ch-sunken); box-shadow: inset 0 0 0 1px var(--ch-line-strong); }

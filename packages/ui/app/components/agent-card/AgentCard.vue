@@ -7,15 +7,16 @@
  */
 
 import { ACTIVITY_LIMIT } from '../../agents/constants.ts';
-import type { AgentRollup, TriggerChip as Chip } from '../../agents/types.ts';
+import { formatBudgetTime } from '../../agents/helpers.ts';
+import type { AgentRollup, ChannelChip as Chip } from '../../agents/types.ts';
 import type { AgentWire } from '../../api/types.ts';
 import { RouteName } from '../../router/constants.ts';
 import { shortId } from '../../runs/helpers.ts';
 import ActivityStrip from '../activity-strip/ActivityStrip.vue';
+import ChannelChip from '../channel-chip/ChannelChip.vue';
 import ExpiryCountdown from '../expiry-countdown/ExpiryCountdown.vue';
 import NavIcon from '../nav-icon/NavIcon.vue';
 import StatusChip from '../status-chip/StatusChip.vue';
-import TriggerChip from '../trigger-chip/TriggerChip.vue';
 
 defineProps<{
     agent: AgentWire;
@@ -44,9 +45,9 @@ defineProps<{
             <NavIcon name="go" />
         </div>
         <div class="trigs">
-            <TriggerChip
+            <ChannelChip
                 v-for="chip in chips"
-                :key="chip.id"
+                :key="`${chip.channel}:${chip.id}`"
                 :chip="chip"
             />
         </div>
@@ -91,7 +92,7 @@ defineProps<{
                     None among the newest {{ ACTIVITY_LIMIT }} runs.
                 </p>
                 <p v-else>
-                    No runs yet.<template v-if="chips.some((c) => c.source === 'http')">
+                    No runs yet.<template v-if="chips.some((c) => c.channel === 'http')">
                         Start one from its page.
                     </template>
                 </p>
@@ -99,27 +100,27 @@ defineProps<{
         </template>
         <dl class="agent-foot">
             <div>
-                <dt>Notifies</dt>
-                <dd :class="{ none: !agent.notify }">
-                    {{ agent.notify ?? 'nobody' }}
+                <dt>Budget</dt>
+                <dd>
+                    {{ agent.budget.maxSteps ?? '—' }} steps · {{ formatBudgetTime(agent.budget.timeoutMs) }}
                 </dd>
             </div>
             <div>
-                <dt>Approval</dt>
+                <dt>State</dt>
                 <dd
-                    v-if="agent.approvals.length"
+                    v-if="agent.state.length"
                 >
                     <span
-                        v-for="tool in agent.approvals"
-                        :key="tool"
-                        class="tag tag-approve"
-                    >{{ tool }}</span>
+                        v-for="collection in agent.state"
+                        :key="collection"
+                        class="tag"
+                    >{{ collection }}</span>
                 </dd>
                 <dd
                     v-else
                     class="none"
                 >
-                    no tools need approval
+                    no collections
                 </dd>
             </div>
         </dl>

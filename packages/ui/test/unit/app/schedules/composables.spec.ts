@@ -16,6 +16,7 @@ import { flush } from '../../../utils/timers.ts';
 
 const schedule = (agent: string, trigger: string, nextAt: string): ScheduleWire => ({
     agent,
+    channel: 'cron',
     trigger,
     expression: '0 8 * * 1-5',
     overlap: 'skip',

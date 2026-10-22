@@ -6,14 +6,15 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { TriggerChip } from '../../agents/types.ts';
+import type { ChannelChip } from '../../agents/types.ts';
 
-defineProps<{ chip: TriggerChip }>();
+defineProps<{ chip: ChannelChip }>();
 </script>
 
 <template>
     <span
-        :class="['trig', `trig-${chip.source}`]"
+        :class="['trig', `trig-${chip.channel}`]"
         :title="chip.id"
-    ><b>{{ chip.source }}</b><span v-if="chip.detail">{{ chip.detail }}</span></span>
+        data-testid="channel-chip"
+    ><b>{{ chip.channel }}</b><span v-if="chip.detail">{{ chip.detail }}</span></span>
 </template>

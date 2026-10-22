@@ -56,7 +56,7 @@ function ratio(run: RunWire): number {
 
 function by(run: RunWire): string {
     const invoker = run.trigger.invoker ? `by ${run.trigger.invoker.name ?? run.trigger.invoker.id} · ` : '';
-    return `${invoker}via ${run.trigger.source}`;
+    return `${invoker}via ${run.trigger.channel}`;
 }
 
 function open(run: RunWire): void {

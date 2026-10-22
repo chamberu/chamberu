@@ -22,12 +22,12 @@ const list = computed(() => groupByAgent(schedules.value).flatMap((group) => gro
 <template>
     <PageHead
         title="Schedules"
-        lede="Cron triggers per agent and when they fire next. Times are in each trigger's time zone."
+        lede="Cron subscriptions per agent and when they fire next. Times are in each subscription's time zone."
     >
         <span
             v-if="!error"
             class="live"
-        >{{ list.length }} cron {{ list.length === 1 ? 'trigger' : 'triggers' }}</span>
+        >{{ list.length }} cron {{ list.length === 1 ? 'subscription' : 'subscriptions' }}</span>
     </PageHead>
 
     <div
@@ -42,8 +42,8 @@ const list = computed(() => groupByAgent(schedules.value).flatMap((group) => gro
     >
         <EmptyState
             icon="schedules"
-            title="No cron triggers"
-            text="No agent has a cron() trigger, so nothing starts on a schedule."
+            title="No cron subscriptions"
+            text="No agent has a cron.on() subscription, so nothing starts on a schedule."
         />
     </div>
     <div
@@ -52,7 +52,7 @@ const list = computed(() => groupByAgent(schedules.value).flatMap((group) => gro
     >
         <ScheduleCard
             v-for="schedule in list"
-            :key="`${schedule.agent}:${schedule.trigger}`"
+            :key="`${schedule.agent}:${schedule.channel}:${schedule.trigger}`"
             :schedule="schedule"
         />
     </div>

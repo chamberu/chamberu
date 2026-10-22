@@ -16,7 +16,7 @@ export function wireRun(overrides: Partial<RunWire> = {}): RunWire {
             id: 't1',
             agent: 'deploy',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: { env: 'prod' },
             receivedAt: '2026-10-21T10:00:00.000Z',
         },

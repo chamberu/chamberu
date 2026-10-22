@@ -15,32 +15,31 @@ import { ACTIVITY_WINDOW_MS } from './constants.ts';
 import type {
     Activity,
     AgentRollup,
+    ChannelChip,
     PayloadResult,
-    TriggerChip,
 } from './types.ts';
 
-function withoutPrefix(id: string, prefix: string): string {
-    return id.startsWith(prefix) ? id.slice(prefix.length) : id;
+/** The part of a subscription id after its first `:` (`github:issues.opened` -> `issues.opened`), if any. */
+function idDetail(id: string): string | undefined {
+    const at = id.indexOf(':');
+    return at >= 0 && at < id.length - 1 ? id.slice(at + 1) : undefined;
 }
 
-/** One chip per trigger: the source and what it listens to (events, cron expression, hook path). */
-export function triggerChips(agent: AgentWire, schedules: readonly ScheduleWire[]): TriggerChip[] {
-    return agent.triggers.map((trigger): TriggerChip => {
-        if (trigger.source === 'http') return { source: trigger.source, id: trigger.id };
-        if (trigger.source === 'cron') {
-            const schedule = schedules.find((s) => s.agent === agent.name && s.trigger === trigger.id);
-            return {
-                source: trigger.source, 
-                id: trigger.id, 
-                detail: schedule?.expression ?? withoutPrefix(trigger.id, 'cron:'), 
-            };
-        }
-        const chip: TriggerChip = {
-            source: trigger.source, 
-            id: trigger.id, 
-            detail: withoutPrefix(trigger.id, `${trigger.source}:`), 
-        };
-        if (trigger.hook) chip.hook = trigger.hook;
+/**
+ * One chip per subscription (`AgentSummary.channels`): the channel and what
+ * it listens to. A cron subscription shows its expression from
+ * `GET /schedules` (else its id's detail), a webhook its path, GitHub its
+ * events; any other channel the part of the id after the first `:`.
+ */
+export function channelChips(agent: AgentWire, schedules: readonly ScheduleWire[]): ChannelChip[] {
+    return agent.channels.map((subscription): ChannelChip => {
+        const chip: ChannelChip = { channel: subscription.channel, id: subscription.id };
+        const schedule = schedules.find((s) => s.agent === agent.name &&
+            s.channel === subscription.channel &&
+            s.trigger === subscription.id);
+        const detail = schedule?.expression ?? idDetail(subscription.id);
+        if (detail) chip.detail = detail;
+        if (subscription.hook) chip.hook = subscription.hook;
         return chip;
     });
 }
@@ -126,8 +125,9 @@ export function tokenShares(runs: readonly RunWire[]): string {
         .join(' · ');
 }
 
-export function hasHttpTrigger(agent: AgentWire): boolean {
-    return agent.triggers.some((trigger) => trigger.source === 'http');
+/** The agent subscribes to the `http` channel, so REST (and the UI) can start it. */
+export function hasHttpSubscription(agent: AgentWire): boolean {
+    return agent.channels.some((subscription) => subscription.channel === 'http');
 }
 
 export function matchesName(agent: AgentWire, query: string): boolean {
