@@ -116,7 +116,7 @@ describe('effect tools', () => {
 
     it('keeps contextSchema and forwards options.context through the wrapper', async () => {
         const plain = defineTool({ inputSchema: schema, execute: async (_i, { context }) => context });
-        const wrapped = wrapToolsForRun({ plain }, ctx, new MemoryStore(), () => true);
+        const wrapped = wrapToolsForRun({ plain }, ctx, new MemoryStore(), { allow: () => true });
         expect(wrapped.plain!.contextSchema).toBe(toolContextSchema);
         expect(await call(wrapped, 'plain', { body: 'x' })).toBe(ctx);
     });
@@ -347,12 +347,12 @@ describe('tool allow check', () => {
         const plain = tool({ inputSchema: schema, execute: async () => ++runs });
         const post = defineEffectTool({ inputSchema: schema, execute: async () => ++runs });
         const store = new MemoryStore();
-        const tools = wrapToolsForRun({ plain, post }, ctx, store, (name) => name === 'none');
+        const tools = wrapToolsForRun({ plain, post }, ctx, store, { allow: (name) => name === 'none' });
         await expect(call(tools, 'plain', { body: 'hi' })).rejects.toBeInstanceOf(ToolNotAllowedError);
         await expect(call(tools, 'post', { body: 'hi' })).rejects.toMatchObject({ code: 'tool_not_allowed' });
         expect(runs).toBe(0);
 
-        const allowed = wrapToolsForRun({ plain }, ctx, store, (name) => name === 'plain');
+        const allowed = wrapToolsForRun({ plain }, ctx, store, { allow: (name) => name === 'plain' });
         expect(await call(allowed, 'plain', { body: 'hi' })).toBe(1);
     });
 });

@@ -6,6 +6,7 @@
  */
 
 import type { Tool, ToolExecutionOptions } from 'ai';
+import type { AgentHooks } from '../agent/types.ts';
 import type { StateSchema } from '../state/types.ts';
 import type { ToolContext } from '../tool/types.ts';
 import type { EFFECT, EFFECT_HOOKS } from './constants.ts';
@@ -27,4 +28,11 @@ export type ToolCallFrame = {
     toolName: string;
     /** How many approve() calls this tool call made so far. */
     approvals: number;
+};
+
+export type WrapToolsOptions = {
+    /** Re-checks every call: a refused one throws ToolNotAllowedError. */
+    allow?: (toolName: string) => boolean;
+    /** The agent's tool hooks, run for every call of every tool. */
+    hooks?: AgentHooks;
 };

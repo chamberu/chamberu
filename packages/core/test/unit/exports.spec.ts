@@ -29,6 +29,7 @@ describe('public api', () => {
         'BudgetExceededError',
         'ArtifactNotFoundError',
         'ToolNotAllowedError',
+        'ToolDeniedError',
         'IncompleteResponseError',
         'SandboxError',
         'hasPermission',

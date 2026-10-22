@@ -6,7 +6,13 @@
  */
 
 import { createHash } from 'node:crypto';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
+import { buildIssuesForStandardSchemaIssues } from '@validup/standard-schema';
+import { TypeValidationError, asSchema } from 'ai';
+import type { FlexibleSchema } from 'ai';
 import { isObject } from 'smob';
+import { ValidationError } from '../errors/index.ts';
+import { describeIssues } from '../state/helpers.ts';
 
 function canonical(value: unknown): unknown {
     if (isObject(value) && typeof value.toJSON === 'function') {
@@ -30,4 +36,25 @@ function canonical(value: unknown): unknown {
  */
 export function stableHash(value: unknown): string {
     return createHash('sha256').update(JSON.stringify(canonical(value)) ?? 'undefined').digest('hex');
+}
+
+/**
+ * `input` parsed by the tool's input schema (the parsed value, so a schema's
+ * transforms apply); a schema without a validator passes it unchanged. A
+ * failure is a ValidationError naming the tool and the issues, never the value.
+ */
+export async function validateToolInput(toolName: string, schema: FlexibleSchema<unknown> | undefined, input: unknown): Promise<unknown> {
+    const { validate } = asSchema(schema);
+    if (!validate) return input;
+    const result = await validate(input);
+    if (result.success) return result.value;
+    const cause = TypeValidationError.isInstance(result.error) ? result.error.cause : undefined;
+    const issues = Array.isArray(cause) ?
+        buildIssuesForStandardSchemaIssues(cause as StandardSchemaV1.Issue[]) :
+        [];
+    const detail = issues.length > 0 ? `: ${describeIssues(issues)}` : '.';
+    throw new ValidationError(
+        `Tool "${toolName}": the input beforeToolExecution returned does not match the tool's input schema${detail}`,
+        issues,
+    );
 }

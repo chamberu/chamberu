@@ -32,6 +32,35 @@ export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: R
  */
 export type ToolPolicy = (toolName: string, ctx: { run: RunContext }) => boolean;
 
+/** A tool call as the agent hooks see it. */
+export type ToolCallInfo = {
+    toolName: string;
+    toolCallId: string;
+    input: unknown;
+};
+
+/**
+ * Gates and rewrites for every tool call of the agent's merged set (user,
+ * chamvi, state and third-party tools alike), run inside the tool-call frame
+ * with the execution's ToolContext (`inject` works there).
+ */
+export type AgentHooks = {
+    /**
+     * Runs before the effect lookup and returns the input to execute with
+     * (`undefined` keeps it). A changed input is re-validated against the
+     * tool's input schema (a failure is a ValidationError tool error) and is
+     * what the effect key is computed from. A throw is a tool error
+     * (ToolDeniedError for a refusal); a FatalToolError fails the run.
+     */
+    beforeToolExecution?(call: ToolCallInfo, ctx: ToolContext): unknown | Promise<unknown>;
+    /**
+     * Runs on a fresh result and on a recorded effect result alike and returns
+     * the output the model sees (`undefined` keeps it). A streaming tool's
+     * hook gets its final value. Not called for a tool error.
+     */
+    afterToolExecution?(call: ToolCallInfo & { output: unknown }, ctx: ToolContext): unknown | Promise<unknown>;
+};
+
 export type AgentDefinition<S extends StateSchema = StateSchema> = {
     name: string;
     model: LanguageModel;
@@ -57,6 +86,11 @@ export type AgentDefinition<S extends StateSchema = StateSchema> = {
      * defineAgent for a plain set, a failed run for a factory).
      */
     toolsContext?: Record<string, unknown>;
+    /**
+     * Tool hooks (see AgentHooks). AI SDK tools declaring their own
+     * `needsApproval` are refused (nothing answers that request).
+     */
+    hooks?: AgentHooks;
     /** Filters the merged tool set (state tools included) per run, e.g. requireToolPermission(). */
     toolPolicy?: ToolPolicy;
     /** Record<collection, StandardSchemaV1>. */

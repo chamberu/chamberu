@@ -18,7 +18,7 @@ import type {
 } from 'ai';
 import { NoSuchToolError, TypeValidationError } from 'ai';
 import { isObject } from 'smob';
-import { assertToolsContext } from '../../agent/helpers.ts';
+import { assertNoNeedsApproval, assertToolsContext } from '../../agent/helpers.ts';
 import type { ApprovalPolicy } from '../../agent/types.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
@@ -122,10 +122,12 @@ export function toRunError(error: unknown): { code: string; message: string } {
  * from an older history still gets an answer; `activeTools` (the names the
  * agent's toolPolicy allows, undefined without a policy) is what the model is
  * offered. wrapToolsForRun memoizes effects and re-checks the policy per call,
- * so a refused call is a tool error. `toolsContext` maps every chamvi tool
+ * so a refused call is a tool error, and runs the agent's hooks around every
+ * call. `toolsContext` maps every chamvi tool
  * (policy-hidden ones included) to the execution's one ToolContext, plus the
  * agent's own `toolsContext` entries for the other tools, by reference.
- * Throws InvalidAgentDefinitionError for a misconfigured `toolsContext`.
+ * Throws InvalidAgentDefinitionError for a misconfigured `toolsContext` and
+ * for a tool declaring `needsApproval`.
  */
 export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
     tools: ToolSet;
@@ -137,6 +139,7 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         state: schema,
         toolPolicy,
         toolsContext: agentToolsContext,
+        hooks,
     } = ctx.agent.definition;
     if (!userTools && !schema) {
         if (agentToolsContext) assertToolsContext(ctx.agent.name, {}, agentToolsContext);
@@ -155,6 +158,9 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         ...(typeof userTools === 'function' ? userTools(toolContext) : userTools),
     };
 
+    // a factory's set is only known here: refused like defineAgent refuses a plain one
+    assertNoNeedsApproval(ctx.agent.name, tools);
+
     const toolsContext: Record<string, unknown> = {};
     for (const [name, tool] of Object.entries(tools)) {
         if (hasToolContext(tool)) toolsContext[name] = toolContext;
@@ -164,10 +170,10 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         for (const [name, value] of Object.entries(agentToolsContext)) toolsContext[name] = value;
     }
 
-    if (!toolPolicy) return { tools: wrapToolsForRun(tools, toolContext, ctx.store), toolsContext };
+    if (!toolPolicy) return { tools: wrapToolsForRun(tools, toolContext, ctx.store, { hooks }), toolsContext };
     const allow = (name: string) => toolPolicy(name, { run: runContext });
     return {
-        tools: wrapToolsForRun(tools, toolContext, ctx.store, allow),
+        tools: wrapToolsForRun(tools, toolContext, ctx.store, { allow, hooks }),
         activeTools: Object.keys(tools).filter(allow),
         toolsContext,
     };

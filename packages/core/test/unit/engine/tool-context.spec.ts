@@ -255,17 +255,12 @@ describe('tool context', () => {
         expect(contexts).toEqual([undefined]);
     });
 
-    it('hands a toolsContext entry to a third-party tool, execute and approval', async () => {
+    it('hands a toolsContext entry to a third-party tool', async () => {
         const token = { token: 't' };
         const executeSeen: unknown[] = [];
-        const approvalSeen: unknown[] = [];
         const raw = tool({
             inputSchema: z.object({}),
             contextSchema: identity<{ token: string }>(),
-            needsApproval: (_input, { context }) => {
-                approvalSeen.push(context);
-                return false;
-            },
             execute: async (_input, { context }) => {
                 executeSeen.push(context);
                 return 'ok';
@@ -287,7 +282,6 @@ describe('tool context', () => {
         });
         expect(run?.status).toBe('completed');
         expect(executeSeen[0]).toBe(token);
-        expect(approvalSeen[0]).toBe(token);
         expect(zoddedSeen[0]).toEqual(token);
     });
 

@@ -21,6 +21,7 @@ export const ErrorCode = {
     RUN_NOT_FOUND: 'run_not_found',
     SANDBOX: 'sandbox_error',
     TIMEOUT: 'Timeout',
+    TOOL_DENIED: 'tool_denied',
     TOOL_NOT_ALLOWED: 'tool_not_allowed',
     VALIDATION: 'validation_error',
 } as const;
