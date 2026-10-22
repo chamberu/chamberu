@@ -72,6 +72,26 @@ describe('openclawModule', () => {
             .toThrow('OPENCLAW_BASE_URL must be an absolute URL.');
     });
 
+    it.each([
+        ['OPENCLAW_HOOKS_TOKEN', 'tok\n', 'OPENCLAW_HOOKS_TOKEN must not hold control characters'],
+        ['OPENCLAW_CHANNEL', 'last', 'OPENCLAW_CHANNEL must name a channel'],
+        ['OPENCLAW_HOOKS_PATH', 'hooks', 'OPENCLAW_HOOKS_PATH must start with "/"'],
+    ])('a malformed %s throws when called, naming the variable', (name, value, message) => {
+        let error: unknown;
+        try {
+            openclawModule({ env: openclawEnv({ [name]: value }) });
+        } catch (e) {
+            error = e;
+        }
+        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((error as Error).message.startsWith(message)).toBe(true);
+    });
+
+    it('a malformed option keeps the option name', () => {
+        expect(() => openclawModule({ env: openclawEnv(), hooksToken: ' padded' }))
+            .toThrow('openclaw: hooksToken must not hold');
+    });
+
     it('options win over env', () => {
         expect(() => openclawModule({
             env: {},
