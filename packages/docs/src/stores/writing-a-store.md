@@ -25,6 +25,7 @@ The suite covers:
 - `listRuns` filters (`agent`, `status`, `concurrencyKey`), `total`, and the `createdAt`/`id` order in both directions (`order: 'asc' | 'desc'`),
 - effect and state round trips, including `where` filters,
 - artifacts: insert-if-absent, metadata and bytes round trips, copies, the `createdAt`/`id` order, unknown ids,
+- agent revisions: upsert, delete (also of a missing marker), the code-point order of `listAgentRevisions`, copies with `changedAt` revived as a `Date`,
 - no aliasing of values passed in or returned.
 
 ## Implementation notes

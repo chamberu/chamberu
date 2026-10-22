@@ -4,7 +4,8 @@ Every error chamvi throws extends `ChamviError`, which extends ebec's `BaseError
 
 | Class | `ErrorCode` | Code | Thrown when |
 |---|---|---|---|
-| `InvalidAgentDefinitionError` | `INVALID_AGENT_DEFINITION` | `invalid_agent_definition` | An agent name, trigger id or cron expression is invalid; duplicate agent names; an unknown notifier; an empty `resumeSecret`; `dispatch()` for an unknown agent |
+| `InvalidAgentDefinitionError` | `INVALID_AGENT_DEFINITION` | `invalid_agent_definition` | An agent name, trigger id or cron expression is invalid; duplicate agent names; an unknown notifier; an empty `resumeSecret` |
+| `AgentNotFoundError` | `AGENT_NOT_FOUND` | `agent_not_found` | `dispatch()` for an agent the engine does not hold; `@chamvi/http` answers 404 |
 | `InvalidResumeTokenError` | `INVALID_RESUME_TOKEN` | `invalid_resume_token` | A resume token is malformed, forged, expired or belongs to another wait point |
 | `InvalidRunStateError` | `INVALID_RUN_STATE` | `invalid_run_state` | A run is not in the status an operation needs: resuming a run that is not waiting, cancelling a settled run, a store guard (`expectStatus`, `expectOwner`) that does not match |
 | `RunNotFoundError` | `RUN_NOT_FOUND` | `run_not_found` | `resume()`, `cancel()` or `updateRun()` for an unknown run |

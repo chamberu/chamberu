@@ -81,4 +81,6 @@ One engine runs any number of agents. They share the store, the concurrency limi
 
 <<< @/snippets/engine.ts#many
 
-`dispatch()` names the agent per run. An unknown agent name throws `InvalidAgentDefinitionError`.
+`dispatch()` names the agent per run. An agent the engine does not hold throws `AgentNotFoundError` (`agent_not_found`, 404 over HTTP).
+
+The set can change while the engine runs: `engine.putAgent(agent)` adds an agent or replaces the one of the same name, `engine.removeAgent(name)` removes it, and both emit `agents.changed` (`{ name, kind: 'added' | 'replaced' | 'removed' }`), which the scheduler and `@chamvi/http` follow. Replacing or removing an agent first cancels its unsettled runs. An app loads such agents from a folder: see [Agent Folders](/guide/agent-folders).

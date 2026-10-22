@@ -23,7 +23,7 @@ function isApp(value: unknown): value is IApp;
 const APP_BRAND: unique symbol; // Symbol.for('chamvi.app')
 ```
 
-Synchronous and side-effect free. Throws `InvalidAgentDefinitionError` for a module list entry that is no `IModule` and for two modules of one name (a built-in's name included: list one module to replace a built-in). `isApp` checks the brand, so an app of another installed copy matches.
+Synchronous and side-effect free. `agents` may be omitted or empty when `CHAMVI_AGENTS_DIR` names an [agents folder](/guide/agent-folders) (`start` and `runJob` refuse an app with neither); `app.agents` holds only the code agents, the live set is `engine.listAgents()`. Throws `InvalidAgentDefinitionError` for options that are no object or whose `agents` is no array, a module list entry that is no `IModule` and for two modules of one name (a built-in's name included: list one module to replace a built-in). `isApp` checks the brand, so an app of another installed copy matches.
 
 <<< ../../../app/src/app/types.ts{ts}
 
@@ -65,6 +65,8 @@ Read by `readConfig(env, { mode, dev })` once per lifecycle; the optional module
 | `RESUME_SECRET` | engine | string, at least 32 characters | none (dev: random per process, warned) | `start`, `run-job` |
 | `CHAMVI_MAX_CONCURRENT_RUNS` | engine | int >= 1 | `4` | never |
 | `CHAMVI_SCHEDULER` | scheduler | bool | `true`; `false` runs no in-process cron (CronJob mode) | never |
+| `CHAMVI_AGENTS_DIR` | agents | path of a directory, relative to the working directory | unset: no [agent folders](/guide/agent-folders) | `createApp()` has no agents |
+| `CHAMVI_AGENTS_POLL_MS` | agents | int 1..`TIMER_MAX_MS` | `5000` (`DEFAULT_AGENTS_POLL_MS`) | never |
 | `CHAMVI_READINESS_DELAY_MS` | http shutdown | int | `0` | never |
 | `CHAMVI_DRAIN_TIMEOUT_MS` | http shutdown | int | `30000` (dev 5000) | never |
 | `CHAMVI_CLOSE_TIMEOUT_MS` | http shutdown | int | `5000` | never |
@@ -109,12 +111,13 @@ function configModule(options?: ConfigModuleOptions): IModule;            // 'ch
 function storeModule(options?: StoreModuleOptions): IModule;              // 'chamvi:store'
 function staticTokensModule(options?: StaticTokensModuleOptions): IModule; // 'chamvi:static-tokens'
 function engineModule(options?: EngineModuleOptions): IModule;            // 'chamvi:engine'
+function agentsModule(): IModule;                                         // 'chamvi:agents'
 function schedulerModule(options?: SchedulerModuleOptions): IModule;      // 'chamvi:scheduler'
 function httpModule(options?: HttpModuleOptions): IModule;                // 'chamvi:http'
 function consoleNotifierModule(options?: ConsoleNotifierModuleOptions): IModule; // 'chamvi:notifier:<name>'
 ```
 
-Listing one of them in `createApp({ modules })` replaces the default instance.
+Listing one of them in `createApp({ modules })` replaces the default instance. `agentsModule()` (no options) reads `CHAMVI_AGENTS_DIR`: in `start` and `job` mode its `onReady` loads every folder into the engine before any start step (a dir that is no directory is `InvalidAgentDefinitionError`), and in `start` mode a lifecycle hook polls the dir from `started` until `stopping`; it registers `AppToken.AGENT_ISSUES`, which the http module passes on as `agentIssues`. Without a dir it only refuses an app without agents.
 
 <<< ../../../app/src/modules/config/types.ts{ts}
 
@@ -194,16 +197,30 @@ The real module lifecycle without `start()` and a port, over exactly `options.mo
 
 <<< ../../../app/src/testing/types.ts{ts}
 
+## Agent folders
+
+```ts
+function loadAgent(dir: string, options?: LoadAgentOptions): Promise<LoadedAgent>;
+function loadAgents(root: string, options?: LoadAgentOptions): Promise<LoadAgentsResult>;
+function listAgentFolders(root: string): Promise<string[]>;
+function hashAgentFolder(dir: string): Promise<string>;
+```
+
+`loadAgent` builds one folder's agent (the [layout](/guide/agent-folders#the-layout)) and its content hash, and throws `InvalidAgentDefinitionError` naming the file relative to the agents dir. `loadAgents` loads every folder `listAgentFolders` names (the direct subfolders not starting with `.` or `_`, in code-point order) and returns the failures as `issues` instead of throwing. `hashAgentFolder` is sha256 (hex) over every file below the folder, dot-entries skipped, by relative POSIX path. The loader holds the only `jiti` and `locter` imports of chamvi.
+
+<<< ../../../app/src/loader/types.ts{ts}
+
 ## Models
 
 ```ts
 function createModelRegistry(options: ModelRegistryOptions): Promise<ProviderRegistryProvider>;
+function resolveModels(options: ModelRegistryOptions): Promise<ResolvedModels>;
 function installDefaultProvider(registry: ProviderRegistryProvider): () => void;
 
 const BUILTIN_PROVIDERS: readonly BuiltinProvider[]; // anthropic, openai, google, mistral, xai
 ```
 
-`createModelRegistry` imports every installed built-in provider package with its key from env, adds `models`, and checks every string model of `agents`: `Agent "<a>": model "<m>" needs the <id> provider; install <pkg>.`, `... needs an API key; set <VAR>.` or `... names the unknown provider "<id>"; available: <ids>.` (each an `InvalidAgentDefinitionError`). `installDefaultProvider` sets `globalThis.AI_SDK_DEFAULT_PROVIDER` only when none is set and returns the undo; the engine module does both at `start` and `runJob`. The global is process-wide: two apps in one process share the first one's registry until it stops, and a default provider set before `start` is left alone (no model strings are checked then).
+`createModelRegistry` imports every installed built-in provider package with its key from env, adds `models`, and checks every string model of `agents`: `Agent "<a>": model "<m>" needs the <id> provider; install <pkg>.`, `... needs an API key; set <VAR>.` or `... names the unknown provider "<id>"; available: <ids>.` (each an `InvalidAgentDefinitionError`). `resolveModels` returns that registry with the check itself (`ResolvedModels.check`), which the engine module registers as `AppToken.MODEL_CHECK` for folder agents loaded later (a no-op when a default provider was preset). `installDefaultProvider` sets `globalThis.AI_SDK_DEFAULT_PROVIDER` only when none is set and returns the undo; the engine module does both at `start` and `runJob`. The global is process-wide: two apps in one process share the first one's registry until it stops, and a default provider set before `start` is left alone (no model strings are checked then).
 
 <<< ../../../app/src/models/types.ts{ts}
 

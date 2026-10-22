@@ -19,6 +19,8 @@ const DEFAULT_TIMEOUT_MS: 900_000; // 15 minutes
 
 Throws `InvalidAgentDefinitionError` for an invalid name, duplicate trigger ids, or a `toolsContext` entry naming a chamvi tool or no tool of a plain tool set. See [Agents](/guide/agents).
 
+`AgentConfig` is the definition without `name`, the default export of a folder agent's `agent.ts`; `AgentRevision` is the store's revision marker of a folder agent (see [Agent Folders](/guide/agent-folders)):
+
 <<< ../../../core/src/agent/types.ts{ts}
 
 ## Permissions
@@ -66,11 +68,14 @@ class Engine {
     readonly clock: IClock;
     getAgent(name: string): Agent | undefined;
     listAgents(): Agent[];
+    putAgent(agent: Agent, options?: { revision?: string }): Promise<'added' | 'replaced' | 'unchanged'>;
+    removeAgent(name: string): Promise<boolean>;
+    agentRevision(name: string): string | undefined;
     provide<T>(key: ContextKey<T>, value: T): void; // IContextProvider, see Context
 
     dispatch(envelope: DispatchEnvelope): Promise<{ runId: string; deduplicated: boolean }>;
     getRun(id: string): Promise<Run | undefined>;
-    on(event: RunEvent['type'], listener: (e: RunEvent) => void): () => void;
+    on<T extends EngineEvent['type']>(event: T, listener: (e: Extract<EngineEvent, { type: T }>) => void): () => void;
 
     start(): Promise<void>;
     stop(): void;
@@ -88,11 +93,14 @@ class Engine {
 | Method | Description | Guide |
 |---|---|---|
 | `store`, `clock` | The store and clock the engine was built with (`clock` defaults to `systemClock`) | |
-| `getAgent`, `listAgents` | One registered agent by name; all of them in registration order (a new array) | |
+| `getAgent`, `listAgents` | One registered agent by name; all of them in registration order (a new array), read at call time | |
+| `putAgent` | Registers an agent or replaces the one of the same name in place (a new one goes last); refuses an unknown `notify` like the constructor. Replacing cancels the agent's unsettled runs created before now. With a `revision` (a folder's content hash) the store's marker is brought to it under the lock `agents:<name>` instead, cancelling once across replicas and only when a marker existed. Resolves `unchanged` (no event) for the same agent object at the same revision | [Agent Folders](/guide/agent-folders) |
+| `removeAgent` | Under the same lock, cancels the agent's unsettled runs (when it has a marker, or is a code agent registered here) and deletes its marker; resolves whether it was registered here | [Agent Folders](/guide/agent-folders) |
+| `agentRevision` | The revision an agent was registered at; `undefined` for a code agent | |
 | `dispatch` | Stores a `queued` run (and its attachments as artifacts); deduplicates by `idempotencyKey` | [Triggers](/guide/triggers) |
 | `getRun` | Reads a run from the store | [Run Lifecycle](/guide/run-lifecycle) |
-| `on` | Subscribes to `run.updated`, `step.appended` or `run.delta`; returns an unsubscribe function | [Run Lifecycle](/guide/run-lifecycle#watching-runs) |
-| `start` | Recovers, starts polling and starts queued runs | [Recovery](/guide/recovery) |
+| `on` | Subscribes to `run.updated`, `step.appended`, `run.delta` or `agents.changed`; returns an unsubscribe function | [Run Lifecycle](/guide/run-lifecycle#watching-runs) |
+| `start` | Recovers, starts polling and starts queued runs: only runs of an agent it holds, a folder agent only at the stored revision (the others stay `queued`) | [Recovery](/guide/recovery) |
 | `stop` | Stops polling only | [Recovery](/guide/recovery) |
 | `drain` | Waits for in-flight runs (default 30 s), then marks the rest `interrupted` | [Recovery](/guide/recovery#drain) |
 | `idle` | Resolves when nothing runs and nothing more can start | |
@@ -132,7 +140,7 @@ class MemoryStore implements IStore {
 }
 ```
 
-`IStore` and its parts (`IRunStore`, `IStepStore`, `ICheckpointStore`, `IIdempotencyStore`, `ILockStore`, `IEffectStore`, `IStateStore`, `IArtifactStore`) are listed on the [Store Contract](/stores/) page.
+`IStore` and its parts (`IRunStore`, `IStepStore`, `ICheckpointStore`, `IIdempotencyStore`, `ILockStore`, `IEffectStore`, `IStateStore`, `IArtifactStore`, `IAgentRevisionStore`) are listed on the [Store Contract](/stores/) page.
 
 ## Artifacts
 
@@ -252,7 +260,7 @@ const systemClock: IClock;
 
 ## Errors
 
-`ChamviError`, `InvalidAgentDefinitionError`, `ContextNotProvidedError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
+`ChamviError`, `InvalidAgentDefinitionError`, `AgentNotFoundError`, `ContextNotProvidedError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
 
 <<< ../../../core/src/errors/constants.ts{ts}
 

@@ -133,6 +133,7 @@ export default defineConfig({
                     text: 'Operations',
                     items: [
                         { text: 'Apps & Modules', link: '/guide/app' },
+                        { text: 'Agent Folders', link: '/guide/agent-folders' },
                         { text: 'Concurrency, Leases & Multi-Replica', link: '/guide/concurrency' },
                         { text: 'Cancel, Drain & Recovery', link: '/guide/recovery' },
                         { text: 'Cron Scheduling', link: '/guide/scheduler' },
