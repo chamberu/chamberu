@@ -7,12 +7,13 @@
 
 import {
     InvalidAgentDefinitionError,
+    consoleNotifier,
     defineAgent,
     defineTool,
     http,
 } from '@chamvi/core';
 import type { INotifier, ToolContext } from '@chamvi/core';
-import { injectOpenclawContext } from '@chamvi/notify-openclaw';
+import { injectOpenclawContext, provideOpenclawContext } from '@chamvi/notify-openclaw';
 import { ControllableClock } from '@chamvi/test-kit';
 import { tool } from 'ai';
 import {
@@ -29,7 +30,7 @@ import {
     engineModule,
     storeModule,
 } from '@chamvi/app';
-import type { IModule } from '@chamvi/app';
+import type { ILifecycleHook, IModule } from '@chamvi/app';
 import { createModuleHarness } from '@chamvi/app/testing';
 import type { ModuleHarness } from '@chamvi/app/testing';
 import { openclawModule } from '@chamvi/notify-openclaw/module';
@@ -221,6 +222,26 @@ describe('openclawModule', () => {
         expect(seen[0]).toBe(notifiers.find((n) => n.name === 'ops'));
         expect(seen[0]).not.toBe(notifiers.find((n) => n.name === 'openclaw'));
         expect(harness.reported).toEqual([]);
+    });
+
+    it('reports a refused provide instead of failing setup', async () => {
+        // provides the default notifier's context before the module's own engineCreated hook runs
+        const earlier: IModule = {
+            name: 'earlier',
+            async setup(container) {
+                const hook: ILifecycleHook = {
+                    name: 'earlier',
+                    engineCreated: (engine) => provideOpenclawContext(engine, consoleNotifier({ name: 'openclaw' })),
+                };
+                container.registerMany(AppToken.LIFECYCLE_HOOKS, { useValue: hook });
+            },
+        };
+        const harness = await probeHarness([earlier, openclawModule({ env: openclawEnv() })], () => undefined);
+
+        expect(harness.reported).toHaveLength(1);
+        expect(harness.reported[0]!.error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((harness.reported[0]!.error as Error).message).toBe('Context "openclaw:openclaw" is already provided.');
+        expect(harness.reported[0]!.context).toEqual({ hook: 'chamvi:notifier:openclaw', phase: 'engineCreated' });
     });
 });
 

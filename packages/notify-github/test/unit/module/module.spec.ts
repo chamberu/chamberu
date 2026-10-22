@@ -5,10 +5,16 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { defineAgent, defineTool, http } from '@chamvi/core';
+import {
+    InvalidAgentDefinitionError,
+    consoleNotifier,
+    defineAgent,
+    defineTool,
+    http,
+} from '@chamvi/core';
 import type { INotifier } from '@chamvi/core';
 import { createGithubApp, githubWebhook } from '@chamvi/github';
-import { injectGithubNotifierContext } from '@chamvi/notify-github';
+import { injectGithubNotifierContext, provideGithubNotifierContext } from '@chamvi/notify-github';
 import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
 import { tool } from 'ai';
 import {
@@ -25,6 +31,7 @@ import {
     engineModule,
     storeModule,
 } from '@chamvi/app';
+import type { ILifecycleHook, IModule } from '@chamvi/app';
 import { createModuleHarness } from '@chamvi/app/testing';
 import type { ModuleHarness } from '@chamvi/app/testing';
 import { githubNotifierModule } from '@chamvi/notify-github/module';
@@ -132,9 +139,9 @@ describe('githubNotifierModule', () => {
     it('provides the notifier as context', async () => {
         const clock = new ControllableClock(new Date('2026-10-21T09:00:00Z'));
         const fake = createFakeGithub({
-            appId: '1', 
-            slug: 'chamvi-test', 
-            clock, 
+            appId: '1',
+            slug: 'chamvi-test',
+            clock,
         });
         const app = createGithubApp({
             appId: '1',
@@ -157,10 +164,10 @@ describe('githubNotifierModule', () => {
             model: mockModel([
                 {
                     parts: [{
-                        type: 'tool-call', 
-                        toolName: 'probe', 
-                        input: {}, 
-                    }], 
+                        type: 'tool-call',
+                        toolName: 'probe',
+                        input: {},
+                    }],
                 },
                 { parts: [{ type: 'text', text: 'done' }] },
             ]),
@@ -193,5 +200,51 @@ describe('githubNotifierModule', () => {
         expect(seen).toHaveLength(1);
         expect(seen[0]).toBe(harness.container.resolveAll(AppToken.NOTIFIERS)[0]);
         expect(harness.reported).toEqual([]);
+    });
+
+    it('reports a refused provide instead of failing setup', async () => {
+        const clock = new ControllableClock(new Date('2026-10-21T09:00:00Z'));
+        const fake = createFakeGithub({ appId: '1', clock });
+        const app = createGithubApp({
+            appId: '1',
+            privateKey: fake.privateKey,
+            webhookSecret: 's',
+            clock,
+            fetch: fake.fetch,
+        });
+        // provides the default notifier's context before the module's own engineCreated hook runs
+        const earlier: IModule = {
+            name: 'earlier',
+            async setup(container) {
+                const hook: ILifecycleHook = {
+                    name: 'earlier',
+                    engineCreated: (engine) => provideGithubNotifierContext(engine, consoleNotifier({ name: 'github' })),
+                };
+                container.registerMany(AppToken.LIFECYCLE_HOOKS, { useValue: hook });
+            },
+        };
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET },
+            agents: [defineAgent({
+                name: 'probe',
+                model: mockModel([]),
+                instructions: 'probe',
+                triggers: [http()],
+            })],
+            clock,
+            modules: [
+                configModule({ clock, logger: createRecordingLogger(clock) }),
+                storeModule(),
+                engineModule(),
+                earlier,
+                githubNotifierModule({ app }),
+            ],
+        });
+        harnesses.push(harness);
+
+        expect(harness.reported).toHaveLength(1);
+        expect(harness.reported[0]!.error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((harness.reported[0]!.error as Error).message).toBe('Context "notify-github:github" is already provided.');
+        expect(harness.reported[0]!.context).toEqual({ hook: 'chamvi:notifier:github', phase: 'engineCreated' });
     });
 });

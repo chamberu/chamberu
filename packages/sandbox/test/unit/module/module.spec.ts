@@ -15,7 +15,7 @@ import {
     http,
 } from '@chamvi/core';
 import type { Agent, Engine } from '@chamvi/core';
-import { injectSandboxContext } from '@chamvi/sandbox';
+import { injectSandboxContext, provideSandboxContext } from '@chamvi/sandbox';
 import type { ISandboxProvider, IWorkspaceManager } from '@chamvi/sandbox';
 import { createLocalSandbox } from '@chamvi/sandbox-local';
 import {
@@ -32,7 +32,7 @@ import {
     engineModule,
     storeModule,
 } from '@chamvi/app';
-import type { AppMode, IModule } from '@chamvi/app';
+import type { AppMode, ILifecycleHook, IModule } from '@chamvi/app';
 import { createModuleHarness } from '@chamvi/app/testing';
 import type { ModuleHarness } from '@chamvi/app/testing';
 import { SandboxModule, sandboxModule } from '@chamvi/sandbox/module';
@@ -321,6 +321,37 @@ describe('sandboxModule', () => {
 
         expect((await engine.getRun(runId))?.status).toBe('completed');
         expect(seen).toEqual([true]);
+    });
+
+    it('reports a refused provide instead of failing setup', async () => {
+        // provides the sandbox context before the module's own engineCreated hook runs
+        const earlier: IModule = {
+            name: 'earlier',
+            async setup(container) {
+                const hook: ILifecycleHook = {
+                    name: 'earlier',
+                    engineCreated: (engine) => provideSandboxContext(engine, fakeManager([])),
+                };
+                container.registerMany(AppToken.LIFECYCLE_HOOKS, { useValue: hook });
+            },
+        };
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET },
+            agents: [agent()],
+            modules: [
+                configModule({ logger: createRecordingLogger() }),
+                storeModule(),
+                engineModule(),
+                earlier,
+                sandboxModule({ manager: fakeManager([]), env: {} }),
+            ],
+        });
+        harnesses.push(harness);
+
+        expect(harness.reported).toHaveLength(1);
+        expect(harness.reported[0]!.error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((harness.reported[0]!.error as Error).message).toBe('Context "sandbox" is already provided.');
+        expect(harness.reported[0]!.context).toEqual({ hook: 'chamvi:sandbox', phase: 'engineCreated' });
     });
 
     it('the real local provider loads', async () => {

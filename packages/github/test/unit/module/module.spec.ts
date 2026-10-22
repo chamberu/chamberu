@@ -13,7 +13,7 @@ import {
     defineTool,
     http,
 } from '@chamvi/core';
-import { githubWebhook, injectGithubContext } from '@chamvi/github';
+import { githubWebhook, injectGithubContext, provideGithubContext } from '@chamvi/github';
 import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
 import {
     afterEach,
@@ -32,6 +32,7 @@ import {
 } from '@chamvi/app';
 import { createModuleHarness } from '@chamvi/app/testing';
 import type { ModuleHarness } from '@chamvi/app/testing';
+import type { ILifecycleHook, IModule } from '@chamvi/app';
 import { githubModule } from '@chamvi/github/module';
 import { mockModel, textModel } from '../../utils/model.ts';
 import {
@@ -218,10 +219,10 @@ describe('githubModule', () => {
             model: mockModel([
                 {
                     parts: [{
-                        type: 'tool-call', 
-                        toolName: 'probe', 
-                        input: {}, 
-                    }], 
+                        type: 'tool-call',
+                        toolName: 'probe',
+                        input: {},
+                    }],
                 },
                 { parts: [{ type: 'text', text: 'done' }] },
             ]),
@@ -252,5 +253,43 @@ describe('githubModule', () => {
         expect((await engine.getRun(runId))?.status).toBe('completed');
         expect(seen).toEqual([true]);
         expect(harness.reported).toEqual([]);
+    });
+
+    it('reports a refused provide instead of failing setup', async () => {
+        const first = githubModule({ env: githubEnv() });
+        const module = githubModule({ env: githubEnv() });
+        // provides the GitHub context before the module's own engineCreated hook runs
+        const earlier: IModule = {
+            name: 'earlier',
+            async setup(container) {
+                const hook: ILifecycleHook = {
+                    name: 'earlier',
+                    engineCreated: (engine) => provideGithubContext(engine, first.app),
+                };
+                container.registerMany(AppToken.LIFECYCLE_HOOKS, { useValue: hook });
+            },
+        };
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET },
+            agents: [defineAgent({
+                name: 'probe',
+                model: textModel('ok'),
+                instructions: 'probe',
+                triggers: [http()],
+            })],
+            modules: [
+                configModule({ logger: createRecordingLogger() }),
+                storeModule(),
+                engineModule(),
+                earlier,
+                module,
+            ],
+        });
+        harnesses.push(harness);
+
+        expect(harness.reported).toHaveLength(1);
+        expect(harness.reported[0]!.error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((harness.reported[0]!.error as Error).message).toBe('Context "github" is already provided.');
+        expect(harness.reported[0]!.context).toEqual({ hook: 'chamvi:github', phase: 'engineCreated' });
     });
 });
