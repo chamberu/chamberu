@@ -275,7 +275,7 @@ process.once('SIGTERM', () => {
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `engine` | `Engine` | required | Drained during the shutdown; its `clock` drives the delays |
-| `scheduler` | `{ stop(): Promise<void> }` | none | Stopped first, e.g. `createScheduler()` from `@chamvi/scheduler` |
+| `scheduler` | `{ stop(): Promise<void> }` | none | Stopped first; an extra background service of your own (the cron channel needs none: `engine.drain()` stops every channel) |
 | `server` | `{ close(force?): Promise<void> }` | none | The srvx server |
 | `readinessDelayMs` | `number` | `0` | Time for load balancers to see the failing readiness |
 | `drainTimeoutMs` | `number` | `30_000` | Passed to `engine.drain()` |

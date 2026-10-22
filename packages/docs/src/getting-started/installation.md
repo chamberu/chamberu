@@ -61,13 +61,13 @@ npm install --save-dev tsdown   # only for chamvi build
 |---|---|
 | `@chamvi/core` | Shipped (0.x) |
 | `@chamvi/test-kit` | Shipped (0.x), test helpers |
-| `@chamvi/scheduler` | Shipped (0.x), cron triggers across replicas |
+| `@chamvi/channel-cron` | Shipped (0.x), the cron channel, one tick across replicas |
 | `@chamvi/store-typeorm` | Shipped (0.x), TypeORM store (PostgreSQL) |
-| `@chamvi/http` | Shipped (0.x), REST, SSE, webhooks and MCP |
-| `@chamvi/github` | Shipped (0.x), GitHub App webhooks and tools |
+| `@chamvi/http` | Shipped (0.x), REST, SSE, MCP, the webhook channel and the `/channels/<name>` mount |
+| `@chamvi/github` | Shipped (0.x), the GitHub channel (deliveries in, comments out) and tools |
 | `@chamvi/sandbox`, `@chamvi/sandbox-local`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s` | Shipped (0.x), disposable workspaces |
 | `@chamvi/coding` | Shipped (0.x), coding tools over a workspace |
-| `@chamvi/notify-openclaw`, `@chamvi/notify-github` | Shipped (0.x), approval notifications to OpenClaw and GitHub |
+| `@chamvi/channel-openclaw` | Shipped (0.x), the OpenClaw channel: messages and approval requests into a chat |
 | `@chamvi/ui` | Shipped (0.x), the dashboard |
 | `@chamvi/app`, `@chamvi/cli` | Shipped (0.x), `createApp()` and the `chamvi` bin |
 | Base image, Helm chart, template | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |

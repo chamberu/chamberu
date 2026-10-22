@@ -21,7 +21,7 @@ Agent repositories use a two-stage Dockerfile from the template:
 1. **Build stage:** install dependencies and bundle the app entry with `chamvi build`.
 2. **Runtime stage:** copy the bundle onto the base image and start it with an exec-form `CMD`, so `SIGTERM` reaches Node (forwarded by the base image's tini) and the engine can [drain](/guide/recovery#drain).
 
-The same image serves every mode: the long-running app, and a one-shot `chamvi run-job <agent> [triggerId]` (the agent's only cron trigger by default) for clusters that prefer Kubernetes CronJobs over in-process scheduling.
+The same image serves every mode: the long-running app, and a one-shot `chamvi run-job <agent> [subscriptionId]` (the agent's only cron subscription by default) for clusters that prefer Kubernetes CronJobs over in-process scheduling.
 
 ## Tags for Flux
 

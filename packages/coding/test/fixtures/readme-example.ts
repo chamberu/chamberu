@@ -1,6 +1,6 @@
 import type { LanguageModel } from 'ai';
 import { codingTools } from '@chamvi/coding';
-import { defineAgent, http } from '@chamvi/core';
+import { ToolDeniedError, approve, defineAgent } from '@chamvi/core';
 import type { IWorkspaceManager } from '@chamvi/sandbox';
 
 export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceManager) {
@@ -9,11 +9,18 @@ export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceMa
         model,
         instructions: 'Check out the repository named in the payload, reproduce the reported bug ' +
             'with a failing test and answer with what you found and the diff.',
-        triggers: [http()],
         // create_workspace and dispose_workspace, then the seven coding tools
         tools: { ...workspaces.tools(), ...codingTools(workspaces) },
-        // every shell command waits for a human
-        approvals: { bash: 'user' },
+        hooks: {
+            // every shell command waits for a human
+            async beforeToolExecution({ toolName, input }, ctx) {
+                if (toolName !== 'bash') return input;
+                const { command } = input as { command: string };
+                const decision = await approve(ctx, { title: 'Run a shell command?', body: command });
+                if (!decision.approved) throw new ToolDeniedError(`Command refused: ${decision.reason ?? 'denied'}`);
+                return input;
+            },
+        },
         budget: { maxSteps: 40 },
     });
 }

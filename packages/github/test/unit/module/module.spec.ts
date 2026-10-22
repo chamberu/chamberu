@@ -181,6 +181,8 @@ describe('githubModule', () => {
             privateKey: fake.privateKey,
             webhookSecret: 'a',
             slug: 'chamvi-test',
+            // an http run has no delivery: the channel comments as the app's installation
+            installationId: 42,
             clock,
             fetch: fake.fetch,
         });

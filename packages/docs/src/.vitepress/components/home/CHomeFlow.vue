@@ -9,7 +9,7 @@ import { VPLink } from 'vitepress/theme';
 import { defineComponent } from 'vue';
 import { useHome } from './use-home';
 
-const DIAGRAM_ALT = 'dispatch() stores a queued run. The engine claims it and runs it, with a checkpoint after every step, until it ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; resume() requeues it. drain() or a crash leaves a run interrupted; recover() requeues it, and the next execution continues from the latest checkpoint.';
+const DIAGRAM_ALT = 'dispatch() stores a queued run. The engine claims it and runs it, with a checkpoint after every step, until it ends completed, failed or cancelled. A tool that awaits approve() pauses the run in waiting; the answer requeues it and the call runs again with the decision. drain() or a crash leaves a run interrupted; recover() requeues it, and the next execution continues from the latest checkpoint.';
 
 export default defineComponent({
     name: 'CHomeFlow',

@@ -1,6 +1,6 @@
 # Dashboard
 
-`@chamvi/ui` is a dashboard for the agents of an app: see what each agent does, start a run, watch runs live, answer approvals, look into agent state and see when cron triggers fire next. It is a prebuilt Vue 3 app (vuecs, the Crimson design) that your own `@chamvi/http` app serves on the same origin, so there is no CORS and no second deployment.
+`@chamvi/ui` is a dashboard for the agents of an app: see what each agent does, start a run, watch runs live, answer approvals, look into agent state and see when cron subscriptions fire next. It is a prebuilt Vue 3 app (vuecs, the Crimson design) that your own `@chamvi/http` app serves on the same origin, so there is no CORS and no second deployment.
 
 ```bash
 npm install @chamvi/ui --save
@@ -16,16 +16,16 @@ Open `/ui/` and paste a token; the dashboard opens on the agents overview. Nothi
 
 | Page | Shows | Needs |
 |---|---|---|
-| Agents | A card per agent: its triggers (GitHub events, cron expressions, hook paths, http), running and waiting runs, the next cron fire, a 24 h activity strip, the last run, the notifier and the tools that need approval; a name filter; a notice listing the [agent folders](/guide/agent-folders) that failed to load, with their messages. The landing page after sign-in. | `run:read` |
-| Agent | The agent's budget, notifier and approval tools, Start run (with an `http()` trigger: a JSON payload sent to `POST /agents/:name/runs` as you) and View all runs, and four tabs: Overview (runs, failures, waiting approvals and tokens, recent runs, its waiting approvals, its triggers with route, hook or next fire), Runs (filtered by status), State (key-value entries and collections, read-only) and Schedules. | `run:read`; `agent:<name>:run` to start; `state:read` for State |
+| Agents | A card per agent: its channel chips (GitHub events, cron expressions, hook paths, http), running and waiting runs, the next cron fire, a 24 h activity strip, the last run, the budget and the state collections; a name filter; a notice listing the [agent folders](/guide/agent-folders) that failed to load, with their messages. The landing page after sign-in. | `run:read` |
+| Agent | The agent's budget, state collections and channel chips, Start run (with an `http.on()` subscription: a JSON payload sent to `POST /agents/:name/runs` as you) and View all runs, and four tabs: Overview (runs, failures, waiting approvals and tokens, recent runs, its waiting approvals, its subscriptions with route, hook or next fire), Runs (filtered by status), State (key-value entries and collections, read-only) and Schedules. | `run:read`; `agent:<name>:run` to start; `state:read` for State |
 | Runs | Every run, newest first (`GET /runs?sort=-createdAt`), filtered by agent and status in the address bar; running and waiting counts, failures and tokens of the last 24 h; tokens per run. Refreshes every 5 s. | `run:read` |
-| Run | Status, budgets (steps, tokens, time), the trigger envelope and the step timeline (llm, tool and wait steps, inputs and outputs collapsed). Live over the run's SSE stream, including the streamed text of the step in progress. A cancel button with a confirmation. | `run:read` or `agent:<name>:run`; `run:cancel` to cancel |
-| Approvals | Each waiting run with the tool, its input, the expiry countdown and a reason field; Approve or Deny (`POST /runs/:id/approve`). The sidebar shows the count. | `run:read` to list, `agent:<name>:approve` to answer |
-| Schedules | The `cron()` triggers per agent with the next fire time in the trigger's time zone. | `run:read` |
+| Run | Status, budgets (steps, tokens, time), the envelope (channel, subscription, address, payload) and the step timeline (llm, tool and wait steps, inputs and outputs collapsed). Live over the run's SSE stream, including the streamed text of the step in progress. A cancel button with a confirmation. | `run:read` or `agent:<name>:run`; `run:cancel` to cancel |
+| Approvals | Each waiting run with the request's title and body, the tool, the channel it went out through, the expiry countdown and a reason field; Approve or Deny (`POST /runs/:id/approve`). The sidebar shows the count. | `run:read` to list, `agent:<name>:approve` to answer |
+| Schedules | The cron subscriptions per agent with the next fire time in the subscription's time zone. | `run:read` |
 
 Agent names link to the agent page from every other page. The 24 h figures come from the newest 100 runs (of the agent on its page, of the whole app on the overview and the runs page), since the API has no time filter: more runs than that in a day show `100+`. Only tools that need an approval are listed, because an agent may build its tool set per run.
 
-A principal without the grant a page needs sees a notice naming it; the rest of the dashboard keeps working. An approval link from a notification needs read access to its run (`run:read` or `agent:<name>:run`) besides `agent:<name>:approve`; only a resume-token link (`#token=`, below) answers with `agent:<name>:approve` alone.
+A principal without the grant a page needs sees a notice naming it; the rest of the dashboard keeps working. An approval link from a channel's message needs read access to its run (`run:read` or `agent:<name>:run`) besides `agent:<name>:approve`; only a resume-token link (`#token=`, below) answers with `agent:<name>:approve` alone.
 
 ## Sign-in
 
@@ -38,7 +38,7 @@ A revoked token or an expired authup session answers 401: the dashboard refreshe
 
 ## Approval links
 
-A notifier links a person straight to an approval by run, without a token: `<origin><uiBase>/approvals?run=<runId>&approval=<approvalId>` (`approval` is optional and then means the approval the run waits on when the page opens). A signed-out visit goes through sign-in, the token form or the authup round-trip, and comes back to the same URL. Signed in, the dashboard scrolls to that run's approval card, highlights and focuses it; Approve and Deny answer through `POST /runs/:id/approve` as the signed-in principal, so the link is only as powerful as the person who opens it. The page reads the run with `GET /runs/:id` (`run:read` or `agent:<name>:run`) and follows it with the inbox poll:
+A channel's approval message (GitHub, OpenClaw, a channel you write) links a person straight to an approval by run, without a token: `<origin><uiBase>/approvals?run=<runId>&approval=<approvalId>` (`approval` is optional and then means the approval the run waits on when the page opens). A signed-out visit goes through sign-in, the token form or the authup round-trip, and comes back to the same URL. Signed in, the dashboard scrolls to that run's approval card, highlights and focuses it; Approve and Deny answer through `POST /runs/:id/approve` as the signed-in principal, so the link is only as powerful as the person who opens it. The page reads the run with `GET /runs/:id` (`run:read` or `agent:<name>:run`) and follows it with the inbox poll:
 
 | The run | The page shows |
 |---|---|
@@ -49,7 +49,7 @@ A notifier links a person straight to an approval by run, without a token: `<ori
 | is not readable with the principal's grants | a 403 notice |
 | does not exist | "not found" |
 
-The resume token reaches a notification only when a notifier is set up to hand it to a trusted channel (the OpenClaw notifier's `resumeTool: true`). The older token link still works: `<origin><uiBase>/approvals#token=<resume token>`. Use the fragment: a browser never sends it, so the token stays out of the server's and every proxy's access log (`?token=` works too, a repeated one included, but travels in the request line). Before anything renders, the dashboard moves the token out of the address bar into `sessionStorage` (so the history, a sign-in redirect and the `Referer` never carry it; every answer is also sent with `referrer-policy: no-referrer`), survives the sign-in round-trip and a sign-out (a principal without the grant can hand over to one with it in the same tab), and answers through `POST /resume` with that token. An expired or already used token reads as "already answered". While such a token is pending in the tab it takes the page: a token-less link opened meanwhile in the same tab shows a notice naming both runs and a button that discards the pending token, after which the link opens. The inbox itself never sees a resume token: it answers by approval id, and a run that moved on to another approval answers 409.
+No shipped channel puts a resume token into a message. A token link still works for tokens you hand out yourself (`createResumeToken()`): `<origin><uiBase>/approvals#token=<resume token>`. Use the fragment: a browser never sends it, so the token stays out of the server's and every proxy's access log (`?token=` works too, a repeated one included, but travels in the request line). Before anything renders, the dashboard moves the token out of the address bar into `sessionStorage` (so the history, a sign-in redirect and the `Referer` never carry it; every answer is also sent with `referrer-policy: no-referrer`), survives the sign-in round-trip and a sign-out (a principal without the grant can hand over to one with it in the same tab), and answers through `POST /resume` with that token. An expired or already used token reads as "already answered". While such a token is pending in the tab it takes the page: a token-less link opened meanwhile in the same tab shows a notice naming both runs and a button that discards the pending token, after which the link opens. The inbox itself never sees a resume token: it answers by approval id, and a run that moved on to another approval answers 409.
 
 ## Serving
 

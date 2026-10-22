@@ -15,7 +15,7 @@ type VitePressVitePlugin = NonNullable<NonNullable<UserConfig['vite']>['plugins'
 
 export default defineConfig({
     title: 'chamvi',
-    description: 'A TypeScript framework for self-hosted, trigger-driven AI agents on the Vercel AI SDK: durable runs, checkpoints, approvals and a pluggable store.',
+    description: 'A TypeScript framework for self-hosted, channel-driven AI agents on the Vercel AI SDK: durable runs, checkpoints, approvals and a pluggable store.',
     base: '/',
     sitemap: { hostname: 'https://chamvi.dev' },
     cleanUrls: true,
@@ -53,7 +53,7 @@ export default defineConfig({
         ['meta', { property: 'og:title', content: 'chamvi' }],
         ['meta', {
             property: 'og:description',
-            content: 'Self-hosted, trigger-driven AI agents on the Vercel AI SDK.',
+            content: 'Self-hosted, channel-driven AI agents on the Vercel AI SDK.',
         }],
     ],
 
@@ -113,7 +113,7 @@ export default defineConfig({
                     items: [
                         { text: 'Overview', link: '/guide/' },
                         { text: 'Agents', link: '/guide/agents' },
-                        { text: 'Triggers & the Envelope', link: '/guide/triggers' },
+                        { text: 'Channels & the Envelope', link: '/guide/channels' },
                         { text: 'Run Lifecycle', link: '/guide/run-lifecycle' },
                     ],
                 },
@@ -124,7 +124,7 @@ export default defineConfig({
                         { text: 'Budgets & Timeouts', link: '/guide/budgets' },
                         { text: 'Tools & Tool Errors', link: '/guide/tools' },
                         { text: 'Effect Tools & Reconciliation', link: '/guide/effect-tools' },
-                        { text: 'Approvals & Resume Tokens', link: '/guide/approvals' },
+                        { text: 'Approvals & Hooks', link: '/guide/approvals' },
                         { text: 'Agent State', link: '/guide/state' },
                         { text: 'Workspaces & Coding', link: '/guide/workspaces' },
                     ],
@@ -139,7 +139,6 @@ export default defineConfig({
                         { text: 'Cron Scheduling', link: '/guide/scheduler' },
                         { text: 'HTTP API & MCP', link: '/guide/http' },
                         { text: 'Dashboard', link: '/guide/ui' },
-                        { text: 'Notifiers', link: '/guide/notifiers' },
                         { text: 'Errors', link: '/guide/errors' },
                     ],
                 },
@@ -174,14 +173,13 @@ export default defineConfig({
                     items: [
                         { text: '@chamvi/core', link: '/reference/' },
                         { text: '@chamvi/app', link: '/reference/app' },
+                        { text: '@chamvi/channel-cron', link: '/reference/channel-cron' },
+                        { text: '@chamvi/channel-openclaw', link: '/reference/channel-openclaw' },
                         { text: '@chamvi/cli', link: '/reference/cli' },
                         { text: '@chamvi/coding', link: '/reference/coding' },
                         { text: '@chamvi/github', link: '/reference/github' },
                         { text: '@chamvi/http', link: '/reference/http' },
-                        { text: '@chamvi/notify-github', link: '/reference/notify-github' },
-                        { text: '@chamvi/notify-openclaw', link: '/reference/notify-openclaw' },
                         { text: '@chamvi/sandbox', link: '/reference/sandbox' },
-                        { text: '@chamvi/scheduler', link: '/reference/scheduler' },
                         { text: '@chamvi/test-kit', link: '/reference/test-kit' },
                         { text: '@chamvi/ui', link: '/reference/ui' },
                     ],

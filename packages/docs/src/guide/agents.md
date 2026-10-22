@@ -1,6 +1,6 @@
 # Agents
 
-An agent is a typed config object passed to `defineAgent()`. It names a model, its instructions, the triggers that may start it, its tools, a budget, approval policies, typed state and a notifier.
+An agent is a typed config object passed to `defineAgent()`. It names a model, its instructions, the channels that may start it, its tools and tool hooks, a budget and typed state.
 
 <<< @/snippets/agents.ts#define
 
@@ -9,10 +9,11 @@ An agent is a typed config object passed to `defineAgent()`. It names a model, i
 `defineAgent()` validates the definition and returns `{ name, definition }` with defaults applied. It throws `InvalidAgentDefinitionError` when:
 
 - the name does not match `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase words joined by single hyphens), or is longer than 64 characters,
-- two triggers of the agent share an id,
+- two subscriptions of the agent share an id,
+- a tool of a plain tool set declares the AI SDK's `needsApproval` (use [`approve()`](/guide/approvals) instead),
 - a `toolsContext` entry names a chamvi tool or no tool of a plain tool set (see [Third-party tools with their own context](/guide/tools#third-party-tools-with-their-own-context)).
 
-The engine checks the rest when you construct it: agent names must be unique within one `Engine`, and every `notify` must name a notifier registered on the engine.
+The engine checks the rest when you construct it: agent names must be unique within one `Engine`, and every subscription must name a channel registered on the engine.
 
 <<< @/snippets/agents.ts#defaults
 
@@ -23,15 +24,13 @@ The engine checks the rest when you construct it: agent names must be unique wit
 | `name` | `string` | required | Unique per engine, lowercase words joined by `-`, at most 64 characters |
 | `model` | `LanguageModel` | required | Any AI SDK model |
 | `instructions` | `string` | required | System instructions |
-| `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()`. See [Triggers](/guide/triggers) |
+| `channels` | `ChannelSubscription[]` | none | From `http.on()`, `webhook.on()`, `cron.on()`, `github.on()`. See [Channels](/guide/channels) |
 | `tools` | `ToolSet \| (ctx) => ToolSet` | none | A plain tool set, or a factory called for each execution. See [Tools and their context](#tools-and-their-context) |
 | `toolsContext` | `Record<string, unknown>` | none | Per tool name, the context of a third-party tool. See [Tools](/guide/tools#third-party-tools-with-their-own-context) |
 | `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()`. See [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker) |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections. See [Agent State](/guide/state) |
 | `budget` | `Partial<Budget>` | `{ maxSteps: 20, timeoutMs: 900_000 }` | See [Budgets & Timeouts](/guide/budgets) |
-| `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval. See [Approvals](/guide/approvals) |
-| `approvalTimeoutMs` | `number` | `86_400_000` (24 h) | After this, a pending approval is denied |
-| `notify` | `string` | none | Name of a notifier registered on the engine |
+| `hooks` | `{ beforeToolExecution?, afterToolExecution? }` | none | Run around every tool call: rewrite input or output, gate a tool with `approve()`. See [Approvals & Hooks](/guide/approvals#gating-tools-you-did-not-write) |
 | `output` | `Output` | none | AI SDK structured output, e.g. `Output.object({ schema })`. See [Structured output](#structured-output) |
 
 The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` keeps the 15 minute timeout.
@@ -69,7 +68,7 @@ The `ToolLoopAgent` gets your `Output` with one change: its `parsePartialOutput`
 
 ## Files
 
-A run can start with files ([attachments](/guide/triggers#attachments)) and tools can store files of their own. Both are artifacts of the run: metadata (`id`, `runId`, `agent`, `mediaType`, `filename?`, `size`, `createdAt`) plus the bytes, kept in the store's `IArtifactStore`. The `artifacts` of the tool context is scoped to the run: `put({ mediaType, filename?, data })` stores a `Uint8Array` and returns the `Artifact`, `get(id)` returns `{ artifact, data }` (or `undefined`, also for another run's artifact) and `list()` returns the run's artifacts by `createdAt` (attachments in the order they were given, ids `<runId>.0000`, ...; tool files get random UUIDs).
+A run can start with files ([attachments](/guide/channels#attachments)) and tools can store files of their own. Both are artifacts of the run: metadata (`id`, `runId`, `agent`, `mediaType`, `filename?`, `size`, `createdAt`) plus the bytes, kept in the store's `IArtifactStore`. The `artifacts` of the tool context is scoped to the run: `put({ mediaType, filename?, data })` stores a `Uint8Array` and returns the `Artifact`, `get(id)` returns `{ artifact, data }` (or `undefined`, also for another run's artifact) and `list()` returns the run's artifacts by `createdAt` (attachments in the order they were given, ids `<runId>.0000`, ...; tool files get random UUIDs).
 
 <<< @/snippets/agents.ts#artifacts
 
@@ -77,10 +76,10 @@ A run can start with files ([attachments](/guide/triggers#attachments)) and tool
 
 ## Many agents per engine
 
-One engine runs any number of agents. They share the store, the concurrency limit and the notifiers:
+One engine runs any number of agents. They share the store, the concurrency limit and the channels:
 
 <<< @/snippets/engine.ts#many
 
 `dispatch()` names the agent per run. An agent the engine does not hold throws `AgentNotFoundError` (`agent_not_found`, 404 over HTTP).
 
-The set can change while the engine runs: `engine.putAgent(agent)` adds an agent or replaces the one of the same name, `engine.removeAgent(name)` removes it, and both emit `agents.changed` (`{ name, kind: 'added' | 'replaced' | 'removed' }`), which the scheduler and `@chamvi/http` follow. Replacing or removing an agent first cancels its unsettled runs. An app loads such agents from a folder: see [Agent Folders](/guide/agent-folders).
+The set can change while the engine runs: `engine.putAgent(agent)` adds an agent or replaces the one of the same name, `engine.removeAgent(name)` removes it, and both emit `agents.changed` (`{ name, kind: 'added' | 'replaced' | 'removed' }`), which the cron channel and `@chamvi/http` follow. Replacing or removing an agent first cancels its unsettled runs. An app loads such agents from a folder: see [Agent Folders](/guide/agent-folders).

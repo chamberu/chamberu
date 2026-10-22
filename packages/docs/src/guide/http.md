@@ -1,6 +1,6 @@
 # HTTP API & MCP
 
-[`@chamvi/http`](/reference/http) turns a chamvi app into one [routup](https://github.com/routup/routup) `App`: humans start and follow runs over REST and server-sent events, machines post webhooks with bearer tokens, and agents (OpenClaw, Claude, any MCP client) start runs as MCP tools. It also serves `/healthz`, `/readyz` and `/metrics`, and ships the graceful shutdown helper.
+[`@chamvi/http`](/reference/http) turns a chamvi app into one [routup](https://github.com/routup/routup) `App`: humans start and follow runs over REST and server-sent events, channels take deliveries at `/channels/<name>` (webhooks with bearer tokens, signed GitHub deliveries), and agents (OpenClaw, Claude, any MCP client) start runs as MCP tools. It also serves `/healthz`, `/readyz` and `/metrics`, and ships the graceful shutdown helper.
 
 ```bash
 npm install @chamvi/http @chamvi/core --save
@@ -10,20 +10,24 @@ npm install @chamvi/http @chamvi/core --save
 
 Every HTTP or MCP start ends in `engine.dispatch()`; nothing runs synchronously in a request. Errors are always JSON `{ status, code, message, issues? }`, unmatched routes included; a 5xx body says `Internal Server Error` and the cause goes to `onError`. An issue carries the `received` value only when it is small (at most 256 characters as JSON), so a 400 for an oversized list, a long string or a large file never echoes the body back.
 
-## Triggers decide what is reachable
+## Channels
 
-| Trigger | Served at | Envelope |
-|---|---|---|
-| `http({ schema? })` (id `http`, at most one per agent) | `POST /agents/:name/runs`, MCP `run_<name>` | `trigger: 'http'`, source `http` (REST, UI) or `mcp` |
-| `webhook({ path, schema?, idempotencyKey?, concurrencyKey? })` (id `webhook:<path>`) | `POST /hooks/:agent<path>` | `trigger: 'webhook:<path>'`, source `webhook` |
+The package ships three channels; register them on the engine (`new Engine({ channels })`) like any other:
 
-An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger's `schema` validates the payload; a failure answers 400 with `issues` and dispatches nothing. A webhook is served on its own path under the agent: `webhook({ path: '/issues' })` on agent `intake` is `POST /hooks/intake/issues` (a path of `/` is `/hooks/intake`); `GET /agents` lists each `hook` URL. See [Triggers & the Envelope](/guide/triggers).
+| Channel | Subscription | Served at | Envelope |
+|---|---|---|---|
+| `httpChannel()`, `mcpChannel()` | `http.on({ schema? })` (id `http`, at most one per agent) | `POST /agents/:name/runs`, MCP `run_<name>` | `trigger: 'http'`, channel `http` (REST, UI) or `mcp` |
+| `webhookChannel({ auth, name?, bodyLimit? })` | `webhook.on(path, { schema?, idempotencyKey?, concurrencyKey? })` (id `webhook:<path>`) | `POST /channels/webhook/<agent><path>` | `trigger: 'webhook:<path>'`, channel `webhook` |
+
+An agent without `http.on()` answers 404 on REST and gets no MCP tool; the engine refuses the subscription unless it holds `httpChannel()`. The subscription's `schema` validates the payload; a failure answers 400 with `issues` and dispatches nothing. A webhook is served on its own path under the agent: `webhook.on('/issues')` on agent `intake` is `POST /channels/webhook/intake/issues` (a path of `/` is `/channels/webhook/intake`); `GET /agents` lists each `hook` URL. A delivery needs a principal of the channel's `auth` (one authenticator or a chain, required, since the app never authenticates channel routes) holding `agent:<agent>:run`, checked before the body is read; webhook runs carry no invoker.
+
+`createHttpApp({ channels })` mounts `POST /channels/<name>` and everything below it for exactly the listed channels: each needs an `in` and must be the object the engine holds under its name (`InvalidAgentDefinitionError` otherwise), and any other `/channels/...` path is 404. The mount is rate-limited but never authenticated by `auth`: each channel checks its own credentials. `in({ request, subpath }, ctx)` gets the raw request, its body unread (core's `readRequestBody(request, { limit })` reads it; its `payload_too_large` answers 413), and the raw subpath (`''` for the bare path, else starting with `/`, still percent-encoded). Its `Response` is sent as is; a thrown error renders like any route's error. See [Channels & the Envelope](/guide/channels).
 
 ## Routes
 
 | Method and path | Permission | Answer |
 |---|---|---|
-| `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, thread?, attachments? }` (or an `Idempotency-Key` header) |
+| `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, address?, attachments? }` (or an `Idempotency-Key` header); runs carry channel `http` |
 | `GET /runs` | `run:read`, or `agent:<agent>:run` with `filter[agent]=<agent>` | `200 { data, meta: { total, limit, offset } }` |
 | `GET /runs/:id` | `run:read` or `agent:<run.agent>:run` | The run with its `steps` |
 | `GET /runs/:id/stream` | as `GET /runs/:id` | SSE |
@@ -32,8 +36,8 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /runs/:id/approve` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ approvalId, approved, reason? }`; answers the run's current wait point without a token (409 for another `approvalId`, an expired wait point or a run not waiting) |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
-| `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }` |
-| `GET /agents`, `GET /schedules` | `run:read` | `{ data, issues }`: agent summaries and the [agent folders](/guide/agent-folders) that failed to load (`{ agent, message, at }`); `cron()` triggers with their next fire time |
+| `POST /channels/<name>[/...]` | the channel's own | Whatever the channel's `in` answers; only for the channels in `channels` |
+| `GET /agents`, `GET /schedules` | `run:read` | `{ data, issues }`: agent summaries and the [agent folders](/guide/agent-folders) that failed to load (`{ agent, message, at }`); agent summaries list their subscriptions `{ channel, id, hook? }`; cron subscriptions with their channel and next fire time |
 | `GET /agents/:name/state/kv` | `state:read` | `200 { data: Array<{ key, value }> }` in key code-point order; `page[limit]` (default 50, at most 100), `page[offset]` |
 | `GET`, `PATCH /agents/:name/state/kv/:key` | `state:read`, `state:write` | `{ key, value }` |
 | `GET /agents/:name/state/collections/:collection` | `state:read` | Documents (`{ id, ...fields }`, or `{ id, doc }` for a non-object); top-level equality filters (`filter[issue]=42` matches a number, `filter[issue]="42"` the string; `filter[id]` is 400, `id` being the store id), `page[limit]` (no offset) |
@@ -45,7 +49,7 @@ An agent without `http()` answers 404 on REST and gets no MCP tool. The trigger'
 
 ## Files
 
-`POST /agents/:name/runs` takes `attachments`: at most 16 objects `{ mediaType, filename?, data }`, `mediaType` of the form `type/subtype` (no parameters), `filename` 1 to 255 characters, `data` strict base64 (padded, standard alphabet, no whitespace). A bad entry answers 400 `validation_error` with the path of the field (`['attachments', 0, 'data']`) and dispatches nothing. Base64 travels in the JSON body, so `bodyLimit` (default 1 MiB) bounds the files too; raise it for larger ones. The files become [attachments](/guide/triggers#attachments) of the run.
+`POST /agents/:name/runs` takes `attachments`: at most 16 objects `{ mediaType, filename?, data }`, `mediaType` of the form `type/subtype` (no parameters), `filename` 1 to 255 characters, `data` strict base64 (padded, standard alphabet, no whitespace). A bad entry answers 400 `validation_error` with the path of the field (`['attachments', 0, 'data']`) and dispatches nothing. Base64 travels in the JSON body, so `bodyLimit` (default 1 MiB) bounds the files too; raise it for larger ones. The files become [attachments](/guide/channels#attachments) of the run.
 
 <<< @/snippets/http.ts#attachments
 
@@ -89,7 +93,7 @@ A `*` segment matches exactly one segment (`agent:*:run`). A client that may sta
 
 ## Invoker
 
-`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name` or `preferred_username` claim (never `email`, since every reader of the run sees the name; static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /runs/:id/approve`, `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook runs have no invoker, and neither ever comes from a request body.
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name` or `preferred_username` claim (never `email`, since every reader of the run sees the name; static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /runs/:id/approve`, `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook and GitHub runs have no invoker, and neither ever comes from a request body.
 
 The invoker is a snapshot: a run keeps the grants it was started with, even when a grant is revoked while it waits on an approval. Responses (REST, SSE, MCP) carry the invoker and the approver without their `permissions`, so a `run:read` holder never learns another principal's grants.
 
@@ -97,7 +101,7 @@ The invoker is a snapshot: a run keeps the grants it was started with, even when
 
 `/mcp` is a streamable HTTP endpoint (MCP TypeScript SDK v2; 2025-era clients are served statelessly), authenticated like REST. Each client sees the tools its principal may use:
 
-- `run_<agent>` for each agent with `http()` it may run: `{ payload?, idempotencyKey?, thread?, waitSeconds? }`. With `waitSeconds` (capped by `mcp.maxWaitSeconds`, default 60) it waits for `completed`, `failed`, `cancelled` or `waiting` and returns the output, the error or the pending approval, never the resume token. A wait counts against `stream.maxOpen`: over the cap the call does not wait and answers at once with `{ runId, status, deduplicated }`, as with `waitSeconds: 0`; the run is already dispatched and goes on.
+- `run_<agent>` for each agent with `http.on()` it may run (runs carry channel `mcp`): `{ payload?, idempotencyKey?, address?, waitSeconds? }`. With `waitSeconds` (capped by `mcp.maxWaitSeconds`, default 60) it waits for `completed`, `failed`, `cancelled` or `waiting` and returns the output, the error or the pending approval, never the resume token. A wait counts against `stream.maxOpen`: over the cap the call does not wait and answers at once with `{ runId, status, deduplicated }`, as with `waitSeconds: 0`; the run is already dispatched and goes on.
 - `get_run`, `list_runs`: the REST read rule applies.
 - `resume_run`: `{ token, approved, reason? }`, with the approve permission.
 
@@ -109,7 +113,7 @@ This is the "MCP in" half of the [OpenClaw](/deployment/openclaw) integration.
 
 ## Extra routes
 
-`routes` adds routes that other packages provide, served under `basePath` beside the built-in ones. A route is a static path with a method and a fetch-style handler: it gets the request (URL, method, headers and signal, without the body) and a `readBody()` that returns the raw bytes (the app's `bodyLimit`, 413 and 415 apply; repeated calls return the same bytes), and answers `{ status, body? }` (an object, array, number or boolean as JSON, a string as `text/plain`, no `body` or `null` as an empty body). Extra routes are not authenticated by `auth`: they check their own credentials, as a webhook checks its signature. Thrown errors render like those of every other route. `rateLimit: false` takes a route out of the rate limit, for senders that never retry a refused request. Paths match case-insensitively, like routup's routing: a route may not differ from a built-in segment or another route only by case.
+`routes` adds routes that other packages provide, served under `basePath` beside the built-in ones. A route is a static path with a method and a fetch-style handler: it gets the request (URL, method, headers and signal, without the body) and a `readBody()` that returns the raw bytes (the app's `bodyLimit`, 413 and 415 apply; repeated calls return the same bytes), and answers `{ status, body? }` (an object, array, number or boolean as JSON, a string as `text/plain`, no `body` or `null` as an empty body). Extra routes are not authenticated by `auth`: they check their own credentials. Intake of runs belongs in a [channel](/guide/channels) (the `/channels/<name>` mount), not in an extra route. Thrown errors render like those of every other route. `rateLimit: false` takes a route out of the rate limit, for senders that never retry a refused request. Paths match case-insensitively, like routup's routing: a route may not differ from a built-in segment or another route only by case.
 
 A route can also answer headers and bytes: `headers` is set on the response (a `content-type` there wins over the body's default) and a `Uint8Array` body is sent as is (`application/octet-stream` unless `headers` names a type), with the CORS and rate limit headers kept. `prefix: true` makes the route serve its `path` and everything below `path/` for its method (a static file server, such as a dashboard's assets): the handler reads the rest as `request.subpath` (`''` for the path itself, else the raw, still percent-encoded rest with its case, never the query), and metrics label it `<path>/*`. A route of the same method at or under a prefix route, or a prefix route at or above the metrics path, is refused at construction. The route context carries the app's `basePath` to build links with.
 
@@ -126,4 +130,4 @@ A route can also answer headers and bytes: `headers` is set on the response (a `
 
 <<< @/snippets/http.ts#shutdown
 
-`createShutdown()` fails readiness, waits `readinessDelayMs` for load balancers, stops the scheduler, runs the `onShutdown` callbacks (the app ends its SSE streams and `run_<agent>` waits, which answer with the run id, and closes MCP there; new streams and MCP requests then answer 503), stops accepting connections, drains the engine (`drainTimeoutMs`, 30 s) and waits at most `closeTimeoutMs` (5 s) for open connections before closing them. Every call returns the same promise. Pass `gracefulShutdown: false` to `serve()` so srvx does not handle the signal itself.
+`createShutdown()` fails readiness, waits `readinessDelayMs` for load balancers, runs the `onShutdown` callbacks (the app ends its SSE streams and `run_<agent>` waits, which answer with the run id, and closes MCP there; new streams and MCP requests then answer 503), stops accepting connections, drains the engine (which stops every channel first, then waits `drainTimeoutMs`, 30 s, for the runs) and waits at most `closeTimeoutMs` (5 s) for open connections before closing them. Every call returns the same promise. Pass `gracefulShutdown: false` to `serve()` so srvx does not handle the signal itself.

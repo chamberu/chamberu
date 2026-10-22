@@ -6,19 +6,18 @@ chamvi is built milestone by milestone, each defined by one real agent that has 
 
 | Package | Contents |
 |---|---|
-| `@chamvi/core` | `defineAgent()`, trigger definitions, `Engine` (dispatch, scheduling, checkpoints, budgets, approvals, cancel, drain, recovery), effect tools, agent state, the `IStore` and `INotifier` contracts, `MemoryStore`, `consoleNotifier()` |
+| `@chamvi/core` | `defineAgent()` with channel subscriptions and tool hooks, the `IChannel` contract (`injectChannel`, `replyChannel`, `consoleChannel()`), `Engine` (dispatch, scheduling, checkpoints, budgets, durable `approve()`, cancel, drain, recovery), effect tools, agent state, the `IStore` contract, `MemoryStore` |
 | `@chamvi/test-kit` | `describeStoreContract`, `describeWorkspaceContract`, `ControllableClock`, `createGitFixture`, `createFakeGithub` |
-| `@chamvi/scheduler` | `createScheduler()` (one locked hubwire component per `cron()` trigger, overlap policies, timezones), `runJob()` for one-shot jobs |
+| `@chamvi/channel-cron` | The cron channel `cronChannel()` and `cron.on()` (one locked hubwire component per subscription, overlap policies, timezones), `runJob()` for one-shot jobs |
 | `@chamvi/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |
-| `@chamvi/http` | REST control API, server-sent events, webhook intake, `/healthz`, `/readyz`, `/metrics`, the MCP endpoint, static-token, authup and OIDC authentication, graceful shutdown. See [HTTP API & MCP](/guide/http) |
-| `@chamvi/github` | GitHub App auth with an installation-token cache, the signed webhook route, `githubWebhook()` triggers deduplicated by delivery id, read tools and effect write tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
+| `@chamvi/http` | REST control API, server-sent events, the `http`, `mcp` and `webhook` channels and the `/channels/<name>` mount, `/healthz`, `/readyz`, `/metrics`, the MCP endpoint, static-token, authup and OIDC authentication, graceful shutdown. See [HTTP API & MCP](/guide/http) |
+| `@chamvi/github` | GitHub App auth with an installation-token cache, the GitHub channel (signed deliveries in, deduplicated by delivery id; issue comments out, deduplicated by a hidden marker), `github.on()` subscriptions, read tools and effect write tools with marker reconciliation. See [GitHub App](/deployment/github-app) |
 | `@chamvi/sandbox` | Sandbox contracts, path, repository and limit rules, the run-scoped workspace manager with `create_workspace` and `dispose_workspace`. See [Workspaces & Coding](/guide/workspaces) |
 | `@chamvi/sandbox-local`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s` | Workspace providers: a temporary directory (development), a hardened container per workspace, a hardened pod per workspace; the `ghcr.io/chamvi/sandbox-node` image |
-| `@chamvi/notify-openclaw` | The OpenClaw notifier: approval requests into an OpenClaw chat through its hooks endpoint, with an `Idempotency-Key`. See [OpenClaw](/deployment/openclaw) |
-| `@chamvi/notify-github` | The GitHub notifier: approval requests as a comment on the run's issue or pull request, deduplicated by a hidden marker |
+| `@chamvi/channel-openclaw` | The OpenClaw channel: messages and approval requests into an OpenClaw chat through its hooks endpoint, with an `Idempotency-Key`. See [OpenClaw](/deployment/openclaw) |
 | `@chamvi/coding` | Coding tools (`read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash`, `git_diff`) over a run's workspaces and the `ICodingBackend` contract |
 | `@chamvi/ui` | Vue 3 dashboard served by `uiRoutes()`: an agents overview, runs started from the agent page, runs with live steps, an approvals inbox, agent state, schedules |
-| `@chamvi/app`, `@chamvi/cli` | `createApp()` with orkos modules booted from env (store, engine, scheduler, HTTP, GitHub, sandbox, notifiers, UI, authup) and the `chamvi` bin with `dev`, `build`, `start`, `run-job` and `migrate`. See [Apps & Modules](/guide/app) |
+| `@chamvi/app`, `@chamvi/cli` | `createApp()` with orkos modules booted from env (store, engine, channels, HTTP, GitHub, sandbox, OpenClaw, UI, authup) and the `chamvi` bin with `dev`, `build`, `start`, `run-job` and `migrate`. See [Apps & Modules](/guide/app) |
 
 ## Milestones
 
@@ -26,11 +25,11 @@ chamvi is built milestone by milestone, each defined by one real agent that has 
 
 On every new issue in the owner's repositories, a triage agent labels it, checks for duplicates, tries to reproduce the bug against the latest release in a sandbox and posts a first reply asking for missing details. A periodic sweep catches issues missed while the agent was down.
 
-M1 is done only when everything it needs ships: the TypeORM store, the scheduler, the HTTP and MCP API with authentication, the GitHub connector, sandboxes with coding tools, the OpenClaw and GitHub notifiers, the UI, the CLI, the base image, the Helm chart (with the sandbox RBAC and an egress NetworkPolicy), the template repository, and the triage agent itself, deployed with Flux.
+M1 is done only when everything it needs ships: the TypeORM store, the cron channel, the HTTP and MCP API with authentication, the GitHub channel and tools, sandboxes with coding tools, the OpenClaw channel, the UI, the CLI, the base image, the Helm chart (with the sandbox RBAC and an egress NetworkPolicy), the template repository, and the triage agent itself, deployed with Flux.
 
 ### M2: mail digest <Badge type="warning" text="Planned" />
 
-Every morning, and on request through OpenClaw, the owner gets a short digest: what matters today, what still needs action, what is waiting on others. Open loops are tracked in typed state collections across days. M2 adds a mail (IMAP) connector and **threaded runs**: a new run continues the conversation of an earlier one.
+Every morning, and on request through OpenClaw, the owner gets a short digest: what matters today, what still needs action, what is waiting on others. Open loops are tracked in typed state collections across days. M2 adds a mail (IMAP) channel and **threaded runs**: a new run continues the conversation of an earlier one at the same channel address.
 
 ### M3: dependency upgrade <Badge type="warning" text="Planned" />
 
@@ -44,9 +43,10 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 | Workspace re-attach | Planned | A run resumed on another replica or after a restart finds its container or pod by label instead of a fresh workspace |
 | `@chamvi/coding-claude-code` | Planned (M3) | A coding backend that runs Claude Code inside the sandbox |
 | Deploy kit | Planned (M1) | A base image, a Helm chart and a template repository around `@chamvi/app` and `@chamvi/cli`. See [Deployment](/deployment/) |
-| `@chamvi/mail` | Planned (M2) | IMAP connector and tools |
+| `@chamvi/mail` | Planned (M2) | IMAP channel and tools |
+| Chat channel | Planned | A chat channel (#32) on the channel contract |
 
-Two changes happened upstream first: a lock hook, timezone support and the scheduled time per tick shipped in [hubwire](https://github.com/tada5hi/hubwire) 0.2.2 (for the scheduler), and a fetch-native token verification in [authup](https://github.com/authup/authup) 1.0.0-beta.70 (for the HTTP API).
+Two changes happened upstream first: a lock hook, timezone support and the scheduled time per tick shipped in [hubwire](https://github.com/tada5hi/hubwire) 0.2.2 (for the cron channel), and a fetch-native token verification in [authup](https://github.com/authup/authup) 1.0.0-beta.70 (for the HTTP API).
 
 ## Stability
 

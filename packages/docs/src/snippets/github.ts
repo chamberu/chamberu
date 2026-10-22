@@ -1,12 +1,17 @@
 import type { LanguageModel } from 'ai';
+import { z } from 'zod';
+import { cron, cronChannel } from '@chamvi/channel-cron';
 import type { IStore } from '@chamvi/core';
 import {
     Engine,
-    cron,
+    ToolDeniedError,
     defineAgent,
+    defineTool,
+    injectChannel,
+    replyChannel,
     requireToolPermission,
 } from '@chamvi/core';
-import { createGithubApp, githubWebhook } from '@chamvi/github';
+import { createGithubApp, github, githubChannel } from '@chamvi/github';
 import { createHttpApp, staticTokens } from '@chamvi/http';
 
 export function createTriage(model: LanguageModel, store: IStore) {
@@ -22,6 +27,17 @@ export function createTriage(model: LanguageModel, store: IStore) {
         // for runs not started by a delivery (the cron sweep below)
         installationId: 12345678,
     });
+
+    // deliveries in at POST /channels/github, issue comments out
+    const channel = githubChannel({
+        app: gh,
+        // mentioned at the top of every comment
+        mention: 'octocat',
+        // a link to the approval in the UI, without the token
+        approvalUrl: ({ runId, approvalId }) => `https://chamvi.example/ui/approvals?run=${encodeURIComponent(runId)}&approval=${encodeURIComponent(approvalId)}`,
+        // raise for large push or pull_request deliveries
+        bodyLimit: 4 * 1024 * 1024,
+    });
     // #endregion app
 
     // #region agent
@@ -29,17 +45,27 @@ export function createTriage(model: LanguageModel, store: IStore) {
         name: 'triage',
         model,
         instructions: 'Label new issues and ask for missing details in one comment.',
-        triggers: [
-            githubWebhook({
-                events: ['issues.opened'],
+        channels: [
+            github.on('issues.opened', {
                 // skip issues opened by bots
                 filter: (event) => event.payload.sender?.type !== 'Bot',
             }),
             // a sweep for issues missed while the app was down
-            cron('0 * * * *'),
+            cron.on('0 * * * *'),
         ],
         tools: () => ({ ...gh.readTools(), ...gh.writeTools() }),
-        approvals: { github_close_issue: 'user' },
+        hooks: {
+            // closing waits for the owner, asked in a comment on the run's issue
+            async beforeToolExecution({ toolName, input }, ctx) {
+                if (toolName !== 'github_close_issue') return input;
+                const { approved } = await injectChannel(ctx, 'github').approve({
+                    title: 'Close this issue?',
+                    body: JSON.stringify(input),
+                });
+                if (!approved) throw new ToolDeniedError('The owner keeps the issue open.');
+                return input;
+            },
+        },
         // delivery and cron runs have no invoker
         toolPolicy: requireToolPermission({ withoutInvoker: 'allow' }),
     });
@@ -49,6 +75,7 @@ export function createTriage(model: LanguageModel, store: IStore) {
     const engine = new Engine({
         store,
         agents: [triage],
+        channels: [channel, cronChannel()],
         resumeSecret: process.env.RESUME_SECRET ?? '',
     });
     const app = createHttpApp({
@@ -60,9 +87,8 @@ export function createTriage(model: LanguageModel, store: IStore) {
                 permissions: ['*'],
             }],
         }),
-        // POST /webhooks/github; raise for large push or pull_request deliveries
-        bodyLimit: 4 * 1024 * 1024,
-        routes: [gh.webhookRoute()],
+        // POST /channels/github: the App's webhook URL
+        channels: [channel],
     });
     // #endregion http
 
@@ -72,3 +98,17 @@ export function createTriage(model: LanguageModel, store: IStore) {
         gh,
     };
 }
+
+// #region outbound
+export const answer = defineTool({
+    description: 'Answer on the issue.',
+    inputSchema: z.object({ body: z.string() }),
+    async execute({ body }, { context }) {
+        // a github run: a comment on the issue it came from
+        await replyChannel(context)?.emit({ body });
+        // any issue: the address is <owner>/<repo>#<number>
+        await injectChannel(context, 'github').emit({ title: 'Triage log', body }, github.to({ repo: 'octo/ops', number: 1 }));
+        return 'sent';
+    },
+});
+// #endregion outbound

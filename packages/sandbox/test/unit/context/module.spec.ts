@@ -72,7 +72,7 @@ async function run(engine: Engine, store: MemoryStore) {
     const { runId } = await engine.dispatch({
         agent: 'coder',
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: {},
     });
     await engine.idle();

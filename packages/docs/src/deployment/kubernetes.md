@@ -19,7 +19,7 @@ The values stay small: image, environment, Secrets, ingress, replicas, sandbox a
 
 ## Graceful shutdown
 
-On `SIGTERM` the app fails readiness first, stops the scheduler, stops intake, then calls `engine.drain()` within its budget. Runs still in progress are marked `interrupted` and recovered by another replica or the next pod. The drain deadline must be shorter than the grace period. This part already works in core: see [Cancel, Drain & Recovery](/guide/recovery#drain).
+On `SIGTERM` the app fails readiness first, stops intake, then calls `engine.drain()` (which stops the channels, the cron schedule among them, first) within its budget. Runs still in progress are marked `interrupted` and recovered by another replica or the next pod. The drain deadline must be shorter than the grace period. This part already works in core: see [Cancel, Drain & Recovery](/guide/recovery#drain).
 
 ## Flux
 

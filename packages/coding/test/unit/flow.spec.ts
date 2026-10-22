@@ -76,7 +76,7 @@ describe('coding flow (local)', () => {
         const { runId } = await engine.dispatch({
             agent: 'coder',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         await engine.idle();

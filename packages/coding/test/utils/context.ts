@@ -25,7 +25,7 @@ export function toolContext(runId: string, signal: AbortSignal = new AbortContro
                 id: `env-${runId}`,
                 agent: 'coder',
                 trigger: 'http',
-                source: 'http',
+                channel: 'http',
                 payload: {},
                 receivedAt: new Date(0),
             },

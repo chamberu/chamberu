@@ -5,7 +5,7 @@
 <h1 align="center">@chamvi/core</h1>
 
 <p align="center">
-    <b>Core engine for self-hosted, trigger-driven AI agents: agents, triggers and durable runs.</b><br>
+    <b>Core engine for self-hosted, channel-driven AI agents: agents, channels and durable runs.</b><br>
     You write the agent with the AI SDK. The engine queues its runs, checkpoints every step,<br>
     pauses for approvals and picks interrupted runs up again, in a plain Node process.
 </p>
@@ -42,14 +42,14 @@ The AI SDK runs the model and its tool loop, and stops there. An agent that reac
 | **Concurrency** | Two webhooks for the same issue race each other | One run at a time per `concurrencyKey`, enforced through the store across replicas |
 | **Durability** | A crash loses the conversation | A checkpoint after every step; a recovered run continues from the latest one |
 | **Side effects** | A retried tool call posts again | `defineEffectTool()` records each result per effect key and can check the remote system before acting |
-| **Approvals** | You build the pause, the storage and the callback | The run waits in `waiting` with a signed resume token; `resume(token, decision)` continues it |
+| **Approvals** | You build the pause, the storage and the callback | `await approve(ctx, { title })` in a tool pauses the run in `waiting`, across restarts; `engine.approve()` or `resume(token, decision)` answers and the call replays with the decision |
 | **Limits** | `stopWhen` per call | `maxSteps`, `maxTokens` and `timeoutMs` per run, settled as `completed` or `failed` |
 | **Shutdown** | Runs die with the process | `drain()` waits for in-flight runs, then marks the rest `interrupted` for another replica |
 
 Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageModel` and a plain `ToolSet` (tools built with `tool()`, or `defineTool()` for tools that read the run context), and nothing is wrapped in a chamvi type.
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool that awaits approve() pauses the run in waiting; approving or denying it requeues the run, and the call runs again with the decision. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
 </p>
 
 **Table of Contents**
@@ -366,6 +366,7 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections |
 | `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()` |
 | `budget` | `{ maxSteps, maxTokens?, timeoutMs? }` | `{ maxSteps: 20, timeoutMs: 900_000 }` | Per run; the timeout applies to each execution |
+| `hooks` | `AgentHooks` | none | `beforeToolExecution` / `afterToolExecution` around every tool call: rewrite input or output, gate a tool with `approve()` |
 | `output` | `Output` | none | AI SDK structured output; a completed run's `output` is the parsed value |
 
 ## API
@@ -375,20 +376,23 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
 | `readRequestBody` | function | Reads a request body of at most `limit` bytes for a channel's `in` |
-| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `getChannel`, `listChannels`, `provide`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
+| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `putAgent`, `removeAgent`, `getChannel`, `listChannels`, `provide`, `start`, `dispatch`, `getRun`, `on`, `resume`, `approve`, `inspectResumeToken`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineTool` | function | An AI SDK `tool()` whose `execute` gets the run's `ToolContext` as `context` |
 | `defineContextKey`, `inject`, `tryInject` | function | Typed context keys, and reading a value provided on the engine from a `ToolContext` |
 | `toolContextSchema` | object | The `contextSchema` that marks a chamvi tool |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |
 | `EFFECT` | symbol | Marks a tool created by `defineEffectTool()` |
-| `wrapToolsForRun` | function | `wrapToolsForRun(tools, ctx, store, allow?)`: applies effect recording to a `ToolSet` outside the engine, with a `ToolContext`; an optional `allow(toolName)` re-checks each call (a refused call throws `ToolNotAllowedError`) |
+| `wrapToolsForRun` | function | `wrapToolsForRun(tools, ctx, store, { allow?, hooks? })`: applies effect recording and the agent hooks to a `ToolSet` outside the engine, with a `ToolContext`; an optional `allow(toolName)` re-checks each call (a refused call throws `ToolNotAllowedError`) |
+| `approve` | function | `approve(ctx, { title, body?, timeoutMs? })`: a durable approval from inside a tool call |
+| `DEFAULT_APPROVAL_TIMEOUT_MS`, `APPROVAL_TIMEOUT_MAX_MS` | constant | `86_400_000` (24 h), `2_147_483_647` |
 | `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API over a store, and `createStateTools(schema)`, the generated state tools (they read `context.state`) |
 | `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
 | `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
 | `injectChannel`, `replyChannel` | function | A run-bound `ChannelHandle` on a registered channel, or on the run's source channel and address, for a tool to `emit()` through |
 | `consoleChannel` | function | `consoleChannel({ name?, write? })`: a development channel, out only, logging each message (default name `console`, default `write` `console.log`) |
+| `assertTriggerKey`, `normalizeEnvelope` | function | The 255-character, no-NUL rule for envelope keys and addresses; the read-back of envelopes stored before channels (`source`, `thread`) for store implementations |
 | `isArtifactMediaType` | function | The media type rule for attachments and artifacts (`type/subtype`, no parameters) |
 | `ChamviError` | class | Base class of every error below |
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
@@ -396,11 +400,12 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `ContextNotProvidedError` | class | `inject()` found no value for the key (`context_not_provided`) |
 | `ChannelNotFoundError` | class | `injectChannel()` named a channel the engine does not have or one without `out` (`channel_not_found`) |
 | `ToolNotAllowedError` | class | The tool error recorded for a call to a tool the `toolPolicy` refuses |
+| `ToolDeniedError` | class | A gate (e.g. a `beforeToolExecution` hook) refused a tool call (`tool_denied`); a tool error, never fatal |
 | `SandboxError` | class | A sandbox workspace or provider failed (`@chamvi/sandbox` and its providers); a tool error, never a failed run |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `ToolContext`, `ContextKey`, `IContextProvider`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `IChannel`, `ChannelSubscription`, `ChannelContext`, `ChannelMessage`, `ChannelSendOptions`, `ChannelHandle`, `EmitMessage`, `ConsoleChannelOptions`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
+Types: `Agent`, `AgentDefinition`, `ToolContext`, `ContextKey`, `IContextProvider`, `ToolPolicy`, `AgentHooks`, `ToolCallInfo`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `ApprovalRequestInput`, `ApprovalDecision`, `ApprovalAnswer`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `IChannel`, `ChannelSubscription`, `ChannelContext`, `ChannelMessage`, `ChannelSendOptions`, `ChannelHandle`, `EmitMessage`, `ConsoleChannelOptions`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
 
 Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamvi/test-kit`](../test-kit).
 

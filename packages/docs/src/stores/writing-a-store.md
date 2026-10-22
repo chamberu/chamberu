@@ -32,6 +32,7 @@ The suite covers:
 
 - **Do atomic work in one statement.** In SQL, a conditional `UPDATE ... WHERE ... RETURNING` or `INSERT ... ON CONFLICT` instead of a read followed by a write in JavaScript.
 - **Pass the clock's time in.** Compare against `clock.now()` passed as a parameter, not the database's `now()`.
+- **Read old envelopes.** Pass a stored envelope through `normalizeEnvelope()` from `@chamvi/core`: runs written before channels existed hold `source` and `thread`, which read back as `channel` and `address` (`run.address` likewise from a stored `thread`).
 - **Revive dates.** `Run`, `Step`, `Checkpoint` and `WaitPoint` carry `Date` values (`createdAt`, `trigger.receivedAt`, `waiting.expiresAt`, `claim.expiresAt`, ...). Return them as `Date` objects.
 - **Store messages as they are.** Checkpoint messages are AI SDK `ModelMessage` arrays; store them as JSON without reshaping.
 - **Only the latest checkpoint is read.** Keeping older ones is optional.

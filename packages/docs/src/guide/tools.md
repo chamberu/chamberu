@@ -37,7 +37,7 @@ A run started through `@chamvi/http` (REST or MCP) carries its **invoker**, `run
 - The policy covers the whole tool set, the generated [state tools](/guide/state) included.
 - The invoker is a snapshot taken at dispatch. A run keeps it across approvals and restarts, so its tool set stays the same; revoking a grant later does not reach a run that already holds it.
 - A model that calls a refused tool anyway gets the AI SDK's unavailable-tool error as the tool result; the tool step records it with code `tool_not_allowed`. The run goes on.
-- The engine re-checks every call when it executes. An approved call from an older history (e.g. a policy tightened before the approval was answered) gets a `ToolNotAllowedError` tool error and the run goes on.
+- The engine re-checks every call when it executes. A pending call that runs after an approval (e.g. a policy tightened before the approval was answered) gets a `ToolNotAllowedError` tool error and the run goes on.
 - The invoker only ever comes from an authenticator, never from a request body or payload.
 - A tool reads the invoker as `context.run.trigger.invoker`.
 
@@ -71,4 +71,4 @@ A tool that needs a shared instance (an API client, the GitHub App, the workspac
 - Provided values are never stored or serialized: `ToolContext` keeps exactly `run`, `state` and `artifacts`, and no step, checkpoint or run holds a provided value.
 - `toolsContext` entries are something else: values the AI SDK hands to third-party tools by tool name. Context is for chamvi tools and factories, keyed by value type.
 
-The optional [app modules](/guide/app#modules) provide their instances this way, each through a pair of its package: `injectGithubContext(ctx)` (`@chamvi/github`), `injectSandboxContext(ctx)` (`@chamvi/sandbox`), `injectOpenclawContext(ctx, name?)` (`@chamvi/notify-openclaw`) and `injectGithubNotifierContext(ctx, name?)` (`@chamvi/notify-github`). Without the app, call the matching `provide*Context(engine, value)` after `new Engine()`.
+The optional [app modules](/guide/app#modules) provide their instances this way, each through a pair of its package: `injectGithubContext(ctx)` (`@chamvi/github`) and `injectSandboxContext(ctx)` (`@chamvi/sandbox`). Without the app, call the matching `provide*Context(engine, value)` after `new Engine()`. Channels need no context pair: the engine provides every registered channel, and a tool reaches one with [`injectChannel(ctx, name)`](/guide/channels#outbound-from-tools).

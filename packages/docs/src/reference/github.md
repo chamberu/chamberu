@@ -1,6 +1,6 @@
 # @chamvi/github
 
-GitHub App webhooks and tools for chamvi agents. The public API of `packages/github/src/index.ts`.
+The GitHub channel (webhook deliveries in, issue comments out) and GitHub tools for chamvi agents. The public API of `packages/github/src/index.ts`.
 
 ```bash
 npm install @chamvi/github @chamvi/http @chamvi/core ai --save
@@ -14,7 +14,6 @@ npm install @chamvi/github @chamvi/http @chamvi/core ai --save
 function createGithubApp(options: GithubAppOptions): IGithubApp;
 
 const DEFAULT_GITHUB_API_URL: 'https://api.github.com';
-const DEFAULT_WEBHOOK_PATH: '/webhooks/github';
 ```
 
 Throws `InvalidAgentDefinitionError` for an empty `appId`, a key that is no RSA private key, an empty webhook secret, an `installationId` that is no positive integer, a `baseUrl` that is no absolute https URL without query (empty means `https://api.github.com`) and a `slug` that is not the App's lower-case slug (`^[a-z0-9]+(-[a-z0-9]+)*$`, as in the App's URL; a miscased one would silently disable the self guard).
@@ -26,23 +25,33 @@ const GITHUB_REQUEST_ERROR_CODE: 'github_request';
 const REPO_PATTERN: string; // '^([\\w.-]*[\\w-][\\w.-]*)/([\\w.-]*[\\w-][\\w.-]*)$'
 ```
 
-`GITHUB_REQUEST_ERROR_CODE` is the `code` of every failed GitHub request (the tools' errors and `@chamvi/notify-github`'s); `REPO_PATTERN` is the `owner/name` rule the tools apply (GitHub's name characters, each segment with one that is not a dot, so `.` and `..` never fold the URL into another API path). Build a `RegExp` from it.
+`GITHUB_REQUEST_ERROR_CODE` is the `code` of every failed GitHub request (the tools' errors and the channel's send failures); `REPO_PATTERN` is the `owner/name` rule the tools apply (GitHub's name characters, each segment with one that is not a dot, so `.` and `..` never fold the URL into another API path). Build a `RegExp` from it.
 
-## githubWebhook
+## githubChannel
 
 ```ts
-function githubWebhook(options: GithubWebhookTriggerOptions): TriggerDefinition<GithubEvent>;
+function githubChannel(options: GithubChannelOptions): GithubChannel; // IChannel with in and out, plus on() and to() bound to its name
+
+const GITHUB_CHANNEL_NAME: 'github';
+const GITHUB_CHANNEL_TIMEOUT_MS: 30_000;
+const COMMENT_BODY_MAX_LENGTH: 60_000;
 ```
 
-Throws `InvalidAgentDefinitionError` without events or for an event that is not `name` or `name.action` (lower case letters, digits and underscores, e.g. `projects_v2_item.created`).
+<<< ../../../github/src/channel/types.ts#public{ts}
 
-<<< ../../../github/src/trigger/types.ts{ts}
-
-## Webhook route
-
-`gh.webhookRoute(options?)` returns an `HttpRoute` for `createHttpApp({ routes })`; it answers `202` with a `GithubWebhookResult`.
+Every option is checked when `githubChannel()` is called (`InvalidAgentDefinitionError`). Register the channel on the engine and list it in `createHttpApp({ channels })`, which serves its `in` at `POST /channels/<name>` (the deliveries: signature, self guard, one run per matching agent, `202` with a `GithubWebhookResult`). Its `out(message, address)` comments on the issue or pull request `address` names (`owner/repo#n`, else a `ValidationError`), deduplicated by the marker `effectMarker(message.key)`. See [GitHub App](/deployment/github-app) for both directions.
 
 <<< ../../../github/src/webhook/types.ts{ts}
+
+## github.on, github.to
+
+```ts
+const github: GithubSubscriber; // github.on(events, options?), github.to({ repo, number }) for the channel named 'github'
+```
+
+`github.on()` throws `InvalidAgentDefinitionError` without events or for an event that is not `name` or `name.action` (lower case letters, digits and underscores, e.g. `projects_v2_item.created`). `github.to({ repo, number })` returns the address `<owner>/<repo>#<number>`.
+
+<<< ../../../github/src/subscription/types.ts{ts}
 
 ## Tools
 
@@ -66,6 +75,6 @@ function injectGithubContext(ctx: ToolContext): IGithubApp;                    /
 function githubModule(options?: GithubModuleOptions): GithubModule; // name GITHUB_MODULE_NAME 'chamvi:github', .app: IGithubApp
 ```
 
-Reads `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` (comma-separated), `GITHUB_INSTALLATION_ID`, `GITHUB_APP_SLUG` and `GITHUB_API_URL` from `options.env ?? process.env` when it is called, unless `options.app` is given; explicit options win. `setup` contributes the signed webhook route (`webhookPath`, default `/webhooks/github`) to the app's routes, and the `engineCreated` hook provides `.app`. `@chamvi/app` is an optional peer: the main entry never imports it. See [Apps & Modules](/guide/app#modules).
+Reads `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` (comma-separated), `GITHUB_INSTALLATION_ID`, `GITHUB_APP_SLUG` and `GITHUB_API_URL` from `options.env ?? process.env` when it is called, unless `options.app` is given; explicit options win. `setup` contributes `githubChannel()` (`options.channel`, the approval link from `CHAMVI_PUBLIC_URL` unless `channel.approvalUrl` is given, the app's clock) to the app's channels, which the http module serves at `/channels/<name>`, and the `engineCreated` hook provides `.app`. `@chamvi/app` is an optional peer: the main entry never imports it. See [Apps & Modules](/guide/app#modules).
 
 <<< ../../../github/src/module/types.ts{ts}

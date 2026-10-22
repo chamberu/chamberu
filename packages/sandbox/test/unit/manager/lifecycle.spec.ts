@@ -16,9 +16,10 @@ import {
     MemoryStore,
     RunStatus,
     SandboxError,
+    approve,
     defineAgent,
 } from '@chamvi/core';
-import type { AgentDefinition, Run, RunEvent } from '@chamvi/core';
+import type { AgentHooks, Run, RunEvent } from '@chamvi/core';
 import { createWorkspaceManager } from '@chamvi/sandbox';
 import { ControllableClock } from '../../utils/clock.ts';
 import { mockModel } from '../../utils/model.ts';
@@ -44,9 +45,20 @@ const call = (toolName: string, input: unknown = {}): MockResponse => ({
 
 type Setup = {
     script: MockResponse[];
-    approvals?: AgentDefinition['approvals'];
+    /** A tool whose calls wait for an approval (asked in a beforeToolExecution hook). */
+    gate?: string;
     provider?: FakeProvider;
 };
+
+function gateHooks(gate: string | undefined): AgentHooks | undefined {
+    if (!gate) return undefined;
+    return {
+        async beforeToolExecution({ toolName, input }, ctx) {
+            if (toolName === gate) await approve(ctx, { title: `Run ${toolName}?` });
+            return input;
+        },
+    };
+}
 
 async function run(s: Setup) {
     const clock = new ControllableClock(new Date(1_000_000));
@@ -64,7 +76,7 @@ async function run(s: Setup) {
         instructions: 'You code.',
         model: mockModel(s.script),
         tools: manager.tools(),
-        approvals: s.approvals,
+        hooks: gateHooks(s.gate),
     });
     const engine = new Engine({
         store,
@@ -79,7 +91,7 @@ async function run(s: Setup) {
     const { runId } = await engine.dispatch({
         agent: 'coder',
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: {},
     });
     await engine.idle();
@@ -135,7 +147,7 @@ describe('workspace manager: run lifecycle', () => {
             run: waiting,
         } = await run({
             script: [call('create_workspace'), call('dispose_workspace')],
-            approvals: { dispose_workspace: 'user' },
+            gate: 'dispose_workspace',
         });
         expect(waiting?.status).toBe('waiting');
         expect(provider.disposed).toEqual([]);
@@ -195,7 +207,7 @@ describe('workspace manager: run lifecycle', () => {
             runId,
         } = await run({
             script: [call('create_workspace'), call('dispose_workspace')],
-            approvals: { dispose_workspace: 'user' },
+            gate: 'dispose_workspace',
         });
         const engine = fakeEngine();
         const unsubscribe = manager.attach(engine);

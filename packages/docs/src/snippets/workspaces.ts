@@ -1,6 +1,12 @@
 import type { LanguageModel } from 'ai';
 import type { IStore } from '@chamvi/core';
-import { Engine, defineAgent, http } from '@chamvi/core';
+import {
+    Engine,
+    ToolDeniedError,
+    approve,
+    defineAgent,
+} from '@chamvi/core';
+import { http, httpChannel } from '@chamvi/http';
 import { codingTools } from '@chamvi/coding';
 import { createWorkspaceManager } from '@chamvi/sandbox';
 import type { ISandboxProvider } from '@chamvi/sandbox';
@@ -20,14 +26,24 @@ export async function serve(store: IStore, model: LanguageModel, provider: ISand
         model,
         instructions: 'Check out the repository from the payload, write a failing test for the reported bug, ' +
             'run it and answer with the output and the diff.',
-        triggers: [http()],
+        channels: [http.on()],
         tools: { ...workspaces.tools(), ...codingTools(workspaces) },
-        approvals: { bash: 'user' },
+        hooks: {
+            // the coding tools are not yours: gate bash here, every command waits for a human
+            async beforeToolExecution({ toolName, input }, ctx) {
+                if (toolName !== 'bash') return input;
+                const { command } = input as { command: string };
+                const decision = await approve(ctx, { title: 'Run a shell command?', body: command });
+                if (!decision.approved) throw new ToolDeniedError(`Command refused: ${decision.reason ?? 'denied'}`);
+                return input;
+            },
+        },
     });
 
     const engine = new Engine({
         store,
         agents: [repro],
+        channels: [httpChannel()],
         resumeSecret: 'change-me',
     });
     // a run's workspaces go once it completed, failed or was cancelled
