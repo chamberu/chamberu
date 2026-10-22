@@ -13,6 +13,13 @@ describe('public api', () => {
         expect(pkg.openclaw).toBeTypeOf('function');
     });
 
+    it.each([
+        'injectOpenclawContext',
+        'provideOpenclawContext',
+    ])('exports %s', (name) => {
+        expect(pkg[name as keyof typeof pkg]).toBeTypeOf('function');
+    });
+
     it('exports the constants', () => {
         expect(pkg.DEFAULT_HOOKS_PATH).toBe('/hooks');
         expect(pkg.OPENCLAW_TIMEOUT_MS).toBe(30_000);
@@ -26,6 +33,7 @@ describe('public api', () => {
         'DEFAULT_NOTIFIER_NAME',
         'ERROR_TEXT_MAX_LENGTH',
         'resolveOptions',
+        'openclawContextKey',
         'renderMessage',
     ])('keeps %s internal', (name) => {
         expect(pkg).not.toHaveProperty(name);
