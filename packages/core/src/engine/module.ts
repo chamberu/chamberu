@@ -68,6 +68,12 @@ export class Engine implements IContextProvider {
     /** The revision each registered agent was loaded at; undefined for a code agent. */
     protected readonly revisions = new Map<string, string | undefined>();
 
+    /** Agents whose revision marker this engine is moving: none of their runs starts here meanwhile. */
+    protected readonly syncing = new Set<string>();
+
+    /** Agents removed here whose store cleanup is still to finish, with the revision they had. */
+    protected readonly removals = new Map<string, string | undefined>();
+
     protected readonly notifiers: Record<string, INotifier>;
 
     protected readonly owner: string;
@@ -260,7 +266,12 @@ export class Engine implements IContextProvider {
         const registered = this.agents.has(name);
         if (registered && this.agents.get(name) === agent && this.revisions.get(name) === revision) return 'unchanged';
         if (revision !== undefined) {
-            await syncRevision(this.registry(), name, revision);
+            this.syncing.add(name);
+            try {
+                await syncRevision(this.registry(), name, revision);
+            } finally {
+                this.syncing.delete(name);
+            }
         } else if (registered) {
             await cancelAgentRuns(this.registry(), name, this.clock.now());
         }
@@ -276,23 +287,33 @@ export class Engine implements IContextProvider {
     }
 
     /**
-     * Removes an agent under the lock `agents:<name>`: with a stored revision
-     * marker (also one this engine never loaded) all its unsettled runs are
-     * cancelled and the marker deleted; a code agent registered here gets its
-     * unsettled runs cancelled. Resolves whether it was registered here (and
-     * emits `agents.changed` then).
+     * Removes an agent: first from this engine (no further dispatch, emits
+     * `agents.changed`), then from the store's view under the lock
+     * `agents:<name>`: with a stored revision marker (also one this engine
+     * never loaded) all its unsettled runs are cancelled and the marker
+     * deleted, unless this engine had the agent at another revision (a newer
+     * one registered elsewhere); without a marker, the runs of an agent
+     * registered here are cancelled. Resolves whether it was registered here.
      */
     async removeAgent(name: string): Promise<boolean> {
         const registered = this.agents.has(name);
-        await dropRevision(this.registry(), name, registered && this.revisions.get(name) === undefined);
-        if (!this.agents.delete(name)) return false;
-        this.revisions.delete(name);
-        this.emit({
-            type: 'agents.changed', 
-            name, 
-            kind: 'removed', 
+        if (registered) {
+            this.removals.set(name, this.revisions.get(name));
+            this.agents.delete(name);
+            this.revisions.delete(name);
+            this.emit({
+                type: 'agents.changed',
+                name,
+                kind: 'removed',
+            });
+        }
+        const pending = this.removals.has(name);
+        await dropRevision(this.registry(), name, {
+            registered: pending,
+            ...(pending && { revision: this.removals.get(name) }),
         });
-        return true;
+        this.removals.delete(name);
+        return registered;
     }
 
     getRun(id: string): Promise<Run | undefined> {
@@ -799,7 +820,7 @@ export class Engine implements IContextProvider {
             new Map<string, string>();
         return (run) => {
             if (run.cancelRequested) return true;
-            if (!this.agents.has(run.agent)) return false;
+            if (!this.agents.has(run.agent) || this.syncing.has(run.agent)) return false;
             const revision = this.revisions.get(run.agent);
             return revision === undefined || revision === markers.get(run.agent);
         };
@@ -807,6 +828,7 @@ export class Engine implements IContextProvider {
 
     /** Whether the registered agent is a code agent or loaded at the stored marker's hash. */
     protected async isCurrent(name: string): Promise<boolean> {
+        if (this.syncing.has(name)) return false;
         const revision = this.revisions.get(name);
         if (revision === undefined) return true;
         return (await this.store.getAgentRevision(name))?.hash === revision;

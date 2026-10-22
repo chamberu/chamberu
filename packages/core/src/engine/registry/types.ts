@@ -18,3 +18,10 @@ export type RegistryContext = {
     cancel: (runId: string) => Promise<void>;
     onError: (error: unknown, run?: Run) => void;
 };
+
+export type DropRevisionOptions = {
+    /** The agent was registered on this engine (no replica may run it any more once its marker is gone). */
+    registered: boolean;
+    /** The revision this engine had it at (undefined for a code agent or one not registered here). */
+    revision?: string;
+};

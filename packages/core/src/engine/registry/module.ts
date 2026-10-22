@@ -8,7 +8,7 @@
 import { InvalidRunStateError, RunNotFoundError } from '../../errors/index.ts';
 import { RunStatus } from '../../run/constants.ts';
 import { withAgentLock } from './helpers.ts';
-import type { RegistryContext } from './types.ts';
+import type { DropRevisionOptions, RegistryContext } from './types.ts';
 
 const UNSETTLED = [RunStatus.QUEUED, RunStatus.RUNNING, RunStatus.WAITING, RunStatus.INTERRUPTED];
 
@@ -35,35 +35,41 @@ export async function cancelAgentRuns(ctx: RegistryContext, agent: string, befor
  * registry lock: when it differs, the runs created before the change are
  * cancelled (only when a marker existed: a first sight cancels nothing) and
  * the marker is written. A marker already at `revision` is left alone, so
- * every change cancels once across replicas.
+ * every change cancels once across replicas. The runs are swept twice: before
+ * the write, and again after it with the marker's `changedAt`, since a
+ * replica at the old hash may create and start a run until the write lands;
+ * from the write on no replica at the old hash starts one.
  */
 export async function syncRevision(ctx: RegistryContext, agent: string, revision: string): Promise<void> {
     await withAgentLock(ctx, agent, async () => {
         const marker = await ctx.store.getAgentRevision(agent);
         if (marker?.hash === revision) return;
+        if (marker) await cancelAgentRuns(ctx, agent, ctx.clock.now());
         const changedAt = ctx.clock.now();
-        if (marker) await cancelAgentRuns(ctx, agent, changedAt);
         await ctx.store.setAgentRevision({
-            agent, 
-            hash: revision, 
-            changedAt, 
+            agent,
+            hash: revision,
+            changedAt,
         });
+        if (marker) await cancelAgentRuns(ctx, agent, changedAt);
     });
 }
 
 /**
  * Removes the agent from the store's view, under the registry lock: with a
- * marker, all its unsettled runs are cancelled and the marker deleted;
- * without one, its runs are cancelled only when `local` (a code agent
- * registered on this engine).
+ * marker, all its unsettled runs are cancelled and the marker deleted, unless
+ * this engine had it at another revision (a newer one was registered
+ * elsewhere: both are left alone); without one, its runs are cancelled when
+ * it was registered here.
  */
-export async function dropRevision(ctx: RegistryContext, agent: string, local: boolean): Promise<void> {
+export async function dropRevision(ctx: RegistryContext, agent: string, options: DropRevisionOptions): Promise<void> {
     await withAgentLock(ctx, agent, async () => {
         const marker = await ctx.store.getAgentRevision(agent);
         if (marker) {
+            if (options.revision !== undefined && marker.hash !== options.revision) return;
             await cancelAgentRuns(ctx, agent);
             await ctx.store.deleteAgentRevision(agent);
-        } else if (local) {
+        } else if (options.registered) {
             await cancelAgentRuns(ctx, agent);
         }
     });
