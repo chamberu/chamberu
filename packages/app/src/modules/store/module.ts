@@ -14,7 +14,7 @@ import { AppToken, ModuleName } from '../../module/constants.ts';
 import { throwIfStopped } from '../../module/helpers.ts';
 import type { ILogger } from '../../logger/types.ts';
 import type { AppContext } from '../../module/types.ts';
-import { MEMORY_STORE_WARNING, PURGE_HOOK_NAME } from './constants.ts';
+import { MEMORY_STORE_WARNING, PURGE_HOOK_NAME, STORE_CONNECT_TIMEOUT_MS } from './constants.ts';
 import { destroyQuietly, isPurgingStore, maskPassword } from './helpers.ts';
 import { createPurgeTimer } from './purge.ts';
 import type {
@@ -40,6 +40,9 @@ export class StoreModule implements IModule {
 
     /** A data source this module initialized, destroyed in teardown. */
     protected created: DataSource | undefined;
+
+    /** The connect timeout of a data source built from a URL. */
+    protected connectTimeoutMs: number = STORE_CONNECT_TIMEOUT_MS;
 
     constructor(options: StoreModuleOptions = {}) {
         this.options = options;
@@ -121,6 +124,7 @@ export class StoreModule implements IModule {
             url,
             entities: STORE_ENTITIES,
             migrations: STORE_MIGRATIONS,
+            connectTimeoutMS: this.connectTimeoutMs,
         });
 
         throwIfStopped(context);

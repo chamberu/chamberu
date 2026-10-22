@@ -6,6 +6,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { createServer } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import { inspect } from 'node:util';
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { STORE_ENTITIES, STORE_MIGRATIONS, TypeormStore } from '@chamvi/store-typeorm';
@@ -27,6 +29,8 @@ import {
 } from '@chamvi/app';
 import type { AppMode, StoreModuleOptions } from '@chamvi/app';
 import { createStoppedError } from '../../../../src/module/helpers.ts';
+import { STORE_CONNECT_TIMEOUT_MS } from '../../../../src/modules/store/constants.ts';
+import { StoreModule } from '../../../../src/modules/store/module.ts';
 import { buildHarness } from '../../../utils/harness.ts';
 import { createRecordingLogger } from '../../../utils/logger.ts';
 import { createTestDatabaseUrl, describePostgres } from '../../../utils/database.ts';
@@ -101,6 +105,39 @@ describe('storeModule on a database URL', () => {
         expect(logger.lines.join('\n')).not.toContain('sekr3t');
         expect(inspect(harness.reported, { depth: 5 })).not.toContain('sekr3t');
         expect(harness.container.has(AppToken.STORE)).toBe(false);
+    });
+
+    it('a server that never answers fails setup after the connect timeout', async () => {
+        // accepts the TCP connection and never speaks the Postgres protocol (a dropped-packet network)
+        const sockets: Socket[] = [];
+        const server = createServer((socket) => {
+            sockets.push(socket);
+        });
+        await new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve); });
+        const { port } = server.address() as AddressInfo;
+
+        class QuickStoreModule extends StoreModule {
+            protected override connectTimeoutMs = 200;
+        }
+        const harness = buildHarness({
+            env: { RESUME_SECRET: SECRET, DATABASE_URL: `postgres://u:p@127.0.0.1:${port}/x` },
+            modules: [configModule({ logger: createRecordingLogger() }), new QuickStoreModule()],
+        });
+
+        try {
+            const began = Date.now();
+            await expect(harness.setup()).rejects.toBeInstanceOf(Error);
+            expect(Date.now() - began).toBeLessThan(5_000);
+            expect(harness.container.has(AppToken.STORE)).toBe(false);
+        } finally {
+            sockets.forEach((socket) => socket.destroy());
+            await new Promise((resolve) => { server.close(resolve); });
+        }
+    });
+
+    it('the default connect timeout ends well inside the force exit', () => {
+        expect(STORE_CONNECT_TIMEOUT_MS).toBeGreaterThan(0);
+        expect(STORE_CONNECT_TIMEOUT_MS).toBeLessThan(90_000);
     });
 
     it('an uninitialized dataSource is a definition error', async () => {

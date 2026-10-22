@@ -12,3 +12,10 @@ export const MEMORY_STORE_WARNING = 'DATABASE_URL unset: MemoryStore keeps runs 
 
 /** What a URL's `:<password>@` pair becomes in an error. */
 export const MASKED_PAIR = ':***@';
+
+/**
+ * How long the TypeORM data source built from a URL waits for Postgres to
+ * accept the first connection (pg has no timeout of its own), so a stop
+ * during an unanswered connect ends well inside CHAMVI_FORCE_EXIT_MS.
+ */
+export const STORE_CONNECT_TIMEOUT_MS = 10_000;
