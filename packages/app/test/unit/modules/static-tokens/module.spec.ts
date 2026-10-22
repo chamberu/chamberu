@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { IModule } from 'orkos';
 import { describe, expect, it } from 'vitest';
 import {
     AUTHENTICATOR_ORDER,
@@ -26,15 +27,17 @@ function bearer(token: string): Request {
 }
 
 async function entriesOf(options: {
-    env?: Record<string, string>; 
-    dev?: boolean; 
-    module?: ReturnType<typeof staticTokensModule> 
+    env?: Record<string, string>;
+    dev?: boolean;
+    module?: ReturnType<typeof staticTokensModule>;
+    extra?: IModule[];
 }) {
     const logger = createRecordingLogger();
     const harness = await createHarness({
         dev: options.dev,
         env: { RESUME_SECRET: SECRET, ...options.env },
-        modules: [configModule({ logger }), options.module ?? staticTokensModule()],
+        // the static-tokens module first, so a contribution registered after its setup still counts
+        modules: [configModule({ logger }), options.module ?? staticTokensModule(), ...(options.extra ?? [])],
     });
     const entries: AuthenticatorEntry[] = harness.container.resolveAll(AppToken.AUTHENTICATORS);
     await harness.stop();
@@ -127,6 +130,26 @@ describe('staticTokensModule', () => {
         });
 
         expect(entries).toHaveLength(1);
+        expect(logger.entries.filter((entry) => entry.msg.includes('CHAMVI_TOKENS'))).toEqual([]);
+    });
+
+    it('dev with another authenticator generates none', async () => {
+        const other: AuthenticatorEntry = {
+            name: 'other',
+            order: AUTHENTICATOR_ORDER.AUTHUP,
+            authenticator: async () => undefined,
+        };
+        const { entries, logger } = await entriesOf({
+            dev: true,
+            extra: [{
+                name: 'other-auth',
+                async setup(container) {
+                    container.registerMany(AppToken.AUTHENTICATORS, { useValue: other });
+                },
+            }],
+        });
+
+        expect(entries).toEqual([other]);
         expect(logger.entries.filter((entry) => entry.msg.includes('CHAMVI_TOKENS'))).toEqual([]);
     });
 });

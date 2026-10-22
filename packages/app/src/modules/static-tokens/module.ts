@@ -20,8 +20,9 @@ import type { StaticTokensModuleOptions } from './types.ts';
 
 /**
  * Contributes the static-token authenticator (`options.tokens`, else
- * `CHAMVI_TOKENS`). Without tokens it contributes nothing, except in dev,
- * where it generates one token with every permission and logs it.
+ * `CHAMVI_TOKENS`) in `setup`. Without tokens it contributes nothing, except
+ * in dev without any other authenticator: then `onReady` (after every module
+ * contributed) generates one token with every permission and logs it.
  */
 export class StaticTokensModule implements IModule {
     readonly name: string = ModuleName.STATIC_TOKENS;
@@ -36,25 +37,31 @@ export class StaticTokensModule implements IModule {
 
     async setup(container: IContainer): Promise<void> {
         const config = container.resolve(AppToken.CONFIG);
-        let tokens: StaticToken[] = this.options.tokens ?? config.tokens ?? [];
+        const tokens: StaticToken[] = this.options.tokens ?? config.tokens ?? [];
+        if (tokens.length > 0) {
+            this.contribute(container, tokens);
+        }
+    }
 
-        if (tokens.length === 0) {
-            if (!config.dev) {
-                return;
-            }
-
-            const value = randomBytes(DEV_TOKEN_BYTES).toString('base64url');
-            tokens = [{
-                value, 
-                id: DEV_TOKEN_ID, 
-                permissions: ['*'], 
-            }];
-            container.resolve(AppToken.LOGGER).warn(
-                'CHAMVI_TOKENS unset: generated a dev token with every permission for this process; set CHAMVI_TOKENS to choose your own.',
-                { token: value },
-            );
+    async onReady(container: IContainer): Promise<void> {
+        const config = container.resolve(AppToken.CONFIG);
+        if (!config.dev || container.resolveAll(AppToken.AUTHENTICATORS).length > 0) {
+            return;
         }
 
+        const value = randomBytes(DEV_TOKEN_BYTES).toString('base64url');
+        container.resolve(AppToken.LOGGER).warn(
+            'CHAMVI_TOKENS unset: generated a dev token with every permission for this process; set CHAMVI_TOKENS to choose your own.',
+            { token: value },
+        );
+        this.contribute(container, [{
+            value,
+            id: DEV_TOKEN_ID,
+            permissions: ['*'],
+        }]);
+    }
+
+    protected contribute(container: IContainer, tokens: StaticToken[]): void {
         container.registerMany(AppToken.AUTHENTICATORS, {
             useValue: {
                 name: STATIC_TOKENS_AUTHENTICATOR,

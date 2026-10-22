@@ -87,11 +87,12 @@ async function served(verifier: ITokenVerifier) {
         })],
         modules: [
             configModule({ logger: createRecordingLogger() }),
+            // authup contributes first: only the authenticator order puts static tokens ahead
+            authupModule({ verifier }),
             storeModule(),
             staticTokensModule(),
             engineModule(),
             httpModule({ metrics: false, rateLimit: false }),
-            authupModule({ verifier }),
         ],
     });
     harnesses.push(harness);
