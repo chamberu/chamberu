@@ -40,6 +40,10 @@ describe('public api', () => {
         'isArtifactMediaType',
         'assertTriggerKey',
         'consoleNotifier',
+        'defineContextKey',
+        'inject',
+        'tryInject',
+        'ContextNotProvidedError',
     ])('exports %s', (name) => {
         expect(core).toHaveProperty(name);
         expect(core[name as keyof typeof core]).toBeTypeOf('function');
@@ -59,6 +63,17 @@ describe('public api', () => {
 
     it('exports the sandbox error code', () => {
         expect(core.ErrorCode.SANDBOX).toBe('sandbox_error');
+    });
+
+    it('exports the context error code', () => {
+        expect(core.ErrorCode.CONTEXT_NOT_PROVIDED).toBe('context_not_provided');
+    });
+
+    it('keeps the context binding internal', () => {
+        expect(core).not.toHaveProperty('isContextKey');
+        expect(core).not.toHaveProperty('bindProvided');
+        expect(core).not.toHaveProperty('providedOf');
+        expect(core).not.toHaveProperty('registerContextKey');
     });
 
     it('exports the RunStatus enum', () => {

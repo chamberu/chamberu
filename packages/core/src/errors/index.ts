@@ -10,6 +10,7 @@ export * from './artifact-not-found.ts';
 export * from './base.ts';
 export * from './budget-exceeded.ts';
 export * from './constants.ts';
+export * from './context-not-provided.ts';
 export * from './fatal-tool.ts';
 export * from './incomplete-response.ts';
 export * from './lease-lost.ts';

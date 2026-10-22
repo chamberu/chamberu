@@ -48,6 +48,9 @@ describe('public api', () => {
         'effectMarker',
         'requireToolPermission',
         'consoleNotifier',
+        'defineContextKey',
+        'inject',
+        'tryInject',
         'agentPermission',
     ])('exports %s', (name) => {
         expect(app).toHaveProperty(name);
