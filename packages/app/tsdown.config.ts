@@ -8,6 +8,7 @@ export default defineConfig({
         openclaw: 'src/openclaw/index.ts',
         ui: 'src/ui/index.ts',
         authup: 'src/authup/index.ts',
+        testing: 'src/testing/index.ts',
     },
     format: 'esm',
     dts: true,

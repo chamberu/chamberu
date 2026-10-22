@@ -34,7 +34,7 @@ export default defineConfig({
             { find: /^@chamvi\/sandbox-k8s$/, replacement: fileURLToPath(new URL('../../sandbox-k8s/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/ui$/, replacement: fileURLToPath(new URL('../../ui/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/app$/, replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/app\/(github|sandbox|openclaw|ui|authup)$/, replacement: `${fileURLToPath(new URL('../src/', import.meta.url))}$1/index.ts` },
+            { find: /^@chamvi\/app\/(github|sandbox|openclaw|ui|authup|testing)$/, replacement: `${fileURLToPath(new URL('../src/', import.meta.url))}$1/index.ts` },
         ],
     },
     test: {

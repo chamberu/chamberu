@@ -41,6 +41,10 @@
         "./authup": {
             "types": "./dist/authup.d.mts",
             "import": "./dist/authup.mjs"
+        },
+        "./testing": {
+            "types": "./dist/testing.d.mts",
+            "import": "./dist/testing.mjs"
         }
     },
     "files": [

@@ -11,6 +11,7 @@ import * as authup from '@chamvi/app/authup';
 import * as github from '@chamvi/app/github';
 import * as openclaw from '@chamvi/app/openclaw';
 import * as sandbox from '@chamvi/app/sandbox';
+import * as testing from '@chamvi/app/testing';
 import * as ui from '@chamvi/app/ui';
 
 describe('public api', () => {
@@ -138,7 +139,17 @@ describe('public api', () => {
         'createLazyProvider',
         'githubModule',
         'sandboxModule',
+        'buildModuleHarness',
+        'createModuleHarness',
     ])('keeps %s out of the main entry', (name) => {
         expect(app).not.toHaveProperty(name);
+    });
+
+    it.each([
+        'buildModuleHarness',
+        'createModuleHarness',
+    ])('@chamvi/app/testing exports %s', (name) => {
+        expect(testing).toHaveProperty(name);
+        expect(testing[name as keyof typeof testing]).toBeTypeOf('function');
     });
 });

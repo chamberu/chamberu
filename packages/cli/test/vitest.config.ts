@@ -31,7 +31,7 @@ export default defineConfig({
             { find: /^@chamvi\/github$/, replacement: source('github/src/index.ts') },
             { find: /^@chamvi\/notify-github$/, replacement: source('notify-github/src/index.ts') },
             { find: /^@chamvi\/app$/, replacement: source('app/src/index.ts') },
-            { find: /^@chamvi\/app\/(github|sandbox|openclaw|ui|authup)$/, replacement: `${source('app/src/')}$1/index.ts` },
+            { find: /^@chamvi\/app\/(github|sandbox|openclaw|ui|authup|testing)$/, replacement: `${source('app/src/')}$1/index.ts` },
             { find: /^@chamvi\/cli$/, replacement: source('cli/src/index.ts') },
         ],
     },
