@@ -9,15 +9,11 @@ import {
     InvalidAgentDefinitionError,
     MemoryStore,
     defineAgent,
-    http,
 } from '@chamvi/core';
-import type {
-    Agent,
-    Engine,
-    INotifier,
-} from '@chamvi/core';
+import { http, httpChannel } from '@chamvi/http';
+import type { Agent, Engine, IChannel } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
-import { customProvider, tool } from 'ai';
+import { customProvider } from 'ai';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import {
@@ -26,12 +22,11 @@ import {
     expect,
     it,
 } from 'vitest';
-import { z } from 'zod';
 import {
     AppToken,
     ModuleName,
     configModule,
-    consoleNotifierModule,
+    consoleChannelModule,
     engineModule,
     storeModule,
 } from '@chamvi/app';
@@ -39,7 +34,7 @@ import type { AppMode, ILifecycleHook } from '@chamvi/app';
 import { buildHarness } from '../../../utils/harness.ts';
 import type { Harness } from '../../../utils/harness.ts';
 import { createRecordingLogger } from '../../../utils/logger.ts';
-import { approvalModel, textModel } from '../../../utils/model.ts';
+import { textModel } from '../../../utils/model.ts';
 
 const SECRET = 'x'.repeat(32);
 
@@ -48,7 +43,6 @@ function agentWith(model: Agent['definition']['model'], extra: Partial<Parameter
         name: 'triage',
         model,
         instructions: 'triage',
-        triggers: [http()],
         ...extra,
     });
 }
@@ -105,7 +99,7 @@ async function dispatch(engine: Engine) {
     return engine.dispatch({
         agent: 'triage',
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: {},
     });
 }
@@ -164,37 +158,37 @@ describe('engineModule', () => {
         expect(globalThis.AI_SDK_DEFAULT_PROVIDER).toBeUndefined();
     });
 
-    it('notifiers come from every NOTIFIERS contribution', async () => {
-        const agent = agentWith(textModel(), { notify: 'console' });
-        const { harness } = build({ agents: [agent], modules: [consoleNotifierModule({ write: () => undefined })] });
+    it('channels come from every CHANNELS contribution', async () => {
+        const agent = agentWith(textModel(), { channels: [http.on()] });
+        const { harness } = build({
+            agents: [agent],
+            modules: [contributing('http', (container) => {
+                container.registerMany(AppToken.CHANNELS, { useValue: httpChannel() });
+            })],
+        });
         await harness.setup();
-        expect(harness.container.has(AppToken.ENGINE)).toBe(true);
+        expect(harness.container.resolve(AppToken.ENGINE).getChannel('http')?.name).toBe('http');
 
         const without = build({ agents: [agent] });
         const error = await rejectionOf(without.harness.setup());
         expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toContain('console');
+        expect(error.message).toBe('Agent "triage" subscribes to unknown channel "http".');
     });
 
-    it('duplicate notifier names throw', async () => {
+    it('duplicate channel names throw', async () => {
         const { harness } = build({
             agents: [agentWith(textModel())],
             modules: [
-                consoleNotifierModule({ write: () => undefined }),
+                consoleChannelModule({ write: () => undefined }),
                 contributing('second', (container) => {
-                    container.registerMany(AppToken.NOTIFIERS, {
-                        useValue: {
-                            name: 'console',
-                            notify: async () => undefined,
-                        },
-                    });
+                    container.registerMany(AppToken.CHANNELS, { useValue: { name: 'console', out: async () => undefined } });
                 }),
             ],
         });
 
         const error = await rejectionOf(harness.setup());
         expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toBe('Two notifiers are named "console".');
+        expect(error.message).toBe('The channel "console" is registered more than once.');
     });
 
     it('engineCreated hooks run before start, drained after drain', async () => {
@@ -272,36 +266,24 @@ describe('engineModule', () => {
     });
 
     it('engine errors go to the logger', async () => {
-        const failing: INotifier = {
+        const failing: IChannel = {
             name: 'boom',
-            notify: async () => {
-                throw new Error('notifier down');
+            start: async () => undefined,
+            stop: async () => {
+                throw new Error('channel down');
             },
         };
-        const agent = agentWith(approvalModel('deploy'), {
-            tools: {
-                deploy: tool({
-                    inputSchema: z.object({}),
-                    execute: async () => 'deployed',
-                }),
-            },
-            approvals: { deploy: 'user' },
-            notify: 'boom',
-        });
         const { harness, logger } = build({
-            agents: [agent],
-            modules: [contributing('chamvi:notifier:boom', (container) => {
-                container.registerMany(AppToken.NOTIFIERS, { useValue: failing });
+            agents: [agentWith(textModel())],
+            modules: [contributing('boom', (container) => {
+                container.registerMany(AppToken.CHANNELS, { useValue: failing });
             })],
         });
         await harness.setup();
-
-        const engine = harness.container.resolve(AppToken.ENGINE);
-        const { runId } = await dispatch(engine);
-        await engine.idle();
+        // the drain stops the channels first; a failing stop is reported and the drain goes on
+        await harness.stop();
 
         const entry = logger.entries.find((e) => e.level === 'error' && e.msg === 'engine error');
-        expect(entry).toMatchObject({ run: runId, agent: 'triage' });
-        expect(JSON.stringify(entry)).toContain('notifier down');
+        expect(JSON.stringify(entry)).toContain('channel down');
     });
 });

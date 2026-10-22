@@ -7,7 +7,7 @@
 
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import type { Agent } from '@chamvi/core';
-import { runJob } from '@chamvi/scheduler';
+import { runJob } from '@chamvi/channel-cron';
 import { Container } from 'eldin';
 import type { IContainer } from 'eldin';
 import { Application } from 'orkos';
@@ -158,7 +158,7 @@ export class App implements IApp {
         } = lifecycle;
         try {
             await application.setup();
-            // every onReady checked its configuration: engine, scheduler, then the http module's serve
+            // every onReady checked its configuration: the engine with its channels, then the http module's serve
             await runStartSteps(container);
             if (container.resolve(AppToken.CONTEXT).mode === 'start' && !container.has(AppToken.SERVER)) {
                 // the http module's serve step runs these hooks; without it the app does
@@ -211,7 +211,7 @@ export class App implements IApp {
             } = await runJob({
                 engine,
                 agent,
-                trigger: options.trigger,
+                subscription: options.subscription,
                 drainTimeoutMs: container.resolve(AppToken.CONFIG).http.drainTimeoutMs,
                 signal: lifecycle.controller.signal,
             });

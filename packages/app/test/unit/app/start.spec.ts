@@ -5,14 +5,14 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { cron } from '@chamvi/channel-cron';
 import {
     Engine,
     InvalidAgentDefinitionError,
     MemoryStore,
-    cron,
     defineAgent,
-    http,
 } from '@chamvi/core';
+import { http } from '@chamvi/http';
 import { ControllableClock } from '@chamvi/test-kit';
 import type { IModule } from 'orkos';
 import {
@@ -46,7 +46,7 @@ const agent = defineAgent({
     name: 'triage',
     model: textModel(),
     instructions: 'x',
-    triggers: [http()],
+    channels: [http.on()],
 });
 
 let apps: IApp[] = [];
@@ -72,6 +72,16 @@ async function envFor(extra: Record<string, string> = {}) {
             PORT: String(port),
             CHAMVI_TOKENS: TOKENS,
             ...extra,
+        },
+    };
+}
+
+/** Replaces the http module: serves nothing, registers the http channel by name only (the agents subscribe to it). */
+function httpless(): IModule {
+    return {
+        name: ModuleName.HTTP,
+        setup: async (container) => {
+            container.registerMany(AppToken.CHANNELS, { useValue: { name: 'http' } });
         },
     };
 }
@@ -227,19 +237,21 @@ describe('App.start', () => {
                 name: 'queued',
                 model: counting,
                 instructions: 'x',
-                triggers: [http(), cron('*/5 * * * *')],
+                channels: [http.on(), cron.on('*/5 * * * *')],
             });
             const store = new MemoryStore();
             // another replica's run, waiting in the shared store
             const other = new Engine({
                 store,
                 agents: [queued],
+                // names only: this replica serves nothing
+                channels: [{ name: 'http' }, { name: 'cron' }],
                 resumeSecret: SECRET,
             });
             const { runId } = await other.dispatch({
                 agent: 'queued',
                 trigger: 'http',
-                source: 'http',
+                channel: 'http',
                 payload: {},
             });
             return {
@@ -267,7 +279,7 @@ describe('App.start', () => {
             const ctx = await queuedRun();
             const app = track(createApp({
                 agents: [ctx.queued],
-                modules: [quiet(), storeModule({ store: ctx.store }), { name: ModuleName.HTTP, setup: async () => undefined }],
+                modules: [quiet(), storeModule({ store: ctx.store }), httpless()],
             }));
             const { env } = await envFor({ CHAMVI_TOKENS: '' });
 
@@ -286,7 +298,7 @@ describe('App.start', () => {
                 modules: [
                     quiet(),
                     storeModule({ store: ctx.store }),
-                    { name: ModuleName.HTTP, setup: async () => undefined },
+                    httpless(),
                     {
                         name: 'hooks',
                         setup: async (container) => {

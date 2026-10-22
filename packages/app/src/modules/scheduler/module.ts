@@ -5,62 +5,49 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { assertSchedulable, createScheduler } from '@chamvi/scheduler';
-import type { IScheduler } from '@chamvi/scheduler';
+import { CRON_CHANNEL_NAME, assertSchedulable, cronChannel } from '@chamvi/channel-cron';
+import type { IChannel } from '@chamvi/core';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { AppToken, ModuleName } from '../../module/constants.ts';
-import { registerStartStep } from '../../module/start.ts';
 import type { SchedulerModuleOptions } from './types.ts';
 
 /**
- * Fires the agents' cron triggers in-process: start mode with
- * `CHAMVI_SCHEDULER` on only. `setup` contributes the folder agents' cron
- * check (`AGENT_CHECKS`, start and job mode); `onReady` builds the scheduler, registers
- * `SCHEDULER` and its start step (after the engine's); `teardown` stops it
- * (idempotent after the shutdown).
+ * Contributes the cron channel (`cronChannel()` of `@chamvi/channel-cron`)
+ * to `CHANNELS` in start and job mode, so `cron.on()` subscriptions
+ * validate; `engine.start()` starts it (a job never starts channels, its
+ * runJob fires the one subscription itself) and the drain stops it. With
+ * `CHAMVI_SCHEDULER` off, start mode contributes a `cron` channel that
+ * fires nothing. `setup` also contributes the folder agents' cron check
+ * (`AGENT_CHECKS`).
  */
 export class SchedulerModule implements IModule {
     readonly name: string = ModuleName.SCHEDULER;
 
-    readonly dependencies = [ModuleName.ENGINE];
+    readonly dependencies = [ModuleName.CONFIG];
 
     protected options: SchedulerModuleOptions;
-
-    protected scheduler: IScheduler | undefined;
 
     constructor(options: SchedulerModuleOptions = {}) {
         this.options = options;
     }
 
     async setup(container: IContainer): Promise<void> {
-        // a folder agent with a cron trigger hubwire refuses is a load issue, in every mode, so the modes agree
-        if (container.resolve(AppToken.CONTEXT).mode === 'migrate') return;
-        container.registerMany(AppToken.AGENT_CHECKS, { useValue: assertSchedulable });
-    }
-
-    async onReady(container: IContainer): Promise<void> {
         const context = container.resolve(AppToken.CONTEXT);
-        if (context.mode !== 'start' || !container.resolve(AppToken.CONFIG).scheduler.enabled) {
-            return;
-        }
+        if (context.mode === 'migrate') return;
 
-        const logger = container.resolve(AppToken.LOGGER);
-        const scheduler = createScheduler({
-            engine: container.resolve(AppToken.ENGINE),
-            ...this.options,
-            onError: (error, ctx) => logger.error('schedule error', error, ctx),
-        });
-        this.scheduler = scheduler;
-        container.register(AppToken.SCHEDULER, { useValue: scheduler });
+        // a folder agent with a cron subscription hubwire refuses is a load issue, in every mode, so the modes agree
+        container.registerMany(AppToken.AGENT_CHECKS, { useValue: (agent) => assertSchedulable(agent) });
 
-        registerStartStep(container, ModuleName.SCHEDULER, () => scheduler.start());
-    }
-
-    async teardown(): Promise<void> {
-        const { scheduler } = this;
-        this.scheduler = undefined;
-        await scheduler?.stop();
+        const enabled = context.mode === 'job' || container.resolve(AppToken.CONFIG).scheduler.enabled;
+        const channel: IChannel = enabled ?
+            cronChannel({
+                ...this.options,
+                onError: (error, ctx) => container.resolve(AppToken.LOGGER).error('schedule error', error, ctx),
+            }) :
+            // subscriptions still validate; nothing is scheduled
+            { name: CRON_CHANNEL_NAME };
+        container.registerMany(AppToken.CHANNELS, { useValue: channel });
     }
 }
 

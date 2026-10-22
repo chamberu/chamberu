@@ -5,8 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Engine, InvalidAgentDefinitionError } from '@chamvi/core';
-import type { INotifier } from '@chamvi/core';
+import { Engine } from '@chamvi/core';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { installDefaultProvider, resolveModels } from '../../models/module.ts';
@@ -20,10 +19,13 @@ import type { EngineModuleOptions } from './types.ts';
  * checks every string model against the provider registry, installs it as
  * the AI SDK default provider, unless one is set already, and registers that
  * check as `MODEL_CHECK` (a no-op with a preset provider); `onReady` builds the
- * engine from every `NOTIFIERS` contribution, registers `ENGINE`, runs the
- * `engineCreated` hooks and, in start mode, registers its start step (run
- * once every module's `onReady` checked its configuration). `teardown` drains
- * it and runs the `drained` hooks.
+ * engine with every `CHANNELS` contribution (two of one name, or a
+ * subscription of a channel nobody contributed, is InvalidAgentDefinitionError),
+ * registers `ENGINE`, runs the `engineCreated` hooks and, in start mode,
+ * registers its start step (run once every module's `onReady` checked its
+ * configuration): `engine.start()`, which starts the channels; a job starts
+ * the engine without them. `teardown` drains it (which stops the channels
+ * first) and runs the `drained` hooks.
  */
 export class EngineModule implements IModule {
     readonly name: string = ModuleName.ENGINE;
@@ -70,18 +72,10 @@ export class EngineModule implements IModule {
         const config = container.resolve(AppToken.CONFIG);
         const logger = container.resolve(AppToken.LOGGER);
 
-        const notifiers: Record<string, INotifier> = {};
-        for (const notifier of container.resolveAll(AppToken.NOTIFIERS)) {
-            if (Object.prototype.hasOwnProperty.call(notifiers, notifier.name)) {
-                throw new InvalidAgentDefinitionError(`Two notifiers are named "${notifier.name}".`);
-            }
-            notifiers[notifier.name] = notifier;
-        }
-
         const engine = new Engine({
             store: container.resolve(AppToken.STORE),
             agents: [...context.agents],
-            notifiers,
+            channels: container.resolveAll(AppToken.CHANNELS),
             resumeSecret: config.engine.resumeSecret,
             maxConcurrentRuns: config.engine.maxConcurrentRuns,
             clock: container.resolve(AppToken.CLOCK),
@@ -95,7 +89,7 @@ export class EngineModule implements IModule {
         await runHooks(container, 'engineCreated', engine);
 
         if (context.mode === 'start') {
-            // started once every onReady checked its configuration (authenticators, routes, the scheduler)
+            // started once every onReady checked its configuration (authenticators, routes); starts the channels
             registerStartStep(container, ModuleName.ENGINE, () => engine.start());
         }
     }

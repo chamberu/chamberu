@@ -64,7 +64,7 @@ const fail = defineAgent({
     model,
     instructions: 'Call explode.',
     tools: { explode },
-    triggers: [cron('0 0 1 1 *')],
+    channels: [cron.on('0 0 1 1 *')],
 });
 
 declare global {

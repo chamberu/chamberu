@@ -43,7 +43,8 @@ describe('loadAgent', () => {
         await writeTree(dir, {
             'agent.ts': [
                 'import { readFileSync } from \'node:fs\';',
-                'import { cron, defineAgent } from \'@chamvi/core\';',
+                'import { cron } from \'@chamvi/channel-cron\';',
+                'import { defineAgent } from \'@chamvi/core\';',
                 'import { tools } from \'./lib/tools.ts\';',
                 '',
                 'export default defineAgent({',
@@ -51,7 +52,7 @@ describe('loadAgent', () => {
                 '    model: \'test:model\',',
                 '    instructions: readFileSync(new URL(\'./prompt.md\', import.meta.url), \'utf8\'),',
                 '    tools,',
-                '    triggers: [cron(\'0 9 * * *\', { timezone: \'Europe/Berlin\' })],',
+                '    channels: [cron.on(\'0 9 * * *\', { timezone: \'Europe/Berlin\' })],',
                 '    budget: { maxSteps: 3 },',
                 '});',
                 '',
@@ -59,7 +60,7 @@ describe('loadAgent', () => {
             'lib/tools.ts': 'export const tools = { say_hi: { description: \'Says hi.\', inputSchema: { type: \'object\' }, execute: async () => \'hi\' } };\n',
             'prompt.md': 'Sort the inbox.\n',
             'tools/README.md': '# the agent\'s own notes\n',
-            'triggers/daily.yaml': 'not read: the folder is the agent\'s own\n',
+            'channels/daily.yaml': 'not read: the folder is the agent\'s own\n',
             'instructions.md': 'not read either\n',
         });
 
@@ -72,7 +73,7 @@ describe('loadAgent', () => {
         expect(loaded.agent.definition.model).toBe('test:model');
         expect(loaded.agent.definition.budget.maxSteps).toBe(3);
         expect(Object.keys(loaded.agent.definition.tools as object)).toEqual(['say_hi']);
-        expect(loaded.agent.definition.triggers?.map((t) => t.id)).toEqual(['cron:0 9 * * *']);
+        expect(loaded.agent.definition.channels?.map((s) => s.id)).toEqual(['cron:0 9 * * *']);
     });
 
     it('applies the budget defaults of defineAgent to a structural agent', async () => {
@@ -115,7 +116,7 @@ describe('loadAgent', () => {
     });
 
     it('an agent definition defineAgent refuses is refused', async () => {
-        await expectRefused({ 'agent.ts': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', triggers: [{ source: \'http\', id: \'http\', options: {} }, { source: \'http\', id: \'http\', options: {} }] } };\n' }, /duplicate trigger id/);
+        await expectRefused({ 'agent.ts': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', channels: [{ channel: \'http\', id: \'http\', options: {} }, { channel: \'http\', id: \'http\', options: {} }] } };\n' }, /duplicate subscription id/);
     });
 
     it('a folder name that is no agent name is refused', async () => {

@@ -43,7 +43,7 @@ export function createStartCommand(context: CliContext): CommandDef<typeof START
     return defineCommand({
         meta: {
             name: 'start',
-            description: 'Start the app: HTTP, scheduler and engine',
+            description: 'Start the app: HTTP, engine and channels',
         },
         args: START_ARGS,
         async run({ args }) {

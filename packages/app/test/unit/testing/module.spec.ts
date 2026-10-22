@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { defineAgent, http } from '@chamvi/core';
+import { defineAgent } from '@chamvi/core';
 import type { Agent, Engine } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
 import {
@@ -33,7 +33,6 @@ function triage(): Agent {
         name: 'triage',
         model: textModel('triaged'),
         instructions: 'triage',
-        triggers: [http()],
     });
 }
 
@@ -69,7 +68,7 @@ async function dispatch(engine: Engine) {
     return engine.dispatch({
         agent: 'triage',
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: {},
     });
 }

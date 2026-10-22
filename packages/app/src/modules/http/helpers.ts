@@ -22,3 +22,33 @@ export function resolveAuthenticators(container: IContainer): Authenticator[] {
 
     return entries.map(({ entry }) => entry.authenticator);
 }
+
+/**
+ * An authenticator running the app's chain once it is resolved (the http
+ * module's `onReady`), with the chain's rules: the first principal wins, an
+ * authenticator answering `undefined` lets the next one try, the first
+ * rejection is rethrown when none resolved a principal. Before `chain` is
+ * set it answers `undefined` (a 401). The webhook channel is built in
+ * `setup`, before the authenticators are known.
+ */
+export function createDeferredAuthenticator(): { authenticator: Authenticator; resolve(chain: readonly Authenticator[]): void } {
+    let authenticators: readonly Authenticator[] = [];
+    return {
+        authenticator: async (request) => {
+            let rejection: { error: unknown } | undefined;
+            for (const authenticator of authenticators) {
+                try {
+                    const principal = await authenticator(request);
+                    if (principal) return principal;
+                } catch (error) {
+                    rejection ??= { error };
+                }
+            }
+            if (rejection) throw rejection.error;
+            return undefined;
+        },
+        resolve(chain) {
+            authenticators = [...chain];
+        },
+    };
+}

@@ -5,7 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { cron, defineAgent } from '@chamvi/core';
+import { cron } from '@chamvi/channel-cron';
+import { defineAgent } from '@chamvi/core';
 import type { Agent } from '@chamvi/core';
 import {
     afterEach,
@@ -36,7 +37,7 @@ function sweep(): Agent {
         name: 'sweep',
         model: mockModel(Array.from({ length: 10 }, () => ({ parts: [{ type: 'text' as const, text: 'swept' }] }))),
         instructions: 'sweep',
-        triggers: [cron('* * * * *', { overlap: 'allow' })],
+        channels: [cron.on('* * * * *', { overlap: 'allow' })],
     });
 }
 
@@ -87,31 +88,34 @@ async function runs(harness: Harness) {
 }
 
 describe('schedulerModule', () => {
-    it('is named and depends on the engine module', () => {
+    it('is named and depends on the config module', () => {
         const module = schedulerModule();
         expect(module.name).toBe(ModuleName.SCHEDULER);
-        expect(module.dependencies).toEqual([ModuleName.ENGINE]);
+        expect(module.dependencies).toEqual([ModuleName.CONFIG]);
     });
 
-    it('starts in start mode', async () => {
+    it('contributes the cron channel, which engine.start() starts in start mode', async () => {
         const harness = await setup();
-        expect(harness.container.has(AppToken.SCHEDULER)).toBe(true);
+        const engine = harness.container.resolve(AppToken.ENGINE);
+        expect(engine.getChannel('cron')?.start).toBeTypeOf('function');
 
         await vi.advanceTimersByTimeAsync(30_000);
         expect(await runs(harness)).toHaveLength(1);
     });
 
-    it('CHAMVI_SCHEDULER=false skips it', async () => {
+    it('CHAMVI_SCHEDULER=false contributes a cron channel that fires nothing', async () => {
         const harness = await setup({ env: { CHAMVI_SCHEDULER: 'false' } });
-        expect(harness.container.has(AppToken.SCHEDULER)).toBe(false);
+        const channel = harness.container.resolve(AppToken.ENGINE).getChannel('cron');
+        expect(channel?.name).toBe('cron');
+        expect(channel?.start).toBeUndefined();
 
         await vi.advanceTimersByTimeAsync(120_000);
         expect(await runs(harness)).toHaveLength(0);
     });
 
-    it('not in job mode', async () => {
+    it('job mode registers the cron channel but never starts it', async () => {
         const harness = await setup({ mode: 'job' });
-        expect(harness.container.has(AppToken.SCHEDULER)).toBe(false);
+        expect(harness.container.resolve(AppToken.ENGINE).getChannel('cron')?.start).toBeTypeOf('function');
 
         await vi.advanceTimersByTimeAsync(120_000);
         expect(await runs(harness)).toHaveLength(0);

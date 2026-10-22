@@ -37,21 +37,21 @@ describe('public api', () => {
         'configModule',
         'storeModule',
         'staticTokensModule',
-        'consoleNotifierModule',
+        'consoleChannelModule',
         'engineModule',
         'agentsModule',
         'schedulerModule',
         'httpModule',
         // the common surface of @chamvi/core and @chamvi/http
         'defineAgent',
-        'cron',
-        'http',
-        'webhook',
+        'injectChannel',
+        'replyChannel',
+        'approve',
         'defineTool',
         'defineEffectTool',
         'effectMarker',
         'requireToolPermission',
-        'consoleNotifier',
+        'consoleChannel',
         'defineContextKey',
         'inject',
         'tryInject',
@@ -59,6 +59,17 @@ describe('public api', () => {
     ])('exports %s', (name) => {
         expect(app).toHaveProperty(name);
         expect(app[name as keyof typeof app]).toBeTypeOf('function');
+    });
+
+    it.each(['cron', 'http', 'webhook'])('exports the %s subscription builder', (name) => {
+        const builder = app[name as 'cron' | 'http' | 'webhook'];
+        expect(builder.on).toBeTypeOf('function');
+    });
+
+    it('drops what channels replaced', () => {
+        for (const name of ['consoleNotifierModule', 'consoleNotifier']) {
+            expect(app).not.toHaveProperty(name);
+        }
     });
 
     it('exports the timer limit of the ms variables', () => {
@@ -74,6 +85,7 @@ describe('public api', () => {
             'AGENT_CHECKS',
             'AGENT_ISSUES',
             'AUTHENTICATORS',
+            'CHANNELS',
             'CLOCK',
             'CONFIG',
             'CONTEXT',
@@ -83,8 +95,6 @@ describe('public api', () => {
             'LIFECYCLE_HOOKS',
             'LOGGER',
             'MODEL_CHECK',
-            'NOTIFIERS',
-            'SCHEDULER',
             'SERVER',
             'SHUTDOWN',
             'STORE',
@@ -100,6 +110,7 @@ describe('public api', () => {
             AGENTS: 'chamvi:agents',
             SCHEDULER: 'chamvi:scheduler',
             HTTP: 'chamvi:http',
+            CONSOLE: 'chamvi:console',
         });
         expect(app.APP_ERROR_CODE).toEqual({
             STOPPED: 'app_stopped',

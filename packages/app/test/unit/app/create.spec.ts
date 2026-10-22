@@ -5,10 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { cron } from '@chamvi/channel-cron';
 import {
     InvalidAgentDefinitionError,
     MemoryStore,
-    cron,
     defineAgent,
 } from '@chamvi/core';
 import type { IModule } from 'orkos';
@@ -29,7 +29,7 @@ const agent = defineAgent({
     name: 'sweep',
     model: textModel(),
     instructions: 'x',
-    triggers: [cron('*/5 * * * *')],
+    channels: [cron.on('*/5 * * * *')],
 });
 
 function named(name: string, calls: string[] = []): IModule {

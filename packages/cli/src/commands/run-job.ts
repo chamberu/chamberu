@@ -22,19 +22,19 @@ import {
 const RUN_JOB_ARGS = {
     agent: {
         type: 'positional',
-        description: 'The agent whose cron trigger fires',
+        description: 'The agent whose cron subscription fires',
         required: true,
     },
-    triggerId: {
+    subscriptionId: {
         type: 'positional',
-        description: 'The cron trigger id (default: the agent\'s only cron trigger)',
+        description: 'The cron subscription id (default: the agent\'s only cron subscription)',
         required: false,
     },
     entry: ENTRY_ARG,
 } as const;
 
 /**
- * `chamvi run-job <agent> [triggerId]`: fires one cron trigger once and waits
+ * `chamvi run-job <agent> [subscriptionId]`: fires one cron subscription once and waits
  * for its run; exit 0 for completed, waiting, skipped, queued behind an
  * approval or interrupted by a signal, 1 for failed or cancelled (also when
  * a signal arrived meanwhile) or a failed stop.
@@ -43,7 +43,7 @@ export function createRunJobCommand(context: CliContext): CommandDef<typeof RUN_
     return defineCommand({
         meta: {
             name: 'run-job',
-            description: 'Fire one cron trigger once and wait for its run (Kubernetes CronJob)',
+            description: 'Fire one cron subscription once and wait for its run (Kubernetes CronJob)',
         },
         args: RUN_JOB_ARGS,
         async run({ args }) {
@@ -73,7 +73,7 @@ export function createRunJobCommand(context: CliContext): CommandDef<typeof RUN_
             try {
                 result = await app.runJob({
                     agent: args.agent,
-                    ...(typeof args.triggerId === 'string' && { trigger: args.triggerId }),
+                    ...(typeof args.subscriptionId === 'string' && { subscription: args.subscriptionId }),
                     env,
                 });
             } catch (error) {

@@ -10,7 +10,6 @@ import type {
     Engine,
     IChannel,
     IClock,
-    INotifier,
     IStore,
 } from '@chamvi/core';
 import type {
@@ -19,7 +18,6 @@ import type {
     HttpRoute,
     IShutdown,
 } from '@chamvi/http';
-import type { IScheduler } from '@chamvi/scheduler';
 import type { DataSource } from 'typeorm';
 import type { AppConfig } from '../config/types.ts';
 import type { Env } from '../env/types.ts';
@@ -48,7 +46,7 @@ export type AppContext = {
 
 /**
  * Throws InvalidAgentDefinitionError for an agent a module could not serve
- * (the scheduler: a cron trigger hubwire refuses; http: a `run_<agent>` MCP
+ * (the scheduler: a cron subscription hubwire refuses; http: a `run_<agent>` MCP
  * tool it cannot build). The agents dir runs every check on a folder agent
  * before registering it, so a refusal is a load issue, never a failed boot.
  */
@@ -58,9 +56,9 @@ export interface ILifecycleHook {
     readonly name: string;
     /** After `new Engine(...)`, before `engine.start()` (start and job). */
     engineCreated?(engine: Engine): void | Promise<void>;
-    /** start only: after scheduler.start(), before serve(). */
+    /** start only: after engine.start() (which starts the channels), before serve(). */
     started?(): void | Promise<void>;
-    /** start only: inside createShutdown's scheduler step, after scheduler.stop(). */
+    /** start only: the shutdown's first step, before the closers, the server close and the drain (which stops the channels). */
     stopping?(): void | Promise<void>;
     /** After the engine drained (start and job), before the store closes. */
     drained?(): void | Promise<void>;
@@ -92,12 +90,10 @@ export type AppTokens = {
     STORE: IStore;
     DATA_SOURCE: DataSource;
     ENGINE: Engine;
-    SCHEDULER: IScheduler;
     SHUTDOWN: IShutdown;
     SERVER: Server;
     HTTP_ROUTES: HttpRoute;
     AUTHENTICATORS: AuthenticatorEntry;
-    NOTIFIERS: INotifier;
     /** A collection: the channels modules contribute (`registerMany` in `setup`). */
     CHANNELS: IChannel<any, any>;
     LIFECYCLE_HOOKS: ILifecycleHook;

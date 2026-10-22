@@ -5,10 +5,15 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError, defineAgent, http } from '@chamvi/core';
+import {
+    InvalidAgentDefinitionError,
+    approve,
+    defineAgent,
+    defineTool,
+} from '@chamvi/core';
 import type { Agent, Engine } from '@chamvi/core';
+import { http } from '@chamvi/http';
 import { ControllableClock } from '@chamvi/test-kit';
-import { tool } from 'ai';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import {
@@ -54,7 +59,7 @@ function triage(model: Agent['definition']['model'] = textModel()): Agent {
         name: 'triage',
         model,
         instructions: 'triage',
-        triggers: [http()],
+        channels: [http.on()],
     });
 }
 
@@ -152,14 +157,20 @@ async function isFree(port: number): Promise<boolean> {
 }
 
 describe('httpModule', () => {
-    it('is named and depends on the engine and, optionally, the scheduler and static tokens', () => {
+    it('is named and depends on the engine and, optionally, static tokens', () => {
         const module = httpModule();
         expect(module.name).toBe(ModuleName.HTTP);
         expect(module.dependencies).toEqual([
             ModuleName.ENGINE,
-            { name: ModuleName.SCHEDULER, optional: true },
             { name: ModuleName.STATIC_TOKENS, optional: true },
         ]);
+    });
+
+    it('contributes the http, mcp and webhook channels in start and job mode', async () => {
+        const { harness } = await build();
+        await harness.setup();
+        expect(harness.container.resolveAll(AppToken.CHANNELS).map((channel) => channel.name))
+            .toEqual(expect.arrayContaining(['http', 'mcp', 'webhook']));
     });
 
     it('serves /healthz and /readyz after start', async () => {
@@ -245,19 +256,16 @@ describe('httpModule', () => {
     it('teardown follows createShutdown', async () => {
         const events: string[] = [];
         let readyz: () => Promise<number> = async () => 0;
+        // a channel stands in for the cron channel: the drain stops it first
         const fakeScheduler: IModule = {
             name: ModuleName.SCHEDULER,
-            dependencies: [ModuleName.ENGINE],
-            async setup() {
-                // registers in onReady, like the built-in
-            },
-            async onReady(container) {
-                container.register(AppToken.SCHEDULER, {
+            async setup(container) {
+                container.registerMany(AppToken.CHANNELS, {
                     useValue: {
+                        name: 'cron',
                         start: async () => undefined,
                         stop: async () => {
-                            events.push(`readyz ${await readyz()}`);
-                            events.push('scheduler.stop');
+                            events.push('channel stop');
                         },
                     },
                 });
@@ -273,7 +281,8 @@ describe('httpModule', () => {
                 drainRecorder(events),
                 hooks({
                     name: 'recorder',
-                    stopping: () => {
+                    stopping: async () => {
+                        events.push(`readyz ${await readyz()}`);
                         events.push('stopping hook');
                     },
                     drained: () => {
@@ -288,8 +297,8 @@ describe('httpModule', () => {
         await harness.stop();
         expect(events).toEqual([
             'readyz 503',
-            'scheduler.stop',
             'stopping hook',
+            'channel stop',
             'engine drained',
             // the engine module's own drain (a no-op now), then its drained hooks
             'engine drained',
@@ -303,14 +312,16 @@ describe('httpModule', () => {
             name: 'triage',
             model: approvalModel('deploy'),
             instructions: 'triage',
-            triggers: [http()],
+            channels: [http.on()],
             tools: {
-                deploy: tool({
+                deploy: defineTool({
                     inputSchema: z.object({}),
-                    execute: async () => 'deployed',
+                    execute: async (_input, { context }) => {
+                        await approve(context, { title: 'Deploy?' });
+                        return 'deployed';
+                    },
                 }),
             },
-            approvals: { deploy: 'user' },
         });
         const {
             harness,
@@ -323,7 +334,7 @@ describe('httpModule', () => {
         const { runId } = await engine.dispatch({
             agent: 'triage',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         await engine.idle();

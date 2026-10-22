@@ -38,7 +38,7 @@ describe('run-job', () => {
         expect(fake.signals.listenerCount('SIGTERM')).toBe(0);
     });
 
-    it('takes the trigger id as the second argument', async () => {
+    it('takes the subscription id as the second argument', async () => {
         await runJob(['echo', 'cron:0 0 1 1 *', '--entry', fixture('app')]);
         expect(fake.exitCodes).toEqual([0]);
     });

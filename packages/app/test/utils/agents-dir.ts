@@ -5,11 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { 
-    Engine, 
-    MemoryStore, 
-    defineAgent, 
-    http, 
+import {
+    Engine,
+    MemoryStore,
+    defineAgent,
 } from '@chamvi/core';
 import type { Agent, IStore } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
@@ -34,21 +33,21 @@ export const POLL_MS = 1_000;
 
 /**
  * An `agent.ts` default-exporting `defineAgent()`'s shape (structural, so the
- * fixture does not depend on the built @chamvi/core); `triggers` are source
- * expressions (`HTTP_TRIGGER`, `cronTrigger()`).
+ * fixture does not depend on the built @chamvi/core); `channels` are
+ * subscription source expressions (`HTTP_TRIGGER`, `cronTrigger()`).
  */
-export function agentFile(instructions: string, model = 'test:model', name = 'greeter', triggers: string[] = []): string {
-    const list = triggers.length > 0 ? `, triggers: [${triggers.join(', ')}]` : '';
+export function agentFile(instructions: string, model = 'test:model', name = 'greeter', channels: string[] = []): string {
+    const list = channels.length > 0 ? `, channels: [${channels.join(', ')}]` : '';
     return `export default { name: '${name}', definition: { model: '${model}', instructions: '${instructions}'${list} } };\n`;
 }
 
-/** `http()`'s definition as a source expression. */
-export const HTTP_TRIGGER = '{ source: \'http\', id: \'http\', options: {} }';
+/** `http.on()`'s definition as a source expression. */
+export const HTTP_TRIGGER = '{ channel: \'http\', id: \'http\', options: {} }';
 
-/** `cron(expression, { timezone })`'s definition as a source expression (structural: no cron-parser check). */
+/** `cron.on(expression, { timezone })`'s definition as a source expression (structural: no cron-parser check). */
 export function cronTrigger(expression: string, timezone?: string): string {
     const zone = timezone ? `, timezone: '${timezone}'` : '';
-    return `{ source: 'cron', id: 'cron:${expression}', options: { expression: '${expression}'${zone}, overlap: 'skip' } }`;
+    return `{ channel: 'cron', id: 'cron:${expression}', options: { expression: '${expression}'${zone}, overlap: 'skip' } }`;
 }
 
 /** The `test` provider: `test:model` answers 'from folder', `test:hang` never answers. */
@@ -62,7 +61,6 @@ export function codeAgent(name: string): Agent {
         name,
         model: textModel('from code'),
         instructions: 'x',
-        triggers: [http()],
     });
 }
 
@@ -77,7 +75,7 @@ export async function queueRun(store: IStore, clock: ControllableClock, name: st
     const { runId } = await engine.dispatch({
         agent: name,
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: {},
     });
     return runId;

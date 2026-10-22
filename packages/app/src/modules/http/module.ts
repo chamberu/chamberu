@@ -5,7 +5,14 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { assertMcpRunTool, createHttpApp, createShutdown } from '@chamvi/http';
+import {
+    assertMcpRunTool,
+    createHttpApp,
+    createShutdown,
+    httpChannel,
+    mcpChannel,
+    webhookChannel,
+} from '@chamvi/http';
 import type { IShutdown } from '@chamvi/http';
 import type { IContainer } from 'eldin';
 import type { IModule, ModuleDependency } from 'orkos';
@@ -14,25 +21,29 @@ import { AppToken, ModuleName } from '../../module/constants.ts';
 import { runHooks, throwIfStopped } from '../../module/helpers.ts';
 import { registerStartStep } from '../../module/start.ts';
 import type { Server } from '../../module/types.ts';
-import { resolveAuthenticators } from './helpers.ts';
+import { createDeferredAuthenticator, resolveAuthenticators } from './helpers.ts';
 import type { HttpModuleOptions } from './types.ts';
 
 /**
- * Serves the HTTP app (start mode only). `setup` contributes the folder
- * agents' MCP tool check (`AGENT_CHECKS`, unless `mcp: false`); `onReady` builds the graceful
- * shutdown (`SHUTDOWN`) and the routup app from every `AUTHENTICATORS` and
- * `HTTP_ROUTES` contribution, then registers the `serve` start step: the
- * app runs the start steps (engine, scheduler, then this one: the `started`
- * hooks, listening, `SERVER`) only once every module's `onReady` ran, so a
- * configuration error any of them finds starts nothing. `teardown` runs the shutdown: readiness 503, scheduler stop and
- * `stopping` hooks, the app's closers, server close, engine drain.
+ * Serves the HTTP app (start mode only). `setup` (start and job) contributes
+ * the `http`, `mcp` and `webhook` channels to `CHANNELS` (the webhook channel
+ * authenticates with the app's authenticator chain) and the folder agents'
+ * MCP tool check (`AGENT_CHECKS`, unless `mcp: false`); `onReady` builds the
+ * graceful shutdown (`SHUTDOWN`) and the routup app from every
+ * `AUTHENTICATORS` and `HTTP_ROUTES` contribution, mounting every
+ * contributed channel with an `in` at `/channels/<name>`, then registers the
+ * `serve` start step: the app runs the start steps (the engine with its
+ * channels, then this one: the `started` hooks, listening, `SERVER`) only
+ * once every module's `onReady` ran, so a configuration error any of them
+ * finds starts nothing. `teardown` runs the shutdown: readiness 503, the
+ * `stopping` hooks, the app's closers, server close, engine drain (which
+ * stops the channels first).
  */
 export class HttpModule implements IModule {
     readonly name: string = ModuleName.HTTP;
 
     readonly dependencies: (string | ModuleDependency)[] = [
         ModuleName.ENGINE,
-        { name: ModuleName.SCHEDULER, optional: true },
         // its onReady may contribute the dev token
         { name: ModuleName.STATIC_TOKENS, optional: true },
     ];
@@ -41,13 +52,26 @@ export class HttpModule implements IModule {
 
     protected shutdown: IShutdown | undefined;
 
+    protected webhookAuth = createDeferredAuthenticator();
+
     constructor(options: HttpModuleOptions = {}) {
         this.options = options;
     }
 
     async setup(container: IContainer): Promise<void> {
+        if (container.resolve(AppToken.CONTEXT).mode === 'migrate') return;
+
+        // in job mode too, so http.on() and webhook.on() subscriptions validate
+        const webhook = webhookChannel({
+            auth: this.webhookAuth.authenticator,
+            ...(this.options.bodyLimit !== undefined && { bodyLimit: this.options.bodyLimit }),
+        });
+        for (const channel of [httpChannel(), mcpChannel(), webhook]) {
+            container.registerMany(AppToken.CHANNELS, { useValue: channel });
+        }
+
         // a folder agent whose run_<agent> MCP tool cannot be built is a load issue, in every mode, so the modes agree
-        if (container.resolve(AppToken.CONTEXT).mode === 'migrate' || this.options.mcp === false) return;
+        if (this.options.mcp === false) return;
         container.registerMany(AppToken.AGENT_CHECKS, { useValue: assertMcpRunTool });
     }
 
@@ -60,20 +84,14 @@ export class HttpModule implements IModule {
         const config = container.resolve(AppToken.CONFIG);
         const logger = container.resolve(AppToken.LOGGER);
         const engine = container.resolve(AppToken.ENGINE);
-        const scheduler = container.has(AppToken.SCHEDULER) ? container.resolve(AppToken.SCHEDULER) : undefined;
-
         const auth = resolveAuthenticators(container);
+        this.webhookAuth.resolve(auth);
 
         let server: Server | undefined;
         const shutdown = createShutdown({
             engine,
-            // always given, so the stopping hooks (the purge timer) run without a scheduler too
-            scheduler: {
-                stop: async () => {
-                    await scheduler?.stop();
-                    await runHooks(container, 'stopping');
-                },
-            },
+            // the shutdown's first step: the stopping hooks (the purge timer); the drain stops the channels
+            scheduler: { stop: () => runHooks(container, 'stopping') },
             server: { close: (force) => (server ? server.close(force) : Promise.resolve()) },
             readinessDelayMs: config.http.readinessDelayMs,
             drainTimeoutMs: config.http.drainTimeoutMs,
@@ -90,11 +108,13 @@ export class HttpModule implements IModule {
             shutdown,
             basePath: config.http.basePath,
             routes: container.resolveAll(AppToken.HTTP_ROUTES),
+            // every contributed channel the http app can serve; the engine holds the same instances
+            channels: container.resolveAll(AppToken.CHANNELS).filter((channel) => typeof channel.in === 'function'),
             ...(container.has(AppToken.AGENT_ISSUES) && { agentIssues: container.resolve(AppToken.AGENT_ISSUES) }),
             onError: (error) => logger.error('http error', error),
         });
 
-        // after the engine and scheduler steps (registered in their onReady, which runs first)
+        // after the engine's step (registered in its onReady, which runs first)
         registerStartStep(container, ModuleName.HTTP, async () => {
             await runHooks(container, 'started');
             throwIfStopped(context);
