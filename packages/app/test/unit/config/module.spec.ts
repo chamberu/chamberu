@@ -47,6 +47,7 @@ describe('readConfig', () => {
                 maxConcurrentRuns: 4,
             },
             scheduler: { enabled: true },
+            agents: { pollMs: 5_000 },
         });
     });
 
@@ -66,6 +67,8 @@ describe('readConfig', () => {
             CHAMVI_READINESS_DELAY_MS: '1000',
             CHAMVI_DRAIN_TIMEOUT_MS: '20000',
             CHAMVI_CLOSE_TIMEOUT_MS: '2000',
+            CHAMVI_AGENTS_DIR: './agents',
+            CHAMVI_AGENTS_POLL_MS: '2000',
         }, { mode: 'start' });
 
         expect(config).toEqual({
@@ -91,6 +94,7 @@ describe('readConfig', () => {
                 maxConcurrentRuns: 8,
             },
             scheduler: { enabled: false },
+            agents: { dir: './agents', pollMs: 2000 },
         });
     });
 
@@ -144,6 +148,18 @@ describe('readConfig', () => {
     ])('%s above the timer limit throws (Node would fire it after 1 ms)', (name) => {
         expect(() => start({ [name]: String(TIMER_MAX_MS + 1) })).toThrow(`${name} must be at most ${TIMER_MAX_MS}.`);
         expect(() => start({ [name]: String(TIMER_MAX_MS) })).not.toThrow();
+    });
+
+    it('CHAMVI_AGENTS_DIR empty is unset', () => {
+        expect(start({ CHAMVI_AGENTS_DIR: '' }).agents).toEqual({ pollMs: 5_000 });
+    });
+
+    it('CHAMVI_AGENTS_POLL_MS must be 1 to the timer limit', () => {
+        expect(() => start({ CHAMVI_AGENTS_POLL_MS: '0' })).toThrow('CHAMVI_AGENTS_POLL_MS must be at least 1.');
+        expect(() => start({ CHAMVI_AGENTS_POLL_MS: String(TIMER_MAX_MS + 1) }))
+            .toThrow(`CHAMVI_AGENTS_POLL_MS must be at most ${TIMER_MAX_MS}.`);
+        expect(start({ CHAMVI_AGENTS_POLL_MS: '1' }).agents.pollMs).toBe(1);
+        expect(start({ CHAMVI_AGENTS_POLL_MS: String(TIMER_MAX_MS) }).agents.pollMs).toBe(TIMER_MAX_MS);
     });
 
     it('CHAMVI_PURGE_INTERVAL_MS 0 disables', () => {

@@ -37,6 +37,12 @@ export type AppConfig = {
     scheduler: {
         enabled: boolean;
     };
+    agents: {
+        /** CHAMVI_AGENTS_DIR, as given (resolved against the working directory when loaded); unset means no folder. */
+        dir?: string;
+        /** CHAMVI_AGENTS_POLL_MS: how often the agents dir is checked for changes. */
+        pollMs: number;
+    };
     /** CHAMVI_TOKENS */
     tokens?: StaticToken[];
 };

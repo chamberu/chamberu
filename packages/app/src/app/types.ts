@@ -12,7 +12,8 @@ import type { ModelProviders } from '../models/types.ts';
 import type { APP_BRAND } from './constants.ts';
 
 export type AppOptions = {
-    agents: Agent[];
+    /** The code agents; may be omitted or empty when CHAMVI_AGENTS_DIR names an agents folder. */
+    agents?: Agent[];
     /** Extra modules; one named like a built-in (`ModuleName`) replaces it. */
     modules?: IModule[];
     /** Providers for string models, passed to the AI SDK's createProviderRegistry. */
@@ -46,6 +47,7 @@ export type AppRunJobResult = {
  */
 export interface IApp {
     readonly [APP_BRAND]: true;
+    /** The code agents (createApp's `agents`); folder agents are in the engine's live set. */
     readonly agents: readonly Agent[];
     /** Sets every module up; resolves once the HTTP server listens. */
     start(options?: AppStartOptions): Promise<void>;

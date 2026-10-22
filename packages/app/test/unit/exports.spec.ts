@@ -20,6 +20,7 @@ describe('public api', () => {
         'createLogger',
         'createModelRegistry',
         'installDefaultProvider',
+        'resolveModels',
         'runHooks',
         'throwIfStopped',
         'envString',
@@ -38,6 +39,7 @@ describe('public api', () => {
         'staticTokensModule',
         'consoleNotifierModule',
         'engineModule',
+        'agentsModule',
         'schedulerModule',
         'httpModule',
         // the common surface of @chamvi/core and @chamvi/http
@@ -63,8 +65,13 @@ describe('public api', () => {
         expect(app.TIMER_MAX_MS).toBe(2_147_483_647);
     });
 
+    it('exports the default poll interval of the agents dir', () => {
+        expect(app.DEFAULT_AGENTS_POLL_MS).toBe(5_000);
+    });
+
     it('exports the tokens', () => {
         expect(Object.keys(app.AppToken).sort()).toEqual([
+            'AGENT_ISSUES',
             'AUTHENTICATORS',
             'CLOCK',
             'CONFIG',
@@ -74,6 +81,7 @@ describe('public api', () => {
             'HTTP_ROUTES',
             'LIFECYCLE_HOOKS',
             'LOGGER',
+            'MODEL_CHECK',
             'NOTIFIERS',
             'SCHEDULER',
             'SERVER',
@@ -88,6 +96,7 @@ describe('public api', () => {
             STORE: 'chamvi:store',
             STATIC_TOKENS: 'chamvi:static-tokens',
             ENGINE: 'chamvi:engine',
+            AGENTS: 'chamvi:agents',
             SCHEDULER: 'chamvi:scheduler',
             HTTP: 'chamvi:http',
         });
@@ -133,6 +142,7 @@ describe('public api', () => {
     it.each([
         'reportingModule',
         'createPurgeTimer',
+        'createAgentsWatcher',
         'createLazyProvider',
         'githubModule',
         'githubNotifierModule',

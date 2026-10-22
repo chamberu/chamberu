@@ -32,6 +32,8 @@ export const AppToken = {
     AUTHENTICATORS: token('AUTHENTICATORS'),
     NOTIFIERS: token('NOTIFIERS'),
     LIFECYCLE_HOOKS: token('LIFECYCLE_HOOKS'),
+    AGENT_ISSUES: token('AGENT_ISSUES'),
+    MODEL_CHECK: token('MODEL_CHECK'),
 } as const;
 
 /** The built-in modules' names; list a module of the same name to replace one. */
@@ -40,6 +42,7 @@ export const ModuleName = {
     STORE: 'chamvi:store',
     STATIC_TOKENS: 'chamvi:static-tokens',
     ENGINE: 'chamvi:engine',
+    AGENTS: 'chamvi:agents',
     SCHEDULER: 'chamvi:scheduler',
     HTTP: 'chamvi:http',
 } as const;

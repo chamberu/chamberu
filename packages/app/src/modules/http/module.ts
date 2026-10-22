@@ -87,6 +87,7 @@ export class HttpModule implements IModule {
             shutdown,
             basePath: config.http.basePath,
             routes: container.resolveAll(AppToken.HTTP_ROUTES),
+            ...(container.has(AppToken.AGENT_ISSUES) && { agentIssues: container.resolve(AppToken.AGENT_ISSUES) }),
             onError: (error) => logger.error('http error', error),
         });
 

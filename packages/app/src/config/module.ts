@@ -19,6 +19,7 @@ import {
 import {
     BASE_PATH_PATTERN,
     DATABASE_URL_PROTOCOLS,
+    DEFAULT_AGENTS_POLL_MS,
     DEFAULT_CLOSE_TIMEOUT_MS,
     DEFAULT_DRAIN_TIMEOUT_MS,
     DEFAULT_HOST,
@@ -74,6 +75,7 @@ export function readConfig(env: Env, options: ReadConfigOptions): AppConfig {
         required: options.mode === 'migrate',
     });
     const tokens = readTokens(env);
+    const agentsDir = envString(env, 'CHAMVI_AGENTS_DIR');
 
     return {
         dev,
@@ -104,6 +106,14 @@ export function readConfig(env: Env, options: ReadConfigOptions): AppConfig {
             }),
         },
         scheduler: { enabled: envBoolean(env, 'CHAMVI_SCHEDULER', { default: true }) },
+        agents: {
+            ...(typeof agentsDir === 'string' ? { dir: agentsDir } : {}),
+            pollMs: envInteger(env, 'CHAMVI_AGENTS_POLL_MS', {
+                default: DEFAULT_AGENTS_POLL_MS,
+                min: 1,
+                max: TIMER_MAX_MS,
+            }),
+        },
         ...(typeof tokens !== 'undefined' ? { tokens } : {}),
     };
 }

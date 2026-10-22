@@ -13,6 +13,7 @@ export * from './loader/index.ts';
 export * from './logger/index.ts';
 export * from './models/index.ts';
 export * from './module/index.ts';
+export * from './modules/agents/index.ts';
 export * from './modules/config/index.ts';
 export * from './modules/console-notifier/index.ts';
 export * from './modules/engine/index.ts';
