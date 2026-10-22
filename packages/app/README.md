@@ -148,7 +148,7 @@ Modules are orkos `IModule`s on an eldin container. The built-in ones are always
 
 1. config
 2. store (and the migrations)
-3. every `onReady`: the engine, the scheduler and the HTTP app are built, nothing runs yet (a configuration error starts nothing)
+3. every `onReady` (user modules included): the engine, the scheduler and the HTTP app are built, nothing runs yet (a configuration error starts nothing)
 4. `engine.start()`
 5. `scheduler.start()`
 6. the purge timer

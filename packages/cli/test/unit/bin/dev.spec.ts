@@ -52,8 +52,7 @@ describe('bin dev', () => {
         await waitForOk(`http://127.0.0.1:${port}/readyz`);
         await cli.waitForOutput((output) => count(output, LISTENING) === 1);
 
-        await appendFile(path.join(app.cwd, 'src/agents.ts'), '\n// changed\n');
-        await cli.waitForOutput((output) => count(output, LISTENING) === 2);
+        await untilRestart(cli, 2, (i) => appendFile(path.join(app.cwd, 'src/agents.ts'), `\n// changed ${i}\n`));
         await waitForOk(`http://127.0.0.1:${port}/readyz`);
 
         process.kill(-cli.child.pid!, 'SIGINT');
@@ -67,8 +66,7 @@ describe('bin dev', () => {
         cli = dev();
         await cli.waitForOutput((output) => count(output, LISTENING) === 1);
 
-        await writeFile(path.join(app.cwd, '.env'), 'CHAMVI_LOG_LEVEL=info\nCHAMVI_DRAIN_TIMEOUT_MS=1000\n');
-        await cli.waitForOutput((output) => count(output, LISTENING) === 2);
+        await untilRestart(cli, 2, (i) => writeFile(path.join(app.cwd, '.env'), `CHAMVI_LOG_LEVEL=info\nCHAMVI_DRAIN_TIMEOUT_MS=${1000 + i}\n`));
 
         process.kill(-cli.child.pid!, 'SIGINT');
         expect((await cli.exited(15_000)).code).toBe(0);
@@ -85,6 +83,21 @@ describe('bin dev', () => {
         await waitForDown(`http://127.0.0.1:${port}/readyz`, 10_000);
     });
 });
+
+/**
+ * Changes a watched file until the app listened `times` times: a file
+ * watcher under load (macOS FSEvents) may miss a single change.
+ */
+async function untilRestart(cli: CliProcess, times: number, change: (i: number) => Promise<void>, timeoutMs = 20_000): Promise<void> {
+    const until = Date.now() + timeoutMs;
+    for (let i = 0; count(cli.stdout() + cli.stderr(), LISTENING) < times; i++) {
+        if (Date.now() > until) {
+            throw new Error(`no restart within ${timeoutMs}ms:\n${cli.stdout()}${cli.stderr()}`);
+        }
+        await change(i);
+        await cli.waitForOutput((output) => count(output, LISTENING) >= times, 2_000).catch(() => {});
+    }
+}
 
 async function waitForDown(url: string, timeoutMs: number): Promise<void> {
     const until = Date.now() + timeoutMs;

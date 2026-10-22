@@ -51,12 +51,18 @@ Relative imports carry `.ts` and there is no `enum`, so `chamvi dev` (Node's typ
 
 ```json
 {
-    "extends": "@tada5hi/tsconfig",
     "compilerOptions": {
+        "target": "ES2023",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "strict": true,
+        "skipLibCheck": true,
+        "verbatimModuleSyntax": true,
         "allowImportingTsExtensions": true,
         "erasableSyntaxOnly": true,
         "noEmit": true
-    }
+    },
+    "include": ["src", "test"]
 }
 ```
 

@@ -22,12 +22,18 @@ npm install --save-dev tsdown   # only for chamvi build
 
 ```json
 {
-    "extends": "@tada5hi/tsconfig",
     "compilerOptions": {
+        "target": "ES2023",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "strict": true,
+        "skipLibCheck": true,
+        "verbatimModuleSyntax": true,
         "allowImportingTsExtensions": true,
         "erasableSyntaxOnly": true,
         "noEmit": true
-    }
+    },
+    "include": ["src", "test"]
 }
 ```
 
@@ -71,7 +77,7 @@ orkos sets every module up in dependency order, then calls every `onReady`. cham
 - In **`setup`**, a module registers what it contributes on the container's collection tokens: `AppToken.HTTP_ROUTES`, `NOTIFIERS`, `AUTHENTICATORS` (with an `order`, lowest first) and `LIFECYCLE_HOOKS`.
 - In **`onReady`**, the consumers build: the engine module collects the notifiers, the http module the routes and authenticators.
 
-So a contribution never depends on module order. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in its own `onReady` lists that module in `dependencies`. The engine and the scheduler start only after the http module built its app (authenticators, routes) and the scheduler its definitions, so a configuration error in any of them starts nothing: no queued run of the shared store executes on a replica that then exits 2.
+So a contribution never depends on module order. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in its own `onReady` lists that module in `dependencies`. Nothing starts in `onReady`: the engine, the scheduler and the http module register start steps, which the app runs (engine, scheduler, then the `started` hooks and listening) only once every module's `onReady` ran, user modules included. So a configuration error any of them finds starts nothing: no queued run of the shared store executes on a replica that then exits 2.
 
 ## Start and stop
 
