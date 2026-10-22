@@ -12,6 +12,8 @@ describe('public api', () => {
     it.each([
         'createGithubApp',
         'githubWebhook',
+        'injectGithubContext',
+        'provideGithubContext',
     ])('exports %s', (name) => {
         expect(github).toHaveProperty(name);
         expect(github[name as keyof typeof github]).toBeTypeOf('function');
@@ -35,6 +37,7 @@ describe('public api', () => {
         'createAppJwt',
         'createInstallationTokens',
         'createWebhookRoute',
+        'GITHUB_CONTEXT',
         'createReadTools',
         'createWriteTools',
         'matchesGithubTrigger',
