@@ -125,5 +125,19 @@ export function processContext(cliPath: string = process.argv[1] ?? ''): CliCont
         spawn,
         execPath: process.execPath,
         cliPath,
+        linkToParent: () => {
+            const { stdin } = process;
+            stdin.once('end', () => {
+                // the watcher (this process's parent) leads the dev group: end the group, else this process alone
+                try {
+                    process.kill(-process.ppid, 'SIGTERM');
+                } catch {
+                    process.kill(process.pid, 'SIGTERM');
+                }
+            });
+            stdin.resume();
+            // reading stdin must not keep a stopped app alive
+            (stdin as { unref?: () => void }).unref?.();
+        },
     };
 }

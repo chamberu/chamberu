@@ -13,6 +13,9 @@ export const DEV_FORCE_EXIT_MS = 15_000;
 
 export const FORCE_EXIT_VARIABLE = 'CHAMVI_FORCE_EXIT_MS';
 
+/** Set by `chamvi dev` on its child: `start --dev` then links to it through stdin (`CliContext.linkToParent`). */
+export const DEV_LINK_VARIABLE = 'CHAMVI_DEV_LINK';
+
 /** The dotenv file `start --dev` reads from the working directory. */
 export const DOTENV_FILE = '.env';
 

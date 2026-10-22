@@ -73,4 +73,30 @@ describe('bin dev', () => {
         process.kill(-cli.child.pid!, 'SIGINT');
         expect((await cli.exited(15_000)).code).toBe(0);
     });
+
+    it('the dev group ends when the CLI is killed without its exit hook', async () => {
+        cli = dev();
+        await waitForOk(`http://127.0.0.1:${port}/readyz`);
+
+        // SIGKILL: no exit event, nothing forwarded; only the closed stdin pipe tells the group
+        process.kill(cli.child.pid!, 'SIGKILL');
+        await cli.exited(5_000);
+
+        await waitForDown(`http://127.0.0.1:${port}/readyz`, 10_000);
+    });
 });
+
+async function waitForDown(url: string, timeoutMs: number): Promise<void> {
+    const until = Date.now() + timeoutMs;
+    for (;;) {
+        try {
+            await fetch(url);
+        } catch {
+            return;
+        }
+        if (Date.now() > until) {
+            throw new Error(`${url} still answers ${timeoutMs}ms after the CLI died`);
+        }
+        await new Promise((resolve) => { setTimeout(resolve, 200); });
+    }
+}

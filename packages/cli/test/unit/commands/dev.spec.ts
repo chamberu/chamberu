@@ -111,7 +111,9 @@ describe('dev', () => {
             '--entry',
             path.join(FIXTURE_APP, 'src/index.ts'),
         ]);
-        expect(call.options).toMatchObject({ cwd: FIXTURE_APP, stdio: 'inherit' });
+        // stdin is a pipe only this process writes: it closes when this process dies, which ends the group
+        expect(call.options).toMatchObject({ cwd: FIXTURE_APP, stdio: ['pipe', 'inherit', 'inherit'] });
+        expect((call.options.env as Record<string, string>).CHAMVI_DEV_LINK).toBe('1');
 
         child.end(0);
         await running;

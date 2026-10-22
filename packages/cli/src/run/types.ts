@@ -29,4 +29,11 @@ export type CliContext = {
     execPath: string;
     /** The bin, `dist/cli.mjs`. */
     cliPath: string;
+    /**
+     * Under `chamvi dev` (stdin is a pipe only the dev CLI writes): once that
+     * pipe closes, the CLI died without forwarding a signal, so this ends the
+     * whole dev process group (the `node --watch` watcher and this process)
+     * with SIGTERM.
+     */
+    linkToParent(): void;
 };

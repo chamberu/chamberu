@@ -12,7 +12,7 @@ import { EXIT_CODE } from '../run/constants.ts';
 import { assertKnownArgs, messageOf } from '../run/helpers.ts';
 import type { CliContext } from '../run/types.ts';
 import type { ProcessEvent, StopSignal } from '../signals/types.ts';
-import { DOTENV_FILE, ENTRY_ARG } from './constants.ts';
+import { DEV_LINK_VARIABLE, DOTENV_FILE, ENTRY_ARG } from './constants.ts';
 
 const DEV_ARGS = { entry: ENTRY_ARG } as const;
 
@@ -21,8 +21,9 @@ const DEV_ARGS = { entry: ENTRY_ARG } as const;
  * entry. The child runs detached (its own process group), so a terminal
  * Ctrl-C reaches only this process, which forwards exactly one signal per
  * signal it gets; SIGHUP and this process's exit stop the child with
- * SIGTERM, so the group never outlives the CLI. The exit code is the
- * child's, 0 when it ended by a forwarded signal, else 1.
+ * SIGTERM, and the child's stdin is a pipe whose close (this process died,
+ * also by SIGKILL) ends the group, so the group never outlives the CLI. The
+ * exit code is the child's, 0 when it ended by a forwarded signal, else 1.
  */
 export function createDevCommand(context: CliContext): CommandDef<typeof DEV_ARGS> {
     return defineCommand({
@@ -49,7 +50,9 @@ export function createDevCommand(context: CliContext): CommandDef<typeof DEV_ARG
                 entry,
             ], {
                 cwd: context.cwd,
-                stdio: 'inherit',
+                env: { ...context.env, [DEV_LINK_VARIABLE]: '1' },
+                // stdin: a pipe only this process writes, closed by the OS when it dies (even by SIGKILL)
+                stdio: ['pipe', 'inherit', 'inherit'],
                 detached: true,
             });
 
@@ -82,6 +85,8 @@ export function createDevCommand(context: CliContext): CommandDef<typeof DEV_ARG
                 context.setExitCode(EXIT_CODE.FAILURE);
             } finally {
                 listeners.forEach((fn, event) => context.signals.off(event, fn));
+                // the open pipe would keep this process alive
+                child.stdin?.destroy();
             }
         },
     });

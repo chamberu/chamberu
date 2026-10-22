@@ -21,6 +21,8 @@ export type FakeProcess = {
     exits: number[];
     stdout: string[];
     stderr: string[];
+    /** How often a command linked to its `chamvi dev` parent (`linkToParent`). */
+    links: number;
     /** The CliContext over this process (env, cwd and importModule as given). */
     context(input?: { env?: Env; cwd?: string }): Partial<CliContext>;
 };
@@ -48,13 +50,14 @@ export function createFakeProcess(): FakeProcess {
         },
     };
 
-    return {
+    const fake: FakeProcess = {
         signals,
         clock,
         exitCodes,
         exits,
         stdout,
         stderr,
+        links: 0,
         context(input = {}) {
             return {
                 cwd: input.cwd ?? process.cwd(),
@@ -73,7 +76,11 @@ export function createFakeProcess(): FakeProcess {
                 stderr: (text) => {
                     stderr.push(text);
                 },
+                linkToParent: () => {
+                    fake.links++;
+                },
             };
         },
     };
+    return fake;
 }

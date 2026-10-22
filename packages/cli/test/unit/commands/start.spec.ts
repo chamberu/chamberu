@@ -177,6 +177,27 @@ describe('start', () => {
             expect(response.status).toBe(200);
         });
 
+        it('links to the chamvi dev parent only when spawned by chamvi dev', async () => {
+            await start(['--dev', '--entry', fixture('app')], startEnv(port), cwd);
+            expect(fake.links).toBe(0);
+            fake.signals.emit('SIGTERM');
+            await vi.waitFor(() => expect(fake.exitCodes).toEqual([0]));
+
+            // a fresh entry import, so a fresh App
+            vi.resetModules();
+            const linked = createFakeProcess();
+            const other = await freePort();
+            await runCli(['start', '--dev', '--entry', fixture('app')], linked.context({ env: startEnv(other, { CHAMVI_DEV_LINK: '1' }), cwd }));
+            expect(linked.links).toBe(1);
+            linked.signals.emit('SIGTERM');
+            await vi.waitFor(() => expect(linked.exitCodes).toEqual([0]));
+        });
+
+        it('a start without --dev never links', async () => {
+            await start(['--entry', fixture('app')], startEnv(port, { CHAMVI_DEV_LINK: '1' }), cwd);
+            expect(fake.links).toBe(0);
+        });
+
         it('warns about the random secret and token', async () => {
             const lines: string[] = [];
             vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {

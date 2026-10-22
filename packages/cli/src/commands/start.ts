@@ -16,6 +16,7 @@ import type { CliContext } from '../run/types.ts';
 import { installSignalHandlers } from '../signals/module.ts';
 import {
     DEV_FORCE_EXIT_MS,
+    DEV_LINK_VARIABLE,
     DOTENV_FILE,
     ENTRY_ARG,
     FORCE_EXIT_MS,
@@ -76,6 +77,9 @@ export function createStartCommand(context: CliContext): CommandDef<typeof START
                 exit: context.exit,
                 stderr: context.stderr,
             });
+            if (dev && env[DEV_LINK_VARIABLE] === '1') {
+                context.linkToParent();
+            }
 
             try {
                 await app.start({ dev, env });
