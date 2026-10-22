@@ -13,6 +13,13 @@ describe('public api', () => {
         expect(pkg.githubNotifier).toBeTypeOf('function');
     });
 
+    it.each([
+        'injectGithubNotifierContext',
+        'provideGithubNotifierContext',
+    ])('exports %s', (name) => {
+        expect(pkg[name as keyof typeof pkg]).toBeTypeOf('function');
+    });
+
     it('exports the constants', () => {
         expect(pkg.GITHUB_NOTIFIER_TIMEOUT_MS).toBe(30_000);
         expect(pkg.COMMENT_BODY_MAX_LENGTH).toBe(60_000);
@@ -27,6 +34,7 @@ describe('public api', () => {
         'resolveTarget',
         'renderComment',
         'markerKey',
+        'githubNotifierContextKey',
     ])('keeps %s internal', (name) => {
         expect(pkg).not.toHaveProperty(name);
     });
