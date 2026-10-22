@@ -6,6 +6,7 @@
     "packages": {
         "packages/app": {"component": "app"},
         "packages/cli": {"component": "cli"},
+        "packages/chat": {"component": "chat"},
         "packages/coding": {"component": "coding"},
         "packages/core": {"component": "core"},
         "packages/github": {"component": "github"},

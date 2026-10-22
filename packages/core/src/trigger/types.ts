@@ -7,7 +7,7 @@
 
 import type { Artifact } from '../artifact/types.ts';
 
-export type TriggerSource = 'cron' | 'http' | 'webhook' | 'github' | 'mcp';
+export type TriggerSource = 'cron' | 'http' | 'webhook' | 'github' | 'mcp' | 'channel';
 
 export type TriggerDefinition<P = unknown> = {
     source: TriggerSource;
