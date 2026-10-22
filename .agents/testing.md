@@ -32,6 +32,11 @@ Only `test/unit/**/*.{test,spec}.{js,ts}` is picked up; a new test directory nee
 - `test/unit/smoke.spec.ts` checks that the package entry resolves.
 - `test/unit/exports.spec.ts` pins the public exports; `test/unit/readme.spec.ts` runs `test/fixtures/readme-example.ts` and checks that the package's `README.md` contains that file verbatim. Change the example in the fixture, then copy it into the README.
 
+## App and CLI (`@chamvi/app`, `@chamvi/cli`)
+
+- `@chamvi/app` tests run modules on `createHarness()`/`buildHarness()` (`test/utils/harness.ts`: an orkos `Application` over a fresh eldin container with `AppToken.CONTEXT` registered, the modules wrapped like the app does, `setup()` also running the start steps) or a whole `createApp()` with `start({ env })`; real loopback ports come from `freePort()` (`test/utils/port.ts`), log lines from `createRecordingLogger()` (`test/utils/logger.ts`). The Postgres suites (`describePostgres`, a database per test from `createTestDatabaseUrl()` in `test/utils/database.ts`) need Docker like `@chamvi/store-typeorm`: `test/global-setup.ts` starts `postgres:18-alpine` with testcontainers, skipping with a warning locally and failing when `CI` is set.
+- `@chamvi/cli` command tests call `runCli(argv, context)` with the fake process of `test/utils/process.ts` (signals, a `ControllableClock`, recorded exit codes, `linkToParent` calls) over the apps in `test/fixtures/` (`app`, `failing`, `hang`, `slow`, `keyless`, `broken`). The `test/unit/bin/` specs spawn the built `dist/cli.mjs` (`spawnCli()` in `test/utils/spawn.ts`), which imports the built `@chamvi/app`, so `nx` runs `@chamvi/cli:test` after its build (`dependsOn: ["build"]`); running vitest by hand needs `npm run build` (at least `@chamvi/app` and `@chamvi/cli`) first.
+
 ## Dashboard (`@chamvi/ui`)
 
 - `nx` runs `@chamvi/ui:test` after its build (`dependsOn: ["build"]`): `readme.spec.ts` serves the real `dist/app`. Running vitest by hand needs `npx nx run @chamvi/ui:build` first.
