@@ -60,9 +60,9 @@ export async function runHooks(container: IContainer, phase: LifecyclePhase, ...
  */
 export function reportingModule(module: IModule, report: AppContext['report']): IModule {
     const {
-        teardown, 
-        onReady, 
-        onError, 
+        teardown,
+        onReady,
+        onError,
     } = module;
 
     return {

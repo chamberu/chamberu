@@ -15,26 +15,26 @@ function capture(level?: LogLevel) {
     const lines: string[] = [];
     const clock = new ControllableClock(new Date('2026-10-21T00:00:00Z'));
     const logger = createLogger({
-        level, 
-        clock, 
+        level,
+        clock,
         write: (line) => {
             lines.push(line);
         },
     });
 
     return {
-        logger, 
-        entries: () => lines.map((line) => JSON.parse(line) as Record<string, unknown>), 
-        lines, 
+        logger,
+        entries: () => lines.map((line) => JSON.parse(line) as Record<string, unknown>),
+        lines,
     };
 }
 
 describe('createLogger', () => {
     it('writes one JSON line per entry with its fields', () => {
         const {
-            logger, 
-            lines, 
-            entries, 
+            logger,
+            lines,
+            entries,
         } = capture();
 
         logger.info('started', { port: 3000 });
@@ -42,10 +42,10 @@ describe('createLogger', () => {
         expect(lines).toHaveLength(1);
         expect(lines[0]).not.toContain('\n');
         expect(entries()[0]).toEqual({
-            level: 'info', 
-            time: '2026-10-21T00:00:00.000Z', 
-            msg: 'started', 
-            port: 3000, 
+            level: 'info',
+            time: '2026-10-21T00:00:00.000Z',
+            msg: 'started',
+            port: 3000,
         });
     });
 
@@ -83,14 +83,14 @@ describe('createLogger', () => {
         const [entry] = entries();
         expect(Object.keys(entry!)).toEqual(['level', 'time', 'msg', 'run', 'error']);
         expect(entry).toMatchObject({
-            level: 'error', 
-            msg: 'failed', 
-            run: 'r1', 
+            level: 'error',
+            msg: 'failed',
+            run: 'r1',
         });
         expect(entry!.error).toMatchObject({
-            name: 'ChamviError', 
-            code: 'x', 
-            message: 'm', 
+            name: 'ChamviError',
+            code: 'x',
+            message: 'm',
         });
         expect(typeof (entry!.error as Record<string, unknown>).stack).toBe('string');
     });
@@ -98,9 +98,9 @@ describe('createLogger', () => {
     it('never expands cause or issues', () => {
         const { logger, entries } = capture();
         const error = new ChamviError({
-            code: 'x', 
-            message: 'm', 
-            cause: new Error('sekr3t'), 
+            code: 'x',
+            message: 'm',
+            cause: new Error('sekr3t'),
         });
 
         logger.error('failed', error);
@@ -130,15 +130,15 @@ describe('createLogger', () => {
         const { logger, entries } = capture();
 
         logger.info('real', {
-            level: 'error', 
-            msg: 'fake', 
-            time: 'never', 
+            level: 'error',
+            msg: 'fake',
+            time: 'never',
         });
 
         expect(entries()[0]).toMatchObject({
-            level: 'info', 
-            msg: 'real', 
-            time: '2026-10-21T00:00:00.000Z', 
+            level: 'info',
+            msg: 'real',
+            time: '2026-10-21T00:00:00.000Z',
         });
     });
 

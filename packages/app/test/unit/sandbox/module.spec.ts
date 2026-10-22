@@ -96,9 +96,9 @@ afterEach(async () => {
 });
 
 async function harnessWith(module: IModule, options: {
-    mode?: AppMode; 
-    agents?: Agent[]; 
-    events?: string[] 
+    mode?: AppMode;
+    agents?: Agent[];
+    events?: string[]
 } = {}) {
     const harness = await createHarness({
         mode: options.mode ?? 'start',
@@ -160,9 +160,9 @@ describe('sandboxModule', () => {
         expect(() => sandboxModule({ env: { CHAMVI_SANDBOX_PROVIDER: 'kubernetes', CHAMVI_SANDBOX_NAMESPACE: 'sandbox' } }))
             .not.toThrow();
         expect(() => sandboxModule({
-            env: {}, 
-            provider: 'kubernetes', 
-            namespace: 'sandbox', 
+            env: {},
+            provider: 'kubernetes',
+            namespace: 'sandbox',
         })).not.toThrow();
     });
 

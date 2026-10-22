@@ -164,9 +164,9 @@ describe('httpModule', () => {
 
     it('serves /healthz and /readyz after start', async () => {
         const {
-            harness, 
-            url, 
-            logger, 
+            harness,
+            url,
+            logger,
         } = await build();
         await harness.setup();
 
@@ -264,9 +264,9 @@ describe('httpModule', () => {
             },
         };
         const {
-            harness, 
-            url, 
-            port, 
+            harness,
+            url,
+            port,
         } = await build({
             scheduler: fakeScheduler,
             modules: [
@@ -313,9 +313,9 @@ describe('httpModule', () => {
             approvals: { deploy: 'user' },
         });
         const {
-            harness, 
-            url, 
-            port, 
+            harness,
+            url,
+            port,
         } = await build({ agents: [agent] });
         await harness.setup();
 

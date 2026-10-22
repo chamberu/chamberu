@@ -72,9 +72,9 @@ async function served(env: Record<string, string> = {}, basePath = '') {
         response,
         html,
         config: match ? JSON.parse(match[1]!) as {
-            apiBase: string; 
-            uiBase: string; 
-            auth: { tokens: boolean; authup?: unknown } 
+            apiBase: string;
+            uiBase: string;
+            auth: { tokens: boolean; authup?: unknown }
         } : undefined,
     };
 }

@@ -31,9 +31,9 @@ export function createLogger(options: LoggerOptions = {}): ILogger {
 
         try {
             const head = {
-                level, 
-                time: clock.now().toISOString(), 
-                msg, 
+                level,
+                time: clock.now().toISOString(),
+                msg,
             };
             write(toLine(head, fields ?? {}, error ? serializeError(error.value) : undefined));
         } catch {

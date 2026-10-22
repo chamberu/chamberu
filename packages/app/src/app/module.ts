@@ -148,7 +148,11 @@ export class App implements IApp {
      * modules down and rethrows, the app_stopped error when stop() interrupted it.
      */
     protected async setup(lifecycle: Lifecycle): Promise<void> {
-        const { application, container, controller } = lifecycle;
+        const {
+            application,
+            container,
+            controller,
+        } = lifecycle;
         try {
             await application.setup();
             // the steps the http module did not run (an app without it)
@@ -192,9 +196,9 @@ export class App implements IApp {
             }
 
             const {
-                runId, 
-                status, 
-                exitCode, 
+                runId,
+                status,
+                exitCode,
             } = await runJob({
                 engine,
                 agent,

@@ -80,9 +80,9 @@ export function readConfig(env: Env, options: ReadConfigOptions): AppConfig {
         logLevel: envOneOf(env, 'CHAMVI_LOG_LEVEL', LOG_LEVELS, { default: 'info' }),
         http: {
             port: envInteger(env, 'PORT', {
-                default: DEFAULT_PORT, 
-                min: 1, 
-                max: 65535, 
+                default: DEFAULT_PORT,
+                min: 1,
+                max: 65535,
             }),
             host: envString(env, 'HOST', { default: DEFAULT_HOST }),
             basePath: readBasePath(env),

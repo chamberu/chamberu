@@ -39,9 +39,9 @@ describe('README example', () => {
             env: {
                 RESUME_SECRET: 'a-resume-secret-of-at-least-32-characters',
                 CHAMVI_TOKENS: JSON.stringify([{
-                    value: 'a-static-token-of-16+', 
-                    id: 'ops', 
-                    permissions: ['*'], 
+                    value: 'a-static-token-of-16+',
+                    id: 'ops',
+                    permissions: ['*'],
                 }]),
                 PORT: String(port),
                 HOST: '127.0.0.1',

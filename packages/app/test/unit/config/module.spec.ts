@@ -193,27 +193,27 @@ describe('readConfig', () => {
 
     describe('CHAMVI_TOKENS', () => {
         const valid = {
-            value: 'a'.repeat(16), 
-            id: 'ops', 
-            permissions: ['*'], 
+            value: 'a'.repeat(16),
+            id: 'ops',
+            permissions: ['*'],
         };
 
         it('parses a valid JSON array', () => {
             const config = start({
                 CHAMVI_TOKENS: JSON.stringify([valid, {
-                    value: 'b'.repeat(20), 
-                    id: 'ci', 
-                    permissions: [], 
-                    extra: 1, 
-                }]), 
+                    value: 'b'.repeat(20),
+                    id: 'ci',
+                    permissions: [],
+                    extra: 1,
+                }]),
             });
 
             expect(config.tokens).toEqual([
                 valid,
                 {
-                    value: 'b'.repeat(20), 
-                    id: 'ci', 
-                    permissions: [], 
+                    value: 'b'.repeat(20),
+                    id: 'ci',
+                    permissions: [],
                 },
             ]);
         });
@@ -223,9 +223,9 @@ describe('readConfig', () => {
             ['an empty array', []],
             ['a non-object item', [valid, 'x']],
             ['a short value', [valid, {
-                value: 'short', 
-                id: 'x', 
-                permissions: [], 
+                value: 'short',
+                id: 'x',
+                permissions: [],
             }]],
             ['a duplicate value', [valid, { ...valid, id: 'other' }]],
             ['an empty id', [{ ...valid, id: '' }]],
@@ -247,10 +247,10 @@ describe('readConfig', () => {
             const secret = 'sekr3t-tok';
             const short = errorOf(() => start({
                 CHAMVI_TOKENS: JSON.stringify([valid, {
-                    value: secret, 
-                    id: 'x', 
-                    permissions: [], 
-                }]), 
+                    value: secret,
+                    id: 'x',
+                    permissions: [],
+                }]),
             }));
 
             expect(short.message).toBe('CHAMVI_TOKENS[1].value must be at least 16 characters.');

@@ -20,9 +20,9 @@ import { createFakeProcess } from '../../utils/process.ts';
 import type { FakeProcess } from '../../utils/process.ts';
 
 type SpawnCall = {
-    command: string; 
-    args: readonly string[]; 
-    options: Record<string, unknown> 
+    command: string;
+    args: readonly string[];
+    options: Record<string, unknown>
 };
 
 class FakeChild extends EventEmitter {
@@ -60,9 +60,9 @@ describe('dev', () => {
     function dev(args: string[] = []): Promise<void> {
         const fakeSpawn = ((command: string, spawnArgs: readonly string[], options: Record<string, unknown>) => {
             calls.push({
-                command, 
-                args: spawnArgs, 
-                options, 
+                command,
+                args: spawnArgs,
+                options,
             });
             return child;
         }) as unknown as typeof spawn;

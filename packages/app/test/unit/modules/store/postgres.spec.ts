@@ -283,9 +283,9 @@ describePostgres('storeModule on Postgres', () => {
     it('purge on Postgres', async () => {
         const url = await createTestDatabaseUrl();
         const {
-            harness, 
-            clock, 
-            logger, 
+            harness,
+            clock,
+            logger,
         } = build({ env: { DATABASE_URL: url } });
         await harness.setup();
 

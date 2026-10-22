@@ -19,9 +19,9 @@ describe('exports', () => {
 
     it('EXIT_CODE', () => {
         expect(cli.EXIT_CODE).toEqual({
-            OK: 0, 
-            FAILURE: 1, 
-            USAGE: 2, 
+            OK: 0,
+            FAILURE: 1,
+            USAGE: 2,
         });
     });
 

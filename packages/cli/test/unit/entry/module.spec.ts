@@ -57,9 +57,9 @@ describe('resolveEntry', () => {
     it('resolves --entry relative to cwd', async () => {
         await touch('app/main.ts');
         await expect(resolveEntry({
-            cwd, 
-            entry: 'app/main.ts', 
-            kind: 'built', 
+            cwd,
+            entry: 'app/main.ts',
+            kind: 'built',
         })).resolves.toBe(path.join(cwd, 'app/main.ts'));
     });
 
@@ -67,9 +67,9 @@ describe('resolveEntry', () => {
         await touch('app/main.ts');
         const entry = path.join(cwd, 'app/main.ts');
         await expect(resolveEntry({
-            cwd: tmpdir(), 
-            entry, 
-            kind: 'source', 
+            cwd: tmpdir(),
+            entry,
+            kind: 'source',
         })).resolves.toBe(entry);
     });
 
@@ -108,9 +108,9 @@ describe('resolveEntry', () => {
 
     it('refuses a missing --entry', async () => {
         const error = await rejectionOf(resolveEntry({
-            cwd, 
-            entry: 'nope.ts', 
-            kind: 'source', 
+            cwd,
+            entry: 'nope.ts',
+            kind: 'source',
         }));
         expect((error as ChamviError).code).toBe(CLI_USAGE_ERROR_CODE);
         expect((error as Error).message).toContain('nope.ts not found');

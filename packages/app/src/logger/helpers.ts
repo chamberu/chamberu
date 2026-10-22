@@ -42,16 +42,16 @@ export function toLine(
     const tail = error ? { error } : {};
     try {
         return JSON.stringify({
-            ...head, 
-            ...fields, 
-            ...head, 
-            ...tail, 
+            ...head,
+            ...fields,
+            ...head,
+            ...tail,
         }, replacer);
     } catch {
         return JSON.stringify({
-            ...head, 
-            fieldsDropped: true, 
-            ...tail, 
+            ...head,
+            fieldsDropped: true,
+            ...tail,
         }, replacer);
     }
 }

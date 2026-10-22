@@ -59,9 +59,9 @@ function fakeImporter(model = textModel('from anthropic')) {
         throw notFound(specifier);
     };
     return {
-        importer, 
-        options, 
-        model, 
+        importer,
+        options,
+        model,
     };
 }
 
@@ -85,9 +85,9 @@ describe('createModelRegistry', () => {
 
     it('resolves \'anthropic:m\' through the discovered provider', async () => {
         const {
-            importer, 
-            options, 
-            model, 
+            importer,
+            options,
+            model,
         } = fakeImporter();
         const registry = await createModelRegistry({
             agents: [agentWith('anthropic:m')],

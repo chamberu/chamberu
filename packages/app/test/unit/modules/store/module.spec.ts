@@ -57,9 +57,9 @@ async function setup(options: {
         ],
     });
     return {
-        harness, 
-        clock, 
-        logger, 
+        harness,
+        clock,
+        logger,
     };
 }
 
@@ -108,9 +108,9 @@ describe('storeModule', () => {
     it('purge runs every interval and never overlaps', async () => {
         const { store, calls } = purgingStore();
         const {
-            harness, 
-            clock, 
-            logger, 
+            harness,
+            clock,
+            logger,
         } = await setup({ store });
         await runHooks(harness.container, 'started');
 
@@ -187,9 +187,9 @@ describe('storeModule', () => {
     it('purge failure is logged and re-armed', async () => {
         const { store, calls } = purgingStore();
         const {
-            harness, 
-            clock, 
-            logger, 
+            harness,
+            clock,
+            logger,
         } = await setup({ store });
         await runHooks(harness.container, 'started');
         clock.advance(DEFAULT_PURGE_INTERVAL_MS);

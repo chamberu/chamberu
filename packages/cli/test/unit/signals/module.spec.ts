@@ -17,9 +17,9 @@ import { createFakeProcess } from '../../utils/process.ts';
 import type { FakeProcess } from '../../utils/process.ts';
 
 type Deferred = {
-    promise: Promise<void>; 
-    resolve(): void; 
-    reject(error: unknown): void 
+    promise: Promise<void>;
+    resolve(): void;
+    reject(error: unknown): void
 };
 
 function deferred(): Deferred {

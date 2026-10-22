@@ -37,9 +37,9 @@ export function readTokens(env: Env): StaticToken[] | undefined {
         }
 
         const {
-            value, 
-            id, 
-            permissions, 
+            value,
+            id,
+            permissions,
         } = item;
         if (typeof value !== 'string' || value.length < TOKEN_VALUE_MIN_LENGTH) {
             throw new InvalidAgentDefinitionError(`${at}.value must be at least ${TOKEN_VALUE_MIN_LENGTH} characters.`);
@@ -58,9 +58,9 @@ export function readTokens(env: Env): StaticToken[] | undefined {
         }
 
         return {
-            value, 
-            id, 
-            permissions: [...permissions] as string[], 
+            value,
+            id,
+            permissions: [...permissions] as string[],
         };
     });
 }

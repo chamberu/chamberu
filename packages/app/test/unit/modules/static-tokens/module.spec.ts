@@ -55,11 +55,11 @@ describe('staticTokensModule', () => {
         const { entries } = await entriesOf({
             env: {
                 CHAMVI_TOKENS: JSON.stringify([{
-                    value: ENV_TOKEN, 
-                    id: 'ci', 
-                    permissions: ['run:read'], 
-                }]), 
-            }, 
+                    value: ENV_TOKEN,
+                    id: 'ci',
+                    permissions: ['run:read'],
+                }]),
+            },
         });
 
         expect(entries).toHaveLength(1);
@@ -76,17 +76,17 @@ describe('staticTokensModule', () => {
         const { entries } = await entriesOf({
             env: {
                 CHAMVI_TOKENS: JSON.stringify([{
-                    value: ENV_TOKEN, 
-                    id: 'ci', 
-                    permissions: ['*'], 
-                }]), 
+                    value: ENV_TOKEN,
+                    id: 'ci',
+                    permissions: ['*'],
+                }]),
             },
             module: staticTokensModule({
                 tokens: [{
-                    value: OPTION_TOKEN, 
-                    id: 'opt', 
-                    permissions: ['*'], 
-                }], 
+                    value: OPTION_TOKEN,
+                    id: 'opt',
+                    permissions: ['*'],
+                }],
             }),
         });
 
@@ -122,10 +122,10 @@ describe('staticTokensModule', () => {
             dev: true,
             env: {
                 CHAMVI_TOKENS: JSON.stringify([{
-                    value: ENV_TOKEN, 
-                    id: 'ci', 
-                    permissions: ['*'], 
-                }]), 
+                    value: ENV_TOKEN,
+                    id: 'ci',
+                    permissions: ['*'],
+                }]),
             },
         });
 

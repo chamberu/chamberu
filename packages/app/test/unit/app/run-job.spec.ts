@@ -75,9 +75,9 @@ function build(agents: Agent[], modules: IModule[] = []) {
 describe('App.runJob', () => {
     it('runs a cron agent once and returns completed', async () => {
         const {
-            app, 
-            env, 
-            store, 
+            app,
+            env,
+            store,
         } = build([sweep(textModel())]);
 
         const result = await app.runJob({ env, agent: 'sweep' });
@@ -94,7 +94,11 @@ describe('App.runJob', () => {
 
     it('rejects app_stop_failed when the teardown after a completed job reports an error', async () => {
         const after: string[] = [];
-        const { app, env, logger } = build([sweep(textModel())], [
+        const {
+            app,
+            env,
+            logger,
+        } = build([sweep(textModel())], [
             {
                 name: 'broken',
                 setup: async () => undefined,
@@ -150,9 +154,9 @@ describe('App.runJob', () => {
             },
         };
         const {
-            app, 
-            env, 
-            logger, 
+            app,
+            env,
+            logger,
         } = build([sweep(textModel())], [probe]);
 
         await app.runJob({ env, agent: 'sweep' });

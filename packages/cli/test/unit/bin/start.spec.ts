@@ -70,9 +70,9 @@ describe('bin start', () => {
         const base = `http://127.0.0.1:${port}`;
         const headers = { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' };
         const response = await fetch(`${base}/agents/hang/runs`, {
-            method: 'POST', 
-            headers, 
-            body: JSON.stringify({ payload: {} }), 
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ payload: {} }),
         });
         expect(response.status).toBe(202);
         const { runId } = await response.json() as { runId: string };
