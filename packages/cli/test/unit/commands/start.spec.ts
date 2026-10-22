@@ -130,6 +130,12 @@ describe('start', () => {
         expect(fake.stderr.join('')).not.toContain('soon');
     });
 
+    it('a CHAMVI_FORCE_EXIT_MS above the timer limit exits 2', async () => {
+        await start(['--entry', fixture('app')], startEnv(port, { CHAMVI_FORCE_EXIT_MS: '2147483648' }));
+        expect(fake.exitCodes).toEqual([2]);
+        expect(fake.stderr.join('')).toContain('CHAMVI_FORCE_EXIT_MS must be at most 2147483647.');
+    });
+
     it('unknown flag exits 2', async () => {
         await start(['--entry', fixture('app'), '--colour'], startEnv(port));
         expect(fake.exitCodes).toEqual([2]);

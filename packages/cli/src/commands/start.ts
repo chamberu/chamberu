@@ -7,7 +7,7 @@
 
 import * as nodeModule from 'node:module';
 import path from 'node:path';
-import { envInteger } from '@chamvi/app';
+import { TIMER_MAX_MS, envInteger } from '@chamvi/app';
 import { defineCommand } from 'citty';
 import type { CommandDef } from 'citty';
 import { loadApp, resolveEntry } from '../entry/module.ts';
@@ -52,7 +52,10 @@ export function createStartCommand(context: CliContext): CommandDef<typeof START
                 // before the entry import: module factories read env when called
                 await loadDotEnv(env, path.join(context.cwd, DOTENV_FILE));
             }
-            const forceExitMs = envInteger(env, FORCE_EXIT_VARIABLE, { default: dev ? DEV_FORCE_EXIT_MS : FORCE_EXIT_MS });
+            const forceExitMs = envInteger(env, FORCE_EXIT_VARIABLE, {
+                default: dev ? DEV_FORCE_EXIT_MS : FORCE_EXIT_MS,
+                max: TIMER_MAX_MS,
+            });
 
             (nodeModule as { setSourceMapsSupport?: (enabled: boolean) => void }).setSourceMapsSupport?.(true);
             const entry = await resolveEntry({

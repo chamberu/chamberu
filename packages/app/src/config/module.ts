@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import type { Env } from '../env/index.ts';
 import {
+    TIMER_MAX_MS,
     envBoolean,
     envInteger,
     envOneOf,
@@ -86,14 +87,14 @@ export function readConfig(env: Env, options: ReadConfigOptions): AppConfig {
             host: envString(env, 'HOST', { default: DEFAULT_HOST }),
             basePath: readBasePath(env),
             ...(typeof publicUrl === 'string' ? { publicUrl } : {}),
-            readinessDelayMs: envInteger(env, 'CHAMVI_READINESS_DELAY_MS', { default: DEFAULT_READINESS_DELAY_MS }),
-            drainTimeoutMs: envInteger(env, 'CHAMVI_DRAIN_TIMEOUT_MS', { default: dev ? DEV_DRAIN_TIMEOUT_MS : DEFAULT_DRAIN_TIMEOUT_MS }),
-            closeTimeoutMs: envInteger(env, 'CHAMVI_CLOSE_TIMEOUT_MS', { default: DEFAULT_CLOSE_TIMEOUT_MS }),
+            readinessDelayMs: envInteger(env, 'CHAMVI_READINESS_DELAY_MS', { default: DEFAULT_READINESS_DELAY_MS, max: TIMER_MAX_MS }),
+            drainTimeoutMs: envInteger(env, 'CHAMVI_DRAIN_TIMEOUT_MS', { default: dev ? DEV_DRAIN_TIMEOUT_MS : DEFAULT_DRAIN_TIMEOUT_MS, max: TIMER_MAX_MS }),
+            closeTimeoutMs: envInteger(env, 'CHAMVI_CLOSE_TIMEOUT_MS', { default: DEFAULT_CLOSE_TIMEOUT_MS, max: TIMER_MAX_MS }),
         },
         store: {
             ...(typeof url === 'string' ? { url } : {}),
             migrate: envBoolean(env, 'CHAMVI_MIGRATE', { default: true }),
-            purgeIntervalMs: envInteger(env, 'CHAMVI_PURGE_INTERVAL_MS', { default: DEFAULT_PURGE_INTERVAL_MS }),
+            purgeIntervalMs: envInteger(env, 'CHAMVI_PURGE_INTERVAL_MS', { default: DEFAULT_PURGE_INTERVAL_MS, max: TIMER_MAX_MS }),
         },
         engine: {
             ...readResumeSecret(env, options),

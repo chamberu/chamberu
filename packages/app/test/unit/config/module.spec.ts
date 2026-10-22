@@ -7,7 +7,7 @@
 
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { describe, expect, it } from 'vitest';
-import { readConfig } from '@chamvi/app';
+import { TIMER_MAX_MS, readConfig } from '@chamvi/app';
 
 const SECRET = 'x'.repeat(32);
 
@@ -134,6 +134,16 @@ describe('readConfig', () => {
 
     it('CHAMVI_MAX_CONCURRENT_RUNS 0 throws', () => {
         expect(() => start({ CHAMVI_MAX_CONCURRENT_RUNS: '0' })).toThrow(/CHAMVI_MAX_CONCURRENT_RUNS/);
+    });
+
+    it.each([
+        'CHAMVI_READINESS_DELAY_MS',
+        'CHAMVI_DRAIN_TIMEOUT_MS',
+        'CHAMVI_CLOSE_TIMEOUT_MS',
+        'CHAMVI_PURGE_INTERVAL_MS',
+    ])('%s above the timer limit throws (Node would fire it after 1 ms)', (name) => {
+        expect(() => start({ [name]: String(TIMER_MAX_MS + 1) })).toThrow(`${name} must be at most ${TIMER_MAX_MS}.`);
+        expect(() => start({ [name]: String(TIMER_MAX_MS) })).not.toThrow();
     });
 
     it('CHAMVI_PURGE_INTERVAL_MS 0 disables', () => {

@@ -54,6 +54,10 @@ describe('public api', () => {
         expect(app[name as keyof typeof app]).toBeTypeOf('function');
     });
 
+    it('exports the timer limit of the ms variables', () => {
+        expect(app.TIMER_MAX_MS).toBe(2_147_483_647);
+    });
+
     it('exports the tokens', () => {
         expect(Object.keys(app.AppToken).sort()).toEqual([
             'AUTHENTICATORS',

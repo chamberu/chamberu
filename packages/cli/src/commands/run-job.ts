@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { envInteger } from '@chamvi/app';
+import { TIMER_MAX_MS, envInteger } from '@chamvi/app';
 import { defineCommand } from 'citty';
 import type { CommandDef } from 'citty';
 import { loadApp, resolveEntry } from '../entry/module.ts';
@@ -47,7 +47,7 @@ export function createRunJobCommand(context: CliContext): CommandDef<typeof RUN_
         async run({ args }) {
             assertKnownArgs(args, RUN_JOB_ARGS);
             const { env } = context;
-            const forceExitMs = envInteger(env, FORCE_EXIT_VARIABLE, { default: FORCE_EXIT_MS });
+            const forceExitMs = envInteger(env, FORCE_EXIT_VARIABLE, { default: FORCE_EXIT_MS, max: TIMER_MAX_MS });
             const entry = await resolveEntry({
                 cwd: context.cwd,
                 entry: args.entry,
