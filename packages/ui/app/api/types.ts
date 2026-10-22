@@ -7,6 +7,7 @@
 
 import type { RunStatusLiteral, Step } from '@chamvi/core';
 import type {
+    AgentIssue,
     AgentSummary,
     MeView,
     RunView,
@@ -42,6 +43,14 @@ export type RunListFilter = {
 };
 
 export type AgentWire = AgentSummary;
+
+export type AgentIssueWire = Wire<AgentIssue>;
+
+/** `GET /agents`: the loaded agents and the ones that failed to load. */
+export type AgentList = {
+    data: AgentWire[];
+    issues: AgentIssueWire[];
+};
 
 export type ScheduleWire = ScheduleSummary;
 
@@ -87,7 +96,7 @@ export type ApiClientOptions = {
 
 export interface IApiClient {
     me(token?: string): Promise<MeWire>;
-    listAgents(): Promise<AgentWire[]>;
+    listAgents(): Promise<AgentList>;
     listSchedules(): Promise<ScheduleWire[]>;
     listRuns(filter: RunListFilter): Promise<RunPage>;
     getRun(id: string): Promise<RunDetail>;

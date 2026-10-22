@@ -15,6 +15,7 @@ import {
     withQuery,
 } from './helpers.ts';
 import type {
+    AgentIssueWire,
     AgentWire,
     ApiClientOptions,
     DocEntry,
@@ -89,7 +90,13 @@ export function createApiClient(options: ApiClientOptions): IApiClient {
 
     return {
         me: (token) => request<MeWire>('/me', token === undefined ? {} : { token }),
-        listAgents: async () => dataOf<AgentWire>(await request('/agents')),
+        listAgents: async () => {
+            const body = await request('/agents');
+            return {
+                data: dataOf<AgentWire>(body),
+                issues: isObject(body) && Array.isArray(body.issues) ? body.issues as AgentIssueWire[] : [],
+            };
+        },
         listSchedules: async () => dataOf<ScheduleWire>(await request('/schedules')),
         listRuns: (filter) => request<RunPage>(withQuery('/runs', runListQuery(filter))),
         getRun: (id) => request<RunDetail>(path('runs', id)),

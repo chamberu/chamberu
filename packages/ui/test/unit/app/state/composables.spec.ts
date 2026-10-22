@@ -25,7 +25,7 @@ function stateClient() {
     const kvCalls: Array<[string, PageQuery | undefined]> = [];
     const docCalls: Array<[string, string]> = [];
     const client = fakeClient({
-        listAgents: async () => [agent('triage', ['duplicates', 'triaged']), agent('digest', [])],
+        listAgents: async () => ({ data: [agent('triage', ['duplicates', 'triaged']), agent('digest', [])], issues: [] }),
         listKv: async (name, page) => {
             kvCalls.push([name, page]);
             return [{ key: `${name}-k`, value: { n: 1 } }];
@@ -90,7 +90,7 @@ describe('useAgentState', () => {
     it('pages kv with an offset', async () => {
         const pages: PageQuery[] = [];
         const client = fakeClient({
-            listAgents: async () => [agent('triage', [])],
+            listAgents: async () => ({ data: [agent('triage', [])], issues: [] }),
             listKv: async (_name, page) => {
                 pages.push(page!);
                 const count = page!.offset === 0 ? KV_PAGE_SIZE : 1;
@@ -110,7 +110,7 @@ describe('useAgentState', () => {
 
     it('a 403 sets error without throwing', async () => {
         const client = fakeClient({
-            listAgents: async () => [agent('triage', ['c'])],
+            listAgents: async () => ({ data: [agent('triage', ['c'])], issues: [] }),
             listKv: async () => { throw apiError(403, 'forbidden'); },
             listDocs: async () => { throw apiError(403, 'forbidden'); },
         });

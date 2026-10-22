@@ -53,8 +53,23 @@ describe('createApiClient', () => {
             token: async () => undefined,
             fetch,
         });
-        expect(await client.listAgents()).toEqual([]);
+        expect(await client.listAgents()).toEqual({ data: [], issues: [] });
         expect(requests[0]!.headers.has('authorization')).toBe(false);
+    });
+
+    it('reads the agents and their load issues from GET /agents', async () => {
+        const issue = {
+            agent: 'triage', 
+            message: 'agent.ts: Unexpected token', 
+            at: '2026-10-22T08:00:00.000Z', 
+        };
+        const { fetch } = createFakeFetch([json({ data: [], issues: [issue] })]);
+        const client = createApiClient({
+            apiBase: '',
+            token: async () => 'tok',
+            fetch,
+        });
+        expect(await client.listAgents()).toEqual({ data: [], issues: [issue] });
     });
 
     it('maps an error body to ApiError', async () => {

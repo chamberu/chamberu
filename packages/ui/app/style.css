@@ -238,6 +238,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hint { font-size: 12.5px; color: var(--ch-muted); }
 .notice { padding: 16px 18px; color: var(--ch-muted); font-size: 13.5px; }
 .notice b { color: var(--ch-ink); font-weight: 500; }
+.load-issues { margin-bottom: 14px; overflow-wrap: anywhere; }
+.load-issues code { color: var(--ch-ink); }
 .form-err {
     font: 400 12.5px/1.5 var(--ch-font-mono); color: var(--ch-ink); background: var(--ch-fail-tint);
     border-left: 3px solid var(--ch-fail); border-radius: var(--ch-radius-sm); padding: 7px 10px; overflow-wrap: anywhere;

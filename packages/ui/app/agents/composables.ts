@@ -15,6 +15,7 @@ import type { Ref } from 'vue';
 import type { ApiError } from '../api/error.ts';
 import { asApiError, retryDelayOf } from '../api/helpers.ts';
 import type {
+    AgentIssueWire,
     AgentWire,
     IApiClient,
     RunWire,
@@ -38,7 +39,7 @@ export function useAgents(client: IApiClient) {
     const error = shallowRef<ApiError>();
     const loaded = (async () => {
         try {
-            agents.value = await client.listAgents();
+            agents.value = (await client.listAgents()).data;
         } catch (e) {
             error.value = asApiError(e);
         }
@@ -67,6 +68,7 @@ async function totalOf(client: IApiClient, agent: string, status: 'running' | 'w
  */
 export function useAgentRollups(client: IApiClient) {
     const agents = shallowRef<AgentWire[]>([]);
+    const issues = shallowRef<AgentIssueWire[]>([]);
     const schedules = shallowRef<ScheduleWire[]>([]);
     const rollups = shallowRef<Record<string, AgentRollup>>({});
     const error = shallowRef<ApiError>();
@@ -84,9 +86,10 @@ export function useAgentRollups(client: IApiClient) {
                     offset: 0,
                 }),
             ]);
-            agents.value = list;
+            agents.value = list.data;
+            issues.value = list.issues;
             schedules.value = crons;
-            rollups.value = buildRollups(list, crons, recent, active, Date.now());
+            rollups.value = buildRollups(list.data, crons, recent, active, Date.now());
             error.value = undefined;
             return undefined;
         } catch (e) {
@@ -101,6 +104,7 @@ export function useAgentRollups(client: IApiClient) {
 
     return {
         agents,
+        issues,
         schedules,
         rollups,
         error,
@@ -148,7 +152,7 @@ export function useAgentDetail(client: IApiClient, name: Ref<string>) {
                 }),
             ]);
             if (current !== generation) return undefined;
-            agent.value = list.find((a) => a.name === agentName);
+            agent.value = list.data.find((a) => a.name === agentName);
             schedules.value = crons.filter((s) => s.agent === agentName);
             runs.value = recent.data;
             totalRuns.value = recent.meta.total;
