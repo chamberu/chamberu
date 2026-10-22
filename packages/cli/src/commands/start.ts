@@ -28,6 +28,8 @@ const START_ARGS = {
     dev: {
         type: 'boolean',
         description: 'Development mode (used by chamvi dev)',
+        // left out of the usage (C3)
+        hidden: true,
     },
 } as const;
 

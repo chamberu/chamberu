@@ -34,6 +34,14 @@ describe('runCli', () => {
         expect(fake.stdout.join('')).toContain('AGENT');
     });
 
+    it('start --help hides --dev (used by chamvi dev)', async () => {
+        const fake = createFakeProcess();
+        await runCli(['start', '--help'], fake.context());
+        const out = fake.stdout.join('');
+        expect(out).toContain('--entry');
+        expect(out).not.toContain('--dev');
+    });
+
     it('unknown command exits 2 with usage', async () => {
         const fake = createFakeProcess();
         await runCli(['deploy'], fake.context());

@@ -27,9 +27,23 @@ async function subCommandOf(main: CommandDef, argv: string[]): Promise<CommandDe
     return typeof sub === 'function' ? sub() : sub;
 }
 
+/**
+ * The command without its hidden args (an arg def carrying `hidden: true`,
+ * which citty supports for commands only), for the usage.
+ */
+async function withoutHiddenArgs(command: CommandDef): Promise<CommandDef> {
+    const args = typeof command.args === 'function' ? await command.args() : await command.args;
+    if (!args) {
+        return command;
+    }
+
+    const shown = Object.fromEntries(Object.entries(args).filter(([, arg]) => (arg as { hidden?: unknown }).hidden !== true));
+    return { ...command, args: shown };
+}
+
 async function usageOf(main: CommandDef, argv: string[]): Promise<string> {
     const sub = await subCommandOf(main, argv);
-    return sub ? renderUsage(sub, main) : renderUsage(main);
+    return sub ? renderUsage(await withoutHiddenArgs(sub), main) : renderUsage(main);
 }
 
 /**
