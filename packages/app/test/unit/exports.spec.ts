@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as app from '@chamvi/app';
 import * as authup from '@chamvi/app/authup';
@@ -146,5 +147,45 @@ describe('public api', () => {
     ])('@chamvi/app/testing exports %s', (name) => {
         expect(testing).toHaveProperty(name);
         expect(testing[name as keyof typeof testing]).toBeTypeOf('function');
+    });
+});
+
+describe('package.json', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
+        exports: Record<string, unknown>,
+        dependencies?: Record<string, string>,
+        devDependencies?: Record<string, string>,
+        peerDependencies?: Record<string, string>,
+        peerDependenciesMeta?: Record<string, { optional?: boolean }>,
+    };
+
+    it('exports only the main, authup and testing entries', () => {
+        expect(Object.keys(pkg.exports).sort()).toEqual(['.', './authup', './package.json', './testing']);
+    });
+
+    it('names no feature package in the dependency fields', () => {
+        const feature = /^@chamvi\/(github|notify-github|notify-openclaw|sandbox(-.+)?|ui)$/;
+        const names = [
+            ...Object.keys(pkg.dependencies ?? {}),
+            ...Object.keys(pkg.devDependencies ?? {}),
+            ...Object.keys(pkg.peerDependencies ?? {}),
+        ];
+        expect(names.filter((name) => feature.test(name))).toEqual([]);
+    });
+
+    it('declares only the model providers and authup as optional peers', () => {
+        const optional = Object.entries(pkg.peerDependenciesMeta ?? {})
+            .filter(([, meta]) => meta.optional)
+            .map(([name]) => name)
+            .sort();
+        expect(optional).toEqual([
+            '@ai-sdk/anthropic',
+            '@ai-sdk/google',
+            '@ai-sdk/mistral',
+            '@ai-sdk/openai',
+            '@ai-sdk/xai',
+            '@authup/core-http-kit',
+            '@authup/server-adapter-kit',
+        ]);
     });
 });

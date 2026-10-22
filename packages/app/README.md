@@ -34,7 +34,7 @@
 npm install @chamvi/app @chamvi/cli ai @ai-sdk/anthropic typeorm pg
 ```
 
-ESM only, Node.js `>=22`. `ai`, `typeorm` and `pg` are peer dependencies; the provider packages (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/mistral`, `@ai-sdk/xai`) and the packages behind the optional modules are optional peers: install the ones you use.
+ESM only, Node.js `>=22`. `ai`, `typeorm` and `pg` are peer dependencies; the provider packages (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/mistral`, `@ai-sdk/xai`) are optional peers: install the ones you use. The optional modules ship with the package they configure (`npm install @chamvi/github` for `@chamvi/github/module`, ...), which peers on `@chamvi/app`.
 
 The main entry re-exports `@chamvi/core` and the common part of `@chamvi/http` (`agentPermission`, `Permission`, the `Authenticator`, `Principal`, `HttpRoute*` and `StaticToken` types), so an agent repository imports one package.
 
@@ -134,11 +134,11 @@ Modules are orkos `IModule`s on an eldin container. The built-in ones are always
 | `schedulerModule({ agents?, owner?, lockTtlMs? })` | `chamvi:scheduler` | `@chamvi/app` | in-process cron (start mode, `CHAMVI_SCHEDULER`) |
 | `httpModule()` | `chamvi:http` | `@chamvi/app` | `createHttpApp()`, the graceful shutdown, listens last |
 | `consoleNotifierModule({ name? })` | `chamvi:notifier:<name>` | `@chamvi/app` | `consoleNotifier()` (name `console`) |
-| `githubModule()` | `chamvi:github` | `@chamvi/app/github` | the GitHub App and its signed webhook route (`/webhooks/github`); `.app` for tools and triggers |
-| `githubNotifierModule({ app, ... })` | `chamvi:notifier:<name>` | `@chamvi/app/github` | `githubNotifier()` |
-| `sandboxModule({ provider?, ... })` | `chamvi:sandbox` | `@chamvi/app/sandbox` | the run-scoped workspace manager (`.manager`), closed after the engine drained |
-| `openclawModule()` | `chamvi:notifier:<name>` | `@chamvi/app/openclaw` | `openclaw()` (name `openclaw`) |
-| `uiModule()` | `chamvi:ui` | `@chamvi/app/ui` | the dashboard at `<basePath>/ui` |
+| `githubModule()` | `chamvi:github` | `@chamvi/github/module` | the GitHub App and its signed webhook route (`/webhooks/github`); `.app` for triggers, `injectGithubContext(ctx)` for tools |
+| `githubNotifierModule({ app, ... })` | `chamvi:notifier:<name>` | `@chamvi/notify-github/module` | `githubNotifier()` (name `github`), `injectGithubNotifierContext(ctx, name?)` |
+| `sandboxModule({ provider?, ... })` | `chamvi:sandbox` | `@chamvi/sandbox/module` | the run-scoped workspace manager (`.manager`, `injectSandboxContext(ctx)`), closed after the engine drained |
+| `openclawModule()` | `chamvi:notifier:<name>` | `@chamvi/notify-openclaw/module` | `openclaw()` (name `openclaw`), `injectOpenclawContext(ctx, name?)` |
+| `uiModule()` | `chamvi:ui` | `@chamvi/ui/module` | the dashboard at `<basePath>/ui` |
 | `authupModule()` | `chamvi:authup` | `@chamvi/app/authup` | the authup authenticator, after static tokens |
 | `oidcModule(options)` | `chamvi:oidc` | `@chamvi/app/authup` | the `oidc()` authenticator, after authup (no env form) |
 
@@ -172,8 +172,7 @@ Modules are orkos `IModule`s on an eldin container. The built-in ones are always
 A module contributes in `setup` and consumes in `onReady`, after every module's `setup` ran:
 
 ```ts
-import type { IContainer } from 'eldin';
-import type { IModule } from 'orkos';
+import type { IContainer, IModule } from '@chamvi/app';
 import { AppToken, ModuleName } from '@chamvi/app';
 
 export function auditModule(): IModule {
@@ -202,6 +201,47 @@ export function auditModule(): IModule {
         },
     };
 }
+```
+
+Everything a module needs comes from `@chamvi/app`: `AppToken`, `ModuleName`, `ILifecycleHook`, `AppContext`, the env readers (`envString`, `envUrl`, ...), `approvalUrlOf` and the orkos `IModule` and eldin `IContainer` types.
+
+A module that builds an instance tools need provides it on the engine in `engineCreated`, through a context key of its package; tools read it with `inject(ctx, key)`, so they need no closure over the module:
+
+```ts
+import type { IContainer, IModule } from '@chamvi/app';
+import { AppToken, defineContextKey, defineTool, inject } from '@chamvi/app';
+
+type Audit = { write(entry: string): void };
+
+const AUDIT = defineContextKey<Audit>('audit');
+
+export function auditLogModule(audit: Audit): IModule {
+    return {
+        name: 'audit-log',
+        async setup(container: IContainer) {
+            container.registerMany(AppToken.LIFECYCLE_HOOKS, {
+                useValue: { name: 'audit-log', engineCreated: (engine) => engine.provide(AUDIT, audit) },
+            });
+        },
+    };
+}
+
+// in an agent: tools: (ctx) => { const audit = inject(ctx, AUDIT); return { ... }; }
+```
+
+Injecting in the `tools` factory fails a run before any model call when the module is missing (`context_not_provided`); in `execute` it is a tool error the model sees. A module spec runs the real module lifecycle without a port through `@chamvi/app/testing`. The harness sets up only the modules it is given, so a module whose hook needs the engine lists the built-ins it builds on:
+
+```ts
+import { configModule, engineModule, storeModule } from '@chamvi/app';
+import { createModuleHarness } from '@chamvi/app/testing';
+
+const harness = await createModuleHarness({
+    env: { RESUME_SECRET: secret },
+    agents: [agent],
+    modules: [configModule(), storeModule(), engineModule(), auditLogModule(audit)],
+});
+// harness.container, harness.context, harness.reported (what context.report() got)
+await harness.stop();
 ```
 
 - **Tokens** (`AppToken`): `CONTEXT`, `CONFIG`, `LOGGER`, `CLOCK`, `STORE`, `DATA_SOURCE`, `ENGINE`, `SCHEDULER`, `SHUTDOWN` and `SERVER` hold one value; `HTTP_ROUTES`, `AUTHENTICATORS` (`{ name, order, authenticator }`, lowest `order` first, `AUTHENTICATOR_ORDER`), `NOTIFIERS` and `LIFECYCLE_HOOKS` are collections (`registerMany(token, { useValue })` in `setup`, `resolveAll` in `onReady`).
