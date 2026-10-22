@@ -24,7 +24,7 @@ import {
     webhook,
 } from '@chamvi/core';
 import type { IScheduler, SchedulerOptions } from '@chamvi/scheduler';
-import { createScheduler } from '@chamvi/scheduler';
+import { assertSchedulable, createScheduler } from '@chamvi/scheduler';
 import { textModel } from '../../utils/model.ts';
 
 const agentWith = (triggers: TriggerDefinition[]) => defineAgent({
@@ -175,6 +175,32 @@ describe('createScheduler', () => {
         }]);
         expect(() => make(store, [malformed])).toThrow(InvalidAgentDefinitionError);
         expect(() => make(store, [malformed])).toThrow(/sweep.*bad/);
+    });
+
+    it('reports a folder agent hubwire cannot schedule instead of throwing', async () => {
+        const onError = vi.fn();
+        const store = new MemoryStore();
+        const engine = new Engine({
+            store, 
+            agents: [], 
+            resumeSecret: 's', 
+        });
+        await engine.putAgent(agentWith([cron('0 0 * * 1/2')]), { revision: 'h1' });
+
+        const scheduler = createScheduler({ engine, onError });
+        schedulers.push(scheduler);
+
+        expect(onError).toHaveBeenCalledWith(expect.any(InvalidAgentDefinitionError), {
+            agent: 'sweep',
+            trigger: 'cron:0 0 * * 1/2',
+        });
+    });
+
+    it('assertSchedulable refuses what createScheduler refuses and accepts the rest', () => {
+        expect(() => assertSchedulable(agentWith([cron('0 0 * * 1/2')]))).toThrow(InvalidAgentDefinitionError);
+        expect(() => assertSchedulable(agentWith([cron('0 9 * * *', { timezone: 'Mars/Base' })]))).toThrow(/sweep.*Invalid timezone/);
+        expect(() => assertSchedulable(agentWith([cron('0 9 * * *', { timezone: 'Europe/Berlin' }), http()]))).not.toThrow();
+        expect(() => assertSchedulable(agentWith([]))).not.toThrow();
     });
 
     it('schedules only the named agents', async () => {

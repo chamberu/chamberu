@@ -25,7 +25,13 @@ import {
     resolveResumeTarget,
     serializeRun,
 } from '../runs/helpers.ts';
-import { MCP_TOOL_NAME_MAX_LENGTH, MCP_WAIT_POLL_MS } from './constants.ts';
+import {
+    DEFAULT_MCP_MAX_WAIT_SECONDS,
+    DEFAULT_MCP_NAME,
+    DEFAULT_MCP_VERSION,
+    MCP_TOOL_NAME_MAX_LENGTH,
+    MCP_WAIT_POLL_MS,
+} from './constants.ts';
 import {
     runTool,
     toJsonSchema,
@@ -207,18 +213,30 @@ export function buildRunTool(agent: Agent, options: McpEndpointOptions): McpRunT
 }
 
 /**
+ * Throws InvalidAgentDefinitionError when the agent's `run_<agent>` MCP tool
+ * cannot be built (a name above 64 characters with `run_`, a payload schema
+ * the MCP validator cannot compile), as createHttpApp would for a code agent.
+ */
+export function assertMcpRunTool(agent: Agent): void {
+    buildRunTool(agent, {
+        name: DEFAULT_MCP_NAME,
+        version: DEFAULT_MCP_VERSION,
+        maxWaitSeconds: DEFAULT_MCP_MAX_WAIT_SECONDS,
+    });
+}
+
+/**
  * The `run_<agent>` tools of the app's agents, read per request in
  * registration order. Each definition is built once per agent object (a
  * replaced agent is a new object, so it is rebuilt). The agents held at
- * construction are built eagerly and a failure fails the app; an agent
+ * construction are built eagerly and a failure fails the app (a folder
+ * agent's is reported to `onError` and its tool skipped); an agent
  * registered later is built on the first request that sees it, and a failure
  * then is reported to `onError` once and its tool skipped.
  */
 export function createRunToolSource(ctx: HttpContext, options: McpEndpointOptions): () => McpRunTool[] {
     // null: no http() trigger, or a definition that failed to build
     const built = new WeakMap<Agent, McpRunTool | null>();
-    for (const agent of ctx.agents.list()) built.set(agent, buildRunTool(agent, options) ?? null);
-
     const toolOf = (agent: Agent): McpRunTool | null => {
         const cached = built.get(agent);
         if (cached !== undefined) return cached;
@@ -231,6 +249,12 @@ export function createRunToolSource(ctx: HttpContext, options: McpEndpointOption
         built.set(agent, tool);
         return tool;
     };
+
+    // a folder agent (one with a revision) never fails the app: it was checked before it was registered
+    for (const agent of ctx.agents.list()) {
+        if (ctx.engine.agentRevision(agent.name) === undefined) built.set(agent, buildRunTool(agent, options) ?? null);
+        else toolOf(agent);
+    }
 
     return () => ctx.agents.list()
         .map(toolOf)

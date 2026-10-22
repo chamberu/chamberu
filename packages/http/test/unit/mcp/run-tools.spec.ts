@@ -12,7 +12,14 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { InvalidAgentDefinitionError, defineAgent, http } from '@chamvi/core';
+import {
+    Engine,
+    InvalidAgentDefinitionError,
+    MemoryStore,
+    defineAgent,
+    http,
+} from '@chamvi/core';
+import { assertMcpRunTool } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     call,
@@ -212,6 +219,45 @@ describe('mcp run_<agent>', () => {
         expect(() => createRunTestApp({ agents: [long], mcp: false })).not.toThrow();
         const fits = defineAgent({ ...long.definition, name: 'a'.repeat(60) });
         expect(() => createRunTestApp({ agents: [fits] })).not.toThrow();
+    });
+
+    it('reports a folder agent whose run_<agent> cannot be built instead of failing the app', async () => {
+        const long = defineAgent({
+            name: 'a'.repeat(61),
+            model: textModel(),
+            instructions: 'Long.',
+            triggers: [http()],
+        });
+        const engine = new Engine({
+            store: new MemoryStore(), 
+            agents: [], 
+            resumeSecret: 's', 
+        });
+        await engine.putAgent(long, { revision: 'h1' });
+        const errors: unknown[] = [];
+
+        const { app } = createRunTestApp({ engine, onError: (error) => { errors.push(error); } });
+
+        expect(errors).toEqual([expect.any(InvalidAgentDefinitionError)]);
+        const client = await connectMcp(app, ADMIN_TOKEN);
+        expect((await client.listTools()).tools.map((t) => t.name)).not.toContain(`run_${long.name}`);
+        await client.close();
+    });
+
+    it('assertMcpRunTool refuses what createHttpApp refuses', () => {
+        const agent = (name: string) => defineAgent({
+            name,
+            model: textModel(),
+            instructions: 'x',
+            triggers: [http()],
+        });
+        expect(() => assertMcpRunTool(agent('a'.repeat(61)))).toThrow(InvalidAgentDefinitionError);
+        expect(() => assertMcpRunTool(agent('a'.repeat(60)))).not.toThrow();
+        expect(() => assertMcpRunTool(defineAgent({
+            name: 'a'.repeat(64), 
+            model: textModel(), 
+            instructions: 'x', 
+        }))).not.toThrow();
     });
 
     it('lists run_<agent> for an agent added later', async () => {

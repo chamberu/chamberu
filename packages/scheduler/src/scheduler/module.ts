@@ -7,18 +7,43 @@
 
 import { hostname } from 'node:os';
 import { pid } from 'node:process';
-import type { AgentChange } from '@chamvi/core';
+import type { Agent, AgentChange } from '@chamvi/core';
+import { defineScheduledComponent } from 'hubwire';
+import { readCronOptions } from '../tick/index.ts';
 import { createStoreScheduleLock } from '../lock/index.ts';
 import { SCHEDULE_LOCK_TTL_MS } from './constants.ts';
-import { buildAgentComponents, selectAgents } from './helpers.ts';
+import { buildAgentComponents, selectAgents, toDefinitionError } from './helpers.ts';
 import type { IScheduler, SchedulerOptions } from './types.ts';
+
+/**
+ * Throws InvalidAgentDefinitionError for a cron trigger of the agent hubwire
+ * cannot schedule (an expression croner refuses, a timezone, an expression
+ * without a future run), like createScheduler does; schedules nothing.
+ */
+export function assertSchedulable(agent: Agent): void {
+    for (const trigger of agent.definition.triggers ?? []) {
+        if (trigger.source !== 'cron') continue;
+        try {
+            const { expression, timezone } = readCronOptions(agent, trigger);
+            defineScheduledComponent({
+                name: `cron:${agent.name}:${trigger.id}`,
+                schedule: expression,
+                timezone,
+                run: async () => {},
+            });
+        } catch (e) {
+            throw toDefinitionError(agent, trigger, e);
+        }
+    }
+}
 
 /**
  * Schedules every cron trigger of the engine's agents (or of `agents`) as one hubwire component,
  * guarded by a per-tick lock in the engine's store, so replicas sharing the
  * store dispatch each tick once. Validates every trigger up front: throws
  * InvalidAgentDefinitionError for a trigger hubwire cannot schedule or a name
- * in `agents` the engine lacks.
+ * in `agents` the engine lacks; a folder agent's (one with a revision) goes to
+ * `onError` instead and leaves that agent unscheduled.
  * Follows the engine's `agents.changed` events (only for the names in `agents`
  * when given): an added agent is scheduled, a replaced one rescheduled, a
  * removed one unscheduled; a replacement hubwire cannot schedule goes to
@@ -39,7 +64,9 @@ export function createScheduler(opts: SchedulerOptions): IScheduler {
     type Scheduled = ReturnType<typeof buildAgentComponents>;
     const byAgent = new Map<string, Scheduled>();
     for (const agent of agents) {
-        byAgent.set(agent.name, buildAgentComponents(ctx, agent));
+        // a folder agent (one with a revision) never fails the scheduler: it was checked before it was registered
+        const folder = opts.engine.agentRevision(agent.name) !== undefined;
+        byAgent.set(agent.name, buildAgentComponents(ctx, agent, folder ? ctx.onError : undefined));
     }
 
     let started = false;

@@ -60,17 +60,21 @@ export function buildAgentComponents(
         try {
             components.push({ trigger: trigger.id, component: defineScheduledComponent(buildComponentOptions(ctx, agent, trigger)) });
         } catch (e) {
-            const error = e instanceof InvalidAgentDefinitionError ?
-                e :
-                new InvalidAgentDefinitionError(
-                    `Agent "${agent.name}" trigger "${trigger.id}": ${e instanceof Error ? e.message : String(e)}`,
-                );
+            const error = toDefinitionError(agent, trigger, e);
             if (!onInvalid) throw error;
             onInvalid(error, { agent: agent.name, trigger: trigger.id });
             return [];
         }
     }
     return components;
+}
+
+/** A hubwire definition error as InvalidAgentDefinitionError naming the agent and trigger. */
+export function toDefinitionError(agent: Agent, trigger: TriggerDefinition, e: unknown): InvalidAgentDefinitionError {
+    if (e instanceof InvalidAgentDefinitionError) return e;
+    return new InvalidAgentDefinitionError(
+        `Agent "${agent.name}" trigger "${trigger.id}": ${e instanceof Error ? e.message : String(e)}`,
+    );
 }
 
 /**
