@@ -73,11 +73,14 @@ type ToolEntry = Tool | ((ctx: ToolContext) => Tool);
 export async function loadAgent(dir: string, options: LoadAgentOptions = {}): Promise<LoadedAgent> {
     const base = dirname(dir);
     try {
+        // Hashed before the read: an edit made while loading then shows up as
+        // a changed hash on the next poll, never as stale code under a fresh hash.
+        const hash = await hashAgentFolder(dir);
         const agent = await buildAgent(dir, options.load ?? ((path) => useRegistry().read(path)));
         return {
-            agent, 
-            hash: await hashAgentFolder(dir), 
-            dir, 
+            agent,
+            hash,
+            dir,
         };
     } catch (error) {
         if (error instanceof InvalidAgentDefinitionError) {

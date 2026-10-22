@@ -13,7 +13,8 @@ import {
     expect,
     it,
 } from 'vitest';
-import { InvalidAgentDefinitionError, loadAgent } from '@chamvi/app';
+import { writeFile } from 'node:fs/promises';
+import { InvalidAgentDefinitionError, hashAgentFolder, loadAgent } from '@chamvi/app';
 import { createTempDir, writeTree } from '../../utils/folder.ts';
 
 const SCHEMA = 'export default { \'~standard\': { version: 1, vendor: \'test\', validate: (value) => ({ value }) } };\n';
@@ -290,5 +291,22 @@ describe('loadAgent', () => {
 
         expect(seen).toEqual([join(dir, 'agent.mjs')]);
         expect(loaded.agent.definition.instructions).toBe('x');
+    });
+
+    it('returns the hash of the content it read when the folder changes during the load', async () => {
+        const dir = join(root.path, 'triage');
+        await writeTree(dir, { 'agent.mjs': '', 'instructions.md': 'x' });
+        const before = await hashAgentFolder(dir);
+
+        const loaded = await loadAgent(dir, {
+            load: async (path) => {
+                await writeFile(path, 'export default { model: \'test:other\' };\n');
+                return { default: { model: 'test:model' } };
+            },
+        });
+
+        expect(loaded.agent.definition.model).toBe('test:model');
+        expect(loaded.hash).toBe(before);
+        expect(loaded.hash).not.toBe(await hashAgentFolder(dir));
     });
 });
