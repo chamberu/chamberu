@@ -28,6 +28,7 @@
     "devDependencies": {
         "@authup/server-adapter-kit": "^1.0.0-beta.70",
         "@chamvi/app": "*",
+        "@chamvi/channel-cron": "*",
         "@chamvi/cli": "*",
         "@chamvi/coding": "*",
         "@chamvi/core": "*",
@@ -39,7 +40,6 @@
         "@chamvi/sandbox-docker": "*",
         "@chamvi/sandbox-k8s": "*",
         "@chamvi/sandbox-local": "*",
-        "@chamvi/scheduler": "*",
         "@chamvi/store-typeorm": "*",
         "@chamvi/test-kit": "*",
         "@chamvi/ui": "*",

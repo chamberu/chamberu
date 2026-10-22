@@ -25,7 +25,7 @@ export default defineConfig({
         alias: [
             { find: /^@chamvi\/core$/, replacement: source('core/src/index.ts') },
             { find: /^@chamvi\/http$/, replacement: source('http/src/index.ts') },
-            { find: /^@chamvi\/scheduler$/, replacement: source('scheduler/src/index.ts') },
+            { find: /^@chamvi\/channel-cron$/, replacement: source('channel-cron/src/index.ts') },
             { find: /^@chamvi\/store-typeorm$/, replacement: source('store-typeorm/src/index.ts') },
             { find: /^@chamvi\/test-kit$/, replacement: source('test-kit/src/index.ts') },
             { find: /^@chamvi\/github$/, replacement: source('github/src/index.ts') },

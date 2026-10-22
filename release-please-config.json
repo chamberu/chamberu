@@ -5,6 +5,7 @@
     "initial-version": "0.1.0",
     "packages": {
         "packages/app": {"component": "app"},
+        "packages/channel-cron": {"component": "channel-cron"},
         "packages/cli": {"component": "cli"},
         "packages/coding": {"component": "coding"},
         "packages/core": {"component": "core"},
@@ -16,7 +17,6 @@
         "packages/sandbox-docker": {"component": "sandbox-docker"},
         "packages/sandbox-k8s": {"component": "sandbox-k8s"},
         "packages/sandbox-local": {"component": "sandbox-local"},
-        "packages/scheduler": {"component": "scheduler"},
         "packages/store-typeorm": {"component": "store-typeorm"},
         "packages/test-kit": {"component": "test-kit"},
         "packages/ui": {"component": "ui"}
