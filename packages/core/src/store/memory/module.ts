@@ -6,6 +6,7 @@
  */
 
 import { isObject } from 'smob';
+import type { AgentRevision } from '../../agent/types.ts';
 import type { Artifact } from '../../artifact/types.ts';
 import { systemClock } from '../../clock/index.ts';
 import type { IClock } from '../../clock/index.ts';
@@ -39,6 +40,8 @@ export class MemoryStore implements IStore {
     protected docs = new Map<string, Map<string, unknown>>();
 
     protected artifacts = new Map<string, { artifact: Artifact; data: Uint8Array }>();
+
+    protected agentRevisions = new Map<string, AgentRevision>();
 
     constructor(opts: { clock?: IClock } = {}) {
         this.clock = opts.clock ?? systemClock;
@@ -261,5 +264,26 @@ export class MemoryStore implements IStore {
             .filter((artifact) => artifact.runId === runId)
             .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id, 'en'))
             .map((artifact) => copy(artifact));
+    }
+
+    // IAgentRevisionStore
+
+    async getAgentRevision(agent: string): Promise<AgentRevision | undefined> {
+        const revision = this.agentRevisions.get(agent);
+        return revision ? copy(revision) : undefined;
+    }
+
+    async setAgentRevision(revision: AgentRevision): Promise<void> {
+        this.agentRevisions.set(revision.agent, copy(revision));
+    }
+
+    async deleteAgentRevision(agent: string): Promise<void> {
+        this.agentRevisions.delete(agent);
+    }
+
+    async listAgentRevisions(): Promise<AgentRevision[]> {
+        return this.agentRevisions.values().toArray()
+            .sort((a, b) => compareCodePoints(a.agent, b.agent))
+            .map((revision) => copy(revision));
     }
 }

@@ -14,8 +14,10 @@ import { envString } from '../env/module.ts';
 import { defaultImporter, isPackageNotFound } from './helpers.ts';
 import type {
     BuiltinProvider,
+    ModelCheck,
     ModelProviders,
     ModelRegistryOptions,
+    ResolvedModels,
 } from './types.ts';
 
 type Discovered = {
@@ -101,13 +103,14 @@ function checkModel(
 }
 
 /**
- * Builds the provider registry model strings resolve through: every installed
- * built-in provider (keys and base URLs from \`env\`), overridden by \`models\`.
- * Every agent's string model is checked against it, so a model string never
- * falls through to the Vercel Gateway: InvalidAgentDefinitionError names the
- * package to install or the variable to set.
+ * The provider registry model strings resolve through (every installed
+ * built-in provider, keys and base URLs from \`env\`, overridden by
+ * \`models\`) and the check of one agent against it, run for every agent of
+ * \`agents\` here and reusable for agents registered later: a model string
+ * never falls through to the Vercel Gateway, InvalidAgentDefinitionError names
+ * the package to install or the variable to set.
  */
-export async function createModelRegistry(options: ModelRegistryOptions): Promise<ProviderRegistryProvider> {
+export async function resolveModels(options: ModelRegistryOptions): Promise<ResolvedModels> {
     const importer = options.importer ?? defaultImporter;
     const discovered = await Promise.all(BUILTIN_PROVIDERS.map((provider) => discover(provider, options, importer)));
 
@@ -119,14 +122,23 @@ export async function createModelRegistry(options: ModelRegistryOptions): Promis
     }
     Object.assign(providers, options.models);
 
-    for (const agent of options.agents) {
+    const check: ModelCheck = (agent) => {
         const { model } = agent.definition;
         if (typeof model === 'string') {
             checkModel(agent.name, model, providers, options, discovered);
         }
-    }
+    };
+    options.agents.forEach(check);
 
-    return createProviderRegistry(providers);
+    return { registry: createProviderRegistry(providers), check };
+}
+
+/**
+ * Builds the provider registry model strings resolve through, after checking
+ * every agent's string model against it (see \`resolveModels\`).
+ */
+export async function createModelRegistry(options: ModelRegistryOptions): Promise<ProviderRegistryProvider> {
+    return (await resolveModels(options)).registry;
 }
 
 /**

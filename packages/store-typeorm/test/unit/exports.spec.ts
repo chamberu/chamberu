@@ -19,9 +19,9 @@ describe('public api', () => {
 
     it('exports the entities, migrations and lock name', () => {
         expect(pkg.STORE_ENTITIES).toBeInstanceOf(Array);
-        expect(pkg.STORE_ENTITIES).toHaveLength(9);
+        expect(pkg.STORE_ENTITIES).toHaveLength(10);
         expect(pkg.STORE_MIGRATIONS).toBeInstanceOf(Array);
-        expect(pkg.STORE_MIGRATIONS).toHaveLength(4);
+        expect(pkg.STORE_MIGRATIONS).toHaveLength(5);
         expect(pkg.MIGRATION_LOCK_NAME).toBe('chamvi:migrations');
     });
 });

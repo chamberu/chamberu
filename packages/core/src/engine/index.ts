@@ -10,8 +10,10 @@ export type {
     ApprovalRequest,
 } from './execute/types.ts';
 export type {
+    AgentChange,
     ApprovalAnswer,
     DispatchEnvelope,
+    EngineEvent,
     ResumeDecision,
     RunDelta,
     EngineOptions,

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { createScheduler } from '@chamvi/scheduler';
+import { assertSchedulable, createScheduler } from '@chamvi/scheduler';
 import type { IScheduler } from '@chamvi/scheduler';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
@@ -15,7 +15,8 @@ import type { SchedulerModuleOptions } from './types.ts';
 
 /**
  * Fires the agents' cron triggers in-process: start mode with
- * `CHAMVI_SCHEDULER` on only. `onReady` builds the scheduler, registers
+ * `CHAMVI_SCHEDULER` on only. `setup` contributes the folder agents' cron
+ * check (`AGENT_CHECKS`, start and job mode); `onReady` builds the scheduler, registers
  * `SCHEDULER` and its start step (after the engine's); `teardown` stops it
  * (idempotent after the shutdown).
  */
@@ -32,8 +33,10 @@ export class SchedulerModule implements IModule {
         this.options = options;
     }
 
-    async setup(): Promise<void> {
-        // everything happens in onReady, once the engine exists
+    async setup(container: IContainer): Promise<void> {
+        // a folder agent with a cron trigger hubwire refuses is a load issue, in every mode, so the modes agree
+        if (container.resolve(AppToken.CONTEXT).mode === 'migrate') return;
+        container.registerMany(AppToken.AGENT_CHECKS, { useValue: assertSchedulable });
     }
 
     async onReady(container: IContainer): Promise<void> {

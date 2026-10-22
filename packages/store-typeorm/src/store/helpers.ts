@@ -6,6 +6,7 @@
  */
 
 import type {
+    AgentRevision,
     Artifact,
     Checkpoint,
     Run,
@@ -20,6 +21,7 @@ import type {
     QueryDeepPartialEntity,
 } from 'typeorm';
 import type {
+    AgentRevisionEntity,
     ArtifactEntity,
     CheckpointEntity,
     RunEntity,
@@ -235,4 +237,13 @@ export function toArtifact(entity: ArtifactEntity): Artifact {
     if (entity.filename !== null) artifact.filename = entity.filename;
 
     return artifact;
+}
+
+/** Map an AgentRevisionEntity to an AgentRevision. */
+export function toAgentRevision(entity: AgentRevisionEntity): AgentRevision {
+    return {
+        agent: entity.agent,
+        hash: entity.hash,
+        changedAt: entity.changedAt,
+    };
 }

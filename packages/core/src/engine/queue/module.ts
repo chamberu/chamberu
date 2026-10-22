@@ -14,7 +14,8 @@ import type { RunQueueOptions } from './types.ts';
  * Concurrency-aware scheduler: starts queued runs in FIFO order of createdAt
  * when (a) a local slot is free, (b) no run of the same agent + concurrencyKey
  * is running, waiting or interrupted (checked in the store, as replicas share it) and
- * (c) the run claim succeeds.
+ * (c) the run claim succeeds; runs the `prepareStart` predicate refuses are
+ * skipped and stay queued.
  */
 export class RunQueue {
     protected readonly opts: RunQueueOptions;
@@ -115,8 +116,11 @@ export class RunQueue {
         if (this.halted || this.running.size >= this.opts.maxConcurrentRuns) return;
         const { store } = this.opts;
         const { data: queued } = await store.listRuns({ status: [RunStatus.QUEUED] });
+        if (queued.length === 0) return;
+        const mayStart = await this.opts.prepareStart?.();
         for (const run of queued) {
             if (this.halted || this.running.size >= this.opts.maxConcurrentRuns) return;
+            if (mayStart && !mayStart(run)) continue;
 
             const started = await this.tryStart(run);
             if (started) this.launch(started);

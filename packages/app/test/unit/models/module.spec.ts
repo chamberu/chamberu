@@ -25,6 +25,7 @@ import {
     BUILTIN_PROVIDERS,
     createModelRegistry,
     installDefaultProvider,
+    resolveModels,
 } from '@chamvi/app';
 import type { ModelProviders } from '@chamvi/app';
 import { textModel } from '../../utils/model.ts';
@@ -215,6 +216,22 @@ describe('createModelRegistry', () => {
         expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
         expect(error.message).toContain('"acme"');
         expect(error.message).toContain('anthropic, local');
+    });
+
+    it('resolveModels checks agents registered later with the same rules', async () => {
+        const { importer } = fakeImporter();
+        const { registry, check } = await resolveModels({
+            agents: [],
+            env: { ANTHROPIC_API_KEY: 'sk-test' },
+            importer,
+        });
+
+        expect(registry.languageModel('anthropic:m')).toBeDefined();
+        expect(() => check(agentWith('anthropic:m', 'later'))).not.toThrow();
+        expect(() => check(agentWith(textModel(), 'later'))).not.toThrow();
+        expect(() => check(agentWith('acme:m', 'later'))).toThrow(
+            new InvalidAgentDefinitionError('Agent "later": model "acme:m" names the unknown provider "acme"; available: anthropic.'),
+        );
     });
 
     it('non-string models are skipped', async () => {

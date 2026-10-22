@@ -25,7 +25,13 @@ import {
     resolveResumeTarget,
     serializeRun,
 } from '../runs/helpers.ts';
-import { MCP_TOOL_NAME_MAX_LENGTH, MCP_WAIT_POLL_MS } from './constants.ts';
+import {
+    DEFAULT_MCP_MAX_WAIT_SECONDS,
+    DEFAULT_MCP_NAME,
+    DEFAULT_MCP_VERSION,
+    MCP_TOOL_NAME_MAX_LENGTH,
+    MCP_WAIT_POLL_MS,
+} from './constants.ts';
 import {
     runTool,
     toJsonSchema,
@@ -151,63 +157,108 @@ function describeAgent(agent: Agent): string {
 }
 
 /**
- * The `run_<agent>` tool of every agent with an `http()` trigger, built once
- * per app: the payload's JSON Schema is converted and compiled here, not per
- * request. A schema the MCP validator cannot compile, or a tool name above 64
- * characters, fails the app.
+ * The `run_<agent>` tool of an agent with an `http()` trigger (`undefined`
+ * without one): the payload's JSON Schema is converted and compiled here, not
+ * per request. A schema the MCP validator cannot compile, or a tool name above
+ * 64 characters, throws InvalidAgentDefinitionError.
  */
-export function buildRunTools(agents: Iterable<Agent>, options: McpEndpointOptions): McpRunTool[] {
-    const tools: McpRunTool[] = [];
-    for (const agent of agents) {
-        const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
-        if (!trigger) continue;
-        if (`run_${agent.name}`.length > MCP_TOOL_NAME_MAX_LENGTH) {
-            throw new InvalidAgentDefinitionError(
-                `The MCP tool "run_${agent.name}" exceeds ${MCP_TOOL_NAME_MAX_LENGTH} characters: shorten the agent name to ${MCP_TOOL_NAME_MAX_LENGTH - 4} or set mcp: false.`,
-            );
-        }
-        const schema = trigger.options.schema as StandardSchemaV1 | undefined;
-        let inputSchema: McpRunTool['inputSchema'];
-        try {
-            inputSchema = fromJsonSchema<RunAgentArgs>({
-                type: 'object',
-                properties: {
-                    payload: toJsonSchema(schema, '#/properties/payload'),
-                    idempotencyKey: {
-                        type: 'string',
-                        minLength: 1,
-                        maxLength: KEY_MAX_LENGTH,
-                        pattern: NO_NUL,
-                        description: 'Dedupes starts over MCP; a key used over REST is a different scope.',
-                    },
-                    thread: {
-                        type: 'string',
-                        minLength: 1,
-                        maxLength: KEY_MAX_LENGTH,
-                        pattern: NO_NUL,
-                    },
-                    waitSeconds: {
-                        type: 'integer',
-                        minimum: 0,
-                        description: `Seconds to wait for the run to finish or pause (at most ${options.maxWaitSeconds}). Default 0.`,
-                    },
-                },
-                additionalProperties: false,
-            });
-        } catch (error) {
-            throw new InvalidAgentDefinitionError(
-                `The payload schema of agent "${agent.name}" is no valid JSON Schema for MCP: ${error instanceof Error ? error.message : String(error)}`,
-            );
-        }
-        tools.push({
-            agent,
-            trigger,
-            ...(schema ? { schema } : {}),
-            description: describeAgent(agent),
-            inputSchema,
-        });
+export function buildRunTool(agent: Agent, options: McpEndpointOptions): McpRunTool | undefined {
+    const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
+    if (!trigger) return undefined;
+    if (`run_${agent.name}`.length > MCP_TOOL_NAME_MAX_LENGTH) {
+        throw new InvalidAgentDefinitionError(
+            `The MCP tool "run_${agent.name}" exceeds ${MCP_TOOL_NAME_MAX_LENGTH} characters: shorten the agent name to ${MCP_TOOL_NAME_MAX_LENGTH - 4} or set mcp: false.`,
+        );
     }
-    return tools;
+    const schema = trigger.options.schema as StandardSchemaV1 | undefined;
+    let inputSchema: McpRunTool['inputSchema'];
+    try {
+        inputSchema = fromJsonSchema<RunAgentArgs>({
+            type: 'object',
+            properties: {
+                payload: toJsonSchema(schema, '#/properties/payload'),
+                idempotencyKey: {
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: KEY_MAX_LENGTH,
+                    pattern: NO_NUL,
+                    description: 'Dedupes starts over MCP; a key used over REST is a different scope.',
+                },
+                thread: {
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: KEY_MAX_LENGTH,
+                    pattern: NO_NUL,
+                },
+                waitSeconds: {
+                    type: 'integer',
+                    minimum: 0,
+                    description: `Seconds to wait for the run to finish or pause (at most ${options.maxWaitSeconds}). Default 0.`,
+                },
+            },
+            additionalProperties: false,
+        });
+    } catch (error) {
+        throw new InvalidAgentDefinitionError(
+            `The payload schema of agent "${agent.name}" is no valid JSON Schema for MCP: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
+    return {
+        agent,
+        trigger,
+        ...(schema ? { schema } : {}),
+        description: describeAgent(agent),
+        inputSchema,
+    };
+}
+
+/**
+ * Throws InvalidAgentDefinitionError when the agent's `run_<agent>` MCP tool
+ * cannot be built (a name above 64 characters with `run_`, a payload schema
+ * the MCP validator cannot compile), as createHttpApp would for a code agent.
+ */
+export function assertMcpRunTool(agent: Agent): void {
+    buildRunTool(agent, {
+        name: DEFAULT_MCP_NAME,
+        version: DEFAULT_MCP_VERSION,
+        maxWaitSeconds: DEFAULT_MCP_MAX_WAIT_SECONDS,
+    });
+}
+
+/**
+ * The `run_<agent>` tools of the app's agents, read per request in
+ * registration order. Each definition is built once per agent object (a
+ * replaced agent is a new object, so it is rebuilt). The agents held at
+ * construction are built eagerly and a failure fails the app (a folder
+ * agent's is reported to `onError` and its tool skipped); an agent
+ * registered later is built on the first request that sees it, and a failure
+ * then is reported to `onError` once and its tool skipped.
+ */
+export function createRunToolSource(ctx: HttpContext, options: McpEndpointOptions): () => McpRunTool[] {
+    // null: no http() trigger, or a definition that failed to build
+    const built = new WeakMap<Agent, McpRunTool | null>();
+    const toolOf = (agent: Agent): McpRunTool | null => {
+        const cached = built.get(agent);
+        if (cached !== undefined) return cached;
+        let tool: McpRunTool | null = null;
+        try {
+            tool = buildRunTool(agent, options) ?? null;
+        } catch (error) {
+            ctx.onError(error);
+        }
+        built.set(agent, tool);
+        return tool;
+    };
+
+    // a folder agent (one with a revision) never fails the app: it was checked before it was registered
+    for (const agent of ctx.agents.list()) {
+        if (ctx.engine.agentRevision(agent.name) === undefined) built.set(agent, buildRunTool(agent, options) ?? null);
+        else toolOf(agent);
+    }
+
+    return () => ctx.agents.list()
+        .map(toolOf)
+        .filter((tool): tool is McpRunTool => tool !== null);
 }
 
 function registerRunTool(

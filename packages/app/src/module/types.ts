@@ -13,6 +13,7 @@ import type {
     IStore,
 } from '@chamvi/core';
 import type {
+    AgentIssue,
     Authenticator,
     HttpRoute,
     IShutdown,
@@ -22,7 +23,7 @@ import type { DataSource } from 'typeorm';
 import type { AppConfig } from '../config/types.ts';
 import type { Env } from '../env/types.ts';
 import type { ILogger } from '../logger/types.ts';
-import type { ModelProviders } from '../models/types.ts';
+import type { ModelCheck, ModelProviders } from '../models/types.ts';
 
 /** The container and module contracts a module factory is written against (eldin, orkos). */
 export type { IContainer } from 'eldin';
@@ -40,8 +41,17 @@ export type AppContext = {
     report(error: unknown, context?: Record<string, unknown>): void;
     /** createApp's `models`. */
     models?: ModelProviders;
+    /** createApp's agents (the code agents); the live set is `engine.listAgents()`. */
     agents: readonly Agent[];
 };
+
+/**
+ * Throws InvalidAgentDefinitionError for an agent a module could not serve
+ * (the scheduler: a cron trigger hubwire refuses; http: a `run_<agent>` MCP
+ * tool it cannot build). The agents dir runs every check on a folder agent
+ * before registering it, so a refusal is a load issue, never a failed boot.
+ */
+export type AgentCheck = (agent: Agent) => void;
 
 export interface ILifecycleHook {
     readonly name: string;
@@ -88,4 +98,10 @@ export type AppTokens = {
     AUTHENTICATORS: AuthenticatorEntry;
     NOTIFIERS: INotifier;
     LIFECYCLE_HOOKS: ILifecycleHook;
+    /** The agents dir's load issues (`chamvi:agents`, when a dir is configured), at the time of the call. */
+    AGENT_ISSUES: () => readonly AgentIssue[];
+    /** A collection: every module's check of a folder agent before it is registered. */
+    AGENT_CHECKS: AgentCheck;
+    /** Checks an agent registered after setup (a folder agent) like setup checks the code agents; a no-op with a preset default provider. */
+    MODEL_CHECK: ModelCheck;
 };

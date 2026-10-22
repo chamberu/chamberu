@@ -12,11 +12,14 @@ npm install @chamvi/scheduler @chamvi/core --save
 
 ```ts
 function createScheduler(opts: SchedulerOptions): IScheduler;
+function assertSchedulable(agent: Agent): void;
 
 const SCHEDULE_LOCK_TTL_MS: 600_000;
 ```
 
-Schedules `engine.listAgents()` (or only the agents named in `agents`) and locks over `engine.store`. Throws `InvalidAgentDefinitionError` for a cron trigger the scheduler cannot use (expression, timezone, `lockTtlMs`) and for a name in `agents` the engine lacks or that is given twice.
+Schedules `engine.listAgents()` (or only the agents named in `agents`) and locks over `engine.store`. Throws `InvalidAgentDefinitionError` for a cron trigger the scheduler cannot use (expression, timezone, `lockTtlMs`) and for a name in `agents` the engine lacks or that is given twice; a folder agent's (one the engine holds at a revision) goes to `onError` instead and leaves that agent unscheduled. `assertSchedulable` throws the same error for an agent's cron triggers without scheduling anything; the app runs it on every folder agent before registering it.
+
+It follows the engine's `agents.changed` events (with `agents`, only for those names): an added agent is scheduled, a replaced one rescheduled, a removed one unscheduled, also before `start()`. A replacement whose cron trigger hubwire cannot schedule goes to `onError` and leaves that agent unscheduled. `stop()` stops following and also waits for the ticks in flight of replaced and removed agents.
 
 <<< ../../../scheduler/src/scheduler/types.ts{ts}
 

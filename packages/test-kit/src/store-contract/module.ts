@@ -8,13 +8,14 @@
 import { describe, expect, it } from 'vitest';
 import { InvalidRunStateError, RunNotFoundError, RunStatus } from '@chamvi/core';
 import type {
+    AgentRevision,
     Artifact,
     Checkpoint,
     IStore,
     Step,
 } from '@chamvi/core';
 import { ControllableClock } from '../clock/index.ts';
-import { makeArtifact, makeRun } from './helpers.ts';
+import { makeAgentRevision, makeArtifact, makeRun } from './helpers.ts';
 
 /**
  * Shared behavioural contract for every IStore implementation.
@@ -567,6 +568,63 @@ export function describeStoreContract(
             const [listed] = await store.listArtifacts('r1');
             listed!.filename = 'evil';
             expect(await store.getArtifact('a1')).toEqual(makeArtifact('a1'));
+        });
+
+        it('getAgentRevision of an unknown agent is undefined', async () => {
+            const { store } = await setup();
+            expect(await store.getAgentRevision('a')).toBeUndefined();
+        });
+
+        it('setAgentRevision upserts', async () => {
+            const { store } = await setup();
+            await store.setAgentRevision(makeAgentRevision('a'));
+            expect(await store.getAgentRevision('a')).toEqual(makeAgentRevision('a'));
+            await store.setAgentRevision(makeAgentRevision('a', { hash: 'h2', changedAt: new Date(2_000) }));
+            expect(await store.getAgentRevision('a')).toEqual({
+                agent: 'a', 
+                hash: 'h2', 
+                changedAt: new Date(2_000), 
+            });
+            expect(await store.listAgentRevisions()).toHaveLength(1);
+        });
+
+        it('deleteAgentRevision removes it and ignores a missing one', async () => {
+            const { store } = await setup();
+            await store.setAgentRevision(makeAgentRevision('a'));
+            await store.setAgentRevision(makeAgentRevision('b'));
+            await store.deleteAgentRevision('a');
+            expect(await store.getAgentRevision('a')).toBeUndefined();
+            await expect(store.deleteAgentRevision('missing')).resolves.toBeUndefined();
+            expect(await store.listAgentRevisions()).toEqual([makeAgentRevision('b')]);
+        });
+
+        it('listAgentRevisions orders by agent code point', async () => {
+            const { store } = await setup();
+            expect(await store.listAgentRevisions()).toEqual([]);
+            await store.setAgentRevision(makeAgentRevision('b'));
+            await store.setAgentRevision(makeAgentRevision('a-b'));
+            await store.setAgentRevision(makeAgentRevision('a'));
+            expect((await store.listAgentRevisions()).map((r) => r.agent)).toEqual(['a', 'a-b', 'b']);
+        });
+
+        it('agent revisions are copied in and out', async () => {
+            const { store } = await setup();
+            const revision: AgentRevision = makeAgentRevision('a');
+            await store.setAgentRevision(revision);
+            revision.hash = 'evil';
+            revision.changedAt.setTime(0);
+            expect(await store.getAgentRevision('a')).toEqual(makeAgentRevision('a'));
+
+            const got = (await store.getAgentRevision('a'))!;
+            expect(got.changedAt).toBeInstanceOf(Date);
+            got.hash = 'evil';
+            got.changedAt.setTime(0);
+            const [listed] = await store.listAgentRevisions();
+            expect(listed!.changedAt).toBeInstanceOf(Date);
+            listed!.hash = 'evil';
+            listed!.changedAt.setTime(0);
+            expect(await store.getAgentRevision('a')).toEqual(makeAgentRevision('a'));
+            expect(await store.listAgentRevisions()).toEqual([makeAgentRevision('a')]);
         });
     });
 }

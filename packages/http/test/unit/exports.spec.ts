@@ -16,6 +16,7 @@ import * as http from '@chamvi/http';
 describe('public api', () => {
     it.each([
         'agentPermission',
+        'assertMcpRunTool',
         'authup',
         'createHttpApp',
         'createShutdown',

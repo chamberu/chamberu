@@ -46,6 +46,15 @@
         "test": "vitest --config test/vitest.config.ts --run",
         "test:coverage": "vitest --config test/vitest.config.ts --run --coverage"
     },
+    "nx": {
+        "targets": {
+            "test": {
+                "dependsOn": [
+                    "build"
+                ]
+            }
+        }
+    },
     "keywords": [
         "chamvi",
         "app",
@@ -63,6 +72,8 @@
         "@chamvi/store-typeorm": "^0.1.0",
         "eldin": "^1.3.0",
         "envix": "^1.5.0",
+        "jiti": "^2.6.1",
+        "locter": "^4.1.1",
         "orkos": "^1.1.1",
         "routup": "^6.1.0",
         "smob": "^1.6.2"

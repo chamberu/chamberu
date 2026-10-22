@@ -12,8 +12,9 @@ Everything the engine persists goes through one interface, `IStore`. It is a set
 | `IEffectStore` | Recorded effect results | `getEffect`, `putEffect` |
 | `IStateStore` | Per-agent state | `kvGet`/`kvSet` (`undefined` removes the key), `kvList` (key code-point order, `limit`/`offset`), `docList`/`docUpsert`/`docDelete` |
 | `IArtifactStore` | Files of a run (attachments, files tools stored) | `putArtifact(artifact, data)` (insert-if-absent), `getArtifact` (metadata), `readArtifact` (bytes), `listArtifacts(runId)` |
+| `IAgentRevisionStore` | One revision marker per [folder agent](/guide/agent-folders): `{ agent, hash, changedAt }`, no code | `getAgentRevision`, `setAgentRevision` (upsert), `deleteAgentRevision` (a missing one is a no-op), `listAgentRevisions` (agent code-point order) |
 
-`IStore` extends all eight.
+`IStore` extends all nine. A store written before agent folders existed needs the four `IAgentRevisionStore` methods (a breaking change of the 0.x line).
 
 ## Rules every store keeps
 
@@ -21,7 +22,7 @@ Everything the engine persists goes through one interface, `IStore`. It is a set
 2. **Time comes from the clock.** Expiry decisions use an injected `IClock`, never the database's clock, so tests can drive time and replicas agree on one rule.
 3. **No aliasing.** Values are copied in and out. Mutating an object after passing it to the store, or one the store returned, never changes what the store holds.
 4. **Atomic means atomic across callers.** `createRun`, `claimKey`, `claimRun`, `renewClaim`, `acquire` and `putArtifact` must hold under concurrency, also across processes.
-5. **Ordering.** `listRuns` orders by `createdAt` ascending, ties broken by `id` ascending, or both descending with `order: 'desc'` (newest first); `total` ignores `limit` and `offset`. `listArtifacts` orders the same way.
+5. **Ordering.** `listRuns` orders by `createdAt` ascending, ties broken by `id` ascending, or both descending with `order: 'desc'` (newest first); `total` ignores `limit` and `offset`. `listArtifacts` orders the same way. `listAgentRevisions` orders by agent name in code-point order.
 6. **Guards throw.** `updateRun` throws `InvalidRunStateError` when `expectStatus` does not match, or when `expectOwner` is given and the claim is absent or held by another owner (expiry is not checked there: a lease is lost once taken over). It throws `RunNotFoundError` for an unknown run.
 7. **Checkpoints.** `saveCheckpoint` keeps the highest `stepIndex`; an equal index replaces.
 8. **State filters.** `docList` `where` matches top-level fields by equality.

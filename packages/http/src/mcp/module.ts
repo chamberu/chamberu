@@ -20,7 +20,7 @@ import {
     DEFAULT_MCP_VERSION,
 } from './constants.ts';
 import { readRequestExtra } from './helpers.ts';
-import { buildRunTools, registerTools } from './tools.ts';
+import { createRunToolSource, registerTools } from './tools.ts';
 import type { McpEndpointOptions, McpRequestExtra } from './types.ts';
 
 function withoutTransferEncoding(input: Headers): Headers {
@@ -31,17 +31,18 @@ function withoutTransferEncoding(input: Headers): Headers {
 
 /**
  * The MCP handler: one McpServer per request, with the tools the request's
- * principal (from `authInfo.extra`) may use; tool definitions are built once. Bodies are bounded by
- * `bodyLimit`, like REST.
+ * principal (from `authInfo.extra`) may use; a `run_<agent>` definition is
+ * built once per agent object (see `createRunToolSource`). Bodies are bounded
+ * by `bodyLimit`, like REST.
  */
 export function createMcpEndpoint(ctx: HttpContext, options: McpEndpointOptions): McpHttpHandler {
-    const runTools = buildRunTools(ctx.agents.values(), options);
+    const runTools = createRunToolSource(ctx, options);
     return createMcpHandler(({ authInfo }) => {
         const extra = readRequestExtra(authInfo?.extra);
         // the route always passes them; a request without them cannot reach here
         if (!extra) throw new UnauthorizedError({ message: 'Authentication required.' });
         const server = new McpServer({ name: options.name, version: options.version });
-        registerTools(server, ctx, runTools, extra, options);
+        registerTools(server, ctx, runTools(), extra, options);
         return server;
     }, { maxRequestBodySize: ctx.bodyLimit });
 }

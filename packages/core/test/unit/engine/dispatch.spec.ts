@@ -15,6 +15,7 @@ import {
     vi,
 } from 'vitest';
 import {
+    AgentNotFoundError,
     Engine,
     InvalidAgentDefinitionError,
     TRIGGER_KEY_MAX_LENGTH,
@@ -201,7 +202,7 @@ describe('Engine.dispatch', () => {
 
     it('dispatch rejects unknown agent', async () => {
         const { engine, store } = make();
-        await expect(engine.dispatch(env({ agent: 'nope' }))).rejects.toThrow(InvalidAgentDefinitionError);
+        await expect(engine.dispatch(env({ agent: 'nope' }))).rejects.toThrow(AgentNotFoundError);
         await expect(engine.dispatch(env({ agent: 'nope' }))).rejects.toThrow('unknown agent: nope');
         expect((await store.listRuns({})).total).toBe(0);
     });

@@ -6,7 +6,7 @@
  */
 
 import type { Agent } from '@chamvi/core';
-import type { createProviderRegistry } from 'ai';
+import type { ProviderRegistryProvider, createProviderRegistry } from 'ai';
 import type { Env } from '../env/types.ts';
 
 /** createApp's `models`: providers by id, as `createProviderRegistry()` takes them. */
@@ -32,4 +32,13 @@ export type ModelRegistryOptions = {
     models?: ModelProviders;
     /** Loads a provider package; default `(s) => import(s)`. */
     importer?: (specifier: string) => Promise<unknown>;
+};
+
+/** Throws InvalidAgentDefinitionError when the agent's string model cannot resolve (a non-string model passes). */
+export type ModelCheck = (agent: Agent) => void;
+
+export type ResolvedModels = {
+    registry: ProviderRegistryProvider;
+    /** The check every agent of `agents` passed, for agents registered later (folder agents). */
+    check: ModelCheck;
 };

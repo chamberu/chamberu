@@ -14,7 +14,7 @@ npm install @chamvi/http @chamvi/core --save
 function createHttpApp(options: HttpAppOptions): App; // routup App
 ```
 
-The store, the agents and the clock come from `engine` (`engine.store`, `engine.listAgents()`, `engine.clock`); `agents` narrows the served agents to the named ones, the others get no routes, MCP tools or hooks in this app. Throws `InvalidAgentDefinitionError` for a name in `agents` the engine lacks or that is given twice, an empty `auth` array and an invalid `routes` entry (a path that is not static, a duplicate method and path, a first segment of a built-in route such as `agents`, `runs` or `hooks`, or the metrics path, all compared case-insensitively).
+The store, the agents and the clock come from `engine` (`engine.store`, `engine.listAgents()`, `engine.clock`). The agents are read from the engine on every request, so an agent registered, replaced or removed at runtime gets (or loses) its routes, hooks, `GET /agents` entry, schedules and MCP `run_<agent>` tool at once; a `run_<agent>` definition is built once per agent object, and one that fails for an agent registered after construction goes to `onError` and that tool is left out. `agents` narrows the served agents to the named ones, checked at construction: the others, also agents registered later, get no routes, MCP tools or hooks in this app, and a named agent removed from the engine answers 404. `agentIssues` lists agents that failed to load as `GET /agents` `issues`. `HttpRouteContext.agents` is read from the engine on every access. Throws `InvalidAgentDefinitionError` for a name in `agents` the engine lacks or that is given twice, an empty `auth` array and an invalid `routes` entry (a path that is not static, a duplicate method and path, a first segment of a built-in route such as `agents`, `runs` or `hooks`, or the metrics path, all compared case-insensitively).
 
 <<< ../../../http/src/app/types.ts#options{ts}
 
@@ -48,7 +48,10 @@ const Permission: {
 };
 
 function agentPermission(agent: string, action: 'run' | 'approve'): string; // agent:<agent>:<action>
+function assertMcpRunTool(agent: Agent): void; // throws InvalidAgentDefinitionError like createHttpApp
 ```
+
+`assertMcpRunTool` builds the agent's `run_<agent>` MCP tool definition and throws what `createHttpApp` would throw for it (a tool name above 64 characters, a payload schema MCP cannot compile); the app runs it on every folder agent before registering it. `createHttpApp` reports a folder agent's failure (one the engine holds at a revision) to `onError` and skips its tool instead of throwing.
 
 Matching uses core's [`hasPermission(principal.permissions, permission)`](/reference/#permissions): true for a granted `*`, or for a grant with the same number of `:` segments whose every segment is equal or `*`.
 
@@ -81,6 +84,6 @@ type RunToolResult = {
 };
 ```
 
-`AgentSummary` and `ScheduleSummary` are the items of `GET /agents` and `GET /schedules`:
+`GET /agents` answers `{ data: AgentSummary[], issues: AgentIssue[] }`, `GET /schedules` `{ data: ScheduleSummary[] }`:
 
 <<< ../../../http/src/agents/types.ts#summaries{ts}

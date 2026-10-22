@@ -107,8 +107,13 @@ describe('createApp', () => {
         expect(calls).toEqual(['fake store']);
     });
 
-    it('throws for empty agents', () => {
-        expect(() => createApp({ agents: [] })).toThrow(InvalidAgentDefinitionError);
-        expect(() => createApp({} as never)).toThrow(InvalidAgentDefinitionError);
+    it('agents may be omitted', () => {
+        expect(createApp({}).agents).toEqual([]);
+        expect(createApp({ agents: [] }).agents).toEqual([]);
+    });
+
+    it('throws for agents that are no array', () => {
+        expect(() => createApp({ agents: 'triage' } as never)).toThrow(InvalidAgentDefinitionError);
+        expect(() => createApp(undefined as never)).toThrow(InvalidAgentDefinitionError);
     });
 });

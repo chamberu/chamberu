@@ -28,6 +28,16 @@ export type RunEvent = { type: 'run.updated'; run: Run } |
     { type: 'step.appended'; step: Step } |
     { type: 'run.delta'; delta: RunDelta };
 
+/** An agent was added, replaced or removed on this engine; local like the run events. */
+export type AgentChange = {
+    type: 'agents.changed';
+    name: string;
+    kind: 'added' | 'replaced' | 'removed';
+};
+
+/** Every event Engine.on() delivers. */
+export type EngineEvent = RunEvent | AgentChange;
+
 export type EngineOptions = {
     store: IStore;
     agents: Agent[];

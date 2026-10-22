@@ -7,16 +7,19 @@
 
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import type { Agent, Engine, TriggerDefinition } from '@chamvi/core';
-import type { IScheduleLock, ScheduledComponentOptions } from 'hubwire';
+import type { IScheduleLock, IScheduledComponent, ScheduledComponentOptions } from 'hubwire';
+import { defineScheduledComponent } from 'hubwire';
 import { fireCronTrigger, readCronOptions } from '../tick/index.ts';
-import type { SchedulerOptions } from './types.ts';
+import type { SchedulerErrorContext, SchedulerOptions } from './types.ts';
+
+type ComponentContext = Required<Pick<SchedulerOptions, 'engine' | 'lockTtlMs' | 'onError'>> & { lock: IScheduleLock };
 
 /**
  * The hubwire component options for one cron trigger. hubwire's onSkip is not
  * wired: on N replicas, N - 1 skip every tick.
  */
 export function buildComponentOptions(
-    ctx: Required<Pick<SchedulerOptions, 'engine' | 'lockTtlMs' | 'onError'>> & { lock: IScheduleLock },
+    ctx: ComponentContext,
     agent: Agent,
     trigger: TriggerDefinition,
 ): ScheduledComponentOptions {
@@ -39,6 +42,39 @@ export function buildComponentOptions(
         },
         hooks: { onError: (error) => ctx.onError(error, { agent: agent.name, trigger: trigger.id }) },
     };
+}
+
+/**
+ * One hubwire component per cron trigger of the agent, with the trigger's id. A trigger hubwire
+ * cannot schedule throws InvalidAgentDefinitionError, or, with `onInvalid`,
+ * is reported there and the agent gets no components at all.
+ */
+export function buildAgentComponents(
+    ctx: ComponentContext,
+    agent: Agent,
+    onInvalid?: (error: InvalidAgentDefinitionError, errorCtx: SchedulerErrorContext) => void,
+): Array<{ trigger: string; component: IScheduledComponent }> {
+    const components: Array<{ trigger: string; component: IScheduledComponent }> = [];
+    for (const trigger of agent.definition.triggers ?? []) {
+        if (trigger.source !== 'cron') continue;
+        try {
+            components.push({ trigger: trigger.id, component: defineScheduledComponent(buildComponentOptions(ctx, agent, trigger)) });
+        } catch (e) {
+            const error = toDefinitionError(agent, trigger, e);
+            if (!onInvalid) throw error;
+            onInvalid(error, { agent: agent.name, trigger: trigger.id });
+            return [];
+        }
+    }
+    return components;
+}
+
+/** A hubwire definition error as InvalidAgentDefinitionError naming the agent and trigger. */
+export function toDefinitionError(agent: Agent, trigger: TriggerDefinition, e: unknown): InvalidAgentDefinitionError {
+    if (e instanceof InvalidAgentDefinitionError) return e;
+    return new InvalidAgentDefinitionError(
+        `Agent "${agent.name}" trigger "${trigger.id}": ${e instanceof Error ? e.message : String(e)}`,
+    );
 }
 
 /**

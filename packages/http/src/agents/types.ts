@@ -25,6 +25,13 @@ export type AgentSummary = {
     notify?: string;
 };
 
+/** An agent that failed to load, as `GET /agents` lists it next to the agents. */
+export type AgentIssue = {
+    agent: string;
+    message: string;
+    at: Date;
+};
+
 /** A `cron()` trigger as `GET /schedules` lists it (definitions only, not scheduler health). */
 export type ScheduleSummary = {
     agent: string;

@@ -14,7 +14,7 @@ function token<K extends keyof AppTokens>(key: K): TypedToken<AppTokens[K]> {
 
 /**
  * The container keys modules share. `HTTP_ROUTES`, `AUTHENTICATORS`,
- * `NOTIFIERS` and `LIFECYCLE_HOOKS` are collections (`registerMany` in
+ * `NOTIFIERS`, `LIFECYCLE_HOOKS` and `AGENT_CHECKS` are collections (`registerMany` in
  * `setup`, `resolveAll` in `onReady`); every other token holds one value.
  */
 export const AppToken = {
@@ -32,6 +32,9 @@ export const AppToken = {
     AUTHENTICATORS: token('AUTHENTICATORS'),
     NOTIFIERS: token('NOTIFIERS'),
     LIFECYCLE_HOOKS: token('LIFECYCLE_HOOKS'),
+    AGENT_ISSUES: token('AGENT_ISSUES'),
+    AGENT_CHECKS: token('AGENT_CHECKS'),
+    MODEL_CHECK: token('MODEL_CHECK'),
 } as const;
 
 /** The built-in modules' names; list a module of the same name to replace one. */
@@ -40,6 +43,7 @@ export const ModuleName = {
     STORE: 'chamvi:store',
     STATIC_TOKENS: 'chamvi:static-tokens',
     ENGINE: 'chamvi:engine',
+    AGENTS: 'chamvi:agents',
     SCHEDULER: 'chamvi:scheduler',
     HTTP: 'chamvi:http',
 } as const;

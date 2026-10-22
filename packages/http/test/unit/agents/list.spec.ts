@@ -60,4 +60,29 @@ describe('GET /agents', () => {
         expect((await call(app, 'GET', '/agents', { token: tokenFor('agent:echo:run') })).status).toBe(403);
         expect((await call(app, 'GET', '/agents')).status).toBe(401);
     });
+
+    it('lists no issues without agentIssues', async () => {
+        const { app } = createTestApp({ agents: inventoryAgents() });
+        const body = await (await call(app, 'GET', '/agents', { token: READER_TOKEN })).json();
+        expect(body.issues).toEqual([]);
+    });
+
+    it('lists agentIssues', async () => {
+        const at = new Date(1_000_000);
+        const { app } = createTestApp({
+            agents: inventoryAgents(),
+            agentIssues: () => [{
+                agent: 'broken', 
+                message: 'agent.yaml: model is missing', 
+                at, 
+            }],
+        });
+        const body = await (await call(app, 'GET', '/agents', { token: READER_TOKEN })).json();
+        expect(body.issues).toEqual([{
+            agent: 'broken', 
+            message: 'agent.yaml: model is missing', 
+            at: at.toISOString(), 
+        }]);
+        expect(body.data.map((agent: { name: string }) => agent.name)).toEqual(['echo', 'intake']);
+    });
 });

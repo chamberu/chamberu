@@ -80,3 +80,13 @@ export type Agent<S extends StateSchema = StateSchema> = {
     readonly name: string;
     readonly definition: Required<Pick<AgentDefinition<S>, 'budget'>> & AgentDefinition<S>;
 };
+
+/**
+ * The revision marker of a folder agent: the content hash of its folder
+ * (never its code) and when that hash was recorded.
+ */
+export type AgentRevision = {
+    agent: string;
+    hash: string;
+    changedAt: Date;
+};

@@ -61,7 +61,7 @@ describePostgres('schema', () => {
         await migrateStore(ds);
 
         const migrations: { name: string }[] = await ds.query('SELECT name FROM migrations ORDER BY id');
-        expect(migrations.map((m) => m.name)).toEqual(['Init1792195200000', 'Artifacts1792368000000', 'IdempotencyScope1792454400000', 'KvKeyCollation1792540800000']);
+        expect(migrations.map((m) => m.name)).toEqual(['Init1792195200000', 'Artifacts1792368000000', 'IdempotencyScope1792454400000', 'KvKeyCollation1792540800000', 'AgentRevisions1792627200000']);
 
         const tables: { table_name: string }[] = await ds.query(
             'SELECT table_name FROM information_schema.tables WHERE table_name = ANY($1::text[])',
@@ -96,6 +96,9 @@ describePostgres('schema', () => {
             );
             return row?.collation;
         };
+        await ds.undoLastMigration({ transaction: 'each' });
+        expect(await tablesIn('other')).toBe(Object.values(TableName).length - 1);
+
         expect(await keyCollation()).toBe('C');
         await ds.undoLastMigration({ transaction: 'each' });
         expect(await keyCollation()).toBeNull();
@@ -103,10 +106,10 @@ describePostgres('schema', () => {
         expect(await scopeLength()).toBe(1024);
         await ds.undoLastMigration({ transaction: 'each' });
         expect(await scopeLength()).toBe(255);
-        expect(await tablesIn('other')).toBe(Object.values(TableName).length);
+        expect(await tablesIn('other')).toBe(Object.values(TableName).length - 1);
 
         await ds.undoLastMigration({ transaction: 'each' });
-        expect(await tablesIn('other')).toBe(Object.values(TableName).length - 1);
+        expect(await tablesIn('other')).toBe(Object.values(TableName).length - 2);
         await ds.undoLastMigration({ transaction: 'each' });
         expect(await tablesIn('other')).toBe(0);
     });

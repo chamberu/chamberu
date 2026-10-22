@@ -43,7 +43,7 @@ An agent's `model` may be a string `'<provider>:<model>'`. It resolves through a
 
 ## Modules
 
-Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](https://github.com/tada5hi/eldin) container, unwrapped. Six built-in modules are always there; listing a module with a built-in's name (`ModuleName`) replaces it, which is also how you configure one (`storeModule({ dataSource })`, `httpModule({ cors })`). Two modules of one name, a built-in's included, throw `InvalidAgentDefinitionError` from `createApp`.
+Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](https://github.com/tada5hi/eldin) container, unwrapped. Seven built-in modules are always there; listing a module with a built-in's name (`ModuleName`) replaces it, which is also how you configure one (`storeModule({ dataSource })`, `httpModule({ cors })`). Two modules of one name, a built-in's included, throw `InvalidAgentDefinitionError` from `createApp`.
 
 | Module | Does |
 |---|---|
@@ -51,6 +51,7 @@ Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](h
 | `storeModule()` | A `TypeormStore` over `DATABASE_URL`, migrated unless `CHAMVI_MIGRATE=false`, plus the hourly `purgeExpired()`; without `DATABASE_URL` a `MemoryStore` (warned outside dev) |
 | `staticTokensModule()` | The `staticTokens()` authenticator from `CHAMVI_TOKENS` |
 | `engineModule()` | Checks the model strings, builds the `Engine` with every contributed notifier and starts it |
+| `agentsModule()` | Without `CHAMVI_AGENTS_DIR`, refuses an app without agents; with it, loads the [agent folders](/guide/agent-folders) before the engine starts and watches them |
 | `schedulerModule()` | The in-process cron scheduler; `CHAMVI_SCHEDULER=false` leaves cron to Kubernetes CronJobs and `chamvi run-job` |
 | `httpModule()` | `createHttpApp()` with every contributed route and authenticator, the graceful shutdown, `serve()` on `HOST`:`PORT` |
 
@@ -76,7 +77,7 @@ With `CHAMVI_PUBLIC_URL` set, the notifier modules link approvals to the dashboa
 
 orkos sets every module up in dependency order, then calls every `onReady`. chamvi splits the work along that line:
 
-- In **`setup`**, a module registers what it contributes on the container's collection tokens: `AppToken.HTTP_ROUTES`, `NOTIFIERS`, `AUTHENTICATORS` (with an `order`, lowest first) and `LIFECYCLE_HOOKS`.
+- In **`setup`**, a module registers what it contributes on the container's collection tokens: `AppToken.HTTP_ROUTES`, `NOTIFIERS`, `AUTHENTICATORS` (with an `order`, lowest first), `LIFECYCLE_HOOKS` and `AGENT_CHECKS` (an `(agent) => void` that throws `InvalidAgentDefinitionError` for a folder agent the module could not serve, run before the agent is registered).
 - In **`onReady`**, the consumers build: the engine module collects the notifiers, the http module the routes and authenticators.
 
 So a contribution never depends on module order. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in its own `onReady` lists that module in `dependencies`. Nothing starts in `onReady`: the engine, the scheduler and the http module register start steps, which the app runs (engine, scheduler, then the `started` hooks and listening) only once every module's `onReady` ran, user modules included. So a configuration error any of them finds starts nothing: no queued run of the shared store executes on a replica that then exits 2.
@@ -87,16 +88,16 @@ So a contribution never depends on module order. A module that resolves `ENGINE`
 
 1. config
 2. store (and the migrations, advisory-locked, so every replica may run them)
-3. every `onReady`: the engine, the scheduler and the HTTP app are built, nothing runs yet
+3. every `onReady`: the engine is built, the [agent folders](/guide/agent-folders) are loaded into it, the scheduler and the HTTP app are built, nothing runs yet
 4. `engine.start()`
 5. `scheduler.start()`
-6. the purge timer
+6. the purge timer and the agents dir watcher
 7. `serve()` on `HOST`:`PORT`, listening last
 
 `app.stop()` is memoized and also stops a start still setting up (which then never listens):
 
 1. `/readyz` answers 503, then `CHAMVI_READINESS_DELAY_MS` (0)
-2. `scheduler.stop()` and the purge timer stop
+2. `scheduler.stop()`, the purge timer and the agents dir watcher stop
 3. the app's closers (SSE streams, MCP waits)
 4. `server.close()`
 5. `engine.drain()` for up to `CHAMVI_DRAIN_TIMEOUT_MS` (30 s)
@@ -106,7 +107,7 @@ So a contribution never depends on module order. A module that resolves `ENGINE`
 
 orkos swallows teardown errors; chamvi does not: every teardown error is logged, and `stop()` then rejects with `app_stop_failed` (the CLI exits 1). An app runs one lifecycle: a second `start()`, `runJob()` or `migrate()` rejects with `app_in_use`.
 
-`runJob({ agent, trigger? })` builds config, store and engine, no scheduler and no HTTP, fires the cron trigger once through [`runJob()`](/guide/scheduler) and tears down. `migrate()` only migrates the store; it fails without `DATABASE_URL`.
+`runJob({ agent, trigger? })` builds config, store and engine (with the folder agents, loaded once), no scheduler and no HTTP, fires the cron trigger once through [`runJob()`](/guide/scheduler) and tears down. `migrate()` only migrates the store; it fails without `DATABASE_URL`.
 
 ## Writing a module
 

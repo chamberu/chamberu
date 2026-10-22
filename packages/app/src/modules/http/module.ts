@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { createHttpApp, createShutdown } from '@chamvi/http';
+import { assertMcpRunTool, createHttpApp, createShutdown } from '@chamvi/http';
 import type { IShutdown } from '@chamvi/http';
 import type { IContainer } from 'eldin';
 import type { IModule, ModuleDependency } from 'orkos';
@@ -18,7 +18,8 @@ import { resolveAuthenticators } from './helpers.ts';
 import type { HttpModuleOptions } from './types.ts';
 
 /**
- * Serves the HTTP app (start mode only). `onReady` builds the graceful
+ * Serves the HTTP app (start mode only). `setup` contributes the folder
+ * agents' MCP tool check (`AGENT_CHECKS`, unless `mcp: false`); `onReady` builds the graceful
  * shutdown (`SHUTDOWN`) and the routup app from every `AUTHENTICATORS` and
  * `HTTP_ROUTES` contribution, then registers the `serve` start step: the
  * app runs the start steps (engine, scheduler, then this one: the `started`
@@ -44,8 +45,10 @@ export class HttpModule implements IModule {
         this.options = options;
     }
 
-    async setup(): Promise<void> {
-        // everything happens in onReady, after every module contributed
+    async setup(container: IContainer): Promise<void> {
+        // a folder agent whose run_<agent> MCP tool cannot be built is a load issue, in every mode, so the modes agree
+        if (container.resolve(AppToken.CONTEXT).mode === 'migrate' || this.options.mcp === false) return;
+        container.registerMany(AppToken.AGENT_CHECKS, { useValue: assertMcpRunTool });
     }
 
     async onReady(container: IContainer): Promise<void> {
@@ -87,6 +90,7 @@ export class HttpModule implements IModule {
             shutdown,
             basePath: config.http.basePath,
             routes: container.resolveAll(AppToken.HTTP_ROUTES),
+            ...(container.has(AppToken.AGENT_ISSUES) && { agentIssues: container.resolve(AppToken.AGENT_ISSUES) }),
             onError: (error) => logger.error('http error', error),
         });
 

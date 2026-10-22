@@ -70,11 +70,12 @@ export class App implements IApp {
     protected stopping: Promise<void> | undefined;
 
     constructor(options: AppOptions) {
-        if (!isObject(options) || !Array.isArray(options.agents) || options.agents.length === 0) {
-            throw new InvalidAgentDefinitionError('createApp needs at least one agent.');
+        // no agents at all is refused by start and runJob, once CHAMVI_AGENTS_DIR is read
+        if (!isObject(options) || (options.agents !== undefined && !Array.isArray(options.agents))) {
+            throw new InvalidAgentDefinitionError('createApp needs an options object whose agents is an array.');
         }
 
-        this.agents = Object.freeze([...options.agents]);
+        this.agents = Object.freeze([...options.agents ?? []]);
         this.modules = buildModules(options.modules);
         this.models = options.models;
     }
@@ -199,7 +200,7 @@ export class App implements IApp {
             const engine = container.resolve(AppToken.ENGINE);
             const agent = engine.getAgent(options.agent);
             if (!agent) {
-                const names = this.agents.map((a) => a.name).join(', ');
+                const names = engine.listAgents().map((a) => a.name).join(', ');
                 throw new InvalidAgentDefinitionError(`No agent "${options.agent}"; the app has: ${names}.`);
             }
 

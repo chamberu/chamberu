@@ -17,6 +17,7 @@ import { useAppContext } from '../context/module.ts';
 const { client } = useAppContext();
 const {
     agents,
+    issues,
     schedules,
     rollups,
     error,
@@ -52,6 +53,20 @@ const shown = computed(() => agents.value.filter((agent) => matchesName(agent, q
         >
             {{ error.code }} · {{ error.message }}
         </p>
+        <div
+            v-if="issues.length > 0"
+            class="card notice load-issues"
+            role="status"
+            data-testid="agent-issues"
+        >
+            <p>{{ issues.length }} {{ issues.length === 1 ? 'agent' : 'agents' }} failed to load</p>
+            <p
+                v-for="issue in issues"
+                :key="issue.agent"
+            >
+                <code class="mono">{{ issue.agent }}</code> {{ issue.message }}
+            </p>
+        </div>
         <div class="toolbar">
             <label
                 class="field"

@@ -87,7 +87,7 @@ describe('useAgentRollups', () => {
         ];
         const seen: RunListFilter[] = [];
         const client = fakeClient({
-            listAgents: async () => AGENTS,
+            listAgents: async () => ({ data: AGENTS, issues: [] }),
             listSchedules: async () => [{
                 agent: 'digest',
                 trigger: 'cron:0 8 * * *',
@@ -113,11 +113,30 @@ describe('useAgentRollups', () => {
         scope.stop();
     });
 
+    it('exposes the load issues of GET /agents', async () => {
+        const issue = {
+            agent: 'triage', 
+            message: 'agent.ts: Unexpected token', 
+            at: now, 
+        };
+        const client = fakeClient({
+            listAgents: async () => ({ data: AGENTS, issues: [issue] }),
+            listSchedules: async () => [],
+            listRuns: listRunsOver([]),
+        });
+        const scope = effectScope();
+        const state = scope.run(() => useAgentRollups(client))!;
+        await flush();
+        expect(state.issues.value).toEqual([issue]);
+        expect(state.agents.value.map((a) => a.name)).toEqual(['deploy', 'digest']);
+        scope.stop();
+    });
+
     it('sends four requests per pass whatever the agent count', async () => {
         const many: AgentWire[] = Array.from({ length: 40 }, (_, i) => ({ ...AGENTS[0]!, name: `agent-${i}` }));
         let requests = 0;
         const client = fakeClient({
-            listAgents: async () => { requests++; return many; },
+            listAgents: async () => { requests++; return { data: many, issues: [] }; },
             listSchedules: async () => { requests++; return []; },
             listRuns: async (filter) => { requests++; return listRunsOver([])(filter); },
         });
@@ -137,7 +156,7 @@ describe('useAgentRollups', () => {
             createdAt: now,
         }));
         const client = fakeClient({
-            listAgents: async () => AGENTS,
+            listAgents: async () => ({ data: AGENTS, issues: [] }),
             listSchedules: async () => [],
             listRuns: listRunsOver(runs),
         });
@@ -218,7 +237,7 @@ describe('useAgentDetail', () => {
             }),
         ];
         const client = fakeClient({
-            listAgents: async () => AGENTS,
+            listAgents: async () => ({ data: AGENTS, issues: [] }),
             listSchedules: async () => [],
             listRuns: listRunsOver(runs),
         });
@@ -247,7 +266,7 @@ describe('useAgentDetail', () => {
             listAgents: async () => {
                 if (fail) throw apiError(0, 'network_error');
                 await gate.promise;
-                return AGENTS;
+                return { data: AGENTS, issues: [] };
             },
             listSchedules: async () => [],
             listRuns: listRunsOver(runs),
@@ -270,7 +289,7 @@ describe('useAgentDetail', () => {
 
     it('reports an unknown agent', async () => {
         const client = fakeClient({
-            listAgents: async () => AGENTS,
+            listAgents: async () => ({ data: AGENTS, issues: [] }),
             listSchedules: async () => [],
             listRuns: listRunsOver([]),
         });
@@ -285,7 +304,7 @@ describe('useAgentDetail', () => {
         const runs: RunWire[] = [];
         const started: Array<[string, unknown, string | undefined]> = [];
         const client = fakeClient({
-            listAgents: async () => AGENTS,
+            listAgents: async () => ({ data: AGENTS, issues: [] }),
             listSchedules: async () => [],
             listRuns: listRunsOver(runs),
             startRun: async (name, body) => {

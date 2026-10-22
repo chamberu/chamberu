@@ -6,6 +6,7 @@
  */
 
 export const ErrorCode = {
+    AGENT_NOT_FOUND: 'agent_not_found',
     ARTIFACT_NOT_FOUND: 'artifact_not_found',
     BUDGET_EXCEEDED: 'BudgetExceeded',
     CONTEXT_NOT_PROVIDED: 'context_not_provided',

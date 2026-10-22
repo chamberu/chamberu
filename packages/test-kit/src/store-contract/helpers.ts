@@ -6,7 +6,7 @@
  */
 
 import { RunStatus } from '@chamvi/core';
-import type { Artifact, Run } from '@chamvi/core';
+import type { AgentRevision, Artifact, Run } from '@chamvi/core';
 
 export function makeRun(id: string, overrides: Partial<Run> = {}): Run {
     const createdAt = new Date(1_000);
@@ -38,6 +38,15 @@ export function makeArtifact(id: string, overrides: Partial<Artifact> = {}): Art
         filename: `${id}.txt`,
         size: 3,
         createdAt: new Date(1_000),
+        ...overrides,
+    };
+}
+
+export function makeAgentRevision(agent: string, overrides: Partial<AgentRevision> = {}): AgentRevision {
+    return {
+        agent,
+        hash: 'h1',
+        changedAt: new Date(1_000),
         ...overrides,
     };
 }

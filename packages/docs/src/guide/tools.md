@@ -16,7 +16,7 @@ Throw `FatalToolError` when continuing makes no sense: a missing credential, a f
 
 The run fails with `error.code` `FatalToolError`, or the code you pass as the second constructor argument (`new FatalToolError(message, 'MissingToken')`). The other tool calls of the same step still complete and are recorded before the run settles.
 
-Infrastructure failures fail the run as well: a store write that throws, or an unknown agent.
+Infrastructure failures fail the run as well, such as a store write that throws. A run whose agent this engine does not hold (not loaded yet, failed to load, or loaded at an older [folder](/guide/agent-folders) revision) does not fail: it stays `queued` for a replica that has the agent's current code.
 
 ## Cancellation inside tools
 

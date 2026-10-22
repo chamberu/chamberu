@@ -6,6 +6,7 @@
  */
 
 import {
+    AgentRevisionEntity,
     ArtifactEntity,
     CheckpointEntity,
     DocEntity,
@@ -17,6 +18,7 @@ import {
     StepEntity,
 } from '../entities/index.ts';
 import {
+    AgentRevisions1792627200000,
     Artifacts1792368000000,
     IdempotencyScope1792454400000,
     Init1792195200000,
@@ -33,6 +35,7 @@ export const STORE_ENTITIES = [
     KvEntity,
     DocEntity,
     ArtifactEntity,
+    AgentRevisionEntity,
 ];
 
 export const STORE_MIGRATIONS = [
@@ -40,6 +43,7 @@ export const STORE_MIGRATIONS = [
     Artifacts1792368000000,
     IdempotencyScope1792454400000,
     KvKeyCollation1792540800000,
+    AgentRevisions1792627200000,
 ];
 
 export const MIGRATION_LOCK_NAME = 'chamvi:migrations';

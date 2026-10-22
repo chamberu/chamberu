@@ -10,6 +10,7 @@ import * as scheduler from '@chamvi/scheduler';
 
 describe('public api', () => {
     it.each([
+        'assertSchedulable',
         'createScheduler',
         'createStoreScheduleLock',
         'fireCronTrigger',

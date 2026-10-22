@@ -46,7 +46,7 @@ export function useAgentState(client: IApiClient, agent: Ref<string | undefined>
         error.value = undefined;
         if (!name) return;
         try {
-            const agents = await client.listAgents();
+            const { data: agents } = await client.listAgents();
             if (current !== generation) return;
             collections.value = agents.find((a) => a.name === name)?.state ?? [];
             await loadKv(name, 0, current);

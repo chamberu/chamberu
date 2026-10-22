@@ -18,6 +18,7 @@ import type { IClock } from '../clock/index.ts';
 import { contextKeyName, isContextKey } from '../context/helpers.ts';
 import type { ContextKey, IContextProvider } from '../context/types.ts';
 import {
+    AgentNotFoundError,
     InvalidAgentDefinitionError,
     InvalidResumeTokenError,
     InvalidRunStateError,
@@ -48,12 +49,14 @@ import { executeRun } from './execute/module.ts';
 import { staleToken } from './helpers.ts';
 import type { ApprovalRequest } from './execute/types.ts';
 import { RunQueue } from './queue/module.ts';
+import { cancelAgentRuns, dropRevision, syncRevision } from './registry/module.ts';
+import type { RegistryContext } from './registry/types.ts';
 import type {
     ApprovalAnswer,
     DispatchEnvelope,
+    EngineEvent,
     EngineOptions,
     ResumeDecision,
-    RunEvent,
 } from './types.ts';
 
 export class Engine implements IContextProvider {
@@ -61,6 +64,15 @@ export class Engine implements IContextProvider {
     readonly store: IStore;
 
     protected readonly agents: Map<string, Agent>;
+
+    /** The revision each registered agent was loaded at; undefined for a code agent. */
+    protected readonly revisions = new Map<string, string | undefined>();
+
+    /** Agents whose revision marker this engine is moving: none of their runs starts here meanwhile. */
+    protected readonly syncing = new Set<string>();
+
+    /** Agents removed here whose store cleanup is still to finish, with the revision they had. */
+    protected readonly removals = new Map<string, string | undefined>();
 
     protected readonly notifiers: Record<string, INotifier>;
 
@@ -75,7 +87,7 @@ export class Engine implements IContextProvider {
 
     protected readonly claimTtlMs: number;
 
-    protected readonly listeners = new Set<(e: RunEvent) => void>();
+    protected readonly listeners = new Set<(e: EngineEvent) => void>();
 
     protected readonly onError: (error: unknown, run?: Run) => void;
 
@@ -116,12 +128,7 @@ export class Engine implements IContextProvider {
             const duplicate = opts.agents.find((a) => seen.size === seen.add(a.name).size);
             throw new InvalidAgentDefinitionError(`Agent name "${duplicate?.name}" is used more than once.`);
         }
-        for (const agent of opts.agents) {
-            const { notify } = agent.definition;
-            if (notify !== undefined && !this.notifiers[notify]) {
-                throw new InvalidAgentDefinitionError(`Agent "${agent.name}" uses unknown notifier "${notify}".`);
-            }
-        }
+        for (const agent of opts.agents) this.assertRegistrable(agent);
         // eslint-disable-next-line no-console
         this.onError = opts.onError ?? ((error) => console.error('[chamvi]', error));
         this.queue = new RunQueue({
@@ -138,13 +145,12 @@ export class Engine implements IContextProvider {
                 await this.recover();
             },
             onLeaseLost: (runId) => this.loseLease(runId),
+            prepareStart: () => this.prepareStart(),
         });
     }
 
     async dispatch(envelope: DispatchEnvelope): Promise<{ runId: string; deduplicated: boolean }> {
-        if (!this.agents.has(envelope.agent)) {
-            throw new InvalidAgentDefinitionError(`unknown agent: ${envelope.agent}`);
-        }
+        if (!this.agents.has(envelope.agent)) throw new AgentNotFoundError(envelope.agent);
         const {
             attachments, 
             invoker, 
@@ -239,13 +245,84 @@ export class Engine implements IContextProvider {
         return this.agents.values().toArray();
     }
 
+    /** The revision the registered agent was loaded at (undefined for a code agent). */
+    agentRevision(name: string): string | undefined {
+        return this.revisions.get(name);
+    }
+
+    /**
+     * Registers an agent, or replaces the one of the same name in place (a new
+     * one goes last). With a `revision` (a folder agent's content hash) the
+     * store's revision marker is brought to it under the lock `agents:<name>`:
+     * a changed marker cancels the agent's unsettled runs created before the
+     * change, once across replicas. Without one, replacing a registered agent
+     * cancels its unsettled runs created before now. Emits `agents.changed`,
+     * except for the same agent at the same revision (`unchanged`).
+     */
+    async putAgent(agent: Agent, options: { revision?: string } = {}): Promise<'added' | 'replaced' | 'unchanged'> {
+        this.assertRegistrable(agent);
+        const { name } = agent;
+        const { revision } = options;
+        const registered = this.agents.has(name);
+        if (registered && this.agents.get(name) === agent && this.revisions.get(name) === revision) return 'unchanged';
+        if (revision !== undefined) {
+            this.syncing.add(name);
+            try {
+                await syncRevision(this.registry(), name, revision);
+            } finally {
+                this.syncing.delete(name);
+            }
+        } else if (registered) {
+            await cancelAgentRuns(this.registry(), name, this.clock.now());
+        }
+        const kind = this.agents.has(name) ? 'replaced' : 'added';
+        this.agents.set(name, agent);
+        this.revisions.set(name, revision);
+        this.emit({
+            type: 'agents.changed', 
+            name, 
+            kind, 
+        });
+        return kind;
+    }
+
+    /**
+     * Removes an agent: first from this engine (no further dispatch, emits
+     * `agents.changed`), then from the store's view under the lock
+     * `agents:<name>`: with a stored revision marker (also one this engine
+     * never loaded) all its unsettled runs are cancelled and the marker
+     * deleted, unless this engine had the agent at another revision (a newer
+     * one registered elsewhere); without a marker, the runs of an agent
+     * registered here are cancelled. Resolves whether it was registered here.
+     */
+    async removeAgent(name: string): Promise<boolean> {
+        const registered = this.agents.has(name);
+        if (registered) {
+            this.removals.set(name, this.revisions.get(name));
+            this.agents.delete(name);
+            this.revisions.delete(name);
+            this.emit({
+                type: 'agents.changed',
+                name,
+                kind: 'removed',
+            });
+        }
+        const pending = this.removals.has(name);
+        await dropRevision(this.registry(), name, {
+            registered: pending,
+            ...(pending && { revision: this.removals.get(name) }),
+        });
+        this.removals.delete(name);
+        return registered;
+    }
+
     getRun(id: string): Promise<Run | undefined> {
         return this.store.getRun(id);
     }
 
-    on<T extends RunEvent['type']>(event: T, listener: (e: Extract<RunEvent, { type: T }>) => void): () => void {
-        const wrapped = (e: RunEvent) => {
-            if (e.type === event) listener(e as Extract<RunEvent, { type: T }>);
+    on<T extends EngineEvent['type']>(event: T, listener: (e: Extract<EngineEvent, { type: T }>) => void): () => void {
+        const wrapped = (e: EngineEvent) => {
+            if (e.type === event) listener(e as Extract<EngineEvent, { type: T }>);
         };
         this.listeners.add(wrapped);
         return () => {
@@ -691,11 +768,21 @@ export class Engine implements IContextProvider {
      * state. `signal` aborts on cancel.
      */
     protected async execute(run: Run, signal: AbortSignal): Promise<void> {
-        const agent = this.agents.get(run.agent);
-        if (!agent) throw new InvalidAgentDefinitionError(`unknown agent: ${run.agent}`);
-        // cancel() asked for it while it ran elsewhere (or was interrupted)
+        // cancel() asked for it while it ran elsewhere (or was interrupted): also for an agent unknown here
         if (run.cancelRequested) {
             await this.finish(run.id, { status: RunStatus.CANCELLED });
+            return;
+        }
+        const agent = this.agents.get(run.agent);
+        if (!agent || !await this.isCurrent(run.agent)) {
+            // removed or replaced since the claim: left for a replica that runs the agent's current revision
+            // guarded by status and owner (`expectStatus: [RUNNING]`, `expectOwner`): a taken-over run is left alone
+            const released = await this.ownedUpdate(run.id, {
+                status: RunStatus.QUEUED,
+                claim: undefined,
+                startedAt: undefined,
+            });
+            if (released) this.emit({ type: 'run.updated', run: released });
             return;
         }
         await executeRun({
@@ -718,6 +805,33 @@ export class Engine implements IContextProvider {
             ownsRun: () => this.ownsRun(run.id),
             provided: this.provided,
         });
+    }
+
+    /**
+     * The start guard of one scheduling pass, built from one read of the
+     * revision markers (skipped while no folder agent is registered): a run
+     * may start when cancel asked for it, or when its agent is registered
+     * here and is a code agent or loaded at the stored marker's hash.
+     */
+    protected async prepareStart(): Promise<(run: Run) => boolean> {
+        const folder = this.revisions.values().some((revision) => revision !== undefined);
+        const markers = folder ?
+            new Map((await this.store.listAgentRevisions()).map((marker) => [marker.agent, marker.hash])) :
+            new Map<string, string>();
+        return (run) => {
+            if (run.cancelRequested) return true;
+            if (!this.agents.has(run.agent) || this.syncing.has(run.agent)) return false;
+            const revision = this.revisions.get(run.agent);
+            return revision === undefined || revision === markers.get(run.agent);
+        };
+    }
+
+    /** Whether the registered agent is a code agent or loaded at the stored marker's hash. */
+    protected async isCurrent(name: string): Promise<boolean> {
+        if (this.syncing.has(name)) return false;
+        const revision = this.revisions.get(name);
+        if (revision === undefined) return true;
+        return (await this.store.getAgentRevision(name))?.hash === revision;
     }
 
     /** A throwing execution fails the run (and releases its claim) instead of leaking. */
@@ -802,7 +916,25 @@ export class Engine implements IContextProvider {
         this.onError(new LeaseLostError(id));
     }
 
-    protected emit(event: RunEvent): void {
+    /** Refuses an agent the engine cannot run: a notifier it does not have. */
+    protected assertRegistrable(agent: Agent): void {
+        const { notify } = agent.definition;
+        if (notify !== undefined && !this.notifiers[notify]) {
+            throw new InvalidAgentDefinitionError(`Agent "${agent.name}" uses unknown notifier "${notify}".`);
+        }
+    }
+
+    protected registry(): RegistryContext {
+        return {
+            store: this.store,
+            clock: this.clock,
+            claimTtlMs: this.claimTtlMs,
+            cancel: (runId) => this.cancel(runId),
+            onError: (error, run) => this.onError(error, run),
+        };
+    }
+
+    protected emit(event: EngineEvent): void {
         for (const listener of this.listeners) {
             try {
                 listener(event);

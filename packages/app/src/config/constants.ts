@@ -15,6 +15,7 @@ export const DEFAULT_READINESS_DELAY_MS = 0;
 export const DEFAULT_DRAIN_TIMEOUT_MS = 30_000;
 export const DEV_DRAIN_TIMEOUT_MS = 5_000;
 export const DEFAULT_CLOSE_TIMEOUT_MS = 5_000;
+export const DEFAULT_AGENTS_POLL_MS = 5_000;
 export const RESUME_SECRET_MIN_LENGTH = 32;
 export const BASE_PATH_PATTERN = /^(?:\/[a-z0-9._~-]+)+$/;
 export const LOG_LEVELS: readonly LogLevel[] = ['error', 'warn', 'info', 'debug'];
