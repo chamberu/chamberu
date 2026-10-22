@@ -6,7 +6,7 @@
  */
 
 /**
- * Longest `idempotencyKey`, `concurrencyKey` and `thread` of an envelope:
+ * Longest `idempotencyKey`, `concurrencyKey` and `address` of an envelope:
  * the width of `@chamvi/store-typeorm`'s `runs.thread` and
  * `runs.concurrency_key` columns.
  */

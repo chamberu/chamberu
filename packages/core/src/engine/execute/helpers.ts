@@ -42,7 +42,7 @@ import type { ApprovalRequest, ExecuteContext } from './types.ts';
 
 export function renderTrigger(envelope: TriggerEnvelope): string {
     const json = JSON.stringify({
-        source: envelope.source,
+        channel: envelope.channel,
         trigger: envelope.trigger,
         payload: envelope.payload,
     }, null, 2);

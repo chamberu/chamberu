@@ -16,9 +16,7 @@ import * as core from '@chamvi/core';
 describe('public api', () => {
     it.each([
         'defineAgent',
-        'cron',
-        'http',
-        'webhook',
+        'readRequestBody',
         'Engine',
         'MemoryStore',
         'defineEffectTool',
@@ -60,6 +58,34 @@ describe('public api', () => {
 
     it('exports the trigger key bound', () => {
         expect(core.TRIGGER_KEY_MAX_LENGTH).toBe(255);
+    });
+
+    it('removes the trigger factories', () => {
+        expect(core).not.toHaveProperty('cron');
+        expect(core).not.toHaveProperty('http');
+        expect(core).not.toHaveProperty('webhook');
+    });
+
+    it('keeps the channel context factory internal', () => {
+        expect(core).not.toHaveProperty('createChannelContext');
+        expect(core).not.toHaveProperty('assertChannelName');
+    });
+
+    it('exports the payload too large error code', () => {
+        expect(core.ErrorCode.PAYLOAD_TOO_LARGE).toBe('payload_too_large');
+    });
+
+    it('exports the channel types', () => {
+        expectTypeOf<core.ChannelRequest>().toEqualTypeOf<{ request: Request; subpath: string }>();
+        expectTypeOf<core.ChannelDispatchEnvelope>().toEqualTypeOf<Omit<core.DispatchEnvelope, 'channel'>>();
+        expectTypeOf<core.ChannelContext['dispatch']>().returns.toEqualTypeOf<Promise<core.DispatchResult>>();
+        expectTypeOf<core.ChannelSendOptions>().toEqualTypeOf<{ signal: AbortSignal; trigger: core.TriggerEnvelope }>();
+        expectTypeOf<core.ChannelMessage['kind']>().toEqualTypeOf<'message' | 'approval'>();
+        expectTypeOf<core.ChannelSubscription>().toHaveProperty('channel').toEqualTypeOf<string>();
+        expectTypeOf<core.IChannel>().toHaveProperty('name').toEqualTypeOf<string>();
+        expectTypeOf<core.TriggerEnvelope>().toHaveProperty('channel').toEqualTypeOf<string>();
+        expectTypeOf<core.Run>().toHaveProperty('address').toEqualTypeOf<string | undefined>();
+        expectTypeOf<core.EngineStartOptions>().toEqualTypeOf<{ channels?: boolean }>();
     });
 
     it('exports the sandbox error code', () => {

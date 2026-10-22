@@ -13,7 +13,7 @@ const trigger: TriggerEnvelope = {
     id: 'e1',
     agent: 'release',
     trigger: 'http',
-    source: 'http',
+    channel: 'http',
     payload: {},
     receivedAt: new Date('2026-10-21T09:00:00Z'),
 };

@@ -51,7 +51,8 @@ export type Run = {
     status: RunStatusLiteral;
     trigger: TriggerEnvelope;
     concurrencyKey?: string;
-    thread?: string;
+    /** Where the run came from on its channel (`trigger.address`). */
+    address?: string;
     output?: unknown;
     error?: { code: string; message: string };
     usage: Usage;

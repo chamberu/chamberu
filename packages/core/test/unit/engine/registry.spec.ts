@@ -98,7 +98,7 @@ function make(opts: Partial<EngineOptions> & { store?: CountingStore; clock?: Co
 const env = (agent = 'triage') => ({
     agent,
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: {},
 });
 

@@ -101,7 +101,7 @@ function make(def: TestAgent, opts: Partial<EngineOptions> & { store?: MemorySto
 const env = {
     agent: 'triage',
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: { issue: 42 },
 };
 
@@ -192,7 +192,7 @@ describe('executeRun', () => {
         expect(prompt).toContain('You triage.');
         expect(prompt).toContain('```json');
         expect(prompt).toContain('\\"issue\\": 42');
-        expect(prompt).toContain('\\"source\\": \\"http\\"');
+        expect(prompt).toContain('\\"channel\\": \\"http\\"');
     });
 
     it('checkpoint saved after every step', async () => {

@@ -7,6 +7,7 @@
 
 import type { Agent } from '../agent/types.ts';
 import type { ArtifactInput } from '../artifact/types.ts';
+import type { IChannel } from '../channel/types.ts';
 import type { IClock } from '../clock/index.ts';
 import type { INotifier } from '../notify/types.ts';
 import type { Run, Step } from '../run/types.ts';
@@ -42,6 +43,11 @@ export type EngineOptions = {
     store: IStore;
     agents: Agent[];
     notifiers?: Record<string, INotifier>;
+    /**
+     * The channels runs come from and talk to; names unique. start() starts
+     * them after the first recover, drain() and stop() stop them first.
+     */
+    channels?: IChannel<any, any>[];
     /** Default `${hostname}-${pid}`. */
     owner?: string;
     /** Default 4. */
@@ -72,4 +78,9 @@ export type ResumeDecision = {
 export type ApprovalAnswer = ResumeDecision & {
     /** Must equal `run.waiting.approvalId`, else InvalidRunStateError. */
     approvalId: string;
+};
+
+export type EngineStartOptions = {
+    /** Default true; false starts no channel (a one-shot job never starts schedules or sockets). */
+    channels?: boolean;
 };

@@ -16,13 +16,10 @@ import {
 import { z } from 'zod';
 import {
     InvalidAgentDefinitionError,
-    cron,
     defineAgent,
     defineTool,
-    http,
-    webhook,
 } from '@chamvi/core';
-import type { AgentDefinition, TriggerDefinition } from '@chamvi/core';
+import type { AgentDefinition, ChannelSubscription } from '@chamvi/core';
 
 const model = {} as LanguageModel;
 const base = { model, instructions: 'do things' };
@@ -59,48 +56,40 @@ describe('defineAgent', () => {
         });
     });
 
-    it('rejects duplicate trigger ids', () => {
+    it('rejects duplicate subscription ids', () => {
+        const on = (channel: string, id: string): ChannelSubscription => ({
+            channel, 
+            id, 
+            options: {}, 
+        });
         expect(() => defineAgent({
             ...base,
             name: 'a',
-            triggers: [cron('*/5 * * * *'), cron('*/5 * * * *')],
-        })).toThrow(InvalidAgentDefinitionError);
+            channels: [on('cron', 'cron:x'), on('cron', 'cron:x')],
+        })).toThrow(/duplicate subscription id "cron:x"/);
         expect(() => defineAgent({
             ...base,
             name: 'a',
-            triggers: [cron('*/5 * * * *'), http()],
+            channels: [on('cron', 'cron:x'), on('http', 'http'), on('webhook', 'webhook:/a'), on('webhook', 'webhook:/b')],
         })).not.toThrow();
     });
 
-    it('allows at most one http() trigger and many webhook() triggers', () => {
-        expect(() => defineAgent({
-            ...base,
-            name: 'a',
-            triggers: [http(), http()],
-        })).toThrow(InvalidAgentDefinitionError);
-        expect(() => defineAgent({
-            ...base,
-            name: 'a',
-            triggers: [http(), webhook({ path: '/a' }), webhook({ path: '/b' }), cron('*/5 * * * *')],
-        })).not.toThrow();
-    });
-
-    it('accepts a trigger typed by its payload', () => {
-        const githubTrigger: TriggerDefinition<{ repo: string }> = {
-            source: 'github',
+    it('accepts a subscription typed by its payload', () => {
+        const github: ChannelSubscription<{ repo: string }> = {
+            channel: 'github',
             id: 'github:issues',
             options: {},
             concurrencyKey: (payload) => payload.repo,
             idempotencyKey: (payload) => `${payload.repo}:1`,
         };
-        expectTypeOf(githubTrigger).toExtend<TriggerDefinition>();
+        expectTypeOf(github).toExtend<ChannelSubscription>();
         const agent = defineAgent({
             ...base,
             name: 'a',
-            triggers: [githubTrigger],
+            channels: [github],
         });
-        expectTypeOf(agent.definition.triggers).toEqualTypeOf<AgentDefinition['triggers']>();
-        expect(agent.definition.triggers?.[0]?.concurrencyKey?.({ repo: 'o/r' })).toBe('o/r');
+        expectTypeOf(agent.definition.channels).toEqualTypeOf<AgentDefinition['channels']>();
+        expect(agent.definition.channels?.[0]?.concurrencyKey?.({ repo: 'o/r' })).toBe('o/r');
     });
 
     it('accepts a plain tool set', () => {

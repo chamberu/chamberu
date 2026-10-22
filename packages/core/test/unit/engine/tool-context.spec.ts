@@ -141,7 +141,7 @@ function setup(s: Setup) {
 const env = (invoker: Invoker | undefined = alice) => ({
     agent: 'release',
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: {},
     invoker,
 });

@@ -5,7 +5,6 @@ import {
     MemoryStore,
     defineAgent,
     defineEffectTool,
-    http,
 } from '@chamvi/core';
 
 export async function triageIssue(model: LanguageModel) {
@@ -15,7 +14,6 @@ export async function triageIssue(model: LanguageModel) {
         name: 'triage',
         model,
         instructions: 'Label the issue in the trigger payload as bug, feature or question.',
-        triggers: [http()],
         budget: { maxSteps: 5 },
         tools: {
             // the result is recorded per (run, tool, input): a resumed run reuses it
@@ -40,7 +38,7 @@ export async function triageIssue(model: LanguageModel) {
     const { runId } = await engine.dispatch({
         agent: 'triage',
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: { title: 'App crashes on start' },
     });
 

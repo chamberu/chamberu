@@ -12,6 +12,8 @@ import type { Agent } from '../agent/types.ts';
 import { createResumeToken, verifyResumeToken } from '../approval/module.ts';
 import { assertArtifactInput } from '../artifact/helpers.ts';
 import { attachmentIds, storeArtifact } from '../artifact/module.ts';
+import { assertChannelName, createChannelContext } from '../channel/helpers.ts';
+import type { IChannel } from '../channel/types.ts';
 import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
 import type { IClock } from '../clock/index.ts';
@@ -56,6 +58,7 @@ import type {
     DispatchEnvelope,
     EngineEvent,
     EngineOptions,
+    EngineStartOptions,
     ResumeDecision,
 } from './types.ts';
 
@@ -75,6 +78,15 @@ export class Engine implements IContextProvider {
     protected readonly removals = new Map<string, string | undefined>();
 
     protected readonly notifiers: Record<string, INotifier>;
+
+    /** The registered channels by name, in registration order. */
+    protected readonly channels: Map<string, IChannel<any, any>>;
+
+    /** Channels started by the last start(), until a drain() or stop() stops them. */
+    protected startedChannels: IChannel<any, any>[] = [];
+
+    /** The stop of the channels started last, shared by drain() and stop(). */
+    protected stoppingChannels: Promise<void> | undefined;
 
     protected readonly owner: string;
 
@@ -115,6 +127,15 @@ export class Engine implements IContextProvider {
         this.store = opts.store;
         this.agents = new Map(opts.agents.map((a) => [a.name, a]));
         this.notifiers = opts.notifiers ?? {};
+        const channels = opts.channels ?? [];
+        this.channels = new Map();
+        for (const channel of channels) {
+            assertChannelName(channel.name);
+            if (this.channels.has(channel.name)) {
+                throw new InvalidAgentDefinitionError(`The channel "${channel.name}" is registered more than once.`);
+            }
+            this.channels.set(channel.name, channel);
+        }
         this.owner = opts.owner ?? `${hostname()}-${pid}`;
         this.clock = opts.clock ?? systemClock;
         this.resumeSecret = opts.resumeSecret;
@@ -163,7 +184,7 @@ export class Engine implements IContextProvider {
         attachments?.forEach((attachment, i) => assertArtifactInput(attachment, `attachment ${i}`));
         assertTriggerKey('idempotency key', envelope.idempotencyKey);
         assertTriggerKey('concurrency key', envelope.concurrencyKey);
-        assertTriggerKey('thread', envelope.thread);
+        assertTriggerKey('address', envelope.address);
         const snapshot = invoker !== undefined ? toInvoker(invoker) : undefined;
         const now = this.nextCreatedAt();
         const trigger: TriggerEnvelope = {
@@ -205,7 +226,7 @@ export class Engine implements IContextProvider {
             status: RunStatus.QUEUED,
             trigger,
             concurrencyKey: trigger.concurrencyKey,
-            thread: trigger.thread,
+            address: trigger.address,
             usage: { inputTokens: 0, outputTokens: 0 },
             createdAt: now,
             updatedAt: now,
@@ -243,6 +264,16 @@ export class Engine implements IContextProvider {
     /** The registered agents in registration order, as a new array. */
     listAgents(): Agent[] {
         return this.agents.values().toArray();
+    }
+
+    /** The registered channel of that name. */
+    getChannel(name: string): IChannel | undefined {
+        return this.channels.get(name);
+    }
+
+    /** The registered channels in registration order, as a new array. */
+    listChannels(): IChannel[] {
+        return Array.from(this.channels.values());
     }
 
     /** The revision the registered agent was loaded at (undefined for a code agent). */
@@ -335,21 +366,64 @@ export class Engine implements IContextProvider {
         return this.draining;
     }
 
-    /** Recovers abandoned runs, then starts executing queued runs and polling. */
-    async start(): Promise<void> {
+    /**
+     * Recovers abandoned runs, starts every channel (in registration order,
+     * unless `channels: false`), then starts executing queued runs and
+     * polling. A throwing channel start rejects after the channels already
+     * started were stopped and polling stopped.
+     */
+    async start(options: EngineStartOptions = {}): Promise<void> {
         this.draining = false;
         this.started = true;
         this.queue.resume();
         this.queue.startPolling();
         // like a failing pass, a failing recovery is reported; the next poll retries it
         await this.recover().catch((error: unknown) => this.onError(error));
+        if (options.channels ?? true) await this.startChannels();
         await this.queue.pump();
     }
 
-    /** Stops the poll for newly runnable work only; dispatch and running runs are unaffected. */
+    /**
+     * Stops the channels started last (their stop errors go to onError) and
+     * the poll for newly runnable work; dispatch and running runs are
+     * unaffected.
+     */
     stop(): void {
+        void this.stopChannels();
         this.started = false;
         this.queue.stopPolling();
+    }
+
+    protected async startChannels(): Promise<void> {
+        // a channel left over from an earlier start must stop before it starts again
+        await this.stopChannels();
+        for (const channel of this.channels.values()) {
+            if (!channel.start) continue;
+            try {
+                await channel.start(createChannelContext(this, channel));
+            } catch (error) {
+                this.stop();
+                await this.stopChannels();
+                throw error;
+            }
+            this.startedChannels.push(channel);
+        }
+    }
+
+    /** Stops every started channel once, concurrently; a rejection goes to onError. */
+    protected stopChannels(): Promise<void> {
+        if (this.startedChannels.length > 0) {
+            const channels = this.startedChannels;
+            this.startedChannels = [];
+            const previous = this.stoppingChannels ?? Promise.resolve();
+            this.stoppingChannels = previous.then(async () => {
+                const results = await Promise.allSettled(channels.map((channel) => channel.stop?.()));
+                for (const result of results) {
+                    if (result.status === 'rejected') this.onError(result.reason);
+                }
+            });
+        }
+        return this.stoppingChannels ?? Promise.resolve();
     }
 
     /**
@@ -406,6 +480,8 @@ export class Engine implements IContextProvider {
     async drain(opts: { timeoutMs?: number } = {}): Promise<void> {
         this.draining = true;
         this.stop();
+        // no new inbound before the wait
+        await this.stopChannels();
         await this.queue.halt();
 
         let timer: { clear(): void } | undefined;
@@ -916,8 +992,13 @@ export class Engine implements IContextProvider {
         this.onError(new LeaseLostError(id));
     }
 
-    /** Refuses an agent the engine cannot run: a notifier it does not have. */
+    /** Refuses an agent the engine cannot run: a notifier or a channel it does not have. */
     protected assertRegistrable(agent: Agent): void {
+        for (const subscription of agent.definition.channels ?? []) {
+            if (!this.channels.has(subscription.channel)) {
+                throw new InvalidAgentDefinitionError(`Agent "${agent.name}" subscribes to unknown channel "${subscription.channel}".`);
+            }
+        }
         const { notify } = agent.definition;
         if (notify !== undefined && !this.notifiers[notify]) {
             throw new InvalidAgentDefinitionError(`Agent "${agent.name}" uses unknown notifier "${notify}".`);

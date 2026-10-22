@@ -1,0 +1,87 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import type { Engine } from '../engine/module.ts';
+import type { DispatchEnvelope } from '../engine/types.ts';
+import type { TriggerEnvelope } from '../trigger/types.ts';
+
+/** The HTTP input of a channel: the raw web request (body unread) and the raw subpath after `/channels/<name>`. */
+export type ChannelRequest = {
+    request: Request;
+    subpath: string;
+};
+
+/** What a channel may dispatch: the engine sets `channel` to the channel's own name. */
+export type ChannelDispatchEnvelope = Omit<DispatchEnvelope, 'channel'>;
+
+/** What `engine.dispatch()` resolves. */
+export type DispatchResult = {
+    runId: string;
+    deduplicated: boolean;
+};
+
+export type ChannelContext = {
+    engine: Engine;
+    /** engine.dispatch with `channel` set to this channel's name (a channel cannot dispatch as another). */
+    dispatch(envelope: ChannelDispatchEnvelope): Promise<DispatchResult>;
+};
+
+/** One outbound message; `key` is stable per logical message and the transport's dedupe key. */
+export type ChannelMessage = {
+    kind: 'message' | 'approval';
+    key: string;
+    runId: string;
+    agent: string;
+    title?: string;
+    body: string;
+    /** Set for kind `approval`. */
+    approvalId?: string;
+    /** Set for kind `approval`. */
+    expiresAt?: Date;
+};
+
+export type ChannelSendOptions = {
+    signal: AbortSignal;
+    /** The run's stored envelope: a transport may read the source payload, never write it. */
+    trigger: TriggerEnvelope;
+};
+
+/**
+ * Anything a run can come from or talk to. The presence of `start`, `in`
+ * and `out` is the only capability; `name` follows the agent-name rules
+ * and is unique per engine.
+ */
+export interface IChannel<TInput = ChannelRequest, TOutput = Response> {
+    readonly name: string;
+    /** Background inbound (cron ticks, sockets, polling); called by engine.start() after the first recover. */
+    start?(ctx: ChannelContext): Promise<void>;
+    /** Called first by engine.drain() and engine.stop(): no new inbound. */
+    stop?(): Promise<void>;
+    /** The channel's single inbound entry; transports feed it (the http route, a socket loop, tests). */
+    in?(input: TInput, ctx: ChannelContext): Promise<TOutput>;
+    /** Sends a message to an address the channel defines; idempotent on `message.key`. */
+    out?(message: ChannelMessage, address: string, opts: ChannelSendOptions): Promise<void>;
+}
+
+/**
+ * An agent's subscription to a channel (replaces the trigger definition):
+ * `channel` names a channel registered on the engine, `id` is unique
+ * within the agent, `options` belong to the channel.
+ */
+export type ChannelSubscription<P = unknown> = {
+    channel: string;
+    id: string;
+    options: Record<string, unknown>;
+    // method signatures (bivariant): a ChannelSubscription<P> fits AgentDefinition.channels
+    concurrencyKey?(payload: P): string | undefined;
+    idempotencyKey?(payload: P): string | undefined;
+};
+
+export type ReadRequestBodyOptions = {
+    /** Most bytes accepted; more is a ValidationError with code `payload_too_large`. */
+    limit: number;
+};

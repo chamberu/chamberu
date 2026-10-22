@@ -93,7 +93,7 @@ function setup(
 const env = (extra: Record<string, unknown> = {}) => ({
     agent: 'vision',
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: { look: true },
     ...extra,
 });

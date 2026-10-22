@@ -16,6 +16,7 @@ export const ErrorCode = {
     INVALID_RESUME_TOKEN: 'invalid_resume_token',
     INVALID_RUN_STATE: 'invalid_run_state',
     LEASE_LOST: 'lease_lost',
+    PAYLOAD_TOO_LARGE: 'payload_too_large',
     RUN_NOT_FOUND: 'run_not_found',
     SANDBOX: 'sandbox_error',
     TIMEOUT: 'Timeout',

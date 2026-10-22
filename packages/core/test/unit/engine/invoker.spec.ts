@@ -108,7 +108,7 @@ function setup(s: Setup) {
 const env = (invoker?: unknown, idempotencyKey?: string) => ({
     agent: 'release',
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: {},
     idempotencyKey,
     invoker: invoker as Invoker,

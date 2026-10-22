@@ -12,13 +12,15 @@ import { ErrorCode } from './constants.ts';
 /**
  * A value failed its Standard Schema validation (e.g. a state document on
  * upsert). `issues` holds the validup issues, with paths flattened to keys.
+ * `code` is `validation_error` unless a narrower one applies (a request body
+ * above its limit is `payload_too_large`).
  */
 export class ValidationError extends ChamviError {
-    constructor(message: string, issues: readonly Issue[] = []) {
+    constructor(message: string, issues: readonly Issue[] = [], code: ErrorCode = ErrorCode.VALIDATION) {
         super({
-            message, 
-            code: ErrorCode.VALIDATION, 
-            issues, 
+            message,
+            code,
+            issues,
         });
     }
 }

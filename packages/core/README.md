@@ -55,7 +55,7 @@ Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageM
 **Table of Contents**
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Agents and triggers](#agents-and-triggers)
+  - [Agents and channels](#agents-and-channels)
   - [Effect tools](#effect-tools)
   - [Approvals](#approvals)
   - [Agent state](#agent-state)
@@ -85,7 +85,6 @@ import {
     MemoryStore,
     defineAgent,
     defineEffectTool,
-    http,
 } from '@chamvi/core';
 
 export async function triageIssue(model: LanguageModel) {
@@ -95,7 +94,6 @@ export async function triageIssue(model: LanguageModel) {
         name: 'triage',
         model,
         instructions: 'Label the issue in the trigger payload as bug, feature or question.',
-        triggers: [http()],
         budget: { maxSteps: 5 },
         tools: {
             // the result is recorded per (run, tool, input): a resumed run reuses it
@@ -120,7 +118,7 @@ export async function triageIssue(model: LanguageModel) {
     const { runId } = await engine.dispatch({
         agent: 'triage',
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: { title: 'App crashes on start' },
     });
 
@@ -133,9 +131,9 @@ export async function triageIssue(model: LanguageModel) {
 
 The run settles `completed`, and its `output` is the text of the model's last answer (with structured `output`, the parsed value). This is the code of [`test/fixtures/readme-example.ts`](./test/fixtures/readme-example.ts), which the test suite runs against a scripted model.
 
-### Agents and triggers
+### Agents and channels
 
-- `defineAgent()` checks the name (`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 characters) and that trigger ids are unique, and fills in the default budget (`maxSteps: 20`, `timeoutMs: 900_000`).
+- `defineAgent()` checks the name (`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 characters) and that subscription ids are unique, and fills in the default budget (`maxSteps: 20`, `timeoutMs: 900_000`).
 - `tools` is a plain AI SDK `ToolSet`, defined once at module scope, or a factory `(ctx) => ToolSet` for dynamic sets (called once per execution). Tools built with `defineTool()` (or `defineEffectTool()`) read the run context as `context` in `execute`: `run` (`runId`, `agent`, `trigger`, `signal`), the agent's `state` and the run's `artifacts`. One context per execution, shared by every call and by the factory; treat it as immutable.
 
 ```typescript
@@ -152,8 +150,8 @@ tools: { search: searchTool },
 toolsContext: { search: { apiKey: process.env.SEARCH_KEY } },
 ```
 
-- `cron()`, `http()` and `webhook()` describe triggers. `cron()` validates the expression and defaults its overlap policy to `skip`. `http()` is the control-plane trigger (id `http`, at most one per agent) that REST, the UI and MCP start runs through; `webhook({ path })` is a generic webhook (id `webhook:<path>`, many per agent). In this package only `engine.dispatch()` starts runs: firing cron, HTTP and webhook triggers belongs to the scheduler and HTTP packages.
-- The trigger envelope (source, trigger id, payload) becomes the run's first user message, as a JSON block.
+- A channel (`IChannel`: `name`, optional `start`, `stop`, `in`, `out`) is anything a run comes from or talks to; `new Engine({ channels })` registers them (names follow the agent-name rule, unique per engine). `start()` starts every channel after the first recovery (`start({ channels: false })` starts none), `drain()` and `stop()` stop them first. An agent subscribes through `channels: ChannelSubscription[]`, each naming a registered channel (an unknown one is refused). A channel dispatches through its `ChannelContext`, which sets `channel` to its own name; `readRequestBody(request, { limit })` reads a bounded body (`payload_too_large` above the limit).
+- The trigger envelope (channel, subscription id, payload; `address` is where the run came from on the channel) becomes the run's first user message, as a JSON block.
 - `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments` (ids `<runId>.0000`, `<runId>.0001`, ..., so a listing keeps the input order), and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
 - The tool context (also the factory's argument) carries `artifacts`, scoped to the run: `put({ mediaType, filename?, data })`, `get(id)` and `list()`. `put()` is no effect by itself; call it inside a `defineEffectTool` to store a file exactly once.
 - `output` takes an AI SDK `Output` (e.g. `Output.object({ schema })`): a completed run's `output` is then the parsed value instead of the text, and a final answer that does not parse fails the run with `validation_error` (the quoted cause cut to 500 characters; the whole answer stays in the `llm` step). An answer cut off at the output token limit, or a loop that ended on a tool call nothing executed, fails it with `incomplete_response`.
@@ -245,7 +243,7 @@ const ops = defineAgent({
 await engine.dispatch({
     agent: 'ops',
     trigger: 'http',
-    source: 'http',
+    channel: 'http',
     payload: {},
     invoker: { id: 'u-42', kind: 'user', permissions: ['tool:ops:deploy'] },
 });
@@ -255,7 +253,7 @@ await engine.resume(token, { approved: true, approver: { id: 'u-7', kind: 'user'
 ```
 
 - The invoker (`{ id, kind, name?, permissions }`) is a snapshot taken at dispatch. A run keeps it across approvals and restarts; revoking a grant later does not reach a run that already holds it.
-- With an invoker, the `idempotencyKey` is scoped to it (`<agent>:<source>:<kind>:<id>`): only the same invoker's retry is deduplicated, another invoker with the same key gets its own run.
+- With an invoker, the `idempotencyKey` is scoped to it (`<agent>:<channel>:<kind>:<id>`): only the same invoker's retry is deduplicated, another invoker with the same key gets its own run.
 - Tool code sees it as `context.run.trigger.invoker` in tools and the factory and `ctx.run.trigger.invoker` in effect hooks; approval policies see it as `runtimeContext.trigger.invoker`.
 - The policy covers state tools too. A call to a refused tool that still arrives fails as a tool error and the run goes on: the step records it as `tool_not_allowed` (`ToolNotAllowedError`), whether the model called it anyway (the model sees the AI SDK's unavailable-tool error) or an approved call from an older history reached the engine's re-check.
 - Permissions are `:`-separated: `*` alone grants everything, a `*` segment matches one segment, and segment counts must match. `requireToolPermission({ withoutInvoker: 'allow' })` lets runs without an invoker use every tool.
@@ -322,6 +320,7 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `agents` | `Agent[]` | required | The agents this engine runs |
 | `resumeSecret` | `string` | required | HMAC secret for resume tokens and AI SDK approval signatures; must not be empty |
 | `notifiers` | `Record<string, INotifier>` | `{}` | Notifiers by name, referenced by an agent's `notify` |
+| `channels` | `IChannel[]` | `[]` | Channels by unique name, started by `start()` and stopped first by `drain()`/`stop()` |
 | `maxConcurrentRuns` | `number` | `4` | Runs executing at once in this process |
 | `claimTtlMs` | `number` | `60_000` | Lease on a running run, renewed every `claimTtlMs / 3`; the poll for new work, expired approvals and abandoned runs uses the same interval |
 | `owner` | `string` | `` `${hostname}-${pid}` `` | Identity of this replica in claims |
@@ -335,7 +334,7 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `name` | `string` | required | Unique per app, lowercase words joined by `-` |
 | `model` | `LanguageModel` | required | Any AI SDK model |
 | `instructions` | `string` | required | System instructions |
-| `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()` |
+| `channels` | `ChannelSubscription[]` | none | Subscriptions to channels registered on the engine |
 | `tools` | `ToolSet \| (ctx) => ToolSet` | none | A plain tool set, or a factory called for each execution |
 | `toolsContext` | `Record<string, unknown>` | none | Per tool name, the context of a tool that is not chamvi's, passed through by reference |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections |
@@ -352,8 +351,8 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 |---|---|---|
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
-| `cron`, `http`, `webhook` | function | Trigger definitions |
-| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `provide`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
+| `readRequestBody` | function | Reads a request body of at most `limit` bytes for a channel's `in` |
+| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `getChannel`, `listChannels`, `provide`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineTool` | function | An AI SDK `tool()` whose `execute` gets the run's `ToolContext` as `context` |
 | `defineContextKey`, `inject`, `tryInject` | function | Typed context keys, and reading a value provided on the engine from a `ToolContext` |

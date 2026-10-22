@@ -140,7 +140,7 @@ type Ctx = ReturnType<typeof setup>;
 const env = (concurrencyKey?: string) => ({
     agent: 'release',
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: {},
     concurrencyKey,
 });
@@ -189,7 +189,7 @@ describe('approvals', () => {
             idempotencyKey: `${runId}:${approvalId}`,
             trigger: expect.objectContaining({
                 agent: 'release',
-                source: 'http',
+                channel: 'http',
                 id: run!.trigger.id,
             }),
         });

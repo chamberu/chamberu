@@ -6,10 +6,10 @@
  */
 
 import type { LanguageModel, OutputInterface, ToolSet } from 'ai';
+import type { ChannelSubscription } from '../channel/types.ts';
 import type { Budget, RunContext } from '../run/types.ts';
 import type { StateSchema } from '../state/types.ts';
 import type { ToolContext } from '../tool/types.ts';
-import type { TriggerDefinition } from '../trigger/types.ts';
 
 /** The factory's argument: the same ToolContext the run's chamvi tools get. */
 export type ToolFactoryContext<S extends StateSchema = StateSchema> = ToolContext<S>;
@@ -36,7 +36,12 @@ export type AgentDefinition<S extends StateSchema = StateSchema> = {
     name: string;
     model: LanguageModel;
     instructions: string;
-    triggers?: TriggerDefinition[];
+    /**
+     * The channels that start the agent's runs (e.g. `cron.on('0 8 * * 1-5')`);
+     * every subscription names a channel registered on the engine, ids are
+     * unique per agent.
+     */
+    channels?: ChannelSubscription[];
     /**
      * The agent's tools: a plain `ToolSet` (the default), or a factory for
      * dynamic sets, called once per execution with the same ToolContext the

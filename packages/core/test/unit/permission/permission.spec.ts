@@ -59,7 +59,7 @@ describe('requireToolPermission', () => {
                 id: 't',
                 agent: 'release',
                 trigger: 'http',
-                source: 'http',
+                channel: 'http',
                 payload: {},
                 receivedAt: new Date(0),
                 invoker,

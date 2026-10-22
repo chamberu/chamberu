@@ -28,13 +28,13 @@ export function defineAgent<S extends StateSchema = StateSchema>(def: AgentDefin
     }
 
     const seen = new Set<string>();
-    for (const trigger of def.triggers ?? []) {
-        if (seen.has(trigger.id)) {
+    for (const subscription of def.channels ?? []) {
+        if (seen.has(subscription.id)) {
             throw new InvalidAgentDefinitionError(
-                `Agent "${def.name}" has duplicate trigger id "${trigger.id}".`,
+                `Agent "${def.name}" has duplicate subscription id "${subscription.id}".`,
             );
         }
-        seen.add(trigger.id);
+        seen.add(subscription.id);
     }
 
     // a factory's set is only known per execution, the engine checks it there

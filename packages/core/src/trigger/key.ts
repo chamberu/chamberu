@@ -9,7 +9,7 @@ import { ValidationError } from '../errors/index.ts';
 import { TRIGGER_KEY_MAX_LENGTH } from './constants.ts';
 
 /**
- * A trigger key (`idempotencyKey`, `concurrencyKey`, `thread`): absent, or a
+ * A trigger key (`idempotencyKey`, `concurrencyKey`, `address`): absent, or a
  * string of at most TRIGGER_KEY_MAX_LENGTH characters without NUL (Postgres
  * text columns refuse it); a ValidationError otherwise. `dispatch` checks
  * every envelope with it; intakes call it to refuse a key before the run.

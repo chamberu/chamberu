@@ -71,7 +71,7 @@ function makeRun(id: string, overrides: Partial<Run> = {}): Run {
             id: `t-${id}`,
             agent: 'ghost',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
             receivedAt: createdAt,
         },
@@ -85,7 +85,7 @@ function makeRun(id: string, overrides: Partial<Run> = {}): Run {
 const env = (agent = 'triage') => ({
     agent,
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: {},
 });
 

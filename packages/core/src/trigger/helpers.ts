@@ -38,12 +38,12 @@ export function toInvoker(value: unknown, label = 'invoker'): Invoker {
 }
 
 /**
- * The idempotency scope of an envelope: `<agent>:<source>`, plus
+ * The idempotency scope of an envelope: `<agent>:<channel>`, plus
  * `:<kind>:<id>` of the invoker when there is one (each part
  * URI-encoded, so a `:` inside cannot make two invokers collide).
  */
-export function idempotencyScope(envelope: Pick<TriggerEnvelope, 'agent' | 'source' | 'invoker'>): string {
-    const base = `${envelope.agent}:${envelope.source}`;
+export function idempotencyScope(envelope: Pick<TriggerEnvelope, 'agent' | 'channel' | 'invoker'>): string {
+    const base = `${envelope.agent}:${envelope.channel}`;
     const { invoker } = envelope;
     if (!invoker) return base;
     return `${base}:${encodeURIComponent(invoker.kind)}:${encodeURIComponent(invoker.id)}`;

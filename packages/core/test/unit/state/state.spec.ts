@@ -41,7 +41,7 @@ function toolContext(store: MemoryStore): ToolContext {
         trigger: {
             agent: 'alpha',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         } as RunContext['trigger'],
         signal: new AbortController().signal,
@@ -76,7 +76,7 @@ async function runOnce(store: MemoryStore, agent: Parameters<typeof defineAgent>
     const { runId } = await engine.dispatch({
         agent: agent.name,
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: {},
     });
     await engine.idle();

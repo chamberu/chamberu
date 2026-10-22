@@ -42,7 +42,7 @@ function toolContext(runId: string): ToolContext {
             trigger: {
                 agent: 'triage',
                 trigger: 'http',
-                source: 'http',
+                channel: 'http',
                 payload: {},
             } as RunContext['trigger'],
             signal: new AbortController().signal,
@@ -191,7 +191,7 @@ describe('effect tools', () => {
         const { runId } = await first.dispatch({
             agent: 'triage',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         await first.idle();
