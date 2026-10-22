@@ -10,7 +10,7 @@ import type { IScheduler } from '@chamvi/scheduler';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { AppToken, ModuleName } from '../../module/constants.ts';
-import { registerStartStep } from '../../module/helpers.ts';
+import { registerStartStep } from '../../module/start.ts';
 import type { SchedulerModuleOptions } from './types.ts';
 
 /**

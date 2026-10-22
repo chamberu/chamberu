@@ -8,13 +8,6 @@
 import { TypedToken } from 'eldin';
 import type { AppTokens } from './types.ts';
 
-/** Something a module starts once every `onReady` checked its configuration (internal). */
-type StartStep = {
-    readonly name: string;
-    /** Runs the step once; later calls return the first call's promise. */
-    run(): Promise<void>;
-};
-
 function token<K extends keyof AppTokens>(key: K): TypedToken<AppTokens[K]> {
     return new TypedToken<AppTokens[K]>(`chamvi.${key.toLowerCase().replace(/_/g, '-')}`);
 }
@@ -40,12 +33,6 @@ export const AppToken = {
     NOTIFIERS: token('NOTIFIERS'),
     LIFECYCLE_HOOKS: token('LIFECYCLE_HOOKS'),
 } as const;
-
-/**
- * The start steps (internal): what the engine and scheduler modules start
- * once every module validated its configuration in `onReady` (`runStartSteps`).
- */
-export const START_STEPS = new TypedToken<StartStep>('chamvi.start-steps');
 
 /** The built-in modules' names; list a module of the same name to replace one. */
 export const ModuleName = {

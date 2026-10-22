@@ -11,7 +11,8 @@ import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { createModelRegistry, installDefaultProvider } from '../../models/module.ts';
 import { AppToken, ModuleName } from '../../module/constants.ts';
-import { registerStartStep, runHooks } from '../../module/helpers.ts';
+import { runHooks } from '../../module/helpers.ts';
+import { registerStartStep } from '../../module/start.ts';
 import type { EngineModuleOptions } from './types.ts';
 
 /**

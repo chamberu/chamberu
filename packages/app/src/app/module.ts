@@ -16,7 +16,8 @@ import { isObject } from 'smob';
 import type { Env } from '../env/types.ts';
 import type { ModelProviders } from '../models/types.ts';
 import { AppToken } from '../module/constants.ts';
-import { createStoppedError, reportingModule, runStartSteps } from '../module/helpers.ts';
+import { createStoppedError, reportingModule } from '../module/helpers.ts';
+import { runStartSteps } from '../module/start.ts';
 import type { AppContext, AppMode } from '../module/types.ts';
 import { APP_BRAND } from './constants.ts';
 import {

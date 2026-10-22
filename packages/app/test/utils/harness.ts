@@ -11,7 +11,8 @@ import type { IContainer } from 'eldin';
 import { Application } from 'orkos';
 import type { IModule } from 'orkos';
 import { AppToken } from '../../src/module/constants.ts';
-import { createStoppedError, reportingModule, runStartSteps } from '../../src/module/helpers.ts';
+import { createStoppedError, reportingModule } from '../../src/module/helpers.ts';
+import { runStartSteps } from '../../src/module/start.ts';
 import type { AppContext, AppMode } from '../../src/module/types.ts';
 import type { Env } from '../../src/env/types.ts';
 
