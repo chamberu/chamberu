@@ -22,6 +22,12 @@ export type RunQueueOptions = {
     onError: (error: unknown, run?: Run) => void;
     /** Periodic work run before each poll pass (e.g. expiring approvals). */
     onPoll?: () => Promise<void>;
+    /**
+     * Called once per scheduling pass that found queued runs: resolves the
+     * predicate deciding which of them may start; a `false` run is skipped
+     * (it stays `queued`) before any claim.
+     */
+    prepareStart?: () => Promise<(run: Run) => boolean>;
     /** A claim renewal was refused: another owner may hold the run now. */
     onLeaseLost?: (runId: string) => void;
 };

@@ -139,6 +139,7 @@ export class Engine implements IContextProvider {
                 await this.recover();
             },
             onLeaseLost: (runId) => this.loseLease(runId),
+            prepareStart: () => this.prepareStart(),
         });
     }
 
@@ -746,11 +747,21 @@ export class Engine implements IContextProvider {
      * state. `signal` aborts on cancel.
      */
     protected async execute(run: Run, signal: AbortSignal): Promise<void> {
-        const agent = this.agents.get(run.agent);
-        if (!agent) throw new InvalidAgentDefinitionError(`unknown agent: ${run.agent}`);
-        // cancel() asked for it while it ran elsewhere (or was interrupted)
+        // cancel() asked for it while it ran elsewhere (or was interrupted): also for an agent unknown here
         if (run.cancelRequested) {
             await this.finish(run.id, { status: RunStatus.CANCELLED });
+            return;
+        }
+        const agent = this.agents.get(run.agent);
+        if (!agent || !await this.isCurrent(run.agent)) {
+            // removed or replaced since the claim: left for a replica that runs the agent's current revision
+            // guarded by status and owner (`expectStatus: [RUNNING]`, `expectOwner`): a taken-over run is left alone
+            const released = await this.ownedUpdate(run.id, {
+                status: RunStatus.QUEUED,
+                claim: undefined,
+                startedAt: undefined,
+            });
+            if (released) this.emit({ type: 'run.updated', run: released });
             return;
         }
         await executeRun({
@@ -773,6 +784,32 @@ export class Engine implements IContextProvider {
             ownsRun: () => this.ownsRun(run.id),
             provided: this.provided,
         });
+    }
+
+    /**
+     * The start guard of one scheduling pass, built from one read of the
+     * revision markers (skipped while no folder agent is registered): a run
+     * may start when cancel asked for it, or when its agent is registered
+     * here and is a code agent or loaded at the stored marker's hash.
+     */
+    protected async prepareStart(): Promise<(run: Run) => boolean> {
+        const folder = this.revisions.values().some((revision) => revision !== undefined);
+        const markers = folder ?
+            new Map((await this.store.listAgentRevisions()).map((marker) => [marker.agent, marker.hash])) :
+            new Map<string, string>();
+        return (run) => {
+            if (run.cancelRequested) return true;
+            if (!this.agents.has(run.agent)) return false;
+            const revision = this.revisions.get(run.agent);
+            return revision === undefined || revision === markers.get(run.agent);
+        };
+    }
+
+    /** Whether the registered agent is a code agent or loaded at the stored marker's hash. */
+    protected async isCurrent(name: string): Promise<boolean> {
+        const revision = this.revisions.get(name);
+        if (revision === undefined) return true;
+        return (await this.store.getAgentRevision(name))?.hash === revision;
     }
 
     /** A throwing execution fails the run (and releases its claim) instead of leaking. */
