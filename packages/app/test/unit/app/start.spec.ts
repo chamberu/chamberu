@@ -14,6 +14,7 @@ import {
     http,
 } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
+import type { IModule } from 'orkos';
 import {
     afterEach,
     describe,
@@ -183,12 +184,15 @@ describe('App.start', () => {
         expect(await isFree(port)).toBe(true);
     });
 
+    const graphModule = (name: string, dependency: string): IModule => ({
+        name,
+        dependencies: [dependency],
+        setup: async () => undefined,
+    });
+
     it.each([
-        ['an unregistered dependency', [{ name: 'mine', dependencies: ['chamvi:github'], setup: async () => undefined }], 'chamvi:github'],
-        ['a dependency cycle', [
-            { name: 'a', dependencies: ['b'], setup: async () => undefined },
-            { name: 'b', dependencies: ['a'], setup: async () => undefined },
-        ], 'ircular'],
+        ['an unregistered dependency', [graphModule('mine', 'chamvi:github')], 'chamvi:github'],
+        ['a dependency cycle', [graphModule('a', 'b'), graphModule('b', 'a')], 'ircular'],
     ])('a module graph error (%s) is an InvalidAgentDefinitionError', async (_label, modules, needle) => {
         const app = track(createApp({ agents: [agent], modules: [quiet(), ...modules] }));
         const { env } = await envFor();
