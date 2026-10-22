@@ -43,7 +43,12 @@ export function stableHash(value: unknown): string {
  * transforms apply); a schema without a validator passes it unchanged. A
  * failure is a ValidationError naming the tool and the issues, never the value.
  */
-export async function validateToolInput(toolName: string, schema: FlexibleSchema<unknown> | undefined, input: unknown): Promise<unknown> {
+export async function validateToolInput(
+    toolName: string,
+    schema: FlexibleSchema<unknown> | undefined,
+    input: unknown,
+    what = 'the input beforeToolExecution returned',
+): Promise<unknown> {
     const { validate } = asSchema(schema);
     if (!validate) return input;
     const result = await validate(input);
@@ -54,7 +59,7 @@ export async function validateToolInput(toolName: string, schema: FlexibleSchema
         [];
     const detail = issues.length > 0 ? `: ${describeIssues(issues)}` : '.';
     throw new ValidationError(
-        `Tool "${toolName}": the input beforeToolExecution returned does not match the tool's input schema${detail}`,
+        `Tool "${toolName}": ${what} does not match the tool's input schema${detail}`,
         issues,
     );
 }

@@ -23,6 +23,7 @@ describe('public api', () => {
         'defineTool',
         'effectMarker',
         'createResumeToken',
+        'approve',
         'verifyResumeToken',
         'ChamviError',
         'InvalidResumeTokenError',
@@ -76,6 +77,17 @@ describe('public api', () => {
         expect(core).not.toHaveProperty('createChannelHandle');
         expect(core).not.toHaveProperty('runToolCall');
         expect(core).not.toHaveProperty('currentToolCall');
+    });
+
+    it('exports the approval timeout bounds', () => {
+        expect(core.DEFAULT_APPROVAL_TIMEOUT_MS).toBe(24 * 60 * 60 * 1000);
+        expect(core.APPROVAL_TIMEOUT_MAX_MS).toBe(2 ** 31 - 1);
+    });
+
+    it('keeps the approval internals internal', () => {
+        expect(core).not.toHaveProperty('SuspendSignal');
+        expect(core).not.toHaveProperty('requestApproval');
+        expect(core).not.toHaveProperty('SUSPENDED_RESULT');
     });
 
     it('removes the notifiers', () => {

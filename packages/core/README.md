@@ -204,13 +204,22 @@ const agent = defineAgent({
 ### Approvals
 
 ```typescript
+const deploy = defineTool({
+    description: 'Deploy a version.',
+    inputSchema: z.object({ version: z.string() }),
+    execute: async ({ version }, { context }) => {
+        // pauses the run until the owner answers; the call then runs again and gets the decision
+        const decision = await approve(context, { title: `Deploy ${version}?`, timeoutMs: 60 * 60 * 1000 });
+        if (!decision.approved) return `Not deployed: ${decision.reason ?? 'denied'}`;
+        return deployVersion(version);
+    },
+});
+
 const deployer = defineAgent({
     name: 'deployer',
     model,
     instructions: 'Deploy the requested version.',
     tools: { deploy },
-    approvals: { deploy: 'user' },
-    approvalTimeoutMs: 60 * 60 * 1000,
 });
 
 // fail fast: the engine rejects an empty secret, which would let anyone mint tokens
@@ -227,11 +236,12 @@ const engine = new Engine({
 await engine.approve(runId, { approvalId, approved: true });
 ```
 
-- A call that needs approval puts the run in `waiting` (`run.waiting` names the approval) and frees its slot.
-- A policy can also be a function that returns `'user'`, `'allow'` or `'deny'` per call.
+- `approve(ctx, { title, body?, timeoutMs? })` runs inside a tool call (its `execute` or the agent's `hooks`). It puts the run in `waiting` (`run.waiting` names the approval, `<toolCallId>:<n>`) and frees its slot; the approval survives restarts. Once answered, the call runs again from the start and `approve()` returns `{ approved, reason?, approver? }`, so code before it must be idempotent. Other calls of the same step that finished keep their results.
+- `injectChannel(ctx, name).approve({ title, address? })` is the same, with the request delivered through that channel.
+- To gate a tool you did not write, call `approve()` in the agent's `beforeToolExecution` hook and throw `ToolDeniedError` for a denial.
 - `engine.resume(token, decision)` answers with a resume token signed with `resumeSecret` (`createResumeToken`). A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
 - `engine.approve(runId, { approvalId, approved, reason? })` answers the current wait point without a token, for a caller that authorized the approver itself; it spends a token handed out earlier like `resume()`.
-- An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied, and the model sees the denial.
+- An approval not answered within its `timeoutMs` (default 24 hours) is denied with the reason `approval timed out`.
 
 ### Invokers and tool access
 
@@ -245,11 +255,14 @@ const ops = defineAgent({
     tools: { deploy, rollback },
     // offers a tool only when the invoker holds tool:ops:<tool>; cron and webhook runs get none
     toolPolicy: requireToolPermission(),
-    approvals: {
+    hooks: {
         // release managers deploy without asking
-        deploy: (_input, { runtimeContext }) => {
-            const invoker = runtimeContext.trigger.invoker;
-            return invoker && hasPermission(invoker.permissions, 'release:manage') ? 'allow' : 'user';
+        async beforeToolExecution({ toolName, input }, ctx) {
+            const { invoker } = ctx.run.trigger;
+            if (toolName !== 'deploy' || (invoker && hasPermission(invoker.permissions, 'release:manage'))) return input;
+            const decision = await approve(ctx, { title: 'Deploy?' });
+            if (!decision.approved) throw new ToolDeniedError('Deploy denied.');
+            return input;
         },
     },
 });
@@ -268,7 +281,7 @@ await engine.resume(token, { approved: true, approver: { id: 'u-7', kind: 'user'
 
 - The invoker (`{ id, kind, name?, permissions }`) is a snapshot taken at dispatch. A run keeps it across approvals and restarts; revoking a grant later does not reach a run that already holds it.
 - With an invoker, the `idempotencyKey` is scoped to it (`<agent>:<channel>:<kind>:<id>`): only the same invoker's retry is deduplicated, another invoker with the same key gets its own run.
-- Tool code sees it as `context.run.trigger.invoker` in tools and the factory and `ctx.run.trigger.invoker` in effect hooks; approval policies see it as `runtimeContext.trigger.invoker`.
+- Tool code sees it as `context.run.trigger.invoker` in tools and the factory and `ctx.run.trigger.invoker` in effect hooks and the agent hooks.
 - The policy covers state tools too. A call to a refused tool that still arrives fails as a tool error and the run goes on: the step records it as `tool_not_allowed` (`ToolNotAllowedError`), whether the model called it anyway (the model sees the AI SDK's unavailable-tool error) or an approved call from an older history reached the engine's re-check.
 - Permissions are `:`-separated: `*` alone grants everything, a `*` segment matches one segment, and segment counts must match. `requireToolPermission({ withoutInvoker: 'allow' })` lets runs without an invoker use every tool.
 
@@ -332,7 +345,7 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 |---|---|---|---|
 | `store` | `IStore` | required | Where runs, steps, checkpoints and state live |
 | `agents` | `Agent[]` | required | The agents this engine runs |
-| `resumeSecret` | `string` | required | HMAC secret for resume tokens and AI SDK approval signatures; must not be empty |
+| `resumeSecret` | `string` | required | HMAC secret for resume tokens; must not be empty |
 | `channels` | `IChannel[]` | `[]` | Channels by unique name, started by `start()` and stopped first by `drain()`/`stop()`; tools reach them through `injectChannel()` |
 | `maxConcurrentRuns` | `number` | `4` | Runs executing at once in this process |
 | `claimTtlMs` | `number` | `60_000` | Lease on a running run, renewed every `claimTtlMs / 3`; the poll for new work, expired approvals and abandoned runs uses the same interval |
@@ -353,8 +366,6 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections |
 | `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()` |
 | `budget` | `{ maxSteps, maxTokens?, timeoutMs? }` | `{ maxSteps: 20, timeoutMs: 900_000 }` | Per run; the timeout applies to each execution |
-| `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval: `'user'` or a function |
-| `approvalTimeoutMs` | `number` | `86_400_000` | After this, the approval is denied |
 | `output` | `Output` | none | AI SDK structured output; a completed run's `output` is the parsed value |
 
 ## API
@@ -398,7 +409,7 @@ Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamvi/te
 - **A tool error does not fail the run.** It goes back to the model as a tool error result. Throw `FatalToolError` to fail the run; the step budget caps retry loops.
 - **Budgets settle runs.** A run stopped by `maxSteps` or `maxTokens` while the model still wanted to call tools fails with code `BudgetExceeded`; a run that hits its timeout fails with code `Timeout`.
 - **Effects are recorded after they happen.** A crash between a tool's side effect and the store write repeats the effect on resume, unless `alreadyApplied` finds it.
-- **Several approvals in one step are handled one at a time.** The run waits on the first; the other calls are dropped from the history, and the model requests them again after the resume.
+- **Several approvals in one step are handled one at a time.** The run waits on the first in call order; the other suspended calls stay pending and ask again after the resume, before any further model call.
 - **`MemoryStore` is not durable.** Everything is gone with the process; use a persistent store to survive restarts or to run replicas.
 - **`stop()` only stops polling.** Runs in progress continue; use `drain()` to shut down.
 

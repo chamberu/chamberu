@@ -6,6 +6,8 @@
  */
 
 import { isObject } from 'smob';
+import { requestApproval } from '../approval/request.ts';
+import type { ApprovalDecision, ApprovalRequestInput } from '../approval/types.ts';
 import type { channelsOf } from '../context/helpers.ts';
 import { currentToolCall } from '../effect/frame.ts';
 import { stableHash } from '../effect/helpers.ts';
@@ -55,7 +57,8 @@ function assertEmitMessage(message: unknown): asserts message is EmitMessage {
  * A handle on `channel` (which has `out`) for the execution `ctx` belongs
  * to. `emit` is an effect: recorded under its key in the effect store, so a
  * redone step (or a parallel identical call) sends once; a throwing `out`
- * records nothing. `approve` arrives with the durable approvals.
+ * records nothing. `approve` is approve() with the request delivered
+ * through this channel to `address` (default: the bound address).
  */
 export function createChannelHandle(
     ctx: ToolContext,
@@ -117,10 +120,22 @@ export function createChannelHandle(
         return pending;
     };
 
-    // approve() is added with the durable approvals
+    const approve = async (request: ApprovalRequestInput & { address?: string }): Promise<ApprovalDecision> => {
+        const { address: to, ...rest }: ApprovalRequestInput & { address?: string } = isObject(request) ? request : { title: '' };
+        const target = to ?? address;
+        if (target === undefined) {
+            throw new ValidationError(`Channel "${name}" needs an address: only the run's source channel has a default one.`);
+        }
+        if (typeof target !== 'string' || target.length === 0) {
+            throw new ValidationError('The address must be a non-empty string.');
+        }
+        return requestApproval(rest as ApprovalRequestInput, { channel: name, address: target });
+    };
+
     return {
         name,
         ...(address !== undefined ? { address } : {}),
         emit,
-    } as ChannelHandle;
+        approve,
+    };
 }

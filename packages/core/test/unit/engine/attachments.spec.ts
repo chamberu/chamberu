@@ -27,7 +27,7 @@ import type {
 } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
-import { recordApprovals } from '../../utils/approvals.ts';
+import { gateTool, recordApprovals } from '../../utils/approvals.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
@@ -312,7 +312,7 @@ describe('attachments in the model prompt', () => {
         ], {
             definition: {
                 tools: () => ({ deploy }),
-                approvals: { deploy: 'user' },
+                hooks: gateTool('deploy'),
             },
         });
         await ctx.engine.start();

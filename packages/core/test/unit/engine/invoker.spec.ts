@@ -27,7 +27,7 @@ import type {
 } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
-import { recordApprovals } from '../../utils/approvals.ts';
+import { gateTool, recordApprovals } from '../../utils/approvals.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
@@ -59,7 +59,7 @@ type Setup = {
     tools?: AgentDefinition['tools'];
     state?: AgentDefinition['state'];
     toolPolicy?: AgentDefinition['toolPolicy'];
-    approvals?: AgentDefinition['approvals'];
+    hooks?: AgentDefinition['hooks'];
 };
 
 function setup(s: Setup) {
@@ -72,7 +72,7 @@ function setup(s: Setup) {
         tools: s.tools,
         state: s.state,
         toolPolicy: s.toolPolicy,
-        approvals: s.approvals,
+        hooks: s.hooks,
     });
     const engine = new Engine({
         store,
@@ -208,7 +208,7 @@ describe('invoker', () => {
         expect(scopes).toEqual(['release:http:user:a%3Ab%20c', 'release:http']);
     });
 
-    it('hands the invoker to the tool factory and approval policies', async () => {
+    it('hands the invoker to the tool factory and the agent hooks', async () => {
         const seen: Array<Invoker | undefined> = [];
         const model = mockModel([callTool('deploy'), text('done')]);
         const { engine, store } = setup({
@@ -222,10 +222,10 @@ describe('invoker', () => {
                     }),
                 };
             },
-            approvals: {
-                deploy: (_input, { runtimeContext }) => {
-                    seen.push(runtimeContext.trigger.invoker);
-                    return 'allow';
+            hooks: {
+                beforeToolExecution(info, ctx) {
+                    seen.push(ctx.run.trigger.invoker);
+                    return info.input;
                 },
             },
         });
@@ -384,7 +384,7 @@ describe('tool policy', () => {
                 rollback,
             }),
             toolPolicy: requireToolPermission(),
-            approvals: { deploy: 'user' },
+            hooks: gateTool('deploy'),
         });
         await engine.start();
         const { runId } = await engine.dispatch(env(alice));
@@ -414,7 +414,7 @@ describe('tool policy', () => {
         });
     });
 
-    it('answers an approved call the policy now refuses with a tool error', async () => {
+    it('answers a pending call the policy now refuses with a tool error', async () => {
         let deployed = 0;
         const model = mockModel([callTool('deploy'), text('could not deploy')]);
         const tools: AgentDefinition['tools'] = () => ({
@@ -436,7 +436,7 @@ describe('tool policy', () => {
             model,
             tools,
             toolPolicy: () => true,
-            approvals: { deploy: 'user' },
+            hooks: gateTool('deploy'),
         });
         await engine.start();
         const { runId } = await engine.dispatch(env(alice));
@@ -453,7 +453,7 @@ describe('tool policy', () => {
                 model,
                 tools,
                 toolPolicy: (name) => name !== 'deploy',
-                approvals: { deploy: 'user' },
+                hooks: gateTool('deploy'),
             })],
             resumeSecret: 'secret',
             clock,
@@ -484,7 +484,7 @@ describe('tool policy', () => {
         } = setup({
             model,
             tools: () => ({ deploy }),
-            approvals: { deploy: 'user' },
+            hooks: gateTool('deploy'),
         });
         await engine.start();
         const { runId } = await engine.dispatch(env(alice));

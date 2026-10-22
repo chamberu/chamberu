@@ -10,10 +10,11 @@ import { isObject } from 'smob';
 import { ToolNotAllowedError } from '../errors/index.ts';
 import type { IEffectStore } from '../store/types.ts';
 import type { ToolContext } from '../tool/types.ts';
+import { SUSPENDED_RESULT } from '../approval/constants.ts';
 import { EFFECT, EFFECT_HOOKS } from './constants.ts';
-import { runToolCall } from './frame.ts';
+import { currentToolCall, runToolCall } from './frame.ts';
 import { stableHash, validateToolInput } from './helpers.ts';
-import type { EffectHooks, WrapToolsOptions } from './types.ts';
+import type { EffectHooks, ToolCallFrame, WrapToolsOptions } from './types.ts';
 
 type Execute = (input: unknown, options: any) => unknown;
 
@@ -25,11 +26,38 @@ function isAsyncGeneratorFunction(fn: unknown): boolean {
     return Object.prototype.toString.call(fn) === '[object AsyncGeneratorFunction]';
 }
 
+/**
+ * A streaming result whose iteration a suspended approve() ended (in a
+ * hook): its last value is the placeholder instead of the error.
+ */
+async function* guardIterable(
+    frame: ToolCallFrame,
+    iterable: AsyncIterable<unknown>,
+    suspend: () => unknown,
+): AsyncIterable<unknown> {
+    try {
+        yield* iterable;
+    } catch (error) {
+        if (!frame.suspended) throw error;
+    }
+    if (frame.suspended) yield suspend();
+}
+
 /** The last value a streaming tool yields: its final output. */
 async function lastOf(iterable: AsyncIterable<unknown>): Promise<unknown> {
     let last: unknown;
     for await (const chunk of iterable) last = chunk;
     return last;
+}
+
+/** Marks the current call as streaming: approve() is refused in a streaming tool's body. */
+function markStreaming(): void {
+    const frame = currentToolCall();
+    if (frame) frame.streaming = true;
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+    return isObject(value) && typeof value.then === 'function';
 }
 
 function toolCallIdOf(options: unknown): string {
@@ -49,7 +77,8 @@ function toolCallIdOf(options: unknown): string {
  * ToolContext; wrapped tools keep every field (`contextSchema` included) and
  * forward the call options unchanged. A throwing execute (or alreadyApplied)
  * records nothing, so a retry can still apply. Tools without `execute` pass
- * through untouched.
+ * through untouched. A call approve() suspended (see `onSuspend`) resolves
+ * with a placeholder, whatever the tool did with the signal.
  */
 export function wrapToolsForRun(
     tools: ToolSet,
@@ -57,7 +86,11 @@ export function wrapToolsForRun(
     store: IEffectStore,
     options: WrapToolsOptions = {},
 ): ToolSet {
-    const { allow, hooks = {} } = options;
+    const {
+        allow, 
+        hooks = {}, 
+        onSuspend, 
+    } = options;
     const inflight = new Map<string, Promise<unknown>>();
     const wrapped: ToolSet = {};
 
@@ -68,12 +101,31 @@ export function wrapToolsForRun(
             wrapped[name] = def;
             continue;
         }
-        const inFrame = (callOptions: unknown, fn: () => unknown) => runToolCall({
-            runId: ctx.run.runId,
-            toolCallId: toolCallIdOf(callOptions),
-            toolName: name,
-            approvals: 0,
-        }, fn);
+        const inFrame = (callOptions: unknown, fn: () => unknown): unknown => {
+            const frame: ToolCallFrame = {
+                runId: ctx.run.runId,
+                toolCallId: toolCallIdOf(callOptions),
+                toolName: name,
+                approvals: 0,
+                effects: store,
+            };
+            const suspend = () => {
+                onSuspend?.(frame.suspended!);
+                return SUSPENDED_RESULT;
+            };
+            const result = runToolCall(frame, fn);
+            if (isPromiseLike(result)) {
+                return Promise.resolve(result).then(
+                    (value) => (frame.suspended ? suspend() : value),
+                    (error: unknown) => {
+                        if (frame.suspended) return suspend();
+                        throw error;
+                    },
+                );
+            }
+            if (isAsyncIterable(result)) return guardIterable(frame, result, suspend);
+            return result;
+        };
         const check = () => {
             if (allow && !allow(name)) throw new ToolNotAllowedError(name);
         };
@@ -104,7 +156,9 @@ export function wrapToolsForRun(
                     ...def,
                     execute: (input: unknown, callOptions: unknown) => inFrame(callOptions, () => {
                         check();
-                        return execute.call(def, input, callOptions);
+                        const result = execute.call(def, input, callOptions);
+                        if (isAsyncIterable(result)) markStreaming();
+                        return result;
                     }),
                 } as ToolSet[string];
                 continue;
@@ -117,6 +171,7 @@ export function wrapToolsForRun(
                     execute: (input: unknown, callOptions: unknown) => inFrame(callOptions, async function* streamed() {
                         check();
                         const final = await before(input, callOptions);
+                        markStreaming();
                         const iterable = execute.call(def, final, callOptions) as AsyncIterable<unknown>;
                         if (!hooks.afterToolExecution) {
                             yield* iterable;
@@ -141,7 +196,10 @@ export function wrapToolsForRun(
                     const final = await before(input, callOptions);
                     let result: unknown = await execute.call(def, final, callOptions);
                     // a streaming result of a plain function: its final value
-                    if (isAsyncIterable(result)) result = await lastOf(result);
+                    if (isAsyncIterable(result)) {
+                        markStreaming();
+                        result = await lastOf(result);
+                    }
                     return after(final, result, callOptions);
                 }),
             } as ToolSet[string];
@@ -160,7 +218,10 @@ export function wrapToolsForRun(
 
             // streaming tools yield; the effect's result is the last value
             let result: unknown = await execute.call(def, input, callOptions);
-            if (isAsyncIterable(result)) result = await lastOf(result);
+            if (isAsyncIterable(result)) {
+                markStreaming();
+                result = await lastOf(result);
+            }
             // The effect already happened: a failing write must not fail the call.
             // `alreadyApplied` is what guards this window on a later retry.
             try {

@@ -7,6 +7,8 @@
 
 import type { Tool, ToolExecutionOptions } from 'ai';
 import type { AgentHooks } from '../agent/types.ts';
+import type { ApprovalRequest } from '../engine/execute/types.ts';
+import type { IEffectStore } from '../store/types.ts';
 import type { StateSchema } from '../state/types.ts';
 import type { ToolContext } from '../tool/types.ts';
 import type { EFFECT, EFFECT_HOOKS } from './constants.ts';
@@ -28,6 +30,12 @@ export type ToolCallFrame = {
     toolName: string;
     /** How many approve() calls this tool call made so far. */
     approvals: number;
+    /** Where approve() reads the recorded decisions. */
+    effects: IEffectStore;
+    /** Set by the approve() that suspended the call; the wrapper answers it with a placeholder. */
+    suspended?: ApprovalRequest;
+    /** True while a streaming tool's body runs: approve() is refused there. */
+    streaming?: boolean;
 };
 
 export type WrapToolsOptions = {
@@ -35,4 +43,10 @@ export type WrapToolsOptions = {
     allow?: (toolName: string) => boolean;
     /** The agent's tool hooks, run for every call of every tool. */
     hooks?: AgentHooks;
+    /**
+     * Called when approve() suspended a call (its decision is not recorded
+     * yet); the call then resolves with a placeholder that never reaches a
+     * checkpoint.
+     */
+    onSuspend?: (request: ApprovalRequest) => void;
 };

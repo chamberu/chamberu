@@ -7,7 +7,6 @@
 
 export const IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const DEFAULT_DRAIN_TIMEOUT_MS = 30_000;
-export const DEFAULT_APPROVAL_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 export const APPROVAL_TIMED_OUT = 'approval timed out';
 /** TTL of the registry lock `agents:<name>`; also how long putAgent/removeAgent wait for it. */
 export const AGENT_LOCK_TTL_MS = 300_000;

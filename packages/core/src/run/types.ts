@@ -34,11 +34,18 @@ export type RunContext = {
     signal: AbortSignal;
 };
 
+/** The approval a `waiting` run waits on, as approve() requested it. */
 export type WaitPoint = {
     kind: 'approval';
+    /** `<toolCallId>:<n>` of the stored checkpoint's pending call: never changes after the pause. */
     approvalId: string;
     toolName: string;
-    input: unknown;
+    toolCallId: string;
+    title: string;
+    body?: string;
+    /** The channel the request is delivered through; none for the inbox and API only. */
+    channel?: string;
+    address?: string;
     expiresAt: Date;
     tokenId: string;
     /** Set once the approval message was sent (unused until approvals deliver through channels). */

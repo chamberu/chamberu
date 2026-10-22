@@ -34,7 +34,7 @@ import type {
 } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
-import { recordApprovals } from '../../utils/approvals.ts';
+import { gateTool, recordApprovals } from '../../utils/approvals.ts';
 import { mockModel } from '../../utils/mock-model.ts';
 import type { MockResponse } from '../../utils/mock-model.ts';
 
@@ -86,7 +86,7 @@ type Setup = {
     tools?: AgentDefinition['tools'];
     state?: AgentDefinition['state'];
     toolPolicy?: AgentDefinition['toolPolicy'];
-    approvals?: AgentDefinition['approvals'];
+    hooks?: AgentDefinition['hooks'];
     toolsContext?: AgentDefinition['toolsContext'];
     store?: MemoryStore;
     owner?: string;
@@ -103,7 +103,7 @@ function setup(s: Setup) {
         tools: s.tools,
         state: s.state,
         toolPolicy: s.toolPolicy,
-        approvals: s.approvals,
+        hooks: s.hooks,
         toolsContext: s.toolsContext,
     });
     const engine = new Engine({
@@ -405,16 +405,6 @@ describe('tool context', () => {
         expect(first.run?.error).toEqual({ code: 'validation_error', message: expected });
         expect(executed).toBe(0);
         expect((await first.store.listSteps(first.runId)).map((s) => s.kind)).toEqual(['llm']);
-
-        const second = await runOnce({
-            model: mockModel([callTool('third'), text('done')]),
-            tools: { third },
-            approvals: { third: () => 'allow' },
-        });
-        expect(second.run?.status).toBe('failed');
-        expect(second.run?.error).toEqual({ code: 'validation_error', message: expected });
-        expect(executed).toBe(0);
-        expect(await second.store.listSteps(second.runId)).toEqual([]);
     });
 
     it('keeps a rejected toolsContext entry out of the run error', async () => {
@@ -625,7 +615,7 @@ describe('tool context', () => {
         } = setup({
             model: mockModel([callTool('deploy'), text('done')]),
             tools: { deploy },
-            approvals: { deploy: 'user' },
+            hooks: gateTool('deploy'),
         });
         await engine.start();
         const { runId } = await engine.dispatch(env());

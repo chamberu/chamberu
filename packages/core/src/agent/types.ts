@@ -14,8 +14,6 @@ import type { ToolContext } from '../tool/types.ts';
 /** The factory's argument: the same ToolContext the run's chamvi tools get. */
 export type ToolFactoryContext<S extends StateSchema = StateSchema> = ToolContext<S>;
 
-export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: RunContext }) => 'user' | 'allow' | 'deny');
-
 /**
  * Decides per tool name whether a run may use a tool. A refused tool is not
  * offered to the model (it is left out of `activeTools`). A call to it that
@@ -24,9 +22,9 @@ export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: R
  * - the model calls it anyway: the AI SDK answers the model with its
  *   unavailable-tool error (NoSuchToolError), the engine records the step
  *   as ToolNotAllowedError;
- * - an approved call from an older history (the policy changed before the
- *   resume) reaches the engine's per-call re-check, which answers the model
- *   with ToolNotAllowedError.
+ * - a call pending on an approval (the policy changed before the resume)
+ *   reaches the engine's per-call re-check, which answers the model with
+ *   ToolNotAllowedError.
  * Should depend only on the run snapshot (e.g. `run.trigger.invoker`), so
  * the tool set is stable across executions.
  */
@@ -96,15 +94,6 @@ export type AgentDefinition<S extends StateSchema = StateSchema> = {
     /** Record<collection, StandardSchemaV1>. */
     state?: S;
     budget?: Partial<Budget>;
-    /**
-     * Tool name to policy (maps to AI SDK toolApproval). A call needing approval
-     * pauses the run in `waiting`; one approval per pause: when a step asks for
-     * several, the run waits on the first and the other calls are dropped from
-     * the history, so the model requests them again after the resume.
-     */
-    approvals?: Record<string, ApprovalPolicy>;
-    /** Default 24h; on timeout the call is denied. */
-    approvalTimeoutMs?: number;
     /**
      * Structured output (AI SDK `Output`, e.g. `Output.object({ schema })`):
      * a completed run's `output` is the parsed value instead of the text; a

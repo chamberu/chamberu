@@ -41,13 +41,13 @@ describe('tool-call frame', () => {
         });
         const effect = defineEffectTool({ inputSchema: schema, execute: async () => currentToolCall() });
         const tools = wrapToolsForRun({ plain, effect }, ctx, new MemoryStore());
-        expect(await call(tools, 'plain', 'c1')).toEqual({
+        expect(await call(tools, 'plain', 'c1')).toMatchObject({
             runId: 'r1', 
             toolCallId: 'c1', 
             toolName: 'plain', 
             approvals: 0,
         });
-        expect(await call(tools, 'effect', 'c2')).toEqual({
+        expect(await call(tools, 'effect', 'c2')).toMatchObject({
             runId: 'r1', 
             toolCallId: 'c2', 
             toolName: 'effect', 

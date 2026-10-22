@@ -35,8 +35,6 @@ export type ExecuteContext = {
      * claim and slot).
      */
     pause: (request: ApprovalRequest, usage: Usage) => Promise<void>;
-    /** HMAC secret the AI SDK signs approval requests with. */
-    toolApprovalSecret?: string;
     /**
      * False once another owner took the run over (its lease expired and it was
      * recovered); checked before every step and checkpoint write.
@@ -54,9 +52,16 @@ export type ExecuteContext = {
     channels?: ReadonlyMap<string, IChannel<any, any>>;
 };
 
-/** A tool call waiting for the owner's decision. */
+/** What a suspended approve() asks for: the run pauses on it (`Run.waiting`). */
 export type ApprovalRequest = {
+    /** `<toolCallId>:<n>`, n the 0-based ordinal of the approve() within its tool call. */
     approvalId: string;
     toolName: string;
-    input: unknown;
+    toolCallId: string;
+    title: string;
+    body?: string;
+    /** The channel to deliver the request through; none for the inbox and API only. */
+    channel?: string;
+    address?: string;
+    timeoutMs: number;
 };

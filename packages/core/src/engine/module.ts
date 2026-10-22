@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { pid } from 'node:process';
 import type { Agent } from '../agent/types.ts';
+import { approvalDecisionKey } from '../approval/helpers.ts';
 import { verifyResumeToken } from '../approval/module.ts';
 import { assertArtifactInput } from '../artifact/helpers.ts';
 import { attachmentIds, storeArtifact } from '../artifact/module.ts';
@@ -41,7 +42,6 @@ import { assertTriggerKey } from '../trigger/key.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 import {
     APPROVAL_TIMED_OUT,
-    DEFAULT_APPROVAL_TIMEOUT_MS,
     DEFAULT_DRAIN_TIMEOUT_MS,
     IDEMPOTENCY_TTL_MS,
 } from './constants.ts';
@@ -656,12 +656,14 @@ export class Engine implements IContextProvider {
     }
 
     /**
-     * waiting → queued, then the approval response is checkpointed. The
-     * transition comes first and is guarded by expectStatus, so only one answer
-     * ever writes; the run stays claimed by us until the checkpoint landed, so no
-     * pass executes it from the unanswered checkpoint.
+     * waiting → queued, then the decision is recorded under
+     * `approval:<runId>:<approvalId>` (where the suspended approve() finds it
+     * when its call runs again) and the `wait` step appended. The transition
+     * comes first and is guarded by expectStatus, so only one answer ever
+     * records; the run stays claimed by us until the decision landed, so no
+     * pass executes it before.
      *
-     * `waiting` survives the transition and is cleared only after the response
+     * `waiting` survives the transition and is cleared only after the decision
      * landed: if we die in between, the run re-pauses on the same wait point, so
      * the token the owner already holds stays valid.
      */
@@ -684,30 +686,21 @@ export class Engine implements IContextProvider {
             if (transitioned.waiting?.tokenId !== waiting.tokenId) {
                 throw stale();
             }
-            const checkpoint = await this.store.latestCheckpoint(run.id);
-            if (!checkpoint) throw new InvalidRunStateError(`Run "${run.id}" has no checkpoint to resume from.`);
-            await this.store.saveCheckpoint({
-                ...checkpoint,
-                messages: [
-                    ...checkpoint.messages,
-                    {
-                        role: 'tool',
-                        content: [{
-                            type: 'tool-approval-response',
-                            approvalId: waiting.approvalId,
-                            approved: decision.approved,
-                            reason: decision.reason,
-                        }],
-                    },
-                ],
-                createdAt: now,
+            await this.store.putEffect(approvalDecisionKey(run.id, waiting.approvalId), {
+                approved: decision.approved,
+                ...(decision.reason !== undefined ? { reason: decision.reason } : {}),
+                ...(decision.approver ? { approver: decision.approver } : {}),
             });
             const step: Step = {
                 runId: run.id,
                 index: (await this.store.listSteps(run.id)).length,
                 kind: 'wait',
                 name: waiting.toolName,
-                input: waiting.input,
+                input: {
+                    toolCallId: waiting.toolCallId,
+                    title: waiting.title,
+                    ...(waiting.body !== undefined ? { body: waiting.body } : {}),
+                },
                 output: {
                     approvalId: waiting.approvalId,
                     approved: decision.approved,
@@ -742,14 +735,15 @@ export class Engine implements IContextProvider {
      * its key blocked while waiting). Re-pausing on the same approval keeps the
      * wait point, so tokens handed out earlier stay valid.
      */
-    protected async pause(run: Run, agent: Agent, request: ApprovalRequest, usage: Usage): Promise<void> {
+    protected async pause(run: Run, request: ApprovalRequest, usage: Usage): Promise<void> {
         const now = this.clock.now();
+        const { timeoutMs, ...asked } = request;
         const waiting: WaitPoint = run.waiting?.approvalId === request.approvalId ?
             run.waiting :
             {
                 kind: 'approval',
-                ...request,
-                expiresAt: new Date(now.getTime() + (agent.definition.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS)),
+                ...asked,
+                expiresAt: new Date(now.getTime() + timeoutMs),
                 tokenId: randomUUID(),
             };
         const updated = await this.ownedUpdate(run.id, {
@@ -806,8 +800,7 @@ export class Engine implements IContextProvider {
             },
             onStepAppended: (step) => this.emit({ type: 'step.appended', step }),
             onDelta: (delta) => this.emit({ type: 'run.delta', delta }),
-            pause: (request, usage) => this.pause(run, agent, request, usage),
-            toolApprovalSecret: this.resumeSecret,
+            pause: (request, usage) => this.pause(run, request, usage),
             ownsRun: () => this.ownsRun(run.id),
             provided: this.provided,
             channels: this.channels,

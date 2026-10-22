@@ -5,14 +5,14 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { createResumeToken } from '@chamvi/core';
-import type { Engine } from '@chamvi/core';
+import { ToolDeniedError, approve, createResumeToken } from '@chamvi/core';
+import type { AgentHooks, Engine } from '@chamvi/core';
 
 export type IssuedApproval = {
     runId: string;
     approvalId: string;
     toolName: string;
-    input: unknown;
+    title: string;
     resumeToken: string;
     expiresAt: Date;
 };
@@ -34,7 +34,7 @@ export function recordApprovals(engine: Engine, resumeSecret: string): { calls: 
             runId: run.id,
             approvalId: waiting.approvalId,
             toolName: waiting.toolName,
-            input: waiting.input,
+            title: waiting.title,
             resumeToken: createResumeToken(resumeSecret, {
                 runId: run.id,
                 approvalId: waiting.approvalId,
@@ -45,4 +45,19 @@ export function recordApprovals(engine: Engine, resumeSecret: string): { calls: 
         });
     });
     return { calls };
+}
+
+/**
+ * Agent hooks that ask for an approval before every call of `toolName` and
+ * refuse a denied one with ToolDeniedError.
+ */
+export function gateTool(toolName: string): AgentHooks {
+    return {
+        async beforeToolExecution(info, ctx) {
+            if (info.toolName !== toolName) return info.input;
+            const decision = await approve(ctx, { title: `Run ${toolName}?` });
+            if (!decision.approved) throw new ToolDeniedError(`${toolName} denied: ${decision.reason ?? 'no reason'}`);
+            return info.input;
+        },
+    };
 }
