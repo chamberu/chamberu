@@ -111,6 +111,20 @@ describe('mcp run_<agent>', () => {
         await client.close();
     });
 
+    it('describes an agent without instructions by its name', async () => {
+        const plain = defineAgent({
+            name: 'plain',
+            model: textModel(),
+            triggers: [http()],
+        });
+        const { app } = createRunTestApp({ agents: [...createRunAgents(), plain] });
+        const client = await connectMcp(app, ADMIN_TOKEN);
+        const { tools } = await client.listTools();
+        const tool = tools.find((t) => t.name === 'run_plain');
+        expect(tool?.description).toBe('Starts a run of agent "plain".');
+        await client.close();
+    });
+
     it('dispatches through the http() trigger with source mcp', async () => {
         const { app, store } = createRunTestApp();
         const client = await connectMcp(app, ADMIN_TOKEN);

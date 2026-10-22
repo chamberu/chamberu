@@ -98,7 +98,7 @@ Every module is a folder with `module.ts`, `types.ts`, `helpers.ts`, `constants.
 |------|---------|
 | `errors/` | `ChamviError` (`base.ts`), one file per subclass, `ErrorCode` (`constants.ts`) |
 | `context/` | `defineContextKey()`, `inject()`, `tryInject()` (`module.ts`), `ContextKey`, `IContextProvider` (`types.ts`), the key `WeakSet` and the ToolContext `WeakMap`: `registerContextKey()`, `isContextKey()`, `bindProvided()`, `providedOf()`, `contextKeyName()` (`helpers.ts`, internal); `ContextNotProvidedError` lives in `errors/context-not-provided.ts` |
-| `agent/` | `defineAgent()`, `AgentDefinition`, `AgentConfig`, `AgentRevision`, name rules and budget defaults (`constants.ts`), `assertToolsContext()` (`helpers.ts`, internal) |
+| `agent/` | `defineAgent()`, `AgentDefinition`, `AgentRevision`, name rules and budget defaults (`constants.ts`), `assertToolsContext()` (`helpers.ts`, internal) |
 | `trigger/` | `TriggerDefinition`, `TriggerEnvelope`, `Invoker` (`types.ts`), `toInvoker()` validation (`helpers.ts`, internal); `cron/`, `http/`, `webhook/` each hold their factory (`module.ts`) and options type (`types.ts`) |
 | `artifact/` | `Artifact`, `ArtifactInput`, `IRunArtifacts` (`types.ts`); `ARTIFACT_URI_PREFIX` (`constants.ts`, internal); `createRunArtifacts()`, `storeArtifact()`, `attachmentIds()` (`module.ts`, the latter two internal); `isArtifactMediaType()` (`media-type.ts`, public); `assertArtifactInput()`, `toFilePart()`, `hydrateMessages()` (`helpers.ts`) |
 | `run/` | `RunStatus` enum (`constants.ts`); `Run`, `RunStatusLiteral`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage` |

@@ -1,13 +1,13 @@
 // #region agent
-// agents/triage/agent.ts: the folder name is the agent name
-import { http } from '@chamvi/app';
-import type { AgentConfig } from '@chamvi/app';
+// agents/triage/agent.ts: the name must match the folder name
+import { defineAgent, http } from '@chamvi/app';
 
-export default {
+export default defineAgent({
+    name: 'triage',
     model: 'anthropic:claude-sonnet-5-5',
-    // instructions come from instructions.md, so the config leaves them out
+    // instructions come from instructions.md, so the definition leaves them out
     triggers: [http()],
     budget: { maxSteps: 10 },
     notify: 'console',
-} satisfies Omit<AgentConfig, 'instructions'>;
+});
 // #endregion agent

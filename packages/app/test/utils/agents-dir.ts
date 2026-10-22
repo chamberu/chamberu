@@ -32,8 +32,9 @@ import { mockModel, textModel } from './model.ts';
 export const START = new Date('2026-10-22T00:00:00Z');
 export const POLL_MS = 1_000;
 
-export function agentFile(instructions: string, model = 'test:model'): string {
-    return `export default { model: '${model}', instructions: '${instructions}' };\n`;
+/** An `agent.ts` default-exporting `defineAgent()`'s shape (structural: the temp folder cannot import @chamvi/core). */
+export function agentFile(instructions: string, model = 'test:model', name = 'greeter'): string {
+    return `export default { name: '${name}', definition: { model: '${model}', instructions: '${instructions}' } };\n`;
 }
 
 /** The `test` provider: `test:model` answers 'from folder', `test:hang` never answers. */

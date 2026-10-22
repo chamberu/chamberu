@@ -68,7 +68,7 @@ describe('a folder edited right after its stable poll', () => {
         await setup.poll();
         // the stable poll's hash is v2; right after it, an editor saves a v3 tree
         hooks.afterHash = async () => {
-            await writeFile(join(dir, 'agent.ts'), 'export default { model: \'test:model\' };\n');
+            await writeFile(join(dir, 'agent.ts'), 'export default { name: \'greeter\', definition: { model: \'test:model\' } };\n');
             await writeFile(join(dir, 'instructions.md'), 'v3');
         };
         const runId = await queueRun(setup.store, setup.clock, 'greeter');

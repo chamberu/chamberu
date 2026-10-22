@@ -33,7 +33,7 @@ describe('the default module reader', () => {
     it('re-reading a changed folder returns the new code, including an imported file', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, {
-            'agent.ts': 'import { text } from \'./_text.ts\';\nexport default { model: \'test:model\', instructions: text };\n',
+            'agent.ts': 'import { defineAgent } from \'@chamvi/core\';\nimport { text } from \'./_text.ts\';\nexport default defineAgent({ name: \'triage\', model: \'test:model\', instructions: text });\n',
             '_text.ts': 'export const text: string = \'one\';\n',
         });
 
@@ -53,7 +53,7 @@ describe('the default module reader', () => {
     ])('re-reading a changed %s returns the new code (package.json %s)', async (file, manifest) => {
         if (manifest) await writeTree(root.path, { 'package.json': manifest });
         const dir = join(root.path, 'triage');
-        const body = (text: string) => `export default { model: 'test:model', instructions: '${text}' };\n`;
+        const body = (text: string) => `import { defineAgent } from '@chamvi/core';\nexport default defineAgent({ name: 'triage', model: 'test:model', instructions: '${text}' });\n`;
         await writeTree(dir, { [file]: body('one') });
 
         expect((await loadAgent(dir)).agent.definition.instructions).toBe('one');
@@ -66,7 +66,7 @@ describe('the default module reader', () => {
     it('re-reading returns the new code of a .mts helper imported from an agent.mjs and a tool', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, {
-            'agent.mjs': 'import { text } from \'./_text.mts\';\nexport default { model: \'test:model\', instructions: text };\n',
+            'agent.mjs': 'import { defineAgent } from \'@chamvi/core\';\nimport { text } from \'./_text.mts\';\nexport default defineAgent({ name: \'triage\', model: \'test:model\', instructions: text });\n',
             'tools/echo.ts': 'import { text } from \'../_text.mts\';\nexport default { description: text, inputSchema: { type: \'object\' } };\n',
             '_text.mts': 'export const text: string = \'one\';\n',
         });
@@ -85,7 +85,7 @@ describe('the default module reader', () => {
     it('a required JSON file is read again', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, {
-            'agent.ts': 'import data from \'./_data.json\';\nexport default { model: \'test:model\', instructions: data.text };\n',
+            'agent.ts': 'import { defineAgent } from \'@chamvi/core\';\nimport data from \'./_data.json\';\nexport default defineAgent({ name: \'triage\', model: \'test:model\', instructions: data.text });\n',
             '_data.json': JSON.stringify({ text: 'one' }),
         });
 
@@ -113,7 +113,7 @@ describe('the default module reader', () => {
         tree['data/volume/agents/triage/agent.ts'] = [
             'import { label, mark } from \'@chamvi/fake\';',
             'import { sub } from \'@chamvi/fake/sub\';',
-            'export default { model: \'test:model\', instructions: `${label} ${sub}`, output: mark({}) };',
+            'export default { name: \'triage\', definition: { model: \'test:model\', instructions: `${label} ${sub}`, output: mark({}) } };',
             '',
         ].join('\n');
         await writeTree(root.path, tree);
@@ -146,7 +146,7 @@ describe('the default module reader', () => {
             'node_modules/fake-registry/index.cjs': 'exports.registry = new WeakSet();\nexports.mark = (value) => { exports.registry.add(value); return value; };\n',
             'agents/triage/agent.ts': [
                 'import { mark } from \'fake-registry\';',
-                'export default { model: \'test:model\', instructions: \'x\', output: mark({ marked: true }) };',
+                'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', output: mark({ marked: true }) } };',
                 '',
             ].join('\n'),
         });
@@ -159,7 +159,7 @@ describe('the default module reader', () => {
 
     it('a TypeScript enum loads', async () => {
         const dir = join(root.path, 'triage');
-        await writeTree(dir, { 'agent.ts': 'enum Kind { Sort = \'sort the inbox\' }\nexport default { model: \'test:model\', instructions: Kind.Sort };\n' });
+        await writeTree(dir, { 'agent.ts': 'import { defineAgent } from \'@chamvi/core\';\nenum Kind { Sort = \'sort the inbox\' }\nexport default defineAgent({ name: \'triage\', model: \'test:model\', instructions: Kind.Sort });\n' });
 
         expect((await loadAgent(dir)).agent.definition.instructions).toBe('sort the inbox');
     });

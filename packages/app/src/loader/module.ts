@@ -19,7 +19,6 @@ import {
     sep,
 } from 'node:path';
 import type {
-    AgentConfig,
     AgentDefinition,
     ApprovalPolicy,
     StateSchema,
@@ -74,7 +73,8 @@ const requireCache = createRequire(import.meta.url).cache;
 
 /**
  * Loads one agent folder (`dir`, whose name is the agent's): `agent.*`
- * (the AgentConfig), `instructions.md`, `tools/`, `triggers/`, `state/` and
+ * (default-exporting `defineAgent()`'s result, named like the folder),
+ * `instructions.md`, `tools/`, `triggers/`, `state/` and
  * `approvals.*`. Every failure is an InvalidAgentDefinitionError naming the
  * file relative to the agents dir (the folder's parent), also a folder whose
  * content changed while it was read.
@@ -251,24 +251,24 @@ async function buildAgent(dir: string, load: (path: string) => Promise<unknown>)
     if (!agentFile) {
         throw new InvalidAgentDefinitionError(`${name}: has no agent.{ts,mts,js,mjs}.`);
     }
-    const config = await readModule(agentFile);
-    if (!isObject(config)) {
-        throw new InvalidAgentDefinitionError(`${rel(agentFile)}: the default export must be an agent config object.`);
+    const declared = await readModule(agentFile);
+    // structural, so an agent built by another @chamvi/core copy passes too
+    if (!isObject(declared) || typeof declared.name !== 'string' || !isObject(declared.definition)) {
+        throw new InvalidAgentDefinitionError(`${rel(agentFile)}: the default export must be defineAgent(...)'s result.`);
     }
-    if ('name' in config) {
-        throw new InvalidAgentDefinitionError(`${rel(agentFile)}: must not set a name (the folder name is the agent name).`);
+    if (declared.name !== name) {
+        throw new InvalidAgentDefinitionError(
+            `${rel(agentFile)}: defineAgent names "${declared.name}", but the folder is "${name}"; the names must match.`,
+        );
     }
-    const definition = { ...config } as AgentConfig;
+    const definition = { ...declared.definition } as AgentDefinition;
 
     const instructionsFile = join(dir, INSTRUCTIONS_FILE);
-    const hasInstructionsFile = await isFile(instructionsFile);
-    if (hasInstructionsFile && definition.instructions !== undefined) {
-        throw new InvalidAgentDefinitionError(`${name}: sets instructions in both ${rel(agentFile)} and ${INSTRUCTIONS_FILE}.`);
-    }
-    if (hasInstructionsFile) {
+    if (await isFile(instructionsFile)) {
+        if (definition.instructions !== undefined) {
+            throw new InvalidAgentDefinitionError(`${name}: sets instructions in both ${rel(agentFile)} and ${INSTRUCTIONS_FILE}.`);
+        }
         definition.instructions = await readFile(instructionsFile, 'utf8');
-    } else if (definition.instructions === undefined) {
-        throw new InvalidAgentDefinitionError(`${name}: sets no instructions (neither in ${rel(agentFile)} nor in ${INSTRUCTIONS_FILE}).`);
     }
 
     const tools = new Map<string, ToolEntry>();
@@ -309,7 +309,7 @@ async function buildAgent(dir: string, load: (path: string) => Promise<unknown>)
         const state: StateSchema = { ...definition.state };
         for (const file of stateFiles) {
             if (file.stem in state) {
-                throw new InvalidAgentDefinitionError(`${rel(file.path)}: the collection "${file.stem}" is also in the config's state.`);
+                throw new InvalidAgentDefinitionError(`${rel(file.path)}: the collection "${file.stem}" is also in ${rel(agentFile)}'s state.`);
             }
             const schema = await readModule(file.path);
             if (!isStandardSchema(schema)) {
@@ -327,7 +327,7 @@ async function buildAgent(dir: string, load: (path: string) => Promise<unknown>)
         const approvals: Record<string, ApprovalPolicy> = { ...definition.approvals };
         for (const [tool, policy] of Object.entries(assertApprovals(value, rel(approvalsFile), data))) {
             if (tool in approvals) {
-                throw new InvalidAgentDefinitionError(`${rel(approvalsFile)}: the approval of "${tool}" is also in the config's approvals.`);
+                throw new InvalidAgentDefinitionError(`${rel(approvalsFile)}: the approval of "${tool}" is also in ${rel(agentFile)}'s approvals.`);
             }
             approvals[tool] = policy;
         }
@@ -346,16 +346,16 @@ async function readWith(load: (path: string) => Promise<unknown>, path: string, 
 }
 
 /**
- * The config's tools plus the folder's: a plain set when both are plain, else a
- * factory. A name in both is refused here for a plain config set, and by the
- * factory (at execution) for a factory config set.
+ * The agent file's tools plus the folder's: a plain set when both are plain, else a
+ * factory. A name in both is refused here for a plain set, and by the
+ * factory (at execution) for a factory set.
  */
 function mergeTools(
     name: string,
-    configured: AgentConfig['tools'],
+    configured: AgentDefinition['tools'],
     files: Map<string, ToolEntry>,
     agentFile: string,
-): AgentConfig['tools'] {
+): AgentDefinition['tools'] {
     if (typeof configured !== 'function') {
         for (const tool of files.keys()) {
             if (configured && tool in configured) {

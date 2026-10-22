@@ -5,7 +5,7 @@ An app can load agents from a folder while it runs, next to the agents passed to
 ```
 agents/
   triage/
-    agent.ts             # the config: model, budgets, triggers, notify, ...
+    agent.ts             # defineAgent({ name: 'triage', ... }): model, budgets, triggers, notify, ...
     instructions.md      # the system prompt
     tools/
       lookup_issue.ts    # the tool lookup_issue
@@ -40,21 +40,21 @@ The folder name is the agent name (`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 charac
 
 | File | Holds |
 |---|---|
-| `agent.{ts,mts,js,mjs}` | Default export: the agent's config, `defineAgent()`'s input without `name` (`AgentConfig`). It carries what has no file of its own: `model`, `budget`, `output`, `toolPolicy`, `notify`, `toolsContext`, and may hold `tools`, `triggers`, `state` and `approvals` too |
-| `instructions.md` | The system prompt, read as is. Setting `instructions` in `agent.ts` as well is an error, and so is setting them nowhere |
+| `agent.{ts,mts,js,mjs}` | Default export: `defineAgent({ name, ... })`'s result, whose `name` must equal the folder name (anything else is an error). It carries what has no file of its own: `model`, `budget`, `output`, `toolPolicy`, `notify`, `toolsContext`, and may hold `instructions`, `tools`, `triggers`, `state` and `approvals` too |
+| `instructions.md` | The system prompt, read as is. Setting `instructions` in `agent.ts` as well is an error; an agent with instructions in neither place runs without a system prompt |
 | `tools/<tool>.{ts,mts,js,mjs}` | Default export: an AI SDK `Tool` or a `(ctx: ToolContext) => Tool` factory. The file name is the tool name (`^[A-Za-z0-9_-]{1,64}$`) |
 | `triggers/<file>.{ts,mts,js,mjs}` | Default export: a `TriggerDefinition` (`cron()`, `http()`, `webhook()`, `githubWebhook()`) |
 | `triggers/<file>.{yaml,yml,json}` | A trigger as data (see below) |
 | `state/<collection>.{ts,mts,js,mjs}` | Default export: the Standard Schema of the collection |
 | `approvals.{ts,mts,js,mjs,yaml,yml,json}` | `{ <tool>: 'user' }`; a module file may also give a policy function |
 
-What the files add is merged with the same key of `agent.ts`, and a name in both is an error: a tool of `tools/` and of the config's `tools`, a collection, an approval. Triggers add up. A trigger keeps its own id whatever the file is called (`cron:<expression>`, `http`, `webhook:<path>`), and ids must stay unique, as for every agent, so two files with the same cron expression are an error. When a tool file exports a factory, or the config's `tools` is one, the merged set is a factory too; a clash with a config factory's tools then fails the run's execution instead of the load.
+What the files add is merged with the same key of `agent.ts`, and a name in both is an error: a tool of `tools/` and of `agent.ts`'s `tools`, a collection, an approval. Triggers add up. A trigger keeps its own id whatever the file is called (`cron:<expression>`, `http`, `webhook:<path>`), and ids must stay unique, as for every agent, so two files with the same cron expression are an error. When a tool file exports a factory, or `agent.ts`'s `tools` is one, the merged set is a factory too; a clash with that factory's tools then fails the run's execution instead of the load.
 
 Entries whose name starts with `.` or `_` are skipped: a `_shared.ts` helper next to the tools is no tool, and an `_archive/` folder in the agents dir is no agent (a `node_modules` folder is never an agent either, and refused, see [Imports](#imports)).
 
 <<< @/snippets/agent-folder/agent.ts#agent
 
-`AgentConfig` requires `instructions`, so an `agent.ts` that leaves them to `instructions.md` checks against `Omit<AgentConfig, 'instructions'>`; one that sets them uses `satisfies AgentConfig`.
+`instructions` is optional in `defineAgent()`, so an `agent.ts` that leaves them to `instructions.md` type-checks as is. `defineAgent()` checks `toolsContext` before the folder's files are merged in, so a `toolsContext` entry in `agent.ts` can only name a tool that `agent.ts` defines itself, never one of `tools/`.
 
 <<< @/snippets/agent-folder/tools/lookup_issue.ts#tool
 

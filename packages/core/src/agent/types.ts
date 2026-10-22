@@ -35,7 +35,8 @@ export type ToolPolicy = (toolName: string, ctx: { run: RunContext }) => boolean
 export type AgentDefinition<S extends StateSchema = StateSchema> = {
     name: string;
     model: LanguageModel;
-    instructions: string;
+    /** System instructions; optional (a folder agent may take them from `instructions.md`). */
+    instructions?: string;
     triggers?: TriggerDefinition[];
     /**
      * The agent's tools: a plain `ToolSet` (the default), or a factory for
@@ -80,13 +81,6 @@ export type Agent<S extends StateSchema = StateSchema> = {
     readonly name: string;
     readonly definition: Required<Pick<AgentDefinition<S>, 'budget'>> & AgentDefinition<S>;
 };
-
-/**
- * An agent definition without its name: the default export of a folder
- * agent's `agent.ts` (`export default { ... } satisfies AgentConfig`), whose
- * name is the folder's.
- */
-export type AgentConfig<S extends StateSchema = StateSchema> = Omit<AgentDefinition<S>, 'name'>;
 
 /**
  * The revision marker of a folder agent: the content hash of its folder

@@ -54,8 +54,8 @@ import { freePort } from '../../../utils/port.ts';
 const START = new Date('2026-10-22T00:00:00Z');
 const POLL_MS = 1_000;
 
-function agentFile(instructions: string, model = 'test:model'): string {
-    return `export default { model: '${model}', instructions: '${instructions}' };\n`;
+function agentFile(instructions: string, model = 'test:model', name = 'greeter'): string {
+    return `export default { name: '${name}', definition: { model: '${model}', instructions: '${instructions}' } };\n`;
 }
 
 function provider() {
@@ -260,7 +260,7 @@ describe('agentsModule', () => {
     it('an unknown model string is an issue, not a boot failure', async () => {
         await writeTree(root.path, {
             'greeter/agent.ts': agentFile('v1', 'acme:model'),
-            'other/agent.ts': agentFile('v1'),
+            'other/agent.ts': agentFile('v1', 'test:model', 'other'),
         });
         const {
             harness, 
@@ -369,7 +369,7 @@ describe('agentsModule', () => {
         await harness.setup();
         await watch();
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
         await poll();
         expect(engine().getAgent('newcomer')).toBeUndefined();
         await poll();
@@ -504,7 +504,7 @@ describe('agentsModule', () => {
         const current = engine();
         await runHooks(harness.container, 'stopping');
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
         await poll();
         await poll();
         expect(current.getAgent('newcomer')).toBeUndefined();
@@ -546,7 +546,7 @@ describe('agentsModule', () => {
         await harness.setup();
         await runHooks(harness.container, 'started');
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
         await poll();
         await poll();
         expect(engine().getAgent('greeter')).toBeDefined();

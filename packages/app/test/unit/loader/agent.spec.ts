@@ -18,7 +18,7 @@ import { InvalidAgentDefinitionError, loadAgent } from '@chamvi/app';
 import { createTempDir, writeTree } from '../../utils/folder.ts';
 
 const SCHEMA = 'export default { \'~standard\': { version: 1, vendor: \'test\', validate: (value) => ({ value }) } };\n';
-const agentTs = () => 'export default { model: \'test:model\', instructions: \'x\' };\n';
+const agentTs = () => 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n';
 const TOOL = 'export default { description: \'Says hi.\', inputSchema: { type: \'object\' }, execute: async () => \'hi\' };\n';
 
 describe('loadAgent', () => {
@@ -42,7 +42,7 @@ describe('loadAgent', () => {
     it('loads agent.mjs plus instructions.md, a tool, a YAML cron trigger, a state schema and YAML approvals', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, {
-            'agent.mjs': 'export default { model: \'test:model\', budget: { maxSteps: 3 } };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', budget: { maxSteps: 3 } } };\n',
             'instructions.md': 'Sort the inbox.\n',
             'tools/say_hi.mjs': TOOL,
             'tools/_helper.ts': 'export const helper = 1;\n',
@@ -77,8 +77,8 @@ describe('loadAgent', () => {
     it('prefers agent.ts over agent.mjs and keeps config instructions without instructions.md', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, {
-            'agent.ts': 'const config: { model: string; instructions: string } = { model: \'test:model\', instructions: \'from ts\' };\nexport default config;\n',
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'from mjs\' };\n',
+            'agent.ts': 'const agent: { name: string; definition: { model: string; instructions: string } } = { name: \'triage\', definition: { model: \'test:model\', instructions: \'from ts\' } };\nexport default agent;\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'from mjs\' } };\n',
         });
 
         const loaded = await loadAgent(dir);
@@ -91,10 +91,13 @@ describe('loadAgent', () => {
         await writeTree(dir, {
             'agent.mjs': [
                 'export default {',
-                '    model: \'test:model\',',
-                '    instructions: \'x\',',
-                '    triggers: [{ source: \'cron\', id: \'cron:* * * * *\', options: {} }],',
-                '    approvals: { a: \'user\' },',
+                '    name: \'triage\',',
+                '    definition: {',
+                '        model: \'test:model\',',
+                '        instructions: \'x\',',
+                '        triggers: [{ source: \'cron\', id: \'cron:* * * * *\', options: {} }],',
+                '        approvals: { a: \'user\' },',
+                '    },',
                 '};',
                 '',
             ].join('\n'),
@@ -118,7 +121,7 @@ describe('loadAgent', () => {
     it('merges a tool factory file into a plain config.tools set as a factory', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, {
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\', tools: { base: { description: \'b\' } } };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', tools: { base: { description: \'b\' } } } };\n',
             'tools/runner.mjs': 'export default (ctx) => ({ description: \'run \' + ctx.run.runId });\n',
         });
 
@@ -134,7 +137,7 @@ describe('loadAgent', () => {
     it('merges tool files into a factory config.tools and refuses a clash at execution', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, {
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\', tools: (ctx) => ctx.tools };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', tools: (ctx) => ctx.tools } };\n',
             'tools/say_hi.mjs': TOOL,
         });
 
@@ -146,8 +149,18 @@ describe('loadAgent', () => {
         expect(() => factory({ tools: { say_hi: {} } })).toThrow(/say_hi/);
     });
 
-    it('a name key is refused', async () => {
-        await expectRefused({ 'agent.mjs': 'export default { name: \'other\', model: \'test:model\', instructions: \'x\' };\n' }, /name/);
+    it('a defineAgent name that differs from the folder is refused', async () => {
+        await expectRefused(
+            { 'agent.mjs': 'export default { name: \'other\', definition: { model: \'test:model\', instructions: \'x\' } };\n' },
+            /^triage\/agent\.mjs: defineAgent names "other", but the folder is "triage"; the names must match\.$/,
+        );
+    });
+
+    it('a plain config object is refused', async () => {
+        await expectRefused(
+            { 'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n' },
+            /^triage\/agent\.mjs: the default export must be defineAgent\(\.\.\.\)'s result\.$/,
+        );
     });
 
     it('a folder without agent file is refused', async () => {
@@ -164,74 +177,80 @@ describe('loadAgent', () => {
 
     it('instructions in both places are refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'instructions.md': 'y',
         }, /instructions/);
     });
 
-    it('missing instructions are refused', async () => {
-        await expectRefused({ 'agent.mjs': 'export default { model: \'test:model\' };\n' }, /instructions/);
+    it('an agent without instructions loads', async () => {
+        const dir = join(root.path, 'triage');
+        await writeTree(dir, { 'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\' } };\n' });
+
+        const loaded = await loadAgent(dir);
+
+        expect(loaded.agent.name).toBe('triage');
+        expect(loaded.agent.definition.instructions).toBeUndefined();
     });
 
     it('a tool clashing with config.tools is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\', tools: { say_hi: {} } };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', tools: { say_hi: {} } } };\n',
             'tools/say_hi.mjs': TOOL,
         }, /say_hi/);
     });
 
     it('a tool file name that is no tool name is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'tools/say.hi.mjs': TOOL,
         }, /say\.hi/);
     });
 
     it('a tool that is neither a Tool nor a factory is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'tools/say_hi.mjs': 'export default "nope";\n',
         }, /tools\/say_hi\.mjs/);
     });
 
     it('an unknown key in a YAML trigger is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'triggers/daily.yaml': 'cron: \'0 9 * * *\'\nschedule: daily\n',
         }, /schedule/);
     });
 
     it('a data trigger naming two forms is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'triggers/both.json': '{ "http": true, "webhook": "/x" }',
         }, /exactly one/);
     });
 
     it('an invalid data trigger value is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'triggers/bad.yaml': 'webhook: no-slash\n',
         }, /webhook/);
     });
 
     it('a cron data trigger with a bad overlap is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'triggers/bad.yaml': 'cron: \'0 9 * * *\'\noverlap: sometimes\n',
         }, /overlap/);
     });
 
     it('a module trigger that is no TriggerDefinition is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'triggers/bad.mjs': 'export default { id: 1 };\n',
         }, /triggers\/bad\.mjs/);
     });
 
     it('a duplicate trigger id is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'triggers/a.json': '{ "http": true }',
             'triggers/b.json': '{ "http": true }',
         }, /duplicate trigger id/);
@@ -239,28 +258,28 @@ describe('loadAgent', () => {
 
     it('a state file that is no Standard Schema is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'state/notes.mjs': 'export default {};\n',
         }, /state\/notes\.mjs/);
     });
 
     it('a state collection clashing with config.state is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'const s = { \'~standard\': {} };\nexport default { model: \'test:model\', instructions: \'x\', state: { notes: s } };\n',
+            'agent.mjs': 'const s = { \'~standard\': {} };\nexport default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', state: { notes: s } } };\n',
             'state/notes.mjs': SCHEMA,
         }, /notes/);
     });
 
     it('an approval clashing with config.approvals is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\', approvals: { say_hi: \'user\' } };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', approvals: { say_hi: \'user\' } } };\n',
             'approvals.yaml': 'say_hi: user\n',
         }, /say_hi/);
     });
 
     it('a data approval other than user is refused', async () => {
         await expectRefused({
-            'agent.mjs': 'export default { model: \'test:model\', instructions: \'x\' };\n',
+            'agent.mjs': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n',
             'approvals.json': '{ "say_hi": "allow" }',
         }, /say_hi/);
     });
@@ -286,7 +305,7 @@ describe('loadAgent', () => {
         const loaded = await loadAgent(dir, {
             load: async (path) => {
                 seen.push(path);
-                return { default: { model: 'test:model' } };
+                return { default: { name: 'triage', definition: { model: 'test:model' } } };
             },
         });
 
@@ -300,8 +319,8 @@ describe('loadAgent', () => {
 
         const promise = loadAgent(dir, {
             load: async (path) => {
-                await writeFile(path, 'export default { model: \'test:other\' };\n');
-                return { default: { model: 'test:model' } };
+                await writeFile(path, 'export default { name: \'triage\', definition: { model: \'test:other\' } };\n');
+                return { default: { name: 'triage', definition: { model: 'test:model' } } };
             },
         });
 

@@ -91,7 +91,6 @@ describe('public api', () => {
 
     it('exports the agent folder types', () => {
         expectTypeOf<core.AgentRevision>().toHaveProperty('hash').toEqualTypeOf<string>();
-        expectTypeOf<core.AgentConfig>().not.toHaveProperty('name');
     });
 
     it('keeps the context binding internal', () => {

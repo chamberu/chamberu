@@ -16,7 +16,7 @@ import {
 import { listAgentFolders, loadAgents } from '@chamvi/app';
 import { createTempDir, writeTree } from '../../utils/folder.ts';
 
-const AGENT = 'export default { model: \'test:model\', instructions: \'x\' };\n';
+const agent = (name: string) => `export default { name: '${name}', definition: { model: 'test:model', instructions: 'x' } };\n`;
 
 describe('loadAgents', () => {
     let root: { path: string; remove: () => Promise<void> };
@@ -31,14 +31,14 @@ describe('loadAgents', () => {
 
     it('loadAgents skips dot and underscore folders and reports broken folders as issues without absolute paths', async () => {
         await writeTree(root.path, {
-            'beta/agent.mjs': AGENT,
-            'alpha/agent.mjs': AGENT,
+            'beta/agent.mjs': agent('beta'),
+            'alpha/agent.mjs': agent('alpha'),
             'broken/agent.mjs': 'export default {\n',
-            'Bad_Name/agent.mjs': AGENT,
+            'Bad_Name/agent.mjs': agent('Bad_Name'),
             'empty/notes.md': 'nothing here',
-            '.tmp-upload/agent.mjs': AGENT,
-            '_shared/agent.mjs': AGENT,
-            'loose-file.mjs': AGENT,
+            '.tmp-upload/agent.mjs': agent('.tmp-upload'),
+            '_shared/agent.mjs': agent('_shared'),
+            'loose-file.mjs': agent('loose-file'),
         });
 
         const { agents, issues } = await loadAgents(root.path);
@@ -55,10 +55,10 @@ describe('loadAgents', () => {
 
     it('lists the agent folders by name', async () => {
         await writeTree(root.path, {
-            'b/agent.mjs': AGENT,
-            'a/agent.mjs': AGENT,
+            'b/agent.mjs': agent('b'),
+            'a/agent.mjs': agent('a'),
             '.git/HEAD': 'x',
-            '_x/agent.mjs': AGENT,
+            '_x/agent.mjs': agent('_x'),
             'file.txt': 'x',
         });
 

@@ -19,7 +19,7 @@ const DEFAULT_TIMEOUT_MS: 900_000; // 15 minutes
 
 Throws `InvalidAgentDefinitionError` for an invalid name, duplicate trigger ids, or a `toolsContext` entry naming a chamvi tool or no tool of a plain tool set. See [Agents](/guide/agents).
 
-`AgentConfig` is the definition without `name`, the default export of a folder agent's `agent.ts`; `AgentRevision` is the store's revision marker of a folder agent (see [Agent Folders](/guide/agent-folders)):
+A folder agent's `agent.ts` default-exports `defineAgent()`'s result, named like its folder; `AgentRevision` is the store's revision marker of a folder agent (see [Agent Folders](/guide/agent-folders)):
 
 <<< ../../../core/src/agent/types.ts{ts}
 

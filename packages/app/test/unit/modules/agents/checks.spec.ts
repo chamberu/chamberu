@@ -52,17 +52,17 @@ const LONG_NAME = 'a'.repeat(62);
 
 describe('the checks a folder agent passes before it is registered', () => {
     it.each([
-        ['an unknown notifier', { 'broken/agent.ts': 'export default { model: \'test:model\', instructions: \'x\', notify: \'slack\' };\n' }, 'broken', /unknown notifier "slack"/],
+        ['an unknown notifier', { 'broken/agent.ts': 'export default { name: \'broken\', definition: { model: \'test:model\', instructions: \'x\', notify: \'slack\' } };\n' }, 'broken', /unknown notifier "slack"/],
         ['a cron timezone hubwire refuses', {
-            'broken/agent.ts': agentFile('x'),
+            'broken/agent.ts': agentFile('x', 'test:model', 'broken'),
             'broken/triggers/daily.yaml': 'cron: \'0 9 * * *\'\ntimezone: Mars/Base\n',
         }, 'broken', /Invalid timezone/],
         ['a cron expression croner refuses', {
-            'broken/agent.ts': agentFile('x'),
+            'broken/agent.ts': agentFile('x', 'test:model', 'broken'),
             'broken/triggers/daily.yaml': 'cron: \'0 0 * * 1/2\'\n',
         }, 'broken', /0 0 \* \* 1\/2/],
         ['a name whose run_<agent> MCP tool is too long', {
-            [`${LONG_NAME}/agent.ts`]: agentFile('x'),
+            [`${LONG_NAME}/agent.ts`]: agentFile('x', 'test:model', LONG_NAME),
             [`${LONG_NAME}/triggers/http.yaml`]: 'http: true\n',
         }, LONG_NAME, /exceeds 64 characters/],
     ])('%s is a load issue at boot, never a failed start', async (_label, tree, agent, message) => {
@@ -92,7 +92,7 @@ describe('the checks a folder agent passes before it is registered', () => {
     });
 
     it.each([
-        ['an unknown notifier', { 'agent.ts': 'export default { model: \'test:model\', instructions: \'v2\', notify: \'slack\' };\n' }],
+        ['an unknown notifier', { 'agent.ts': 'export default { name: \'greeter\', definition: { model: \'test:model\', instructions: \'v2\', notify: \'slack\' } };\n' }],
         ['a cron trigger hubwire refuses', { 'triggers/daily.yaml': 'cron: \'0 0 * * 1/2\'\n' }],
     ])('a change to %s keeps the old agent, cancels nothing and is tried once', async (_label, change) => {
         await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1') });
