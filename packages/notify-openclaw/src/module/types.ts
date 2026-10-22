@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { OpenclawNotifierOptions } from '@chamvi/notify-openclaw';
-import type { Env } from '../env/types.ts';
+import type { Env } from '@chamvi/app';
+import type { OpenclawNotifierOptions } from '../notifier/types.ts';
 
 /**
  * `openclaw()` options; the ones not given come from env, `approvalUrl`

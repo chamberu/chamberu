@@ -2,7 +2,7 @@
 // src/index.ts
 import { createApp, defineAgent } from '@chamvi/app';
 import { githubModule } from '@chamvi/github/module';
-import { openclawModule } from '@chamvi/app/openclaw';
+import { openclawModule } from '@chamvi/notify-openclaw/module';
 import { sandboxModule } from '@chamvi/app/sandbox';
 import { uiModule } from '@chamvi/app/ui';
 import { codingTools } from '@chamvi/coding';

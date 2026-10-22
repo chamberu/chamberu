@@ -6,44 +6,29 @@
  */
 
 import { InvalidAgentDefinitionError } from '@chamvi/core';
-import { openclaw } from '@chamvi/notify-openclaw';
-import type { OpenclawDelivery, OpenclawNotifierOptions } from '@chamvi/notify-openclaw';
-import type { IContainer } from 'eldin';
-import type { IModule } from 'orkos';
-import { approvalUrlOf } from '../config/helpers.ts';
-import { envString, envUrl } from '../env/module.ts';
-import type { Env } from '../env/types.ts';
-import { AppToken, ModuleName } from '../module/constants.ts';
+import {
+    AppToken,
+    ModuleName,
+    approvalUrlOf,
+    envString,
+    envUrl,
+} from '@chamvi/app';
+import type { IContainer, IModule } from '@chamvi/app';
+import { provideOpenclawContext } from '../context/module.ts';
+import { DEFAULT_NOTIFIER_NAME } from '../notifier/constants.ts';
+import { openclaw } from '../notifier/module.ts';
+import type { OpenclawNotifierOptions } from '../notifier/types.ts';
+import { ERROR_PREFIX, VARIABLES } from './constants.ts';
+import { readDelivery } from './helpers.ts';
 import type { OpenclawModuleOptions } from './types.ts';
-
-const DEFAULT_NAME = 'openclaw';
-
-/** The prefix of openclaw()'s option errors. */
-const ERROR_PREFIX = 'openclaw: ';
-
-/** The env variable each openclaw() option is read from (`deliver.*` from the deliver variables). */
-const VARIABLES = {
-    'baseUrl': 'OPENCLAW_BASE_URL',
-    'hooksToken': 'OPENCLAW_HOOKS_TOKEN',
-    'hooksPath': 'OPENCLAW_HOOKS_PATH',
-    'agentId': 'OPENCLAW_AGENT_ID',
-    'deliver.channel': 'OPENCLAW_CHANNEL',
-    'deliver.to': 'OPENCLAW_TO',
-    'deliver.accountId': 'OPENCLAW_ACCOUNT_ID',
-} as const;
 
 type EnvOption = keyof typeof VARIABLES;
 
-function readDelivery(env: Env): OpenclawDelivery {
-    const accountId = envString(env, VARIABLES['deliver.accountId']);
-    return {
-        channel: envString(env, VARIABLES['deliver.channel'], { required: true }),
-        to: envString(env, VARIABLES['deliver.to'], { required: true }),
-        ...(typeof accountId === 'string' && { accountId }),
-    };
-}
-
-/** Contributes `openclaw()` to `AppToken.NOTIFIERS`, options resolved and checked when the factory is called. */
+/**
+ * Contributes `openclaw()` to `AppToken.NOTIFIERS`, options resolved and checked
+ * when the factory is called, and provides it on the engine
+ * (`injectOpenclawContext(ctx, name)`).
+ */
 export class OpenclawModule implements IModule {
     readonly name: string;
 
@@ -77,7 +62,7 @@ export class OpenclawModule implements IModule {
             ...(typeof hooksPath === 'string' && { hooksPath }),
             ...(typeof agentId === 'string' && { agentId }),
         };
-        this.name = `chamvi:notifier:${options.name ?? DEFAULT_NAME}`;
+        this.name = `chamvi:notifier:${options.name ?? DEFAULT_NOTIFIER_NAME}`;
         this.check(fromEnv);
     }
 
@@ -102,12 +87,17 @@ export class OpenclawModule implements IModule {
 
     async setup(container: IContainer): Promise<void> {
         const approvalUrl = this.options.approvalUrl ?? approvalUrlOf(container.resolve(AppToken.CONFIG));
-        container.registerMany(AppToken.NOTIFIERS, {
-            useValue: openclaw({
-                ...this.options,
-                ...(approvalUrl && { approvalUrl }),
-                clock: this.options.clock ?? container.resolve(AppToken.CLOCK),
-            }),
+        const notifier = openclaw({
+            ...this.options,
+            ...(approvalUrl && { approvalUrl }),
+            clock: this.options.clock ?? container.resolve(AppToken.CLOCK),
+        });
+        container.registerMany(AppToken.NOTIFIERS, { useValue: notifier });
+        container.registerMany(AppToken.LIFECYCLE_HOOKS, {
+            useValue: {
+                name: this.name,
+                engineCreated: (engine) => provideOpenclawContext(engine, notifier),
+            },
         });
     }
 }

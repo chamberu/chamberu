@@ -12,7 +12,6 @@ npm install @chamvi/app ai typeorm pg
 |---|---|---|
 | `@chamvi/app` | `createApp`, `isApp`, the built-in modules, tokens, env readers, `readConfig`, `createLogger`, `createModelRegistry` | |
 | `@chamvi/app/sandbox` | `sandboxModule` | `@chamvi/sandbox` and the provider package (`@chamvi/sandbox-local`, `-docker`, `-k8s`) |
-| `@chamvi/app/openclaw` | `openclawModule` | `@chamvi/notify-openclaw` |
 | `@chamvi/app/ui` | `uiModule` | `@chamvi/ui` |
 | `@chamvi/app/authup` | `authupModule`, `oidcModule` | `@authup/server-adapter-kit`, `@authup/core-http-kit` |
 
@@ -144,7 +143,7 @@ function githubNotifierModule(options: GithubNotifierModuleOptions): IModule; //
 // @chamvi/app/sandbox
 function sandboxModule(options?: SandboxModuleOptions): SandboxModule;     // .manager: IWorkspaceManager, 'chamvi:sandbox'
 
-// @chamvi/app/openclaw
+// @chamvi/notify-openclaw/module
 function openclawModule(options?: OpenclawModuleOptions): IModule;         // 'chamvi:notifier:<name>', default name 'openclaw'
 
 // @chamvi/app/ui
@@ -163,7 +162,7 @@ Each factory reads `options.env ?? process.env` when it is called and throws `In
 
 <<< ../../../app/src/sandbox/types.ts{ts}
 
-<<< ../../../app/src/openclaw/types.ts{ts}
+<<< ../../../notify-openclaw/src/module/types.ts{ts}
 
 <<< ../../../app/src/ui/types.ts{ts}
 

@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as pkg from '@chamvi/notify-openclaw';
+import * as module from '@chamvi/notify-openclaw/module';
 
 describe('public api', () => {
     it('exports openclaw', () => {
@@ -36,6 +37,26 @@ describe('public api', () => {
         'openclawContextKey',
         'renderMessage',
     ])('keeps %s internal', (name) => {
+        expect(pkg).not.toHaveProperty(name);
+    });
+
+    it('@chamvi/notify-openclaw/module exports openclawModule', () => {
+        expect(module.openclawModule).toBeTypeOf('function');
+        expect(module.OpenclawModule).toBeTypeOf('function');
+    });
+
+    it.each([
+        'ERROR_PREFIX',
+        'VARIABLES',
+        'readDelivery',
+    ])('@chamvi/notify-openclaw/module keeps %s internal', (name) => {
+        expect(module).not.toHaveProperty(name);
+    });
+
+    it.each([
+        'openclawModule',
+        'OpenclawModule',
+    ])('the main entry keeps %s out', (name) => {
         expect(pkg).not.toHaveProperty(name);
     });
 });

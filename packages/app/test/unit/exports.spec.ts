@@ -8,7 +8,6 @@
 import { describe, expect, it } from 'vitest';
 import * as app from '@chamvi/app';
 import * as authup from '@chamvi/app/authup';
-import * as openclaw from '@chamvi/app/openclaw';
 import * as sandbox from '@chamvi/app/sandbox';
 import * as testing from '@chamvi/app/testing';
 import * as ui from '@chamvi/app/ui';
@@ -121,7 +120,6 @@ describe('public api', () => {
 
     it.each([
         ['sandbox', sandbox, ['sandboxModule']],
-        ['openclaw', openclaw, ['openclawModule']],
         ['ui', ui, ['uiModule']],
         ['authup', authup, ['authupModule', 'oidcModule']],
     ] as const)('@chamvi/app/%s exports its modules', (_, entry, names) => {
@@ -137,6 +135,7 @@ describe('public api', () => {
         'createLazyProvider',
         'githubModule',
         'githubNotifierModule',
+        'openclawModule',
         'sandboxModule',
         'buildModuleHarness',
         'createModuleHarness',
