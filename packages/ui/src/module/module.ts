@@ -5,33 +5,13 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { uiRoutes } from '@chamvi/ui';
-import type { UiRoutesOptions } from '@chamvi/ui';
-import type { IContainer } from 'eldin';
-import type { IModule } from 'orkos';
-import { envString, envUrl } from '../env/module.ts';
-import type { Env } from '../env/types.ts';
-import { AppToken } from '../module/constants.ts';
+import { AppToken } from '@chamvi/app';
+import type { IContainer, IModule } from '@chamvi/app';
+import { uiRoutes } from '../routes/module.ts';
+import type { UiRoutesOptions } from '../routes/types.ts';
 import { UI_MODULE_NAME } from './constants.ts';
+import { readAuth } from './helpers.ts';
 import type { UiModuleOptions } from './types.ts';
-
-/** The token login, plus the authup login with `CHAMVI_UI_AUTHUP_CLIENT_ID` (then `AUTHUP_URL` is required). */
-function readAuth(env: Env): NonNullable<UiRoutesOptions['auth']> {
-    const clientId = envString(env, 'CHAMVI_UI_AUTHUP_CLIENT_ID');
-    if (typeof clientId === 'undefined') {
-        return { tokens: true };
-    }
-
-    const realmId = envString(env, 'CHAMVI_UI_AUTHUP_REALM_ID');
-    return {
-        tokens: true,
-        authup: {
-            url: envUrl(env, 'AUTHUP_URL', { required: true, protocols: ['http:', 'https:'] }),
-            clientId,
-            ...(typeof realmId === 'string' && { realmId }),
-        },
-    };
-}
 
 /** Contributes the dashboard's `uiRoutes()` to `AppToken.HTTP_ROUTES`. */
 export class UiModule implements IModule {

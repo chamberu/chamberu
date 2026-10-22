@@ -4,7 +4,7 @@ import { createApp, defineAgent } from '@chamvi/app';
 import { githubModule } from '@chamvi/github/module';
 import { openclawModule } from '@chamvi/notify-openclaw/module';
 import { sandboxModule } from '@chamvi/app/sandbox';
-import { uiModule } from '@chamvi/app/ui';
+import { uiModule } from '@chamvi/ui/module';
 import { codingTools } from '@chamvi/coding';
 import { githubWebhook } from '@chamvi/github';
 

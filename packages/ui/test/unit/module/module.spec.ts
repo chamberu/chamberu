@@ -20,17 +20,20 @@ import {
     staticTokensModule,
     storeModule,
 } from '@chamvi/app';
-import { uiModule } from '@chamvi/app/ui';
-import { SECRET, TOKENS } from '../../utils/app.ts';
-import { createHarness } from '../../utils/harness.ts';
-import type { Harness } from '../../utils/harness.ts';
-import { createRecordingLogger } from '../../utils/logger.ts';
+import { createModuleHarness } from '@chamvi/app/testing';
+import type { ModuleHarness } from '@chamvi/app/testing';
+import { uiModule } from '@chamvi/ui/module';
 import { textModel } from '../../utils/model.ts';
-import { freePort } from '../../utils/port.ts';
+import {
+    SECRET,
+    TOKENS,
+    createRecordingLogger,
+    freePort,
+} from '../../utils/module.ts';
 
-const ROOT = fileURLToPath(new URL('../../../../ui/test/fixtures/build', import.meta.url));
+const ROOT = fileURLToPath(new URL('../../fixtures/build', import.meta.url));
 
-let harnesses: Harness[] = [];
+let harnesses: ModuleHarness[] = [];
 
 afterEach(async () => {
     await Promise.all(harnesses.map((h) => h.stop()));
@@ -40,7 +43,7 @@ afterEach(async () => {
 
 async function served(env: Record<string, string> = {}, basePath = '') {
     const port = await freePort();
-    const harness = await createHarness({
+    const harness = await createModuleHarness({
         env: {
             RESUME_SECRET: SECRET,
             CHAMVI_TOKENS: TOKENS,

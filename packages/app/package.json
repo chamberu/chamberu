@@ -26,10 +26,6 @@
             "types": "./dist/sandbox.d.mts",
             "import": "./dist/sandbox.mjs"
         },
-        "./ui": {
-            "types": "./dist/ui.d.mts",
-            "import": "./dist/ui.mjs"
-        },
         "./authup": {
             "types": "./dist/authup.d.mts",
             "import": "./dist/authup.mjs"
@@ -84,7 +80,6 @@
         "@chamvi/sandbox-k8s": "^0.1.0",
         "@chamvi/sandbox-local": "^0.1.0",
         "@chamvi/test-kit": "^0.1.0",
-        "@chamvi/ui": "^0.1.0",
         "@swc/core": "^1.16.18",
         "@testcontainers/postgresql": "^12.2.1",
         "ai": "^7.0.143",
@@ -106,7 +101,6 @@
         "@chamvi/sandbox-docker": "^0.1.0",
         "@chamvi/sandbox-k8s": "^0.1.0",
         "@chamvi/sandbox-local": "^0.1.0",
-        "@chamvi/ui": "^0.1.0",
         "ai": "^7.0.143",
         "pg": "^8",
         "typeorm": "^1.1.2"
@@ -143,9 +137,6 @@
             "optional": true
         },
         "@chamvi/sandbox-local": {
-            "optional": true
-        },
-        "@chamvi/ui": {
             "optional": true
         }
     }

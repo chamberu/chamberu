@@ -32,7 +32,7 @@ export default defineConfig({
             { find: /^@chamvi\/github\/module$/, replacement: source('github/src/module/index.ts') },
             { find: /^@chamvi\/notify-github$/, replacement: source('notify-github/src/index.ts') },
             { find: /^@chamvi\/app$/, replacement: source('app/src/index.ts') },
-            { find: /^@chamvi\/app\/(sandbox|ui|authup|testing)$/, replacement: `${source('app/src/')}$1/index.ts` },
+            { find: /^@chamvi\/app\/(sandbox|authup|testing)$/, replacement: `${source('app/src/')}$1/index.ts` },
             { find: /^@chamvi\/cli$/, replacement: source('cli/src/index.ts') },
         ],
     },
