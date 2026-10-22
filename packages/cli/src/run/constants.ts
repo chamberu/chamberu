@@ -5,6 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { APP_ERROR_CODE, ErrorCode } from '@chamvi/app';
+
 /** The exit codes of every command (C3). */
 export const EXIT_CODE = {
     OK: 0,
@@ -19,7 +21,7 @@ export const CLI_USAGE_ERROR_CODE = 'cli_usage';
 export const CITTY_ERROR_NAME = 'CLIError';
 
 /** The codes exiting 2 besides citty's own errors. */
-export const USAGE_ERROR_CODES: readonly string[] = [CLI_USAGE_ERROR_CODE, 'invalid_agent_definition'];
+export const USAGE_ERROR_CODES: readonly string[] = [CLI_USAGE_ERROR_CODE, ErrorCode.INVALID_AGENT_DEFINITION];
 
 /** The app's stop error: the signal handler decides the exit code. */
-export const APP_STOPPED_ERROR_CODE = 'app_stopped';
+export const APP_STOPPED_ERROR_CODE: string = APP_ERROR_CODE.STOPPED;
