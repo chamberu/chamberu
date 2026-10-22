@@ -35,12 +35,15 @@ export function registerAgentRoutes(app: App, ctx: HttpContext): void {
 
     app.get('/agents', defineCoreHandler(async (event) => {
         await authorize(event, ctx, Permission.RUN_READ);
-        return { data: ctx.agents.values().toArray().map((agent) => summarizeAgent(agent, ctx.basePath)) };
+        return {
+            data: ctx.agents.list().map((agent) => summarizeAgent(agent, ctx.basePath)),
+            issues: ctx.agentIssues(),
+        };
     }));
 
     app.get('/schedules', defineCoreHandler(async (event) => {
         await authorize(event, ctx, Permission.RUN_READ);
-        return { data: listSchedules(ctx.agents.values(), ctx.clock.now()) };
+        return { data: listSchedules(ctx.agents.list(), ctx.clock.now()) };
     }));
 
     app.get('/agents/:name/state/kv', defineCoreHandler(async (event) => {

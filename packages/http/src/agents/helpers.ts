@@ -16,6 +16,7 @@ import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
 import { webhookUrl } from '../hooks/helpers.ts';
 import { decodeQuery } from '../request/helpers.ts';
 import { isDefined } from '../request/validators.ts';
+import type { HttpAgents } from '../app/types.ts';
 import type { AgentSummary, KvBody, ScheduleSummary } from './types.ts';
 
 /**
@@ -76,7 +77,7 @@ export function listSchedules(agents: Iterable<Agent>, now: Date): ScheduleSumma
 }
 
 /** The agent by name, else 404. */
-export function requireAgent(agents: Map<string, Agent>, name: string): Agent {
+export function requireAgent(agents: HttpAgents, name: string): Agent {
     const agent = agents.get(name);
     if (!agent) throw new NotFoundError({ message: `Agent "${name}" was not found.` });
     return agent;

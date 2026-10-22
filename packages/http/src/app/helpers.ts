@@ -27,7 +27,13 @@ import {
     STREAM_RETRY_AFTER_SECONDS,
 } from './constants.ts';
 import { boundIssues } from '../request/helpers.ts';
-import type { HttpAppOptions, HttpContext, HttpRoute } from './types.ts';
+import type { AgentIssue } from '../agents/types.ts';
+import type {
+    HttpAgents,
+    HttpAppOptions,
+    HttpContext,
+    HttpRoute,
+} from './types.ts';
 
 type ErrorBody = {
     status: number;
@@ -39,6 +45,7 @@ type ErrorBody = {
 const CORE_STATUS: Record<string, number> = {
     [ErrorCode.VALIDATION]: 400,
     [ErrorCode.INVALID_RESUME_TOKEN]: 400,
+    [ErrorCode.AGENT_NOT_FOUND]: 404,
     [ErrorCode.RUN_NOT_FOUND]: 404,
     [ErrorCode.ARTIFACT_NOT_FOUND]: 404,
     [ErrorCode.INVALID_RUN_STATE]: 409,
@@ -128,11 +135,39 @@ export function selectAgents(engine: Engine, names?: readonly string[]): Agent[]
     });
 }
 
+/**
+ * The engine's agents, read on every call, or only the named ones the engine
+ * holds then (checked by `selectAgents` at construction).
+ */
+export function createLiveAgents(engine: Engine, names?: readonly string[]): HttpAgents {
+    const served = names === undefined ? undefined : new Set(names);
+    const list = (): Agent[] => {
+        const agents = engine.listAgents();
+        return served ? agents.filter((agent) => served.has(agent.name)) : agents;
+    };
+    return {
+        get: (name) => (served && !served.has(name) ? undefined : engine.getAgent(name)),
+        list,
+        names: () => list().map((agent) => agent.name),
+    };
+}
+
+/** `options.agentIssues` as a fresh array, only of the named agents when `names` is given. */
+function readAgentIssues(options: HttpAppOptions): () => AgentIssue[] {
+    const read = options.agentIssues;
+    if (!read) return () => [];
+    const served = options.agents === undefined ? undefined : new Set(options.agents);
+    return () => read().filter((issue) => !served || served.has(issue.agent));
+}
+
 export function buildContext(options: HttpAppOptions): HttpContext {
     const authenticators = Array.isArray(options.auth) ? [...options.auth] : [options.auth];
     if (authenticators.length === 0) {
         throw new InvalidAgentDefinitionError('The http app needs at least one authenticator.');
     }
+
+    // a name the engine lacks fails here; requests read the engine live
+    selectAgents(options.engine, options.agents);
 
     const maxOpenStreams = options.stream?.maxOpen ?? DEFAULT_MAX_OPEN_STREAMS;
     if (!Number.isSafeInteger(maxOpenStreams) || maxOpenStreams < 1) {
@@ -142,7 +177,8 @@ export function buildContext(options: HttpAppOptions): HttpContext {
     return {
         engine: options.engine,
         store: options.engine.store,
-        agents: new Map(selectAgents(options.engine, options.agents).map((agent) => [agent.name, agent])),
+        agents: createLiveAgents(options.engine, options.agents),
+        agentIssues: readAgentIssues(options),
         authenticators,
         basePath: normalizeBasePath(options.basePath),
         bodyLimit: options.bodyLimit ?? DEFAULT_BODY_LIMIT,

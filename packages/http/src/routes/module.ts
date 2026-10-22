@@ -52,7 +52,10 @@ function toRouteRequest(event: IAppEvent, ctx: HttpContext, route: HttpRoute): H
 export function registerRoutes(app: App, ctx: HttpContext): void {
     const routeCtx: HttpRouteContext = {
         engine: ctx.engine,
-        agents: ctx.agents.values().toArray(),
+        // a getter: the engine's agents change at runtime
+        get agents() {
+            return ctx.agents.list();
+        },
         clock: ctx.clock,
         onError: ctx.onError,
         basePath: ctx.basePath,

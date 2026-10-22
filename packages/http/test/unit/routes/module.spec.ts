@@ -7,10 +7,11 @@
 
 import { UnauthorizedError } from '@ebec/http';
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError } from '@chamvi/core';
+import { InvalidAgentDefinitionError, defineAgent, http } from '@chamvi/core';
 import type { HttpRoute, HttpRouteContext, HttpRouteRequest } from '@chamvi/http';
 import type { App } from 'routup';
 import { createTestApp } from '../../utils/app.ts';
+import { textModel } from '../../utils/model.ts';
 
 type SendOptions = {
     method?: string;
@@ -470,5 +471,28 @@ describe('prefix routes, headers and byte bodies', () => {
                 prefix: true, 
             }), route({ method: 'GET', path: '/uix' })], 
         })).not.toThrow();
+    });
+
+    it('lists live agents in the route context', async () => {
+        let names: string[] | undefined;
+        const { app, engine } = createTestApp({
+            routes: [route({
+                handler: async (_request, ctx) => {
+                    names = ctx.agents.map((agent) => agent.name);
+                    return { status: 204 };
+                },
+            })],
+        });
+        await engine.putAgent(defineAgent({
+            name: 'late',
+            model: textModel(),
+            instructions: 'Late.',
+            triggers: [http()],
+        }));
+        await send(app, '/extra');
+        expect(names).toEqual(['echo', 'late']);
+        await engine.removeAgent('echo');
+        await send(app, '/extra');
+        expect(names).toEqual(['late']);
     });
 });

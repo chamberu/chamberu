@@ -15,6 +15,7 @@ import type { Options as CorsPluginOptions } from '@routup/cors';
 import type { Options as PrometheusPluginOptions } from '@routup/prometheus';
 import type { Options as RateLimitPluginOptions } from '@routup/rate-limit';
 import type { AppOptionsInput } from 'routup';
+import type { AgentIssue } from '../agents/types.ts';
 import type { Authenticator } from '../auth/types.ts';
 import type { IShutdown } from '../shutdown/types.ts';
 
@@ -39,9 +40,16 @@ export type HttpAppOptions = {
     engine: Engine;
     /**
      * Names of the engine's agents to serve (routes, MCP tools, hooks, extra
-     * routes); the others are unknown to this app. Default: every agent.
+     * routes), checked at construction; the others, also agents registered
+     * later, are unknown to this app. A named agent removed from the engine
+     * answers 404. Default: every agent the engine holds, at request time.
      */
     agents?: string[];
+    /**
+     * Agents that failed to load (e.g. from an agents folder), read per
+     * `GET /agents` and listed as its `issues`. Default: none.
+     */
+    agentIssues?: () => readonly AgentIssue[];
     /** One authenticator or a chain; the first principal wins. */
     auth: Authenticator | Authenticator[];
     /** Prefix of every route, e.g. `/api`. Default: none. */
@@ -112,6 +120,7 @@ export type HttpRouteResult = {
 
 export type HttpRouteContext = {
     engine: Engine;
+    /** The agents the app serves, read from the engine on every access. */
     agents: readonly Agent[];
     clock: IClock;
     onError: (error: unknown) => void;
@@ -139,11 +148,21 @@ export type HttpRoute = {
 
 // #endregion routes
 
+/** The app's live view of the engine's agents (filtered by `HttpAppOptions.agents`); internal. */
+export type HttpAgents = {
+    get(name: string): Agent | undefined;
+    /** In registration order, a new array. */
+    list(): Agent[];
+    names(): string[];
+};
+
 /** Shared by every route module; internal. */
 export type HttpContext = {
     engine: Engine;
     store: IStore;
-    agents: Map<string, Agent>;
+    agents: HttpAgents;
+    /** Agents that failed to load, as `GET /agents` lists them. */
+    agentIssues: () => AgentIssue[];
     authenticators: Authenticator[];
     basePath: string;
     bodyLimit: number;

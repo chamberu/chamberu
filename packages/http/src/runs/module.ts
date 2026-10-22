@@ -81,7 +81,7 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
 
     app.get('/runs', defineCoreHandler(async (event) => {
         const principal = await authenticate(event, ctx);
-        const query = parseRunListQuery(event.searchParams, ctx.agents.keys());
+        const query = parseRunListQuery(event.searchParams, ctx.agents.names());
         assertCanListRuns(principal, query.agent);
 
         const { data, total } = await ctx.store.listRuns(query);

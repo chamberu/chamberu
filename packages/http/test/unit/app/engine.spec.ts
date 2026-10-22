@@ -12,6 +12,7 @@ import {
     MemoryStore,
     defineAgent,
     http,
+    webhook,
 } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
 import { createHttpApp } from '@chamvi/http';
@@ -139,5 +140,75 @@ describe('createHttpApp over the engine', () => {
         });
         expect(() => make(['missing'])).toThrow(InvalidAgentDefinitionError);
         expect(() => make(['echo', 'echo'])).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('serves an agent registered after the app was built', async () => {
+        const { app, engine } = setup();
+        await engine.putAgent(defineAgent({
+            name: 'late',
+            model: textModel(),
+            instructions: 'Late.',
+            triggers: [http()],
+        }));
+        const { data } = await (await call(app, 'GET', '/agents', { token: ADMIN_TOKEN })).json() as { data: { name: string }[] };
+        expect(data.map((agent) => agent.name)).toEqual(['echo', 'other', 'late']);
+        expect((await call(app, 'POST', '/agents/late/runs', { token: ADMIN_TOKEN })).status).toBe(202);
+        expect((await call(app, 'PATCH', '/agents/late/state/kv/k', { token: ADMIN_TOKEN, body: { value: 1 } })).status).toBe(200);
+        expect(await (await call(app, 'GET', '/agents/late/state/kv/k', { token: ADMIN_TOKEN })).json()).toEqual({ key: 'k', value: 1 });
+    });
+
+    it('answers 404 after the agent was removed', async () => {
+        const { app, engine } = setup();
+        await engine.putAgent(defineAgent({
+            name: 'hooked',
+            model: textModel(),
+            instructions: 'Hooked.',
+            triggers: [webhook({ path: '/x' })],
+        }));
+        expect((await call(app, 'POST', '/hooks/hooked/x', { token: ADMIN_TOKEN, body: {} })).status).toBe(202);
+
+        await engine.removeAgent('other');
+        await engine.removeAgent('hooked');
+        expect((await call(app, 'POST', '/agents/other/runs', { token: ADMIN_TOKEN })).status).toBe(404);
+        expect((await call(app, 'POST', '/hooks/hooked/x', { token: ADMIN_TOKEN, body: {} })).status).toBe(404);
+        expect((await call(app, 'GET', '/agents/other/state/kv/k', { token: ADMIN_TOKEN })).status).toBe(404);
+        const { data } = await (await call(app, 'GET', '/agents', { token: ADMIN_TOKEN })).json() as { data: { name: string }[] };
+        expect(data.map((agent) => agent.name)).toEqual(['echo']);
+    });
+
+    it('GET /runs/:id of a removed agent\'s run still answers', async () => {
+        const { app, engine } = setup();
+        const started = await call(app, 'POST', '/agents/other/runs', { token: ADMIN_TOKEN });
+        const { runId } = await started.json() as { runId: string };
+        await engine.removeAgent('other');
+        const response = await call(app, 'GET', `/runs/${runId}`, { token: ADMIN_TOKEN });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+            id: runId,
+            agent: 'other',
+            status: 'cancelled',
+        });
+    });
+
+    it('keeps an agent registered later out of an app serving named agents', async () => {
+        const { engine } = setup();
+        const app = createHttpApp({
+            engine,
+            agents: ['echo', 'other'],
+            auth: testAuth,
+            metrics: false,
+            rateLimit: false,
+        });
+        await engine.putAgent(defineAgent({
+            name: 'late',
+            model: textModel(),
+            instructions: 'Late.',
+            triggers: [http()],
+        }));
+        await engine.removeAgent('other');
+        const { data } = await (await call(app, 'GET', '/agents', { token: ADMIN_TOKEN })).json() as { data: { name: string }[] };
+        expect(data.map((agent) => agent.name)).toEqual(['echo']);
+        expect((await call(app, 'POST', '/agents/late/runs', { token: ADMIN_TOKEN })).status).toBe(404);
+        expect((await call(app, 'POST', '/agents/other/runs', { token: ADMIN_TOKEN })).status).toBe(404);
     });
 });

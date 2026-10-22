@@ -62,7 +62,7 @@ export type RunAgentArgs = {
     waitSeconds?: number;
 };
 
-/** A `run_<agent>` tool definition, built once per app; internal. */
+/** A `run_<agent>` tool definition, built once per agent object; internal. */
 export type McpRunTool = {
     agent: Agent;
     trigger: TriggerDefinition;

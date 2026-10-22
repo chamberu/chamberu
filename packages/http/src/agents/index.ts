@@ -5,4 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export type { AgentSummary, ScheduleSummary } from './types.ts';
+export type {
+    AgentIssue,
+    AgentSummary,
+    ScheduleSummary,
+} from './types.ts';

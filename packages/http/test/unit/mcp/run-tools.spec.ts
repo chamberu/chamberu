@@ -213,4 +213,74 @@ describe('mcp run_<agent>', () => {
         const fits = defineAgent({ ...long.definition, name: 'a'.repeat(60) });
         expect(() => createRunTestApp({ agents: [fits] })).not.toThrow();
     });
+
+    it('lists run_<agent> for an agent added later', async () => {
+        const { app, engine } = createRunTestApp();
+        await engine.putAgent(typedAgent());
+        const client = await connectMcp(app, ADMIN_TOKEN);
+        expect((await client.listTools()).tools.map((t) => t.name)).toContain('run_typed');
+        const result = await callTool(client, 'run_typed', { payload: { n: 1 } });
+        expect(result.isError, textOf(result)).toBeFalsy();
+        await client.close();
+
+        await engine.removeAgent('typed');
+        const after = await connectMcp(app, ADMIN_TOKEN);
+        expect((await after.listTools()).tools.map((t) => t.name)).not.toContain('run_typed');
+        await after.close();
+    });
+
+    it('replaces run_<agent> when its agent is replaced', async () => {
+        const { app, engine } = createRunTestApp({ agents: [...createRunAgents(), typedAgent()] });
+        const first = await connectMcp(app, ADMIN_TOKEN);
+        expect((await first.listTools()).tools.find((t) => t.name === 'run_typed')?.description).toContain('Typed runs.');
+        await first.close();
+
+        const schema = z.object({ s: z.string() });
+        const input = vi.spyOn(schema['~standard'].jsonSchema!, 'input');
+        await engine.putAgent(defineAgent({
+            name: 'typed',
+            model: textModel(),
+            instructions: 'Retyped runs.',
+            triggers: [http({ schema })],
+        }));
+        for (let i = 0; i < 3; i++) {
+            const client = await connectMcp(app, ADMIN_TOKEN);
+            const typed = (await client.listTools()).tools.find((t) => t.name === 'run_typed')!;
+            expect(typed.description).toContain('Retyped runs.');
+            expect(typed.inputSchema.properties?.payload).toMatchObject({ properties: { s: { type: 'string' } } });
+            await client.close();
+        }
+        expect(input).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports an uncompilable payload schema of a later agent and skips its tool', async () => {
+        const errors: unknown[] = [];
+        const { app, engine } = createRunTestApp({ onError: (error) => { errors.push(error); } });
+        const schema = z.object({ n: z.number() });
+        vi.spyOn(schema['~standard'].jsonSchema!, 'input').mockReturnValue({ type: 'nonsense' });
+        await engine.putAgent(defineAgent({
+            name: 'broken',
+            model: textModel(),
+            instructions: 'Broken.',
+            triggers: [http({ schema })],
+        }));
+        await engine.putAgent(defineAgent({
+            name: 'a'.repeat(61),
+            model: textModel(),
+            instructions: 'Long.',
+            triggers: [http()],
+        }));
+        for (let i = 0; i < 2; i++) {
+            const client = await connectMcp(app, ADMIN_TOKEN);
+            const names = (await client.listTools()).tools.map((t) => t.name);
+            expect(names).toContain('run_echo');
+            expect(names).not.toContain('run_broken');
+            expect(names).not.toContain(`run_${'a'.repeat(61)}`);
+            await client.close();
+        }
+        expect(errors).toHaveLength(2);
+        expect(errors[0]).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((errors[0] as Error).message).toContain('"broken"');
+        expect(errors[1]).toBeInstanceOf(InvalidAgentDefinitionError);
+    });
 });

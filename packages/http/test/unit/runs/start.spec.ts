@@ -5,7 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { describe, expect, it } from 'vitest';
+import {
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
 import { z } from 'zod';
 import { defineAgent, http } from '@chamvi/core';
 import { staticTokens } from '@chamvi/http';
@@ -289,5 +294,19 @@ describe('POST /agents/:name/runs', () => {
             });
             expect(response.status).toBe(413);
         });
+    });
+
+    it('answers 404 when the agent is removed while the request was in flight', async () => {
+        const errors: unknown[] = [];
+        const { app, engine } = createRunTestApp({ onError: (error) => { errors.push(error); } });
+        const dispatch = engine.dispatch.bind(engine);
+        vi.spyOn(engine, 'dispatch').mockImplementationOnce(async (envelope) => {
+            await engine.removeAgent('echo');
+            return dispatch(envelope);
+        });
+        const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN });
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ code: 'agent_not_found' });
+        expect(errors).toEqual([]);
     });
 });
