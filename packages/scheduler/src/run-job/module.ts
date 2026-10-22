@@ -56,10 +56,9 @@ export async function runJob(opts: RunJobOptions): Promise<RunJobResult> {
     let run: Run | undefined;
     try {
         // recovery, the queue and the approval tick also run when the tick was skipped
-        if (!signal?.aborted) {
-            await engine.start();
-            await engine.tick();
-        }
+        // checked again after start: a stop that arrived meanwhile must not deny approvals or notify
+        if (!signal?.aborted) await engine.start();
+        if (!signal?.aborted) await engine.tick();
         if (tick.dispatched && !signal?.aborted) {
             const { runId } = tick;
             run = await new Promise<Run | undefined>((resolve, reject) => {

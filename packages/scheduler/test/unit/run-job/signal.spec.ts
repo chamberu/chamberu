@@ -130,4 +130,58 @@ describe('runJob with a signal', () => {
         const { total } = await ctx.store.listRuns({});
         expect(total).toBe(0);
     });
+
+    it('an abort during the dispatch never starts the engine and answers the stored run', async () => {
+        const ctx = setup();
+        const controller = new AbortController();
+        const dispatch = ctx.engine.dispatch.bind(ctx.engine);
+        vi.spyOn(ctx.engine, 'dispatch').mockImplementation(async (envelope) => {
+            const answer = await dispatch(envelope);
+            controller.abort();
+            return answer;
+        });
+        const start = vi.spyOn(ctx.engine, 'start');
+
+        const result = await runJob({
+            engine: ctx.engine,
+            agent: ctx.agent,
+            signal: controller.signal,
+        });
+
+        expect(start).not.toHaveBeenCalled();
+        expect(result).toMatchObject({ status: 'queued', exitCode: 0 });
+        expect(result.runId).toBeDefined();
+    });
+
+    it('an abort during engine.start skips the approval tick and the wait', async () => {
+        const ctx = setup();
+        const controller = new AbortController();
+        const start = ctx.engine.start.bind(ctx.engine);
+        vi.spyOn(ctx.engine, 'start').mockImplementation(async () => {
+            controller.abort();
+            await start();
+        });
+        const tick = vi.spyOn(ctx.engine, 'tick');
+        let result: RunJobResult | undefined;
+        const job = runJob({
+            engine: ctx.engine,
+            agent: ctx.agent,
+            pollMs: POLL_MS,
+            drainTimeoutMs: DRAIN_MS,
+            signal: controller.signal,
+        }).then((r) => {
+            result = r;
+            return r;
+        });
+
+        await vi.waitFor(() => {
+            ctx.clock.advance(DRAIN_MS);
+            expect(result).toBeDefined();
+        });
+        await job;
+
+        expect(tick).not.toHaveBeenCalled();
+        expect(result?.exitCode).toBe(0);
+        expect(result?.runId).toBeDefined();
+    });
 });
