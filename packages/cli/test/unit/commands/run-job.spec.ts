@@ -61,6 +61,43 @@ describe('run-job', () => {
         expect(fake.stderr.join('')).toContain('USAGE');
     });
 
+    it.each([
+        [['--entry']],
+        [['--entry=']],
+        [['--no-entry']],
+    ])('%j without a path exits 2', async (flags) => {
+        await runJob(['echo', ...flags]);
+        expect(fake.exitCodes).toEqual([2]);
+        expect(fake.stderr.join('')).toContain('--entry needs a path');
+    });
+
+    it('a run interrupted by a signal exits 0', async () => {
+        globalThis.chamviHangStreaming = undefined;
+        const job = runJob(['hang', '--entry', fixture('hang')]);
+        await vi.waitFor(() => expect(globalThis.chamviHangStreaming).toBe(true));
+
+        fake.signals.emit('SIGTERM');
+        await job;
+
+        await vi.waitFor(() => expect(fake.exitCodes).toEqual([0]));
+        expect(fake.exits).toEqual([]);
+        expect(fake.stdout.join('')).toContain('hang: interrupted (run ');
+    });
+
+    it('a failed run exits 1 also when a signal arrives during the teardown', async () => {
+        globalThis.chamviFailingDrained = () => fake.signals.emit('SIGTERM');
+        try {
+            await runJob(['fail', '--entry', fixture('failing')]);
+        } finally {
+            globalThis.chamviFailingDrained = undefined;
+        }
+
+        await vi.waitFor(() => expect(fake.exitCodes.length).toBeGreaterThan(0));
+        expect(fake.exitCodes.at(-1)).toBe(1);
+        expect(fake.stdout.join('')).toContain('fail: failed');
+        expect(fake.exits).toEqual([]);
+    });
+
     it('unknown flag exits 2', async () => {
         await runJob(['echo', '--entry', fixture('app'), '--colour']);
         expect(fake.exitCodes).toEqual([2]);

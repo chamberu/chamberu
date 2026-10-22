@@ -9,7 +9,8 @@ import { TIMER_MAX_MS, envInteger } from '@chamvi/app';
 import { defineCommand } from 'citty';
 import type { CommandDef } from 'citty';
 import { loadApp, resolveEntry } from '../entry/module.ts';
-import { assertKnownArgs } from '../run/helpers.ts';
+import { EXIT_CODE } from '../run/constants.ts';
+import { assertKnownArgs, exitCodeOf } from '../run/helpers.ts';
 import type { CliContext } from '../run/types.ts';
 import { installSignalHandlers } from '../signals/module.ts';
 import {
@@ -35,7 +36,8 @@ const RUN_JOB_ARGS = {
 /**
  * `chamvi run-job <agent> [triggerId]`: fires one cron trigger once and waits
  * for its run; exit 0 for completed, waiting, skipped, queued behind an
- * approval or interrupted by a signal, 1 for failed or cancelled.
+ * approval or interrupted by a signal, 1 for failed or cancelled (also when
+ * a signal arrived meanwhile) or a failed stop.
  */
 export function createRunJobCommand(context: CliContext): CommandDef<typeof RUN_JOB_ARGS> {
     return defineCommand({
@@ -55,12 +57,14 @@ export function createRunJobCommand(context: CliContext): CommandDef<typeof RUN_
             });
             const app = await loadApp(entry, context.importModule);
 
+            // the job's own exit code; a signal's stop never lowers it (a failed run stays 1)
+            let jobCode: number = EXIT_CODE.OK;
             const handlers = installSignalHandlers({
                 target: context.signals,
                 clock: context.clock,
                 forceExitMs,
                 stop: () => app.stop(),
-                setExitCode: context.setExitCode,
+                setExitCode: (code) => context.setExitCode(Math.max(code, jobCode)),
                 exit: context.exit,
                 stderr: context.stderr,
             });
@@ -73,21 +77,27 @@ export function createRunJobCommand(context: CliContext): CommandDef<typeof RUN_
                     env,
                 });
             } catch (error) {
-                if (handlers.signalled) {
+                if (!handlers.signalled) {
+                    handlers.dispose();
+                } else if (exitCodeOf(error) === EXIT_CODE.OK) {
+                    // stopped before the job ran: the handler sets the exit code
                     return;
+                } else {
+                    jobCode = exitCodeOf(error);
                 }
-                handlers.dispose();
                 throw error;
             }
 
-            if (handlers.signalled) {
-                return;
+            if (!handlers.signalled) {
+                handlers.dispose();
             }
-            handlers.dispose();
 
+            jobCode = result.exitCode;
             const run = result.runId ? ` (run ${result.runId})` : '';
             context.stdout(`${args.agent}: ${result.status}${run}\n`);
-            context.setExitCode(result.exitCode);
+            if (!handlers.signalled || result.exitCode !== EXIT_CODE.OK) {
+                context.setExitCode(result.exitCode);
+            }
         },
     });
 }

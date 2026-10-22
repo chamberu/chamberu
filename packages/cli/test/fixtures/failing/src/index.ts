@@ -6,12 +6,14 @@
  */
 
 import {
+    AppToken,
     FatalToolError,
     createApp,
     cron,
     defineAgent,
     defineTool,
 } from '@chamvi/app';
+import type { ILifecycleHook } from '@chamvi/app';
 import { jsonSchema, simulateReadableStream } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 
@@ -65,4 +67,21 @@ const fail = defineAgent({
     triggers: [cron('0 0 1 1 *')],
 });
 
-export default createApp({ agents: [fail] });
+declare global {
+    // a test sets it to receive a call once the engine drained (the job's teardown)
+    var chamviFailingDrained: (() => void) | undefined;
+}
+
+const drainedProbe = {
+    name: 'drained-probe',
+    async setup(container: { registerMany(token: typeof AppToken.LIFECYCLE_HOOKS, provider: { useValue: ILifecycleHook }): void }): Promise<void> {
+        container.registerMany(AppToken.LIFECYCLE_HOOKS, {
+            useValue: {
+                name: 'drained-probe',
+                drained: () => globalThis.chamviFailingDrained?.(),
+            },
+        });
+    },
+};
+
+export default createApp({ agents: [fail], modules: [drainedProbe] });
