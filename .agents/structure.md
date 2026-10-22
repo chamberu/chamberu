@@ -200,9 +200,9 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 
 | Path | Purpose |
 |------|---------|
-| `app/` | `createApp()`, `isApp()` and the `App` class (`module.ts`, the lifecycle: one orkos `Application` over a fresh eldin `Container` per `start`/`runJob`/`migrate`, memoized `stop()`), `buildModules()` (built-ins replaced by name, duplicate names refused), `createInUseError()`, `createStopFailedError()` (`helpers.ts`), `APP_BRAND` (`constants.ts`), `AppOptions`, `IApp` and the lifecycle option/result types (`types.ts`) |
-| `module/` | `AppToken`, `ModuleName`, `AUTHENTICATOR_ORDER`, `APP_ERROR_CODE` (`constants.ts`), `runHooks()`, `throwIfStopped()`, `reportingModule()`, `createStoppedError()` (`helpers.ts`, the last two internal), `AppContext`, `ILifecycleHook`, `AuthenticatorEntry`, `Server`, `AppTokens` (`types.ts`) |
-| `env/` | `envString()`, `envInteger()`, `envBoolean()`, `envUrl()`, `envList()`, `envJson()`, `envOneOf()` (`module.ts`, never echoing a value), `Env` and the reader options (`types.ts`) |
+| `app/` | `createApp()`, `isApp()` and the `App` class (`module.ts`, the lifecycle: one orkos `Application` over a fresh eldin `Container` per `start`/`runJob`/`migrate`, memoized `stop()`), `buildModules()` (built-ins replaced by name, duplicate names refused), `toSetupError()` (orkos graph errors as `InvalidAgentDefinitionError`), `createInUseError()`, `createStopFailedError()` (`helpers.ts`), `APP_BRAND` (`constants.ts`), `AppOptions`, `IApp` and the lifecycle option/result types (`types.ts`) |
+| `module/` | `AppToken`, `ModuleName`, `AUTHENTICATOR_ORDER`, `APP_ERROR_CODE` (`constants.ts`), `runHooks()`, `throwIfStopped()`, `reportingModule()`, `createStoppedError()` (`helpers.ts`, the last two internal), `registerStartStep()`, `runStartSteps()` (`start.ts`, internal: the engine and scheduler starts, run once every `onReady` built), `AppContext`, `ILifecycleHook`, `AuthenticatorEntry`, `Server`, `AppTokens` (`types.ts`) |
+| `env/` | `TIMER_MAX_MS` (`constants.ts`), `envString()`, `envInteger()`, `envBoolean()`, `envUrl()`, `envList()`, `envJson()`, `envOneOf()` (`module.ts`, never echoing a value), `Env` and the reader options (`types.ts`) |
 | `config/` | `readConfig(env, { mode, dev })` (`module.ts`), `readTokens()`, `approvalUrlOf()` (`helpers.ts`), defaults and patterns (`constants.ts`), `AppConfig`, `LogLevel`, `ReadConfigOptions`, `ApprovalRef` (`types.ts`) |
 | `logger/` | `createLogger()` (`module.ts`, JSON lines on stderr), `serializeError()`, `toLine()` (`helpers.ts`), `LOG_LEVEL_RANK` |
 | `models/` | `createModelRegistry()`, `installDefaultProvider()` (`module.ts`), `isPackageNotFound()`, `defaultImporter()` (`helpers.ts`), `BUILTIN_PROVIDERS`, `MODEL_SEPARATOR` (`constants.ts`) |
@@ -216,9 +216,9 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 |------|---------|
 | `cli.ts` | The bin: `await runCli(process.argv.slice(2), processContext(fileURLToPath(import.meta.url)))` |
 | `run/` | `runCli()` (`module.ts`: `--help`/`--version`, citty `runCommand`, errors to stderr with `exitCodeOf`), `processContext()`, `exitCodeOf()`, `createUsageError()`, `assertKnownArgs()`, `messageOf()`, `isRecord()` (`helpers.ts`), `EXIT_CODE`, `CLI_USAGE_ERROR_CODE` (public), `CITTY_ERROR_NAME`, `USAGE_ERROR_CODES`, `APP_STOPPED_ERROR_CODE` (`constants.ts`), `CliContext` (`types.ts`) |
-| `commands/` | `createMainCommand()` (`module.ts`), one file per command (`dev.ts`, `build.ts`, `start.ts`, `run-job.ts`, `migrate.ts`), `readVersion()`, `loadDotEnv()` (`helpers.ts`, `node:util` `parseEnv`), `FORCE_EXIT_MS`, `DEV_FORCE_EXIT_MS`, `BUILD_OUT_DIR`, `TSDOWN_PACKAGE`, ... (`constants.ts`) |
+| `commands/` | `createMainCommand()` (`module.ts`), one file per command (`dev.ts`, `build.ts`, `start.ts`, `run-job.ts`, `migrate.ts`), `readVersion()`, `loadDotEnv()` (`helpers.ts`, `node:util` `parseEnv`), `FORCE_EXIT_MS`, `DEV_FORCE_EXIT_MS`, `DEV_LINK_VARIABLE`, `BUILD_OUT_DIR`, `BUILD_OUTPUT_PATTERN`, `TSDOWN_PACKAGE`, ... (`constants.ts`) |
 | `entry/` | `resolveEntry()` (`--entry`, `package.json` `chamvi.entry` for source commands only, `SOURCE_ENTRY`/`BUILT_ENTRY`), `loadApp()` (`isApp` check) (`module.ts`), `EntryKind`, `ResolveEntryInput` (`types.ts`); not re-exported from the main entry |
-| `signals/` | `installSignalHandlers()` (`module.ts`: first signal stops, second exits 1, the force-exit timer on the `IClock`), `ISignalTarget` (public), `ProcessEvent`, `StopSignal`, `SignalHandlersInput`, `SignalHandlers` (`types.ts`) |
+| `signals/` | `installSignalHandlers()` (`module.ts`: first signal stops, a second one at least `SIGNAL_REPEAT_MS` (`constants.ts`, 1 s) later exits 1, the force-exit timer on the `IClock`, kept alive), `ISignalTarget` (public), `ProcessEvent`, `StopSignal`, `SignalHandlersInput`, `SignalHandlers` (`types.ts`) |
 
 ## Store-TypeORM Module Map (`packages/store-typeorm/src`)
 
