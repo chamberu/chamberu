@@ -11,17 +11,18 @@ import { ChamviError, FatalToolError, ValidationError } from '@chamvi/core';
 import type { ToolContext } from '@chamvi/core';
 import { isObject } from 'smob';
 import type { GithubOctokit, IGithubApp } from '../app/types.ts';
+import { GITHUB_CHANNEL_NAME } from '../channel/constants.ts';
 import type { NumberInput, RepoInput } from './types.ts';
 import { GITHUB_REQUEST_ERROR_CODE, REPO_PATTERN } from './constants.ts';
 
 /**
- * The installation a tool acts as: the delivery's for a run started by a
- * GitHub delivery, else the app's `installationId`. Neither is a
+ * The installation a tool acts as: the delivery's for a run the `github`
+ * channel started, else the app's `installationId`. Neither is a
  * FatalToolError, since every GitHub tool of the run would fail.
  */
 export function installationIdOf(ctx: ToolContext, app: IGithubApp): number {
     const { trigger } = ctx.run;
-    if (trigger.source === 'github' && isObject(trigger.payload)) {
+    if (trigger.channel === GITHUB_CHANNEL_NAME && isObject(trigger.payload)) {
         const { installationId } = trigger.payload;
         if (typeof installationId === 'number') return installationId;
     }

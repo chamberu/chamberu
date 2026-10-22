@@ -8,6 +8,7 @@
 import type {
     Agent,
     Engine,
+    IChannel,
     IClock,
     INotifier,
     IStore,
@@ -97,6 +98,8 @@ export type AppTokens = {
     HTTP_ROUTES: HttpRoute;
     AUTHENTICATORS: AuthenticatorEntry;
     NOTIFIERS: INotifier;
+    /** A collection: the channels modules contribute (`registerMany` in `setup`). */
+    CHANNELS: IChannel<any, any>;
     LIFECYCLE_HOOKS: ILifecycleHook;
     /** The agents dir's load issues (`chamvi:agents`, when a dir is configured), at the time of the call. */
     AGENT_ISSUES: () => readonly AgentIssue[];

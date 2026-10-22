@@ -34,7 +34,6 @@
         "@chamvi/core": "*",
         "@chamvi/github": "*",
         "@chamvi/http": "*",
-        "@chamvi/notify-github": "*",
         "@chamvi/notify-openclaw": "*",
         "@chamvi/sandbox": "*",
         "@chamvi/sandbox-docker": "*",

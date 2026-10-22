@@ -11,7 +11,6 @@
         "packages/core": {"component": "core"},
         "packages/github": {"component": "github"},
         "packages/http": {"component": "http"},
-        "packages/notify-github": {"component": "notify-github"},
         "packages/notify-openclaw": {"component": "notify-openclaw"},
         "packages/sandbox": {"component": "sandbox"},
         "packages/sandbox-docker": {"component": "sandbox-docker"},

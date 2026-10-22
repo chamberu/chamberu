@@ -5,26 +5,29 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { DispatchEnvelope, TriggerDefinition } from '@chamvi/core';
-import type { HttpRoute, HttpRouteResult } from '@chamvi/http';
-import { UnauthorizedError } from '@ebec/http';
-import { DEFAULT_WEBHOOK_PATH } from '../app/constants.ts';
+import { readRequestBody } from '@chamvi/core';
+import type { ChannelContext, ChannelDispatchEnvelope, ChannelRequest } from '@chamvi/core';
+import { NotFoundError, UnauthorizedError, UnsupportedMediaTypeError } from '@ebec/http';
 import { isSameLogin } from '../app/helpers.ts';
 import type { IGithubApp } from '../app/types.ts';
-import { matchesGithubTrigger } from '../trigger/helpers.ts';
-import type { GithubEvent } from '../trigger/types.ts';
-import { readHeaders, toGithubEvent } from './helpers.ts';
-import type { GithubWebhookResult, GithubWebhookRouteOptions } from './types.ts';
+import type { ResolvedGithubChannelOptions } from '../channel/types.ts';
+import { eventAddress, matchesGithubSubscription } from '../subscription/helpers.ts';
+import type { GithubEvent } from '../subscription/types.ts';
+import {
+    isJsonMediaType,
+    readHeaders,
+    toGithubEvent,
+} from './helpers.ts';
+import type { GithubWebhookResult } from './types.ts';
 
-/** The 500 body of a delivery some agent could not be dispatched for (shaped like the http app's errors). */
-const DISPATCH_FAILED: HttpRouteResult = {
-    status: 500,
-    body: {
+/** The answer to a delivery some agent could not be dispatched for (shaped like the http app's errors). */
+function dispatchFailed(): Response {
+    return Response.json({
         status: 500,
         code: 'internal_error',
         message: 'Internal Server Error',
-    },
-};
+    }, { status: 500 });
+}
 
 /** True when the App itself sent the delivery (its comment, label, ...). */
 async function isSelfSent(app: IGithubApp, event: GithubEvent): Promise<boolean> {
@@ -34,74 +37,80 @@ async function isSelfSent(app: IGithubApp, event: GithubEvent): Promise<boolean>
 }
 
 /**
- * `POST <path>` for GitHub App deliveries: checks the signature over the
- * raw body, then dispatches one run per agent with a matching
- * `githubWebhook()` trigger (its first one), deduplicated by the delivery
- * id (keys are checked by `dispatch`). Answers `202` (also for ping,
- * unmatched and self-sent events); a failing agent (filter, key function,
- * dispatch) goes to `onError`, the others are still dispatched, and the
- * answer is then a 500.
+ * The GitHub channel's `in`: a delivery to the bare channel path (else
+ * 404). Checks, in order: the signature header (401), the event and
+ * delivery headers (400), the body size (413) and media type (415), the
+ * signature over the raw bytes under every webhook secret (401) and the
+ * body being a JSON object (400). Then every agent's first subscription of
+ * this channel matching the event gets one run, keyed by
+ * `idempotencyKey(event) ?? delivery`, with the address of the event's
+ * issue or pull request; all keys are computed before any dispatch. A
+ * delivery the App sent itself dispatches nothing. A failing agent (filter,
+ * key function, refused key, dispatch) goes to `onError`, the others are
+ * still dispatched, and the answer is then 500.
  */
-export function createWebhookRoute(app: IGithubApp, options: GithubWebhookRouteOptions = {}): HttpRoute {
-    return {
-        method: 'POST',
-        path: options.path ?? DEFAULT_WEBHOOK_PATH,
-        rateLimit: false,
-        async handler({ request, readBody }, ctx): Promise<HttpRouteResult> {
-            const signature = request.headers.get('x-hub-signature-256');
-            if (signature === null) {
-                throw new UnauthorizedError({ message: 'The X-Hub-Signature-256 header is missing.' });
-            }
-            const { name, delivery } = readHeaders(request);
-            const body = await readBody();
-            if (!app.verifySignature(body, signature)) {
-                throw new UnauthorizedError({ message: 'The delivery signature does not match.' });
-            }
-            const event = toGithubEvent(body, name, delivery);
+export async function receiveDelivery(
+    { request, subpath }: ChannelRequest,
+    ctx: ChannelContext,
+    options: ResolvedGithubChannelOptions,
+): Promise<Response> {
+    if (subpath !== '') throw new NotFoundError({ message: 'The GitHub channel takes deliveries at its own path only.' });
+    const signature = request.headers.get('x-hub-signature-256');
+    if (signature === null) {
+        throw new UnauthorizedError({ message: 'The X-Hub-Signature-256 header is missing.' });
+    }
+    const { name, delivery } = readHeaders(request);
+    const body = await readRequestBody(request, { limit: options.bodyLimit });
+    if (body.byteLength > 0 && !isJsonMediaType(request.headers.get('content-type'))) {
+        throw new UnsupportedMediaTypeError({ message: 'The delivery must be application/json; set the App\'s webhook content type to JSON.' });
+    }
+    if (!options.app.verifySignature(body, signature)) {
+        throw new UnauthorizedError({ message: 'The delivery signature does not match.' });
+    }
+    const event = toGithubEvent(body, name, delivery);
+    const address = eventAddress(event);
 
-            // a failing agent (a throwing filter or key function, a key dispatch
-            // refuses) goes to onError and does not stop the others
-            let failed = false;
-            const fail = (error: unknown) => {
-                failed = true;
-                ctx.onError(error);
-            };
-            const envelopes: DispatchEnvelope[] = [];
-            for (const agent of ctx.agents) {
-                try {
-                    const trigger = (agent.definition.triggers ?? [])
-                        .find((t: TriggerDefinition) => matchesGithubTrigger(t, event));
-                    if (!trigger) continue;
-                    const concurrencyKey = trigger.concurrencyKey?.(event);
-                    envelopes.push({
-                        agent: agent.name,
-                        trigger: trigger.id,
-                        source: 'github',
-                        payload: event,
-                        idempotencyKey: trigger.idempotencyKey?.(event) ?? delivery,
-                        ...(concurrencyKey !== undefined ? { concurrencyKey } : {}),
-                    });
-                } catch (error) {
-                    fail(error);
-                }
-            }
-
-            const result: GithubWebhookResult = { delivery, runs: [] };
-            if (envelopes.length > 0 && !await isSelfSent(app, event)) {
-                for (const envelope of envelopes) {
-                    try {
-                        const { runId, deduplicated } = await ctx.engine.dispatch(envelope);
-                        result.runs.push({
-                            agent: envelope.agent,
-                            runId,
-                            deduplicated,
-                        });
-                    } catch (error) {
-                        fail(error);
-                    }
-                }
-            }
-            return failed ? DISPATCH_FAILED : { status: 202, body: result };
-        },
+    // a failing agent (a throwing filter or key function, a key dispatch
+    // refuses) goes to onError and does not stop the others
+    let failed = false;
+    const fail = (error: unknown) => {
+        failed = true;
+        options.onError(error);
     };
+    const envelopes: ChannelDispatchEnvelope[] = [];
+    for (const agent of ctx.engine.listAgents()) {
+        try {
+            const subscription = (agent.definition.channels ?? [])
+                .find((s) => matchesGithubSubscription(s, options.name, event));
+            if (!subscription) continue;
+            const concurrencyKey = subscription.concurrencyKey?.(event);
+            envelopes.push({
+                agent: agent.name,
+                trigger: subscription.id,
+                payload: event,
+                idempotencyKey: subscription.idempotencyKey?.(event) ?? delivery,
+                ...(concurrencyKey !== undefined ? { concurrencyKey } : {}),
+                ...(address !== undefined ? { address } : {}),
+            });
+        } catch (error) {
+            fail(error);
+        }
+    }
+
+    const result: GithubWebhookResult = { delivery, runs: [] };
+    if (envelopes.length > 0 && !await isSelfSent(options.app, event)) {
+        for (const envelope of envelopes) {
+            try {
+                const { runId, deduplicated } = await ctx.dispatch(envelope);
+                result.runs.push({
+                    agent: envelope.agent,
+                    runId,
+                    deduplicated,
+                });
+            } catch (error) {
+                fail(error);
+            }
+        }
+    }
+    return failed ? dispatchFailed() : Response.json(result, { status: 202 });
 }

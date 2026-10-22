@@ -2,7 +2,7 @@
     "name": "@chamvi/github",
     "version": "0.1.0",
     "type": "module",
-    "description": "GitHub App webhooks and tools for chamvi agents.",
+    "description": "The GitHub channel and tools for chamvi agents: App webhooks in, issue comments out.",
     "author": {
         "name": "Peter Placzek",
         "email": "contact@tada5hi.net",
@@ -47,6 +47,7 @@
         "github",
         "github-app",
         "webhook",
+        "channel",
         "octokit"
     ],
     "publishConfig": {
@@ -70,7 +71,6 @@
     "peerDependencies": {
         "@chamvi/app": "^0.1.0",
         "@chamvi/core": "^0.1.0",
-        "@chamvi/http": "^0.1.0",
         "ai": "^7"
     },
     "peerDependenciesMeta": {

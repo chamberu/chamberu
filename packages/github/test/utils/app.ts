@@ -7,9 +7,14 @@
 
 import { createHmac } from 'node:crypto';
 import { Engine, MemoryStore } from '@chamvi/core';
-import type { Agent, INotifier } from '@chamvi/core';
-import { createGithubApp } from '@chamvi/github';
-import type { GithubAppOptions, GithubWebhookRouteOptions, IGithubApp } from '@chamvi/github';
+import type { Agent, IChannel } from '@chamvi/core';
+import { createGithubApp, githubChannel } from '@chamvi/github';
+import type {
+    GithubAppOptions,
+    GithubChannel,
+    GithubChannelOptions,
+    IGithubApp,
+} from '@chamvi/github';
 import { createHttpApp, staticTokens } from '@chamvi/http';
 import type { HttpAppOptions } from '@chamvi/http';
 import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
@@ -23,14 +28,13 @@ export const WEBHOOK_SECRET = 'webhook-secret';
 export const START = new Date('2026-10-20T10:00:00Z');
 
 export type GithubTestAppInput = {
-    /** Agents the engine (and so the webhook route) knows; a function of the GitHub app for agents whose tools come from it. */
+    /** Agents the engine (and so the channel) knows; a function of the GitHub app for agents whose tools come from it. */
     agents: Agent[] | ((gh: IGithubApp) => Agent[]);
     rateLimit?: HttpAppOptions['rateLimit'];
-    bodyLimit?: number;
-    route?: GithubWebhookRouteOptions;
     github?: Partial<GithubAppOptions>;
-    notifiers?: Record<string, INotifier>;
-    /** Receives every error the engine and the http app report. */
+    /** githubChannel() options besides `app`, `clock` and `onError`. */
+    channel?: Partial<Omit<GithubChannelOptions, 'app' | 'clock' | 'onError'>>;
+    /** Receives every error the engine, the channel and the http app report. */
     onError?: (error: unknown) => void;
 };
 
@@ -41,6 +45,7 @@ export type GithubTestApp = {
     clock: ControllableClock;
     fake: FakeGithub;
     gh: IGithubApp;
+    channel: GithubChannel;
     errors: unknown[];
 };
 
@@ -64,8 +69,8 @@ export function createGithubFixture(github: Partial<GithubAppOptions> = {}) {
 }
 
 /**
- * Engine, http app with `gh.webhookRoute()` (metrics off, limiter off unless
- * given) and a fake GitHub.
+ * Engine with the GitHub channel, an http app serving it at
+ * `/channels/<name>` (metrics off, limiter off unless given) and a fake GitHub.
  */
 export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
     const {
@@ -79,13 +84,19 @@ export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
         errors.push(error);
         input.onError?.(error);
     };
+    const channel = githubChannel({
+        app: gh,
+        clock,
+        onError,
+        ...input.channel,
+    });
     const store = new MemoryStore({ clock });
     const engine = new Engine({
         store,
         agents,
+        channels: [channel as IChannel],
         resumeSecret: 'test-secret',
         clock,
-        notifiers: input.notifiers,
         onError,
     });
     const app = createHttpApp({
@@ -99,8 +110,7 @@ export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
         })],
         metrics: false,
         rateLimit: input.rateLimit ?? false,
-        ...(input.bodyLimit !== undefined ? { bodyLimit: input.bodyLimit } : {}),
-        routes: [gh.webhookRoute(input.route)],
+        channels: [channel],
         onError,
     });
     return {
@@ -110,6 +120,7 @@ export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
         clock,
         fake,
         gh,
+        channel,
         errors,
     };
 }
@@ -129,6 +140,7 @@ export type DeliverInput = {
     /** Overrides the computed signature header. */
     signature?: string;
     contentType?: string;
+    /** Default `/channels/github`. */
     path?: string;
 };
 
@@ -142,7 +154,7 @@ export function deliver(app: App, input: DeliverInput): Promise<Response> {
     } else if (input.secret !== null) {
         headers.set('x-hub-signature-256', sign(input.body, input.secret ?? WEBHOOK_SECRET));
     }
-    return app.fetch(new Request(`http://test${input.path ?? '/webhooks/github'}`, {
+    return app.fetch(new Request(`http://test${input.path ?? '/channels/github'}`, {
         method: 'POST',
         headers,
         body: input.body,

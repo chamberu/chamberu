@@ -14,7 +14,7 @@ function token<K extends keyof AppTokens>(key: K): TypedToken<AppTokens[K]> {
 
 /**
  * The container keys modules share. `HTTP_ROUTES`, `AUTHENTICATORS`,
- * `NOTIFIERS`, `LIFECYCLE_HOOKS` and `AGENT_CHECKS` are collections (`registerMany` in
+ * `NOTIFIERS`, `CHANNELS`, `LIFECYCLE_HOOKS` and `AGENT_CHECKS` are collections (`registerMany` in
  * `setup`, `resolveAll` in `onReady`); every other token holds one value.
  */
 export const AppToken = {
@@ -31,6 +31,7 @@ export const AppToken = {
     HTTP_ROUTES: token('HTTP_ROUTES'),
     AUTHENTICATORS: token('AUTHENTICATORS'),
     NOTIFIERS: token('NOTIFIERS'),
+    CHANNELS: token('CHANNELS'),
     LIFECYCLE_HOOKS: token('LIFECYCLE_HOOKS'),
     AGENT_ISSUES: token('AGENT_ISSUES'),
     AGENT_CHECKS: token('AGENT_CHECKS'),

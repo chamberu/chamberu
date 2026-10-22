@@ -7,24 +7,36 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { defineAgent } from '@chamvi/core';
-import type { INotifier, Notification } from '@chamvi/core';
+import { ToolDeniedError, approve, defineAgent } from '@chamvi/core';
+import type { AgentHooks } from '@chamvi/core';
 import type { IGithubApp } from '@chamvi/github';
-import { githubWebhook } from '@chamvi/github';
+import { github } from '@chamvi/github';
 import { createGithubTestApp, deliver } from '../../utils/app.ts';
 import { mockModel } from '../../utils/model.ts';
 import type { MockResponse } from '../../utils/model.ts';
 
 const ISSUES_OPENED = readFileSync(new URL('../../fixtures/deliveries/issues-opened.json', import.meta.url), 'utf8');
 
+/** Asks the owner (inbox and API) before `tool` runs with an input `gated` accepts. */
+function gate(tool: string, gated: (input: unknown) => boolean = () => true): AgentHooks {
+    return {
+        async beforeToolExecution(call, ctx) {
+            if (call.toolName !== tool || !gated(call.input)) return undefined;
+            const decision = await approve(ctx, { title: `Run ${tool}?` });
+            if (!decision.approved) throw new ToolDeniedError(`${tool} was denied.`);
+            return undefined;
+        },
+    };
+}
+
 function triage(script: MockResponse[]) {
     return (gh: IGithubApp) => [defineAgent({
         name: 'triage',
         model: mockModel(script),
         instructions: 'Triage new issues.',
-        triggers: [githubWebhook({ events: ['issues.opened'] })],
+        channels: [github.on('issues.opened')],
         tools: () => ({ ...gh.readTools(), ...gh.writeTools() }),
-        approvals: { github_close_issue: 'user' },
+        hooks: gate('github_close_issue'),
     })];
 }
 
@@ -131,11 +143,6 @@ describe('webhook to comment', () => {
     });
 
     it('keeps one comment per step across an approval resume', async () => {
-        const notifications: Notification[] = [];
-        const notifier: INotifier = {
-            name: 'owner',
-            notify: async (n) => { notifications.push(n); },
-        };
         const comment = (body: string) => ({
             parts: [{
                 type: 'tool-call' as const,
@@ -144,15 +151,13 @@ describe('webhook to comment', () => {
             }],
         });
         const setup = createGithubTestApp({
-            notifiers: { owner: notifier },
             agents: (gh) => [defineAgent({
                 name: 'triage',
                 model: mockModel([comment('zero'), comment('first'), comment('second'), { parts: [{ type: 'text', text: 'Done.' }] }]),
                 instructions: 'Triage new issues.',
-                triggers: [githubWebhook({ events: ['issues.opened'] })],
+                channels: [github.on('issues.opened')],
                 tools: () => gh.writeTools(),
-                approvals: { github_create_comment: (input) => ((input as { body?: string }).body === 'first' ? 'user' : 'allow') },
-                notify: 'owner',
+                hooks: gate('github_create_comment', (input) => (input as { body?: string }).body === 'first'),
             })],
         });
         const {
@@ -179,7 +184,7 @@ describe('webhook to comment', () => {
         expect(paused?.waiting?.toolName).toBe('github_create_comment');
         expect(fake.comments.get('octo/demo#5')).toHaveLength(1);
 
-        await engine.resume(notifications[0]!.resumeToken!, { approved: true });
+        await engine.approve(runId, { approvalId: paused!.waiting!.approvalId, approved: true });
         await engine.idle();
         expect((await store.getRun(runId))?.status).toBe('completed');
         expect(errors).toEqual([]);

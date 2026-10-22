@@ -1,6 +1,12 @@
 import type { LanguageModel } from 'ai';
-import { Engine, MemoryStore, defineAgent } from '@chamvi/core';
-import { createGithubApp, githubWebhook } from '@chamvi/github';
+import {
+    Engine,
+    MemoryStore,
+    ToolDeniedError,
+    defineAgent,
+    injectChannel,
+} from '@chamvi/core';
+import { createGithubApp, github, githubChannel } from '@chamvi/github';
 import type { GithubAppOptions } from '@chamvi/github';
 import { createHttpApp, createShutdown, staticTokens } from '@chamvi/http';
 
@@ -25,26 +31,39 @@ export async function createTriageServer(
         webhookSecret: GITHUB_WEBHOOK_SECRET,
         ...options,
     });
+    // deliveries in, issue comments out
+    const channel = githubChannel({ app: gh, clock: options.clock });
 
     const triage = defineAgent({
         name: 'triage',
         model,
         instructions: 'Label new issues and thank the author in one comment.',
         // one run per issues.opened delivery, deduplicated by the delivery id
-        triggers: [githubWebhook({ events: ['issues.opened'] })],
+        channels: [github.on('issues.opened')],
         tools: () => ({ ...gh.readTools(), ...gh.writeTools() }),
-        approvals: { github_close_issue: 'user' },
+        hooks: {
+            // closing waits for the owner, asked in a comment on the issue
+            async beforeToolExecution({ toolName, input }, ctx) {
+                if (toolName !== 'github_close_issue') return undefined;
+                const { approved } = await injectChannel(ctx, 'github').approve({
+                    title: 'Close this issue?',
+                    body: JSON.stringify(input),
+                });
+                if (!approved) throw new ToolDeniedError('The owner keeps the issue open.');
+                return undefined;
+            },
+        },
     });
 
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage],
+        channels: [channel],
         resumeSecret: RESUME_SECRET,
     });
 
     const shutdown = createShutdown({ engine });
     const app = createHttpApp({
-        // the webhook route dispatches to the engine's agents
         engine,
         auth: staticTokens({
             tokens: [{
@@ -53,8 +72,8 @@ export async function createTriageServer(
                 permissions: ['*'],
             }],
         }),
-        // POST /webhooks/github: point the App's webhook URL here
-        routes: [gh.webhookRoute()],
+        // POST /channels/github: point the App's webhook URL here
+        channels: [channel],
         shutdown,
     });
 

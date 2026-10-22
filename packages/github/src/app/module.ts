@@ -22,8 +22,6 @@ import { createReadTools } from '../tools/read.ts';
 import { GITHUB_REQUEST_ERROR_CODE } from '../tools/constants.ts';
 import { createWriteTools } from '../tools/write.ts';
 import { verifySignature } from '../webhook/helpers.ts';
-import { createWebhookRoute } from '../webhook/module.ts';
-import type { GithubWebhookRouteOptions } from '../webhook/types.ts';
 import type { GithubAppOptions, GithubOctokit, IGithubApp } from './types.ts';
 
 /**
@@ -83,9 +81,6 @@ export function createGithubApp(options: GithubAppOptions): IGithubApp {
         },
         verifySignature(body: Uint8Array, signature: string | null): boolean {
             return verifySignature(secrets, body, signature);
-        },
-        webhookRoute(routeOptions?: GithubWebhookRouteOptions) {
-            return createWebhookRoute(app, routeOptions);
         },
         readTools(): ToolSet {
             return createReadTools(app);
