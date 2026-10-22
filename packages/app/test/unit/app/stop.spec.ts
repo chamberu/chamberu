@@ -127,6 +127,31 @@ describe('App.stop', () => {
         expect(await isFree(port)).toBe(true);
     });
 
+    it('logs a setup failure that a stop during setup answers with app_stopped', async () => {
+        const gate = deferred();
+        const entered = deferred();
+        const { app, logger } = build([{
+            name: ModuleName.STORE,
+            dependencies: [ModuleName.CONFIG],
+            async setup() {
+                entered.resolve();
+                await gate.promise;
+                throw new Error('migration 1792540800000 failed');
+            },
+        }]);
+        const { env } = await envFor();
+
+        const started = rejectionOf(app.start({ env }));
+        await entered.promise;
+        const stopped = app.stop();
+        gate.resolve();
+
+        expect(await started).toMatchObject({ code: APP_ERROR_CODE.STOPPED });
+        await stopped;
+        const entry = logger.entries.find((e) => e.level === 'error');
+        expect(JSON.stringify(entry)).toContain('migration 1792540800000 failed');
+    });
+
     it('is memoized', async () => {
         const teardowns: string[] = [];
         const { app } = build([{

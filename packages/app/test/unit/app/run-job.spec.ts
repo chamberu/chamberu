@@ -22,6 +22,7 @@ import {
     vi,
 } from 'vitest';
 import {
+    APP_ERROR_CODE,
     AppToken,
     ModuleName,
     configModule,
@@ -89,6 +90,32 @@ describe('App.runJob', () => {
         const { app, env } = build([sweep(failingModel())]);
 
         expect(await app.runJob({ env, agent: 'sweep' })).toMatchObject({ status: 'failed', exitCode: 1 });
+    });
+
+    it('rejects app_stop_failed when the teardown after a completed job reports an error', async () => {
+        const after: string[] = [];
+        const { app, env, logger } = build([sweep(textModel())], [
+            {
+                name: 'broken',
+                setup: async () => undefined,
+                async teardown() {
+                    throw new Error('close failed');
+                },
+            },
+            {
+                name: 'later',
+                setup: async () => undefined,
+                async teardown() {
+                    after.push('later');
+                },
+            },
+        ]);
+
+        const error = await rejectionOf(app.runJob({ env, agent: 'sweep' }));
+
+        expect(error).toMatchObject({ code: APP_ERROR_CODE.STOP_FAILED });
+        expect(after).toEqual(['later']);
+        expect(JSON.stringify(logger.entries.filter((e) => e.level === 'error'))).toContain('close failed');
     });
 
     it('throws InvalidAgentDefinitionError listing the agents for an unknown agent', async () => {
