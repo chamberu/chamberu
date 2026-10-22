@@ -16,7 +16,7 @@ import { isObject } from 'smob';
 import type { Env } from '../env/types.ts';
 import type { ModelProviders } from '../models/types.ts';
 import { AppToken } from '../module/constants.ts';
-import { createStoppedError, reportingModule } from '../module/helpers.ts';
+import { createStoppedError, reportingModule, runHooks } from '../module/helpers.ts';
 import { runStartSteps } from '../module/start.ts';
 import type { AppContext, AppMode } from '../module/types.ts';
 import { APP_BRAND } from './constants.ts';
@@ -45,6 +45,8 @@ type Lifecycle = {
     errors: unknown[];
     /** The lifecycle call in flight (start: the setup; job and migrate: the whole call). */
     done: Promise<unknown>;
+    /** The app ran the `started` hooks itself (a start without the http module), so it runs `stopping` too. */
+    hooksStarted?: boolean;
 };
 
 /**
@@ -155,8 +157,13 @@ export class App implements IApp {
         } = lifecycle;
         try {
             await application.setup();
-            // the steps the http module did not run (an app without it)
+            // every onReady checked its configuration: engine, scheduler, then the http module's serve
             await runStartSteps(container);
+            if (container.resolve(AppToken.CONTEXT).mode === 'start' && !container.has(AppToken.SERVER)) {
+                // the http module's serve step runs these hooks; without it the app does
+                lifecycle.hooksStarted = true;
+                await runHooks(container, 'started');
+            }
         } catch (error) {
             if (controller.signal.aborted && error !== controller.signal.reason) {
                 // the stop's reason answers, but the real failure must not vanish
@@ -175,6 +182,7 @@ export class App implements IApp {
     /** Tears every ready module down; throws app_stop_failed when that reported errors. */
     protected async teardown(lifecycle: Lifecycle): Promise<void> {
         const from = lifecycle.errors.length;
+        await this.runStoppingHooks(lifecycle);
         await lifecycle.application.teardown();
         const errors = lifecycle.errors.slice(from);
         if (errors.length > 0) {
@@ -226,6 +234,15 @@ export class App implements IApp {
         await this.teardown(lifecycle);
     }
 
+    /** The `stopping` hooks, once, when the app ran `started` itself (no http module). */
+    protected async runStoppingHooks(lifecycle: Lifecycle): Promise<void> {
+        if (!lifecycle.hooksStarted) {
+            return;
+        }
+        lifecycle.hooksStarted = false;
+        await runHooks(lifecycle.container, 'stopping');
+    }
+
     protected async shutdown(): Promise<void> {
         const { lifecycle } = this;
         if (!lifecycle) {
@@ -239,6 +256,7 @@ export class App implements IApp {
 
         // never tear down while a module sets up, or a job under runJob's feet
         await lifecycle.done.catch(() => {});
+        await this.runStoppingHooks(lifecycle);
         // a no-op when the lifecycle already tore down
         await lifecycle.application.teardown();
 

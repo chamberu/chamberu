@@ -24,9 +24,9 @@ type StartStep = {
 const START_STEPS = new TypedToken<StartStep>('chamvi.start-steps');
 
 /**
- * Registers a start step: `run` is called at most once, by the http module's
- * `onReady` after it built the HTTP app, or by the app once every `onReady`
- * ran, so a configuration error any of them finds starts nothing.
+ * Registers a start step: `run` is called at most once, by the app once every
+ * `onReady` ran (in registration order: engine, scheduler, the http module's
+ * serve), so a configuration error any module finds starts nothing.
  */
 export function registerStartStep(container: IContainer, name: string, run: () => Promise<void>): void {
     let started: Promise<void> | undefined;

@@ -24,6 +24,7 @@ import {
 } from 'vitest';
 import {
     APP_ERROR_CODE,
+    AppToken,
     ModuleName,
     configModule,
     createApp,
@@ -265,6 +266,63 @@ describe('App.start', () => {
             await vi.waitFor(async () => {
                 expect((await ctx.store.getRun(ctx.runId))?.status).toBe('completed');
             });
+        });
+
+        it('an app without the http module runs the started hooks', async () => {
+            const ctx = await queuedRun();
+            const started: string[] = [];
+            const app = track(createApp({
+                agents: [ctx.queued],
+                modules: [
+                    quiet(),
+                    storeModule({ store: ctx.store }),
+                    { name: ModuleName.HTTP, setup: async () => undefined },
+                    {
+                        name: 'hooks',
+                        setup: async (container) => {
+                            container.registerMany(AppToken.LIFECYCLE_HOOKS, {
+                                useValue: {
+                                    name: 'probe',
+                                    started: () => { started.push('started'); },
+                                    stopping: () => { started.push('stopping'); },
+                                },
+                            });
+                        },
+                    },
+                ],
+            }));
+            const { env } = await envFor({ CHAMVI_TOKENS: '' });
+
+            await app.start({ env });
+            expect(started).toEqual(['started']);
+
+            await app.stop();
+            expect(started).toEqual(['started', 'stopping']);
+        });
+
+        it('a user module whose onReady fails after the http module', async () => {
+            const ctx = await queuedRun();
+            const started: string[] = [];
+            const app = track(createApp({
+                agents: [ctx.queued],
+                modules: [quiet(), storeModule({ store: ctx.store }), {
+                    name: 'late',
+                    // ordered after the http module, so its onReady runs last
+                    dependencies: [ModuleName.HTTP],
+                    setup: async (container) => {
+                        container.registerMany(AppToken.LIFECYCLE_HOOKS, { useValue: { name: 'probe', started: () => { started.push('started'); } } });
+                    },
+                    onReady: async () => {
+                        throw new InvalidAgentDefinitionError('late module misconfigured');
+                    },
+                }],
+            }));
+            const { env } = await envFor();
+
+            expect(await rejectionOf(app.start({ env }))).toBeInstanceOf(InvalidAgentDefinitionError);
+            expect(started).toEqual([]);
+            expect(ctx.calls()).toBe(0);
+            expect((await ctx.store.getRun(ctx.runId))?.status).toBe('queued');
         });
 
         it('a scheduler definition error', async () => {

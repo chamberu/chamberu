@@ -12,17 +12,18 @@ import type { IModule, ModuleDependency } from 'orkos';
 import { serve } from 'routup';
 import { AppToken, ModuleName } from '../../module/constants.ts';
 import { runHooks, throwIfStopped } from '../../module/helpers.ts';
-import { runStartSteps } from '../../module/start.ts';
+import { registerStartStep } from '../../module/start.ts';
 import type { Server } from '../../module/types.ts';
 import { resolveAuthenticators } from './helpers.ts';
 import type { HttpModuleOptions } from './types.ts';
 
 /**
  * Serves the HTTP app (start mode only). `onReady` builds the graceful
- * shutdown (`SHUTDOWN`), the routup app from every `AUTHENTICATORS` and
- * `HTTP_ROUTES` contribution, then runs the start steps (engine, scheduler),
- * the `started` hooks and listens last (`SERVER`), so a configuration error
- * starts nothing. `teardown` runs the shutdown: readiness 503, scheduler stop and
+ * shutdown (`SHUTDOWN`) and the routup app from every `AUTHENTICATORS` and
+ * `HTTP_ROUTES` contribution, then registers the `serve` start step: the
+ * app runs the start steps (engine, scheduler, then this one: the `started`
+ * hooks, listening, `SERVER`) only once every module's `onReady` ran, so a
+ * configuration error any of them finds starts nothing. `teardown` runs the shutdown: readiness 503, scheduler stop and
  * `stopping` hooks, the app's closers, server close, engine drain.
  */
 export class HttpModule implements IModule {
@@ -89,23 +90,24 @@ export class HttpModule implements IModule {
             onError: (error) => logger.error('http error', error),
         });
 
-        // everything is configured: start the engine and the scheduler, then listen
-        await runStartSteps(container);
-        await runHooks(container, 'started');
-        throwIfStopped(context);
+        // after the engine and scheduler steps (registered in their onReady, which runs first)
+        registerStartStep(container, ModuleName.HTTP, async () => {
+            await runHooks(container, 'started');
+            throwIfStopped(context);
 
-        server = serve(app, {
-            port: config.http.port,
-            hostname: config.http.host,
-            silent: true,
-            gracefulShutdown: false,
+            server = serve(app, {
+                port: config.http.port,
+                hostname: config.http.host,
+                silent: true,
+                gracefulShutdown: false,
+            });
+            container.register(AppToken.SERVER, { useValue: server });
+            await server.ready();
+
+            logger.info('listening', { url: server.url });
+            // a stop that arrived while binding tears down at once
+            throwIfStopped(context);
         });
-        container.register(AppToken.SERVER, { useValue: server });
-        await server.ready();
-
-        logger.info('listening', { url: server.url });
-        // a stop that arrived while binding tears down at once
-        throwIfStopped(context);
     }
 
     async teardown(): Promise<void> {
