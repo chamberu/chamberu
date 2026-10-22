@@ -57,3 +57,23 @@ For an approval with `resumeTool: true` the first line reads `keep every link, i
 ### Failures
 
 Any 2xx resolves. Every other status throws a `ChamviError` with `code` `openclaw_request` and the message `OpenClaw <status>: <response text>` (plus `(retry after <value>)` for a `Retry-After` header); a network failure throws `OpenClaw request failed: <message> (<cause message>)` (undici keeps the detail, such as `ECONNREFUSED` or `ENOTFOUND`, in `cause`), a send that takes longer than `timeoutMs` `OpenClaw did not answer within <ms>ms.` (the timer runs on the `clock` and aborts the `fetch`). The response text and the network failure message are cut to 500 characters after the hooks token and the resume token (sent with `resumeTool` only) were replaced by `[redacted]`, so an endpoint that echoes the request never puts either into `onError`.
+
+## Context
+
+```ts
+function provideOpenclawContext(provider: IContextProvider, notifier: INotifier): void; // key 'openclaw:<notifier.name>'
+function injectOpenclawContext(ctx: ToolContext, name?: string): INotifier;          // name default 'openclaw'
+```
+
+One key per notifier name: `openclawModule()` beside `openclawModule({ name: 'ops' })` provides both, `injectOpenclawContext(ctx, 'ops')` reads the second, and a name never provided throws `ContextNotProvidedError` naming `openclaw:<name>`. See [Context](/guide/tools#context-shared-instances-for-tools).
+
+## Module
+
+```ts
+// @chamvi/notify-openclaw/module, needs @chamvi/app
+function openclawModule(options?: OpenclawModuleOptions): IModule; // name 'chamvi:notifier:<name>', default name 'openclaw'
+```
+
+Reads `OPENCLAW_BASE_URL`, `OPENCLAW_HOOKS_TOKEN`, `OPENCLAW_CHANNEL`, `OPENCLAW_TO` (required), `OPENCLAW_HOOKS_PATH`, `OPENCLAW_AGENT_ID` and `OPENCLAW_ACCOUNT_ID` from `options.env ?? process.env` when it is called (options win), defaults `approvalUrl` to the dashboard link from `CHAMVI_PUBLIC_URL`, contributes the notifier to the app's notifiers and provides it on the engine in its `engineCreated` hook. `@chamvi/app` is an optional peer: the main entry never imports it.
+
+<<< ../../../notify-openclaw/src/module/types.ts{ts}

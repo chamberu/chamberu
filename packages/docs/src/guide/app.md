@@ -54,19 +54,21 @@ Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](h
 | `schedulerModule()` | The in-process cron scheduler; `CHAMVI_SCHEDULER=false` leaves cron to Kubernetes CronJobs and `chamvi run-job` |
 | `httpModule()` | `createHttpApp()` with every contributed route and authenticator, the graceful shutdown, `serve()` on `HOST`:`PORT` |
 
-The optional modules live on subpath entries, so the main entry never imports their packages; install the peer packages of the ones you use. Each factory reads its variables **when it is called**, that is when the entry is imported, and exposes its instance at once, so tools and triggers can use it in the agent definitions:
+The optional modules ship with the package they configure, on its `/module` subpath (`@chamvi/app` is an optional peer there, and the package's main entry never imports it), so install the feature package of each one you use. Each factory reads its variables **when it is called**, that is when the entry is imported, and exposes its instance at once (`.app`, `.manager`). Each module also **provides its instance on the engine** before it starts, so a tools factory injects it per execution with the package's `inject*Context(ctx)` (see [Context](/guide/tools#context-shared-instances-for-tools)):
 
 <<< @/snippets/app-modules.ts#modules
 
-| Factory | Entry | Contributes |
-|---|---|---|
-| `githubModule()` | `@chamvi/app/github` | `.app` (`IGithubApp`), the signed webhook route `/webhooks/github` |
-| `githubNotifierModule({ app })` | `@chamvi/app/github` | the `githubNotifier()` named `github` |
-| `sandboxModule()` | `@chamvi/app/sandbox` | `.manager` (`IWorkspaceManager`), attached on start, closed after the engine drained |
-| `openclawModule()` | `@chamvi/app/openclaw` | the `openclaw()` notifier named `openclaw` |
-| `uiModule()` | `@chamvi/app/ui` | the [dashboard](/guide/ui) at `<basePath>/ui` |
-| `authupModule()`, `oidcModule(options)` | `@chamvi/app/authup` | the `authup()` and `oidc()` authenticators, after the static tokens |
-| `consoleNotifierModule()` | `@chamvi/app` | the `consoleNotifier()` named `console` |
+| Factory | Entry | Contributes | Context |
+|---|---|---|---|
+| `githubModule()` | `@chamvi/github/module` | `.app` (`IGithubApp`), the signed webhook route `/webhooks/github` | `injectGithubContext(ctx)` |
+| `githubNotifierModule({ app })` | `@chamvi/notify-github/module` | the `githubNotifier()` named `github` | `injectGithubNotifierContext(ctx, name?)` |
+| `sandboxModule()` | `@chamvi/sandbox/module` | `.manager` (`IWorkspaceManager`), attached on start, closed after the engine drained | `injectSandboxContext(ctx)` |
+| `openclawModule()` | `@chamvi/notify-openclaw/module` | the `openclaw()` notifier named `openclaw` | `injectOpenclawContext(ctx, name?)` |
+| `uiModule()` | `@chamvi/ui/module` | the [dashboard](/guide/ui) at `<basePath>/ui` | |
+| `authupModule()`, `oidcModule(options)` | `@chamvi/app/authup` | the `authup()` and `oidc()` authenticators, after the static tokens | |
+| `consoleNotifierModule()` | `@chamvi/app` | the `consoleNotifier()` named `console` | |
+
+The notifier contexts are keyed per notifier name, so `openclawModule()` beside `openclawModule({ name: 'ops' })` provides both (`injectOpenclawContext(ctx, 'ops')`). `@chamvi/app/authup` stays in the app package, since `@chamvi/http` cannot depend on `@chamvi/app`.
 
 With `CHAMVI_PUBLIC_URL` set, the notifier modules link approvals to the dashboard: `<CHAMVI_PUBLIC_URL><basePath>/ui/approvals?run=<runId>&approval=<approvalId>`, without a token. A factory missing a required variable throws `InvalidAgentDefinitionError` naming it; no message ever echoes a value.
 
@@ -108,12 +110,15 @@ orkos swallows teardown errors; chamvi does not: every teardown error is logged,
 
 ## Writing a module
 
+The module contract comes from the main entry of `@chamvi/app`: `AppToken`, `ModuleName`, `AppContext`, `ILifecycleHook`, the env readers and the orkos `IModule` and eldin `IContainer` types, so a module needs no direct orkos or eldin import. A module that shares an instance with tools provides it in the `engineCreated` hook and exports an `inject*` function next to it, keeping its key internal:
+
 <<< @/snippets/app-module.ts#module
 
-- **Hooks** (`LIFECYCLE_HOOKS`): `engineCreated(engine)` before `engine.start()`, `started()` before the server listens, `stopping()` after the scheduler stopped, `drained()` after the engine drained and before the store closes.
+- **Hooks** (`LIFECYCLE_HOOKS`): `engineCreated(engine)` before `engine.start()` (the place for `engine.provide()`; a throwing hook, such as a second value for one key, is logged through `context.report()` and the app still starts), `started()` before the server listens, `stopping()` after the scheduler stopped, `drained()` after the engine drained and before the store closes.
 - **Failures:** orkos never tears down a module whose `setup` threw, so such a `setup` closes what it opened before rethrowing. A module whose `onReady` threw is torn down, so `teardown` tolerates state that `onReady` never built.
 - **Stopping:** `AppToken.CONTEXT` holds the lifecycle's `signal`, aborted once `stop()` is called; `throwIfStopped(context)` before a long step keeps a stopped start from going on. `context.report(error)` logs an error and, during `stop()`, makes it reject.
 - **Modes:** `AppToken.CONTEXT` holds the `mode`: `start` builds everything, `job` (`runJob`) config, store and engine, `migrate` only config and store. A module that resolves `ENGINE` in `onReady` returns early in `migrate` mode, as the sample does, or `chamvi migrate` fails.
+- **Testing:** `createModuleHarness({ modules, env?, agents?, clock? })` from `@chamvi/app/testing` runs the real module lifecycle (setup, `onReady`, the start steps) of the modules you list, built-ins included, without `start()` and a port: `harness.container` resolves what a module contributed, `harness.reported` holds every `context.report()` call, `harness.stop()` tears down. The feature packages test their own modules with it.
 - **Dependencies:** `dependencies` name modules the app registers (`{ name, optional: true }` for one it may lack). A missing one, a cycle or a version mismatch throws `InvalidAgentDefinitionError` from `start`, `runJob` and `migrate` before any module set up (the CLI exits 2).
 
 ## Testing an app

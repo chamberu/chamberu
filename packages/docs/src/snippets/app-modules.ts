@@ -6,7 +6,8 @@ import { openclawModule } from '@chamvi/notify-openclaw/module';
 import { sandboxModule } from '@chamvi/sandbox/module';
 import { uiModule } from '@chamvi/ui/module';
 import { codingTools } from '@chamvi/coding';
-import { githubWebhook } from '@chamvi/github';
+import { githubWebhook, injectGithubContext } from '@chamvi/github';
+import { injectSandboxContext } from '@chamvi/sandbox';
 
 // every factory reads its env when it is called (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, ...)
 const github = githubModule();
@@ -21,11 +22,15 @@ const repro = defineAgent({
     model: 'anthropic:claude-sonnet-5-5',
     instructions: 'Reproduce the reported bug with a failing test and comment the result.',
     triggers: [githubWebhook({ events: ['issues.labeled'] })],
-    // the instances exist at import time, before start()
-    tools: {
-        ...github.app.readTools(),
-        ...sandbox.manager.tools(),
-        ...codingTools(sandbox.manager),
+    // each module provides its instance on the engine; a factory injects it per execution
+    // (github.app and sandbox.manager still exist at import time, for definition-time use)
+    tools: (ctx) => {
+        const manager = injectSandboxContext(ctx);
+        return {
+            ...injectGithubContext(ctx).readTools(),
+            ...manager.tools(),
+            ...codingTools(manager),
+        };
     },
     approvals: { bash: 'user' },
     notify: 'openclaw',

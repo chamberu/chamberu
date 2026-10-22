@@ -64,6 +64,28 @@ A provider that can run argv in a container implements `IExecTransport`: it runs
 
 <<< ../../../sandbox/src/remote/types.ts{ts}
 
+### Context
+
+```ts
+function provideSandboxContext(provider: IContextProvider, manager: IWorkspaceManager): void; // engine.provide under the key 'sandbox'
+function injectSandboxContext(ctx: ToolContext): IWorkspaceManager;                         // else ContextNotProvidedError
+```
+
+`sandboxModule()` provides its manager; with a hand-built engine call `provideSandboxContext(engine, manager)` after `new Engine()`. A tools factory then builds the workspace and coding tools per execution: `tools: (ctx) => { const manager = injectSandboxContext(ctx); return { ...manager.tools(), ...codingTools(manager) }; }`. See [Context](/guide/tools#context-shared-instances-for-tools).
+
+### Module
+
+```ts
+// @chamvi/sandbox/module, needs @chamvi/app
+function sandboxModule(options?: SandboxModuleOptions): SandboxModule; // name SANDBOX_MODULE_NAME 'chamvi:sandbox', .manager: IWorkspaceManager
+
+const SANDBOX_PROVIDER_NAMES: readonly SandboxProviderName[]; // ['local', 'docker', 'kubernetes']
+```
+
+The provider is `CHAMVI_SANDBOX_PROVIDER`, else `options.provider`, else `local`, read from `options.env ?? process.env` when the factory is called; `CHAMVI_SANDBOX_NAMESPACE` and `CHAMVI_SANDBOX_IMAGE` win over the options too. In start and job mode `setup` imports the provider package (`@chamvi/sandbox-local`, `@chamvi/sandbox-docker` or `@chamvi/sandbox-k8s`, optional peers; a missing one throws `InvalidAgentDefinitionError` naming it), and the lifecycle hooks attach the manager to the engine, provide it (`engineCreated`) and close it after the engine drained; migrate mode does nothing. `@chamvi/app` is an optional peer: the main entry never imports it.
+
+<<< ../../../sandbox/src/module/types.ts#public{ts}
+
 ## @chamvi/sandbox-local
 
 ```ts

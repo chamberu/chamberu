@@ -66,6 +66,7 @@ class Engine {
     readonly clock: IClock;
     getAgent(name: string): Agent | undefined;
     listAgents(): Agent[];
+    provide<T>(key: ContextKey<T>, value: T): void; // IContextProvider, see Context
 
     dispatch(envelope: DispatchEnvelope): Promise<{ runId: string; deduplicated: boolean }>;
     getRun(id: string): Promise<Run | undefined>;
@@ -162,6 +163,18 @@ const toolContextSchema: StandardSchemaV1<ToolContext, ToolContext>; // vendor '
 
 See [Tools and their context](/guide/agents#tools-and-their-context).
 
+## Context
+
+```ts
+function defineContextKey<T>(name: string): ContextKey<T>;                      // a new frozen key per call; empty name -> InvalidAgentDefinitionError
+function inject<T>(ctx: ToolContext, key: ContextKey<T>): T;                    // else ContextNotProvidedError ('context_not_provided')
+function tryInject<T>(ctx: ToolContext, key: ContextKey<T>): T | undefined;
+```
+
+`engine.provide(key, value)` (`Engine` implements `IContextProvider`) keeps the value by reference and refuses a foreign key, `undefined` and a second value for one key (`InvalidAgentDefinitionError` naming the key). `inject` reads the engine's values for the `ToolContext` the engine built for the execution (tool `execute`, the tools factory, `alreadyApplied`, `effectKey`); `ToolContext` itself gains no field, and nothing provided is stored or serialized. A missing value is a tool error in `execute` and the effect hooks and fails the run in the factory. See [Context](/guide/tools#context-shared-instances-for-tools).
+
+<<< ../../../core/src/context/types.ts{ts}
+
 ## Effect tools
 
 ```ts
@@ -239,7 +252,7 @@ const systemClock: IClock;
 
 ## Errors
 
-`ChamviError`, `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
+`ChamviError`, `InvalidAgentDefinitionError`, `ContextNotProvidedError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
 
 <<< ../../../core/src/errors/constants.ts{ts}
 

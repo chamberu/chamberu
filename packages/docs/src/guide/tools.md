@@ -52,3 +52,23 @@ A tool from another library may declare its own `contextSchema` and expect its c
 - An entry naming a chamvi tool (built with `defineTool()`/`defineEffectTool()`, the state tools included) or no tool of the agent is a misconfiguration: with a plain tool set `defineAgent()` throws `InvalidAgentDefinitionError`; with a factory (whose set is only known per execution) the run fails with that error (`invalid_agent_definition`) before any model call. A factory that returns a tool only sometimes must leave its entry out and close over the value instead.
 - Without an entry, a tool whose `contextSchema` requires a value fails the run (the AI SDK validates the context outside its tool-error handling); an optional schema gets `undefined`.
 - An entry the tool's `contextSchema` rejects fails the run the same way, with `validation_error`. The run error names the tool and the failing paths only, never the entry's value, so a key in it is not stored or served with the run.
+
+## Context: shared instances for tools
+
+A tool that needs a shared instance (an API client, the GitHub App, the workspace manager) does not have to close over it. Define a typed key once, provide the value on the engine, and inject it from the tool's context:
+
+<<< @/snippets/context.ts#define
+
+<<< @/snippets/context.ts#provide
+
+<<< @/snippets/context.ts#inject
+
+- `defineContextKey<T>(name)` returns a new key per call: two keys of one name are independent, the name only appears in messages.
+- `engine.provide(key, value)` keeps the value **by reference**. It refuses a key that is not from `defineContextKey()`, `undefined` and a second value for one key (`InvalidAgentDefinitionError` naming the key). A value provided after `engine.start()` reaches the next execution.
+- `inject(ctx, key)` returns the value or throws `ContextNotProvidedError` (`context_not_provided`, the message names the key, never a value); `tryInject(ctx, key)` returns `undefined` instead.
+- It works on the `ToolContext` the engine passed: in a tool's `execute` (`context`), in the [tools factory](/guide/agents#tools-and-their-context) and in the [effect hooks](/guide/effect-tools) (`alreadyApplied`, `effectKey`), which all see the same object. A spread copy (`{ ...ctx }`) or a hand-built context has no values.
+- Where it fails decides what fails: in `execute` or an effect hook a missing value is a tool error the model sees, and the run goes on; in the tools factory the run fails before any model call (and the engine's `onError` gets the error). Inject in the factory when the agent cannot work without the value.
+- Provided values are never stored or serialized: `ToolContext` keeps exactly `run`, `state` and `artifacts`, and no step, checkpoint or run holds a provided value.
+- `toolsContext` entries are something else: values the AI SDK hands to third-party tools by tool name. Context is for chamvi tools and factories, keyed by value type.
+
+The optional [app modules](/guide/app#modules) provide their instances this way, each through a pair of its package: `injectGithubContext(ctx)` (`@chamvi/github`), `injectSandboxContext(ctx)` (`@chamvi/sandbox`), `injectOpenclawContext(ctx, name?)` (`@chamvi/notify-openclaw`) and `injectGithubNotifierContext(ctx, name?)` (`@chamvi/notify-github`). Without the app, call the matching `provide*Context(engine, value)` after `new Engine()`.

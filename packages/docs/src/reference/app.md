@@ -6,12 +6,13 @@ Boots chamvi agents as an app. The public API of `packages/app/src/index.ts` and
 npm install @chamvi/app ai typeorm pg
 ```
 
-`ai`, `typeorm` and `pg` are peer dependencies. The provider packages (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/mistral`, `@ai-sdk/xai`) and the packages behind the optional modules are optional peers. The main entry re-exports `@chamvi/core` and `agentPermission`, `Permission` and the `Authenticator`, `Principal`, `HttpRoute`, `HttpRouteContext`, `HttpRouteRequest`, `HttpRouteResult` and `StaticToken` types of `@chamvi/http`.
+`ai`, `typeorm` and `pg` are peer dependencies. The provider packages (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/mistral`, `@ai-sdk/xai`) and the `@authup/*` packages behind `@chamvi/app/authup` are optional peers. The other optional modules ship with their feature packages (`@chamvi/github/module`, ...), so `@chamvi/app` depends on none of them. The main entry re-exports `@chamvi/core` and `agentPermission`, `Permission` and the `Authenticator`, `Principal`, `HttpRoute`, `HttpRouteContext`, `HttpRouteRequest`, `HttpRouteResult` and `StaticToken` types of `@chamvi/http`.
 
 | Entry | Exports | Needs |
 |---|---|---|
-| `@chamvi/app` | `createApp`, `isApp`, the built-in modules, tokens, env readers, `readConfig`, `createLogger`, `createModelRegistry` | |
+| `@chamvi/app` | `createApp`, `isApp`, the built-in modules, the module contract (tokens, `ModuleName`, `AppContext`, `ILifecycleHook`, the `IModule` and `IContainer` types), env readers, `approvalUrlOf`, `readConfig`, `createLogger`, `createModelRegistry` | |
 | `@chamvi/app/authup` | `authupModule`, `oidcModule` | `@authup/server-adapter-kit`, `@authup/core-http-kit` |
+| `@chamvi/app/testing` | `buildModuleHarness`, `createModuleHarness` | |
 
 ## createApp
 
@@ -152,7 +153,7 @@ function authupModule(options?: AuthupModuleOptions): IModule;             // 'c
 function oidcModule(options: OidcOptions): IModule;                        // 'chamvi:oidc', no env form
 ```
 
-Each factory reads `options.env ?? process.env` when it is called and throws `InvalidAgentDefinitionError` naming a missing or malformed variable. Options win over env, except `CHAMVI_SANDBOX_PROVIDER`, `CHAMVI_SANDBOX_NAMESPACE` and `CHAMVI_SANDBOX_IMAGE`, which win over the sandbox options. The notifier modules default `approvalUrl` to the dashboard link built from `CHAMVI_PUBLIC_URL` and use the app's clock.
+Each factory reads `options.env ?? process.env` when it is called and throws `InvalidAgentDefinitionError` naming a missing or malformed variable. Options win over env, except `CHAMVI_SANDBOX_PROVIDER`, `CHAMVI_SANDBOX_NAMESPACE` and `CHAMVI_SANDBOX_IMAGE`, which win over the sandbox options. The notifier modules default `approvalUrl` to the dashboard link built from `CHAMVI_PUBLIC_URL` and use the app's clock. Each module but `uiModule` and the authup ones provides its instance on the engine in its `engineCreated` hook; tools reach it through the package's context pair ([github](/reference/github#context), [notify-github](/reference/notify-github#context), [sandbox](/reference/sandbox#context), [notify-openclaw](/reference/notify-openclaw#context)).
 
 <<< ../../../github/src/module/types.ts{ts}
 
@@ -172,7 +173,7 @@ Each factory reads `options.env ?? process.env` when it is called and throws `In
 
 <<< ../../../app/src/module/constants.ts{ts}
 
-`AppContext`, `ILifecycleHook`, `AuthenticatorEntry`, `Server` and `AppTokens` (each token's value type):
+`AppContext`, `ILifecycleHook`, `AuthenticatorEntry`, `Server`, `AppTokens` (each token's value type) and the re-exported orkos `IModule` and eldin `IContainer` types:
 
 <<< ../../../app/src/module/types.ts{ts}
 
@@ -180,6 +181,18 @@ Each factory reads `options.env ?? process.env` when it is called and throws `In
 function runHooks(container: IContainer, phase: LifecyclePhase, ...args: unknown[]): Promise<void>; // every LIFECYCLE_HOOKS entry, in order
 function throwIfStopped(context: AppContext): void; // throws the app_stopped error once stop() was called
 ```
+
+## Testing modules
+
+```ts
+// @chamvi/app/testing
+function buildModuleHarness(options?: ModuleHarnessOptions): ModuleHarness;          // not set up yet
+async function createModuleHarness(options?: ModuleHarnessOptions): Promise<ModuleHarness>; // set up
+```
+
+The real module lifecycle without `start()` and a port, over exactly `options.modules` (list the built-ins a module needs, e.g. `configModule()`, `storeModule()`, `engineModule()`) on a container holding `AppToken.CONTEXT` (and `CLOCK` with `clock`): `setup()` runs every `setup`, every `onReady` and the start steps like the app and tears down and rethrows when one fails, `reported` collects every `context.report()` call (a throwing lifecycle hook lands there), `stop()` aborts the context signal and tears down.
+
+<<< ../../../app/src/testing/types.ts{ts}
 
 ## Models
 
