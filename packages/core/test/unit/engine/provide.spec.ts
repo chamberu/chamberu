@@ -245,7 +245,11 @@ describe('engine.provide', () => {
         const { engine } = setup(mockModel([]), {});
         const foreign = { name: 'x' } as ContextKey<number>;
         expect(() => engine.provide(foreign, 1)).toThrow(InvalidAgentDefinitionError);
-        expect(() => engine.provide(foreign, 1)).toThrow('provide() takes a key from defineContextKey().');
+        // a key of another @chamvi/core copy (a package that resolved its own) reads the same
+        expect(() => engine.provide(foreign, 1)).toThrow(
+            'Context "x" has no key from defineContextKey() of the engine\'s @chamvi/core: ' +
+            'a key from another copy of @chamvi/core (a package that resolved its own) is refused.',
+        );
 
         const KEY = defineContextKey<Service | undefined>('service');
         expect(() => engine.provide(KEY, undefined)).toThrow(InvalidAgentDefinitionError);
@@ -302,9 +306,9 @@ describe('engine.provide', () => {
         const KEY = defineContextKey<Service>('service');
         const model = mockModel([text('done')]);
         const {
-            engine, 
-            store, 
-            errors, 
+            engine,
+            store,
+            errors,
         } = setup(model, (ctx) => {
             inject(ctx, KEY);
             return {};

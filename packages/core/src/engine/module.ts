@@ -213,12 +213,17 @@ export class Engine implements IContextProvider {
     /**
      * Provides `value` (by reference, never cloned, stored or serialized) to
      * every execution's tools, tools factory and effect hooks through
-     * inject(ctx, key); also after start(). Refuses a key not made by
-     * defineContextKey(), `undefined` and a second value for one key.
+     * inject(ctx, key); also after start(). Refuses a key not made by this
+     * copy's defineContextKey(), `undefined` and a second value for one key.
      */
     provide<T>(key: ContextKey<T>, value: T): void {
-        if (!isContextKey(key)) throw new InvalidAgentDefinitionError('provide() takes a key from defineContextKey().');
         const name = contextKeyName(key);
+        if (!isContextKey(key)) {
+            throw new InvalidAgentDefinitionError(
+                `Context "${name}" has no key from defineContextKey() of the engine's @chamvi/core: ` +
+                'a key from another copy of @chamvi/core (a package that resolved its own) is refused.',
+            );
+        }
         if (value === undefined) throw new InvalidAgentDefinitionError(`Context "${name}" needs a value.`);
         if (this.provided.has(key)) throw new InvalidAgentDefinitionError(`Context "${name}" is already provided.`);
         this.provided.set(key, value);

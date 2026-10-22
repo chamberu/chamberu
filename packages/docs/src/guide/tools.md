@@ -64,7 +64,7 @@ A tool that needs a shared instance (an API client, the GitHub App, the workspac
 <<< @/snippets/context.ts#inject
 
 - `defineContextKey<T>(name)` returns a new key per call: two keys of one name are independent, the name only appears in messages.
-- `engine.provide(key, value)` keeps the value **by reference**. It refuses a key that is not from `defineContextKey()`, `undefined` and a second value for one key (`InvalidAgentDefinitionError` naming the key). A value provided after `engine.start()` reaches the next execution.
+- `engine.provide(key, value)` keeps the value **by reference**. It refuses a key that is not from the `defineContextKey()` of the engine's `@chamvi/core` (also a key of another copy, which a package resolving its own `@chamvi/core` would hold), `undefined` and a second value for one key (`InvalidAgentDefinitionError` naming the key). A value provided after `engine.start()` reaches the next execution.
 - `inject(ctx, key)` returns the value or throws `ContextNotProvidedError` (`context_not_provided`, the message names the key, never a value); `tryInject(ctx, key)` returns `undefined` instead.
 - It works on the `ToolContext` the engine passed: in a tool's `execute` (`context`), in the [tools factory](/guide/agents#tools-and-their-context) and in the [effect hooks](/guide/effect-tools) (`alreadyApplied`, `effectKey`), which all see the same object. A spread copy (`{ ...ctx }`) or a hand-built context has no values.
 - Where it fails decides what fails: in `execute` or an effect hook a missing value is a tool error the model sees, and the run goes on; in the tools factory the run fails before any model call (and the engine's `onError` gets the error). Inject in the factory when the agent cannot work without the value.
