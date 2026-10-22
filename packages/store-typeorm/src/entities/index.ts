@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+export * from './agent-revision.ts';
 export * from './artifact.ts';
 export * from './checkpoint.ts';
 export { TableName } from './constants.ts';

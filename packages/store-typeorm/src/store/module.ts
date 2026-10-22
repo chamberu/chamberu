@@ -11,6 +11,7 @@ import {
     systemClock,
 } from '@chamvi/core';
 import type {
+    AgentRevision,
     Artifact,
     Checkpoint,
     IClock,
@@ -32,6 +33,7 @@ import type {
     Repository,
 } from 'typeorm';
 import {
+    AgentRevisionEntity,
     ArtifactEntity,
     CheckpointEntity,
     DocEntity,
@@ -44,6 +46,7 @@ import {
 } from '../entities/index.ts';
 import {
     asValues,
+    toAgentRevision,
     toArtifact,
     toArtifactValues,
     toCheckpoint,
@@ -109,6 +112,10 @@ export class TypeormStore implements IStore {
 
     protected get artifacts(): Repository<ArtifactEntity> {
         return this.dataSource.getRepository(ArtifactEntity);
+    }
+
+    protected get agentRevisions(): Repository<AgentRevisionEntity> {
+        return this.dataSource.getRepository(AgentRevisionEntity);
     }
 
     // IRunStore
@@ -467,6 +474,30 @@ export class TypeormStore implements IStore {
             order: { createdAt: 'ASC', id: 'ASC' },
         });
         return entities.map((entity) => toArtifact(entity));
+    }
+
+    // IAgentRevisionStore
+
+    async getAgentRevision(agent: string): Promise<AgentRevision | undefined> {
+        const entity = await this.agentRevisions.findOneBy({ agent });
+        return entity ? toAgentRevision(entity) : undefined;
+    }
+
+    async setAgentRevision(revision: AgentRevision): Promise<void> {
+        await this.agentRevisions.upsert(asValues<AgentRevisionEntity>({
+            agent: revision.agent,
+            hash: revision.hash,
+            changedAt: revision.changedAt,
+        }), ['agent']);
+    }
+
+    async deleteAgentRevision(agent: string): Promise<void> {
+        await this.agentRevisions.delete({ agent });
+    }
+
+    async listAgentRevisions(): Promise<AgentRevision[]> {
+        const entities = await this.agentRevisions.find({ order: { agent: 'ASC' } });
+        return entities.map((entity) => toAgentRevision(entity));
     }
 
     // Maintenance

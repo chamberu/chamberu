@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { AgentRevision } from '../agent/types.ts';
 import type { Artifact } from '../artifact/types.ts';
 import type { 
     Checkpoint, 
@@ -114,4 +115,23 @@ export interface IArtifactStore {
     listArtifacts(runId: string): Promise<Artifact[]>;
 }
 
-export interface IStore extends IRunStore, IStepStore, ICheckpointStore, IIdempotencyStore, ILockStore, IEffectStore, IStateStore, IArtifactStore {}
+/** One revision marker per folder agent, keyed by agent name, copied in and out. */
+export interface IAgentRevisionStore {
+    getAgentRevision(agent: string): Promise<AgentRevision | undefined>;
+    /** Upsert: replaces the hash and `changedAt` of an existing marker. */
+    setAgentRevision(revision: AgentRevision): Promise<void>;
+    /** Deleting a missing marker is a no-op. */
+    deleteAgentRevision(agent: string): Promise<void>;
+    /** Every marker, ordered by agent in code-point order (`COLLATE "C"`). */
+    listAgentRevisions(): Promise<AgentRevision[]>;
+}
+
+export interface IStore extends IRunStore,
+    IStepStore,
+    ICheckpointStore,
+    IIdempotencyStore,
+    ILockStore,
+    IEffectStore,
+    IStateStore,
+    IArtifactStore,
+    IAgentRevisionStore {}

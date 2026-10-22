@@ -18,6 +18,7 @@ export const TableName = {
     KV: 'chamvi_kv',
     DOCS: 'chamvi_docs',
     ARTIFACTS: 'chamvi_artifacts',
+    AGENT_REVISIONS: 'chamvi_agent_revisions',
 } as const;
 
 /**

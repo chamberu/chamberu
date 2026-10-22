@@ -80,3 +80,20 @@ export type Agent<S extends StateSchema = StateSchema> = {
     readonly name: string;
     readonly definition: Required<Pick<AgentDefinition<S>, 'budget'>> & AgentDefinition<S>;
 };
+
+/**
+ * An agent definition without its name: the default export of a folder
+ * agent's `agent.ts` (`export default { ... } satisfies AgentConfig`), whose
+ * name is the folder's.
+ */
+export type AgentConfig<S extends StateSchema = StateSchema> = Omit<AgentDefinition<S>, 'name'>;
+
+/**
+ * The revision marker of a folder agent: the content hash of its folder
+ * (never its code) and when that hash was recorded.
+ */
+export type AgentRevision = {
+    agent: string;
+    hash: string;
+    changedAt: Date;
+};
