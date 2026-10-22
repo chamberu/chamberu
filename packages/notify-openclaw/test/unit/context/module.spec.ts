@@ -133,9 +133,9 @@ describe('openclaw context', () => {
             return 'ok';
         });
         const {
-            engine, 
-            store, 
-            notifier, 
+            engine,
+            store,
+            notifier,
         } = setup(mockModel([callUse, done]), { use });
         const main = notifier();
         const ops = notifier({ name: 'ops' });
@@ -153,9 +153,9 @@ describe('openclaw context', () => {
             return 'ok';
         });
         const {
-            engine, 
-            store, 
-            notifier, 
+            engine,
+            store,
+            notifier,
         } = setup(mockModel([callUse, done]), { use });
         provideOpenclawContext(engine, notifier());
         const { run: result, steps } = await run(engine, store);

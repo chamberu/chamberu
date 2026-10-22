@@ -91,9 +91,9 @@ describe('github context', () => {
             { parts: [{ type: 'text', text: 'done' }] },
         ]);
         const {
-            engine, 
-            store, 
-            gh, 
+            engine,
+            store,
+            gh,
         } = setup(model, { use });
         provideGithubContext(engine, gh);
         await engine.start();
@@ -105,9 +105,9 @@ describe('github context', () => {
     it('the tools factory builds the read tools from the injected app', async () => {
         const model = mockModel([{ parts: [{ type: 'text', text: 'done' }] }]);
         const {
-            engine, 
-            store, 
-            gh, 
+            engine,
+            store,
+            gh,
         } = setup(model, (ctx) => injectGithubContext(ctx).readTools());
         provideGithubContext(engine, gh);
         await engine.start();
@@ -119,9 +119,9 @@ describe('github context', () => {
     it('without provide the run fails naming github', async () => {
         const model = mockModel([{ parts: [{ type: 'text', text: 'done' }] }]);
         const {
-            engine, 
-            store, 
-            errors, 
+            engine,
+            store,
+            errors,
         } = setup(model, (ctx) => injectGithubContext(ctx).readTools());
         await engine.start();
         const result = await run(engine, store);

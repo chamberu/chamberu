@@ -45,9 +45,9 @@ const done: MockResponse = { parts: [{ type: 'text', text: 'done' }] };
 
 function setup(model: LanguageModel, tools: AgentDefinition['tools']) {
     const {
-        clock, 
-        fake, 
-        gh, 
+        clock,
+        fake,
+        gh,
     } = createGithubFixture({ installationId: 42 });
     const store = new MemoryStore({ clock });
     const engine = new Engine({
@@ -132,9 +132,9 @@ describe('github notifier context', () => {
             return 'ok';
         });
         const {
-            engine, 
-            store, 
-            notifier, 
+            engine,
+            store,
+            notifier,
         } = setup(mockModel([callUse, done]), { use });
         const main = notifier();
         const ops = notifier({ name: 'ops' });
@@ -152,9 +152,9 @@ describe('github notifier context', () => {
             return 'ok';
         });
         const {
-            engine, 
-            store, 
-            notifier, 
+            engine,
+            store,
+            notifier,
         } = setup(mockModel([callUse, done]), { use });
         provideGithubNotifierContext(engine, notifier());
         const { run: result, steps } = await run(engine, store);

@@ -38,7 +38,7 @@ export const ops = defineAgent({
     name: 'ops',
     model,
     instructions: 'Operate the service.',
-    // in the factory: a missing value fails the run before any model call
+    // in the factory: tryInject reads an optional value (inject would fail the run before any model call)
     tools: (ctx) => {
         const audit = tryInject(ctx, AUDIT);
         audit?.write(`run ${ctx.run.runId} started`);

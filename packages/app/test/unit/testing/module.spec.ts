@@ -146,17 +146,17 @@ describe('module harness', () => {
     it('registers the clock and the context', () => {
         const clock = new ControllableClock(new Date('2026-10-22T00:00:00Z'));
         const harness = buildModuleHarness({
-            clock, 
-            mode: 'job', 
-            dev: true, 
+            clock,
+            mode: 'job',
+            dev: true,
         });
 
         expect(harness.container.resolve(AppToken.CLOCK)).toBe(clock);
         expect(harness.container.resolve(AppToken.CONTEXT)).toBe(harness.context);
         expect(harness.context).toMatchObject({
-            mode: 'job', 
-            dev: true, 
-            agents: [], 
+            mode: 'job',
+            dev: true,
+            agents: [],
         });
     });
 });
