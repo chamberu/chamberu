@@ -16,6 +16,7 @@ import {
     it,
 } from 'vitest';
 import { loadAgent } from '@chamvi/app';
+import { createModuleJiti, createPackageAliases, readModule } from '../../../src/loader/helpers.ts';
 import { createTempDir, writeTree } from '../../utils/folder.ts';
 
 describe('the default module reader', () => {
@@ -41,6 +42,96 @@ describe('the default module reader', () => {
         await writeFile(join(dir, '_text.ts'), 'export const text: string = \'two\';\n');
 
         expect((await loadAgent(dir)).agent.definition.instructions).toBe('two');
+    });
+
+    it.each([
+        ['agent.ts', undefined],
+        ['agent.mts', undefined],
+        ['agent.mjs', undefined],
+        ['agent.js', JSON.stringify({ type: 'module' })],
+        ['agent.js', undefined],
+    ])('re-reading a changed %s returns the new code (package.json %s)', async (file, manifest) => {
+        if (manifest) await writeTree(root.path, { 'package.json': manifest });
+        const dir = join(root.path, 'triage');
+        const body = (text: string) => `export default { model: 'test:model', instructions: '${text}' };\n`;
+        await writeTree(dir, { [file]: body('one') });
+
+        expect((await loadAgent(dir)).agent.definition.instructions).toBe('one');
+
+        await writeFile(join(dir, file), body('two'));
+
+        expect((await loadAgent(dir)).agent.definition.instructions).toBe('two');
+    });
+
+    it('re-reading returns the new code of a .mts helper imported from an agent.mjs and a tool', async () => {
+        const dir = join(root.path, 'triage');
+        await writeTree(dir, {
+            'agent.mjs': 'import { text } from \'./_text.mts\';\nexport default { model: \'test:model\', instructions: text };\n',
+            'tools/echo.ts': 'import { text } from \'../_text.mts\';\nexport default { description: text, inputSchema: { type: \'object\' } };\n',
+            '_text.mts': 'export const text: string = \'one\';\n',
+        });
+        const read = async () => {
+            const { agent } = await loadAgent(dir);
+            return [agent.definition.instructions, (agent.definition.tools as Record<string, { description: string }>).echo?.description];
+        };
+
+        expect(await read()).toEqual(['one', 'one']);
+
+        await writeFile(join(dir, '_text.mts'), 'export const text: string = \'two\';\n');
+
+        expect(await read()).toEqual(['two', 'two']);
+    });
+
+    it('a required JSON file is read again', async () => {
+        const dir = join(root.path, 'triage');
+        await writeTree(dir, {
+            'agent.ts': 'import data from \'./_data.json\';\nexport default { model: \'test:model\', instructions: data.text };\n',
+            '_data.json': JSON.stringify({ text: 'one' }),
+        });
+
+        expect((await loadAgent(dir)).agent.definition.instructions).toBe('one');
+
+        await writeFile(join(dir, '_data.json'), JSON.stringify({ text: 'two' }));
+
+        expect((await loadAgent(dir)).agent.definition.instructions).toBe('two');
+    });
+
+    it('a pinned package resolves to the app\'s copy, also for an agents dir outside the app tree', async () => {
+        const fake = (label: string) => ({
+            'package.json': JSON.stringify({
+                name: '@chamvi/fake',
+                type: 'module',
+                exports: { '.': { import: './index.mjs' }, './sub': { import: './sub.mjs' } },
+            }),
+            'index.mjs': `export const label = '${label}';\nexport const registry = new WeakSet();\nexport function mark(value) { registry.add(value); return value; }\n`,
+            'sub.mjs': `export const sub = '${label} sub';\n`,
+        });
+        const tree: Record<string, string> = { 'app/src/main.ts': '' };
+        for (const [file, content] of Object.entries(fake('app'))) tree[`app/node_modules/@chamvi/fake/${file}`] = content;
+        // a second copy where a resolution from the agent file upwards would find it
+        for (const [file, content] of Object.entries(fake('elsewhere'))) tree[`data/node_modules/@chamvi/fake/${file}`] = content;
+        tree['data/volume/agents/triage/agent.ts'] = [
+            'import { label, mark } from \'@chamvi/fake\';',
+            'import { sub } from \'@chamvi/fake/sub\';',
+            'export default { model: \'test:model\', instructions: `${label} ${sub}`, output: mark({}) };',
+            '',
+        ].join('\n');
+        await writeTree(root.path, tree);
+        const jiti = createModuleJiti(join(root.path, 'app/src/main.ts'));
+
+        const loaded = await loadAgent(join(root.path, 'data/volume/agents/triage'), { load: (path) => readModule(jiti, path) });
+        const app = await import(pathToFileURL(join(root.path, 'app/node_modules/@chamvi/fake/index.mjs')).href) as { registry: WeakSet<object> };
+
+        expect(loaded.agent.definition.instructions).toBe('app app sub');
+        expect(app.registry.has(loaded.agent.definition.output as object)).toBe(true);
+    });
+
+    it('pins @chamvi/*, ai and @ai-sdk/* to the copies the app resolves', () => {
+        const aliases = createPackageAliases(import.meta.url);
+
+        expect(Object.keys(aliases)).toEqual(expect.arrayContaining(['@chamvi/core', 'ai', 'ai/test', '@ai-sdk/provider']));
+        expect(aliases['@chamvi/core']).toMatch(/core[\\/]dist[\\/]index\.mjs$/);
+        expect(Object.keys(aliases).some((key) => key.includes('*') || key.endsWith('/package.json'))).toBe(false);
     });
 
     it('a package from node_modules is the same instance as a native import', async () => {

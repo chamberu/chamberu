@@ -9,6 +9,18 @@
 /** Module files, in the order a folder's `agent.*` is looked up. */
 export const MODULE_EXTENSIONS = ['.ts', '.mts', '.js', '.mjs'] as const;
 
+/**
+ * JavaScript files: allowed only as the module files the loader reads itself
+ * (it transpiles those fresh); a helper must be `.ts` or `.mts`, since a
+ * natively imported JavaScript file stays cached for the life of the process.
+ */
+export const SCRIPT_EXTENSIONS = ['.js', '.mjs', '.cjs'] as const;
+
+/** Scopes whose packages resolve to the app's copies (with the `ai` package). */
+export const PINNED_PACKAGE_SCOPES = ['@chamvi', '@ai-sdk'] as const;
+
+export const NODE_MODULES_DIR = 'node_modules';
+
 /** Data files (YAML or JSON) a trigger or the approvals may be written in. */
 export const DATA_EXTENSIONS = ['.yaml', '.yml', '.json'] as const;
 

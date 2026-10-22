@@ -12,6 +12,7 @@ import type { IModule } from 'orkos';
 import { AppToken, ModuleName } from '../../module/constants.ts';
 import { AGENTS_WATCHER_HOOK_NAME, NO_AGENTS_MESSAGE, NO_DIRECTORY_MESSAGE } from './constants.ts';
 import { isDirectory } from './helpers.ts';
+import type { AgentCheck } from '../../module/types.ts';
 import type { IAgentsWatcher } from './types.ts';
 import { createAgentsWatcher } from './watcher.ts';
 
@@ -21,7 +22,8 @@ import { createAgentsWatcher } from './watcher.ts';
  * With one, `setup` registers `AGENT_ISSUES` and (start mode) the watcher's
  * lifecycle hook; `onReady` loads every folder into the engine before any
  * start step runs (a folder changed while the app was down cancels its old
- * runs once, a marker without a folder removes that agent), and the watcher
+ * runs once; in start mode a marker without a folder removes that agent, a
+ * job never removes one), and the watcher
  * polls every `CHAMVI_AGENTS_POLL_MS` from `started` until `stopping` or
  * `teardown`, awaiting a reload in flight.
  */
@@ -75,11 +77,12 @@ export class AgentsModule implements IModule {
             root,
             engine: container.resolve(AppToken.ENGINE),
             codeNames: new Set(context.agents.map((agent) => agent.name)),
-            check: container.has(AppToken.MODEL_CHECK) ? container.resolve(AppToken.MODEL_CHECK) : () => undefined,
+            check: createAgentCheck(container),
             clock: container.resolve(AppToken.CLOCK),
             logger: container.resolve(AppToken.LOGGER),
             pollMs: config.agents.pollMs,
             signal: context.signal,
+            removeOrphans: context.mode === 'start',
         });
         this.watcher = watcher;
         await watcher.boot();
@@ -94,6 +97,16 @@ export class AgentsModule implements IModule {
         // idempotent; the issues stay readable
         await this.watcher?.stop();
     }
+}
+
+/** The model check, then every module's `AGENT_CHECKS` contribution. */
+function createAgentCheck(container: IContainer): AgentCheck {
+    const model = container.has(AppToken.MODEL_CHECK) ? container.resolve(AppToken.MODEL_CHECK) : undefined;
+    const checks = container.resolveAll(AppToken.AGENT_CHECKS);
+    return (agent) => {
+        model?.(agent);
+        for (const check of checks) check(agent);
+    };
 }
 
 export function agentsModule(): IModule {

@@ -14,10 +14,11 @@ import {
     it,
 } from 'vitest';
 import { writeFile } from 'node:fs/promises';
-import { InvalidAgentDefinitionError, hashAgentFolder, loadAgent } from '@chamvi/app';
+import { InvalidAgentDefinitionError, loadAgent } from '@chamvi/app';
 import { createTempDir, writeTree } from '../../utils/folder.ts';
 
 const SCHEMA = 'export default { \'~standard\': { version: 1, vendor: \'test\', validate: (value) => ({ value }) } };\n';
+const agentTs = () => 'export default { model: \'test:model\', instructions: \'x\' };\n';
 const TOOL = 'export default { description: \'Says hi.\', inputSchema: { type: \'object\' }, execute: async () => \'hi\' };\n';
 
 describe('loadAgent', () => {
@@ -44,13 +45,13 @@ describe('loadAgent', () => {
             'agent.mjs': 'export default { model: \'test:model\', budget: { maxSteps: 3 } };\n',
             'instructions.md': 'Sort the inbox.\n',
             'tools/say_hi.mjs': TOOL,
-            'tools/_helper.mjs': 'export const helper = 1;\n',
+            'tools/_helper.ts': 'export const helper = 1;\n',
             'tools/README.md': '# notes\n',
             'triggers/daily.yaml': 'cron: \'0 9 * * *\'\ntimezone: Europe/Berlin\noverlap: allow\npayload:\n  kind: daily\n',
             'state/notes.mjs': SCHEMA,
             'approvals.yaml': 'say_hi: user\n',
             '.hidden/agent.mjs': 'throw new Error("never loaded");\n',
-            '_drafts/x.mjs': 'throw new Error("never loaded");\n',
+            '_drafts/x.ts': 'throw new Error("never loaded");\n',
         });
 
         const loaded = await loadAgent(dir);
@@ -293,20 +294,41 @@ describe('loadAgent', () => {
         expect(loaded.agent.definition.instructions).toBe('x');
     });
 
-    it('returns the hash of the content it read when the folder changes during the load', async () => {
+    it('refuses a load that a change of the folder straddles', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, { 'agent.mjs': '', 'instructions.md': 'x' });
-        const before = await hashAgentFolder(dir);
 
-        const loaded = await loadAgent(dir, {
+        const promise = loadAgent(dir, {
             load: async (path) => {
                 await writeFile(path, 'export default { model: \'test:other\' };\n');
                 return { default: { model: 'test:model' } };
             },
         });
 
-        expect(loaded.agent.definition.model).toBe('test:model');
-        expect(loaded.hash).toBe(before);
-        expect(loaded.hash).not.toBe(await hashAgentFolder(dir));
+        await expect(promise).rejects.toBeInstanceOf(InvalidAgentDefinitionError);
+        await expect(promise).rejects.toThrow('triage: changed while loading; load it again.');
+    });
+
+    it.each([
+        ['a .mjs helper', '_text.mjs'],
+        ['a .js helper', 'lib/text.js'],
+        ['a .cjs helper', '_text.cjs'],
+    ])('refuses %s, which a reload would not see fresh', async (_label, file) => {
+        await expectRefused({
+            'agent.ts': agentTs(),
+            [file]: 'export const text = 1;\n',
+        }, new RegExp(`^triage/${file.replace('.', '\\.')}: a JavaScript helper is not reloaded fresh`));
+    });
+
+    it.each([
+        ['the agent folder', 'triage/node_modules/x/index.js', 'triage holds a node_modules folder'],
+        ['the agents dir', 'node_modules/x/index.js', 'the agents dir holds a node_modules folder'],
+    ])('refuses a node_modules folder in %s', async (_label, file, message) => {
+        await writeTree(root.path, {
+            'triage/agent.ts': agentTs(),
+            [file]: 'module.exports = 1;\n',
+        });
+
+        await expect(loadAgent(join(root.path, 'triage'))).rejects.toThrow(`triage: ${message}`);
     });
 });

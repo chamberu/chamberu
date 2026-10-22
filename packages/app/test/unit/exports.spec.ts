@@ -71,6 +71,7 @@ describe('public api', () => {
 
     it('exports the tokens', () => {
         expect(Object.keys(app.AppToken).sort()).toEqual([
+            'AGENT_CHECKS',
             'AGENT_ISSUES',
             'AUTHENTICATORS',
             'CLOCK',

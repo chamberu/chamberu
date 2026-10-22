@@ -6,10 +6,21 @@
  */
 
 
-import { realpathSync } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
-import { extname, join, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import {
+    readFileSync,
+    readdirSync,
+    realpathSync,
+    statSync,
+} from 'node:fs';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import {
+    basename,
+    dirname,
+    extname,
+    join,
+    sep,
+} from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { ApprovalPolicy, TriggerDefinition } from '@chamvi/core';
 import {
     InvalidAgentDefinitionError,
@@ -19,6 +30,7 @@ import {
 } from '@chamvi/core';
 import { IssueCode, flattenIssueItems } from '@ebec/core';
 import { createJiti } from 'jiti';
+import type { Jiti } from 'jiti';
 import { FormatRegistry } from 'locter';
 import { isObject } from 'smob';
 import {
@@ -28,34 +40,154 @@ import {
     isValidupError,
 } from 'validup';
 import type { ValidatorDescriptor } from 'validup';
-import { DATA_TRIGGER_KEYS, MODULE_EXTENSIONS, OVERLAP_POLICIES } from './constants.ts';
+import {
+    DATA_TRIGGER_KEYS,
+    MODULE_EXTENSIONS,
+    OVERLAP_POLICIES,
+    PINNED_PACKAGE_SCOPES,
+} from './constants.ts';
 import type { FolderFile } from './types.ts';
 
 let registry: FormatRegistry | undefined;
 
 /**
  * One scoped locter registry (never `setModuleReader`, which is process
- * global): module files through one jiti without module or fs cache, so a
- * re-read sees edits and writes nothing into `node_modules`, while jiti's
- * async import keeps packages native (one instance per package); YAML and
- * JSON through locter's built-ins.
+ * global): module files through `readModule` on one jiti that pins the
+ * app's packages (`createPackageAliases`), YAML and JSON through locter's
+ * built-ins.
  */
 export function useRegistry(): FormatRegistry {
     if (!registry) {
-        const jiti = createJiti(import.meta.url, {
-            moduleCache: false, 
-            fsCache: false, 
-            interopDefault: true, 
-        });
+        const jiti = createModuleJiti(import.meta.url);
         registry = new FormatRegistry({
             rules: [{
                 id: 'chamvi-agent-module',
-                test: ['.ts', '.mts', '.mjs', '.js'],
-                reader: { read: (id: string) => jiti.import(id), readSync: (id: string) => jiti(id) },
+                test: [...MODULE_EXTENSIONS],
+                reader: { read: (id: string) => readModule(jiti, id), readSync: (id: string) => jiti(id) },
             }],
         });
     }
     return registry;
+}
+
+/**
+ * A jiti without module or fs cache (writes nothing into `node_modules`)
+ * whose bare `@chamvi/*`, `ai` and `@ai-sdk/*` specifiers resolve to the
+ * copies `from` resolves, wherever the importing file lives.
+ */
+export function createModuleJiti(from: string): Jiti {
+    return createJiti(from, {
+        moduleCache: false,
+        fsCache: false,
+        interopDefault: true,
+        alias: createPackageAliases(from),
+    });
+}
+
+/**
+ * Evaluates a module file fresh on every call: its source is transpiled
+ * whatever its extension, since Node's ESM loader caches a natively imported
+ * `.mjs` or `.js` file for the life of the process. Its relative `.ts`/`.mts`
+ * imports are transpiled fresh too; packages load natively (one instance).
+ */
+export async function readModule(jiti: Jiti, path: string): Promise<unknown> {
+    const source = await readFile(path, 'utf8');
+    return jiti.evalModule(source, {
+        filename: path,
+        async: true,
+        forceTranspile: true,
+    });
+}
+
+/**
+ * Alias entries (`specifier -> absolute file`) for every package named
+ * `@chamvi/*`, `ai` or `@ai-sdk/*` that `from` can resolve (the closest
+ * `node_modules` first), one per exported subpath without a wildcard,
+ * resolved with the ESM conditions from `from`.
+ */
+export function createPackageAliases(from: string): Record<string, string> {
+    const fromPath = from.startsWith('file:') ? fileURLToPath(from) : from;
+    const resolver = createJiti(fromPath, { moduleCache: false, fsCache: false });
+    const packages = new Map<string, string>();
+    for (const modules of nodeModulesPaths(dirname(fromPath))) {
+        for (const name of listPinnedPackages(modules)) {
+            if (!packages.has(name)) packages.set(name, join(modules, name));
+        }
+    }
+
+    const aliases: Record<string, string> = {};
+    for (const [name, dir] of packages) {
+        for (const subpath of exportedSubpaths(dir)) {
+            const specifier = subpath === '.' ? name : `${name}${subpath.slice(1)}`;
+            try {
+                const resolved = resolver.esmResolve(specifier, { parentURL: pathToFileURL(fromPath).href });
+                aliases[specifier] = realpathSync(resolved.startsWith('file:') ? fileURLToPath(resolved) : resolved);
+            } catch {
+                // not resolvable with the import conditions (e.g. a require-only subpath): left to jiti
+            }
+        }
+    }
+    return aliases;
+}
+
+function nodeModulesPaths(start: string): string[] {
+    const paths: string[] = [];
+    let dir = start;
+    for (;;) {
+        if (basename(dir) !== 'node_modules') paths.push(join(dir, 'node_modules'));
+        const parent = dirname(dir);
+        if (parent === dir) return paths;
+        dir = parent;
+    }
+}
+
+function listPinnedPackages(modules: string): string[] {
+    const names: string[] = [];
+    if (isDirectorySync(join(modules, 'ai'))) names.push('ai');
+    for (const scope of PINNED_PACKAGE_SCOPES) {
+        let entries: string[];
+        try {
+            entries = readdirSync(join(modules, scope));
+        } catch {
+            continue;
+        }
+        for (const entry of entries) {
+            if (!entry.startsWith('.')) names.push(`${scope}/${entry}`);
+        }
+    }
+    return names;
+}
+
+/** The subpaths a package exports (`.` and `./x`), wildcards and `./package.json` left out. */
+function exportedSubpaths(dir: string): string[] {
+    let manifest: unknown;
+    try {
+        manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    } catch {
+        return [];
+    }
+    if (!isObject(manifest)) return [];
+    const { exports } = manifest;
+    if (!isObject(exports)) return ['.'];
+    const keys = Object.keys(exports);
+    if (keys.every((key) => !key.startsWith('.'))) return ['.'];
+    return keys.filter((key) => key.startsWith('.') && !key.includes('*') && key !== './package.json');
+}
+
+function isDirectorySync(path: string): boolean {
+    try {
+        return statSync(path).isDirectory();
+    } catch {
+        return false;
+    }
+}
+
+export async function isDirectory(path: string): Promise<boolean> {
+    try {
+        return (await stat(path)).isDirectory();
+    } catch {
+        return false;
+    }
 }
 
 export function isModuleFile(path: string): boolean {

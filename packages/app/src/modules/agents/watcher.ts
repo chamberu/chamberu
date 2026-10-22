@@ -6,10 +6,12 @@
  */
 
 import { join } from 'node:path';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import type { AgentIssue } from '@chamvi/http';
 import { messageOf, relativize } from '../../loader/helpers.ts';
 import { hashAgentFolder, listAgentFolders, loadAgent } from '../../loader/module.ts';
 import type { LoadedAgent } from '../../loader/types.ts';
+import { BOOT_LOAD_ATTEMPTS } from './constants.ts';
 import { isDirectory } from './helpers.ts';
 import type { AgentsWatcherOptions, IAgentsWatcher } from './types.ts';
 
@@ -19,9 +21,11 @@ import type { AgentsWatcherOptions, IAgentsWatcher } from './types.ts';
  * (`attempted`, so a broken folder is tried once per content) and the hash
  * the previous poll saw (`seen`): a folder whose hash differs from the
  * attempted one is loaded once a poll sees the same hash as the poll before
- * (stable for one interval). A folder absent on two consecutive polls is
- * removed from the engine. A failed load keeps the registered agent and
- * writes no revision marker.
+ * (stable for one interval), and registered only when the load read exactly
+ * that content. A folder absent on two consecutive polls is removed from the
+ * engine. A failed load or check keeps the registered agent and writes no
+ * revision marker. Every poll compares the stored markers with the applied
+ * hashes and records an agent whose marker another process moved as an issue.
  */
 export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatcher {
     const {
@@ -33,6 +37,7 @@ export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatch
         logger,
         pollMs,
         signal,
+        removeOrphans = true,
     } = options;
 
     const issues = new Map<string, AgentIssue>();
@@ -40,6 +45,8 @@ export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatch
     const attempted = new Map<string, string>();
     const seen = new Map<string, string>();
     const missing = new Set<string>();
+    // agents whose marker another process moved (an issue until it matches again)
+    const drifted = new Set<string>();
 
     let timer: { clear(): void } | undefined;
     let started = false;
@@ -56,34 +63,100 @@ export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatch
         logger.warn('agent load failed', { agent, message });
     };
 
-    /** Loads the folder (hashed to `hash` just before) and registers its agent, unless that is refused. */
-    const apply = async (name: string, hash: string): Promise<void> => {
+    const recordDrift = (agent: string, marker: string | undefined) => {
+        const message = marker === undefined ?
+            `${agent}: another process sharing the store removed this agent's revision marker; this replica does not run it until its folder changes. Every process sharing the store must see the same folders.` :
+            `${agent}: another process sharing the store registered other content for this agent; this replica does not run it until its folder matches. Every process sharing the store must see the same folders.`;
+        issues.set(agent, {
+            agent,
+            message,
+            at: clock.now(),
+        });
+        logger.warn('agent revision moved', { agent, message });
+    };
+
+    /** Whether the folder no longer hashes to `hash` (or is gone). */
+    const changedSince = async (name: string, hash: string): Promise<boolean> => {
+        try {
+            return await hashAgentFolder(join(root, name)) !== hash;
+        } catch {
+            return true;
+        }
+    };
+
+    /**
+     * Loads the folder (hashed to `hash` just before) and registers its agent,
+     * unless that is refused (an issue). `unstable` when the folder moved past
+     * `hash` while loading: nothing is registered or recorded, and the next
+     * stable poll decides.
+     */
+    const apply = async (name: string, hash: string): Promise<'done' | 'unstable'> => {
         attempted.set(name, hash);
         if (codeNames.has(name)) {
             record(name, `${name}: a code agent has this name; the folder is not loaded.`);
-            return;
+            return 'done';
         }
 
         let loaded: LoadedAgent;
         try {
             loaded = await loadAgent(join(root, name));
         } catch (error) {
+            if (await changedSince(name, hash)) {
+                attempted.delete(name);
+                return 'unstable';
+            }
             record(name, relativize(messageOf(error), root));
-            return;
+            return 'done';
         }
-        // the content read, which an edit while loading may have moved past `hash`
-        attempted.set(name, loaded.hash);
+        if (loaded.hash !== hash) {
+            attempted.delete(name);
+            return 'unstable';
+        }
 
         try {
             check(loaded.agent);
         } catch (error) {
             record(name, relativize(messageOf(error), root));
-            return;
+            return 'done';
         }
 
-        await engine.putAgent(loaded.agent, { revision: loaded.hash });
-        applied.set(name, loaded.hash);
+        try {
+            await engine.putAgent(loaded.agent, { revision: hash });
+        } catch (error) {
+            // refused before any store write (an unknown notifier): an issue until the content changes
+            if (error instanceof InvalidAgentDefinitionError) {
+                record(name, relativize(messageOf(error), root));
+                return 'done';
+            }
+            throw error;
+        }
+        applied.set(name, hash);
         issues.delete(name);
+        drifted.delete(name);
+        return 'done';
+    };
+
+    /**
+     * Compares the stored markers with the applied hashes: an agent whose
+     * marker another process moved or removed while its folder here is
+     * unchanged cannot run on this replica (the start guard), so it becomes
+     * an issue; it is not re-synced, since two populations with different
+     * folders would cancel each other's runs.
+     */
+    const checkMarkers = async (): Promise<void> => {
+        if (applied.size === 0) return;
+        const markers = new Map((await engine.store.listAgentRevisions()).map((marker) => [marker.agent, marker.hash]));
+        for (const [name, hash] of applied) {
+            if (seen.get(name) !== hash) continue;
+            const marker = markers.get(name);
+            if (marker === hash) {
+                if (drifted.delete(name)) issues.delete(name);
+                continue;
+            }
+            if (drifted.has(name)) continue;
+            drifted.add(name);
+            recordDrift(name, marker);
+        }
     };
 
     const poll = async (): Promise<void> => {
@@ -110,9 +183,10 @@ export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatch
             seen.set(name, hash);
             if (hash === attempted.get(name) || hash !== previous) continue;
             if (hash === applied.get(name)) {
-                // back to the registered content: nothing to reload
+                // back to the registered content: nothing to reload (the marker check re-reads a moved marker)
                 attempted.set(name, hash);
                 issues.delete(name);
+                drifted.delete(name);
                 continue;
             }
 
@@ -143,11 +217,14 @@ export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatch
                 }
             }
             missing.delete(name);
+            drifted.delete(name);
             seen.delete(name);
             attempted.delete(name);
             applied.delete(name);
             issues.delete(name);
         }
+
+        await checkMarkers();
     };
 
     const arm = () => {
@@ -169,18 +246,26 @@ export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatch
         async boot() {
             const names = await listAgentFolders(root);
             for (const name of names) {
-                if (signal?.aborted) throw signal.reason;
-                let hash: string;
-                try {
-                    hash = await hashAgentFolder(join(root, name));
-                } catch (error) {
-                    record(name, relativize(messageOf(error), root));
-                    continue;
+                for (let attempt = 1; ; attempt++) {
+                    if (signal?.aborted) throw signal.reason;
+                    let hash: string;
+                    try {
+                        hash = await hashAgentFolder(join(root, name));
+                    } catch (error) {
+                        record(name, relativize(messageOf(error), root));
+                        break;
+                    }
+                    seen.set(name, hash);
+                    if (await apply(name, hash) === 'done') break;
+                    if (attempt >= BOOT_LOAD_ATTEMPTS) {
+                        // the watcher loads it once it is stable
+                        record(name, `${name}: changed while loading; it is loaded once it stays unchanged for one poll.`);
+                        break;
+                    }
                 }
-                seen.set(name, hash);
-                await apply(name, hash);
             }
 
+            if (!removeOrphans) return;
             const folders = new Set(names);
             for (const marker of await engine.store.listAgentRevisions()) {
                 if (folders.has(marker.agent) || codeNames.has(marker.agent)) continue;

@@ -11,3 +11,6 @@ export const AGENTS_WATCHER_HOOK_NAME = 'chamvi:agents-watcher';
 export const NO_AGENTS_MESSAGE = 'createApp needs at least one agent or CHAMVI_AGENTS_DIR.';
 
 export const NO_DIRECTORY_MESSAGE = 'CHAMVI_AGENTS_DIR must name a directory.';
+
+/** How often the boot loads a folder that changes while it is read before it leaves it to the watcher. */
+export const BOOT_LOAD_ATTEMPTS = 3;

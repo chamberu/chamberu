@@ -45,6 +45,14 @@ export type AppContext = {
     agents: readonly Agent[];
 };
 
+/**
+ * Throws InvalidAgentDefinitionError for an agent a module could not serve
+ * (the scheduler: a cron trigger hubwire refuses; http: a `run_<agent>` MCP
+ * tool it cannot build). The agents dir runs every check on a folder agent
+ * before registering it, so a refusal is a load issue, never a failed boot.
+ */
+export type AgentCheck = (agent: Agent) => void;
+
 export interface ILifecycleHook {
     readonly name: string;
     /** After `new Engine(...)`, before `engine.start()` (start and job). */
@@ -92,6 +100,8 @@ export type AppTokens = {
     LIFECYCLE_HOOKS: ILifecycleHook;
     /** The agents dir's load issues (`chamvi:agents`, when a dir is configured), at the time of the call. */
     AGENT_ISSUES: () => readonly AgentIssue[];
+    /** A collection: every module's check of a folder agent before it is registered. */
+    AGENT_CHECKS: AgentCheck;
     /** Checks an agent registered after setup (a folder agent) like setup checks the code agents; a no-op with a preset default provider. */
     MODEL_CHECK: ModelCheck;
 };

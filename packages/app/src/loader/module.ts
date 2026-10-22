@@ -7,10 +7,13 @@
 
 
 import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import {
     basename,
     dirname,
+    extname,
     join,
     relative,
     sep,
@@ -35,6 +38,8 @@ import {
     DATA_EXTENSIONS,
     INSTRUCTIONS_FILE,
     MODULE_EXTENSIONS,
+    NODE_MODULES_DIR,
+    SCRIPT_EXTENSIONS,
     STATE_DIR,
     TOOLS_DIR,
     TOOL_NAME_PATTERN,
@@ -45,6 +50,7 @@ import {
     compareCodePoints,
     defaultExportOf,
     findFile,
+    isDirectory,
     isFile,
     isModuleFile,
     isStandardSchema,
@@ -64,19 +70,36 @@ import type {
 
 type ToolEntry = Tool | ((ctx: ToolContext) => Tool);
 
+const requireCache = createRequire(import.meta.url).cache;
+
 /**
  * Loads one agent folder (`dir`, whose name is the agent's): `agent.*`
  * (the AgentConfig), `instructions.md`, `tools/`, `triggers/`, `state/` and
  * `approvals.*`. Every failure is an InvalidAgentDefinitionError naming the
- * file relative to the agents dir (the folder's parent).
+ * file relative to the agents dir (the folder's parent), also a folder whose
+ * content changed while it was read.
  */
 export async function loadAgent(dir: string, options: LoadAgentOptions = {}): Promise<LoadedAgent> {
     const base = dirname(dir);
     try {
-        // Hashed before the read: an edit made while loading then shows up as
-        // a changed hash on the next poll, never as stale code under a fresh hash.
+        await assertNoNodeModules(dir);
+        // Hashed before and after the read: a read that straddles an edit is
+        // refused, so the returned hash always names the content that was read.
         const hash = await hashAgentFolder(dir);
-        const agent = await buildAgent(dir, options.load ?? ((path) => useRegistry().read(path)));
+        const read = new Set<string>();
+        const load = options.load ?? ((path: string) => useRegistry().read(path));
+        const agent = await buildAgent(dir, async (path) => {
+            read.add(path);
+            try {
+                return await load(path);
+            } finally {
+                forgetRequired(dir);
+            }
+        });
+        await assertNoScriptHelpers(dir, read);
+        if (await hashAgentFolder(dir) !== hash) {
+            throw new InvalidAgentDefinitionError(`${basename(dir)}: changed while loading; load it again.`);
+        }
         return {
             agent,
             hash,
@@ -108,13 +131,86 @@ export async function loadAgents(root: string, options: LoadAgentOptions = {}): 
     return { agents, issues };
 }
 
-/** The names of the direct subfolders of `root` not starting with `.` or `_`, in code-point order. */
+/** The names of the direct subfolders of `root` not starting with `.` or `_` (and not `node_modules`), in code-point order. */
 export async function listAgentFolders(root: string): Promise<string[]> {
     const found = await locateMany('*', { cwd: root, onlyDirectories: true });
     return found
         .map((info) => basename(info.path))
-        .filter((name) => !name.startsWith('.') && !name.startsWith('_'))
+        .filter((name) => !name.startsWith('.') && !name.startsWith('_') && name !== NODE_MODULES_DIR)
         .sort(compareCodePoints);
+}
+
+/**
+ * Refuses a `node_modules` folder in the agent folder or the agents dir: a
+ * package installed there would load as a second copy next to the app's
+ * (a second `@chamvi/core` breaks tools, `inject()` and `instanceof`).
+ */
+async function assertNoNodeModules(dir: string): Promise<void> {
+    for (const [where, path] of [[basename(dir), dir], ['the agents dir', dirname(dir)]] as const) {
+        if (await isDirectory(join(path, NODE_MODULES_DIR))) {
+            throw new InvalidAgentDefinitionError(
+                `${basename(dir)}: ${where} holds a node_modules folder; packages resolve from the app, install them there.`,
+            );
+        }
+    }
+}
+
+/**
+ * Refuses a JavaScript file (`.js`, `.mjs`, `.cjs`) that is not one of the
+ * module files the loader read itself (or would read: a shadowed `agent.mjs`
+ * next to an `agent.ts`): Node caches a natively imported
+ * JavaScript file for the life of the process, so a reload would not see an
+ * edit of it. Helpers are `.ts` or `.mts`.
+ */
+async function assertNoScriptHelpers(dir: string, read: ReadonlySet<string>): Promise<void> {
+    const found = await locateMany(`**/*{${SCRIPT_EXTENSIONS.join(',')}}`, {
+        cwd: dir,
+        onlyFiles: true,
+        dot: false,
+    });
+    const helpers = found
+        .map((info) => info.path)
+        .filter((path) => !read.has(path))
+        .map((path) => relative(dir, path).split(sep).join('/'))
+        .filter((path) => !isModulePosition(path))
+        .sort(compareCodePoints);
+    if (helpers.length > 0) {
+        throw new InvalidAgentDefinitionError(
+            `${basename(dir)}/${helpers[0]}: a JavaScript helper is not reloaded fresh; write helpers as .ts or .mts.`,
+        );
+    }
+}
+
+/**
+ * Whether a folder-relative POSIX path is where the loader looks for a module
+ * file (`agent.*`, `approvals.*`, `tools/*`, `triggers/*`, `state/*`).
+ */
+function isModulePosition(path: string): boolean {
+    const extension = extname(path);
+    if (!(MODULE_EXTENSIONS as readonly string[]).includes(extension)) return false;
+    const segments = path.split('/');
+    const name = segments[segments.length - 1] as string;
+    if (segments.length === 1) {
+        const stem = name.slice(0, -extension.length);
+        return stem === AGENT_FILE || stem === APPROVALS_FILE;
+    }
+    return segments.length === 2 &&
+        [TOOLS_DIR, TRIGGERS_DIR, STATE_DIR].includes(segments[0] as string) &&
+        !name.startsWith('.') &&
+        !name.startsWith('_');
+}
+
+/** Drops the CommonJS cache entries below `dir` (a required `.json` file), so the next load reads them again. */
+function forgetRequired(dir: string): void {
+    const prefixes = [`${dir}${sep}`];
+    try {
+        prefixes.push(`${realpathSync(dir)}${sep}`);
+    } catch {
+        // gone meanwhile
+    }
+    for (const key of Object.keys(requireCache)) {
+        if (prefixes.some((prefix) => key.startsWith(prefix))) delete requireCache[key];
+    }
 }
 
 /**
