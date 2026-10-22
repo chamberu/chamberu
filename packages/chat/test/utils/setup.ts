@@ -51,6 +51,7 @@ export function setupChat(options: {
         userName: 'bot',
         adapters: { slack: adapter },
         state: createMemoryState(),
+        concurrency: 'concurrent',
         logger: 'silent',
     });
     const errors: unknown[] = [];

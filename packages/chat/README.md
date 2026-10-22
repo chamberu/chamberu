@@ -18,6 +18,8 @@ const chat = new Chat({
     userName: 'chamvi',
     adapters: { slack: createSlackAdapter() },
     state: createPostgresState({ url: process.env.DATABASE_URL }),
+    // the handlers only dispatch; chamvi orders a thread's runs. The default 'drop' would discard messages.
+    concurrency: 'concurrent',
 });
 
 const bridge = createChatBridge({

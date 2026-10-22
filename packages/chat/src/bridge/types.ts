@@ -20,7 +20,13 @@ export type ChatApprovalRef = {
 export type ChatTarget = { threadId: string } | { channelId: string };
 
 export type ChatBridgeOptions = {
-    /** A configured Chat SDK instance: adapters and a state adapter (`@chat-adapter/state-pg` shares chamvi's Postgres). */
+    /**
+     * A configured Chat SDK instance: adapters and a state adapter
+     * (`@chat-adapter/state-pg` shares chamvi's Postgres). Create it with
+     * `concurrency: 'concurrent'`: the handlers only dispatch, the engine
+     * already orders a thread's runs, and the Chat SDK default `'drop'`
+     * discards a message that arrives while another one of the thread is dispatched.
+     */
     chat: Chat<any>;
     /** Default 'chat'; chatTrigger({ channel }) and the notifier name refer to it. */
     name?: string;
