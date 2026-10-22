@@ -22,6 +22,9 @@ import { contextKeyName, isContextKey } from '../context/helpers.ts';
 import type { ContextKey, IContextProvider } from '../context/types.ts';
 import {
     AgentNotFoundError,
+    ChamviError,
+    ChannelNotFoundError,
+    ErrorCode,
     InvalidAgentDefinitionError,
     InvalidResumeTokenError,
     InvalidRunStateError,
@@ -634,13 +637,21 @@ export class Engine implements IContextProvider {
         );
     }
 
-    /** Denies every approval past its expiresAt ('approval timed out'). Also runs on every poll. */
+    /**
+     * Denies every approval past its expiresAt ('approval timed out') and
+     * re-sends the approval message of every other approval not delivered
+     * yet (a failed send, or a crash between the pause and the send). Also
+     * runs on every poll.
+     */
     async tick(): Promise<void> {
         const now = this.clock.now().getTime();
         const { data } = await this.store.listRuns({ status: [RunStatus.WAITING] });
         for (const listed of data) {
             if (!listed.waiting) continue;
-            if (listed.waiting.expiresAt.getTime() > now) continue;
+            if (listed.waiting.expiresAt.getTime() > now) {
+                if (!listed.waiting.notifiedAt) await this.deliverApproval(listed, listed.waiting);
+                continue;
+            }
             try {
                 // the listing may be stale by now: the run could wait on a newer approval
                 const run = await this.store.getRun(listed.id);
@@ -755,11 +766,85 @@ export class Engine implements IContextProvider {
         });
         if (!updated) return;
         this.emit({ type: 'run.updated', run: updated });
-        // a cancel arrived while pausing (an abort cannot interrupt this write): settle
+        // a cancel arrived while pausing (an abort cannot interrupt this write): settle, do not deliver
         if (updated.cancelRequested || this.executions.get(run.id)?.stop === 'cancel') {
             await this.cancelStored(run.id, [RunStatus.WAITING]).catch((error: unknown) => {
                 if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
             });
+            return;
+        }
+        if (!waiting.notifiedAt) await this.deliverApproval(updated, waiting);
+    }
+
+    /**
+     * Sends the approval message of `waiting` through the channel it names
+     * (none: inbox and API only, nothing to send) unless it was delivered
+     * already: a successful send records `waiting.notifiedAt`. The message
+     * never carries the resume token; its key `<runId>:<approvalId>` is fixed
+     * once the wait point is stored, so the channel dedupes a send whose
+     * record was lost. A store lock `notify:<runId>:<approvalId>` held for one
+     * attempt keeps replicas from sending concurrently; the attempt is aborted
+     * after claimTtlMs (the lock's TTL). A failed attempt, or a channel the
+     * engine does not have, goes to onError and is retried by tick() on the
+     * next poll; the run keeps waiting.
+     */
+    protected async deliverApproval(run: Run, waiting: WaitPoint): Promise<void> {
+        if (waiting.channel === undefined) return;
+        const channel = this.channels.get(waiting.channel);
+        if (!channel || typeof channel.out !== 'function') {
+            this.onError(new ChannelNotFoundError(waiting.channel), run);
+            return;
+        }
+        const key = `${run.id}:${waiting.approvalId}`;
+        const lockKey = `notify:${key}`;
+        const attempt = randomUUID();
+        let acquired = false;
+        const isCurrent = (current: Run | undefined) => current?.status === RunStatus.WAITING &&
+            current.waiting?.tokenId === waiting.tokenId;
+        const controller = new AbortController();
+        const timer = this.clock.setTimeout(() => controller.abort(new ChamviError({
+            message: `Channel "${channel.name}" did not deliver approval "${waiting.approvalId}" within ${this.claimTtlMs}ms.`,
+            code: ErrorCode.TIMEOUT,
+        })), this.claimTtlMs);
+        try {
+            acquired = await this.store.acquire(lockKey, attempt, this.claimTtlMs);
+            if (!acquired) return;
+            // another attempt may have delivered it since `run` was read
+            const current = await this.store.getRun(run.id);
+            if (!isCurrent(current) || current?.waiting?.notifiedAt) return;
+            const aborted = new Promise<never>((_, reject) => {
+                if (controller.signal.aborted) reject(controller.signal.reason);
+                controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true });
+            });
+            // a transport that ignores the signal must not hold the pause (or tick) forever
+            await Promise.race([
+                channel.out({
+                    kind: 'approval',
+                    key,
+                    runId: run.id,
+                    agent: run.agent,
+                    title: waiting.title,
+                    body: waiting.body ?? '',
+                    approvalId: waiting.approvalId,
+                    expiresAt: waiting.expiresAt,
+                }, waiting.address ?? '', { signal: controller.signal, trigger: run.trigger }),
+                aborted,
+            ]);
+            // answered meanwhile: nothing left to record
+            if (!isCurrent(await this.store.getRun(run.id))) return;
+            const notified = await this.store.updateRun(
+                run.id,
+                { waiting: { ...waiting, notifiedAt: this.clock.now() } },
+                { expectStatus: [RunStatus.WAITING] },
+            );
+            this.emit({ type: 'run.updated', run: notified });
+        } catch (error) {
+            if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
+        } finally {
+            timer.clear();
+            if (acquired) {
+                await this.store.release(lockKey, attempt).catch((releaseError: unknown) => this.onError(releaseError, run));
+            }
         }
     }
 
