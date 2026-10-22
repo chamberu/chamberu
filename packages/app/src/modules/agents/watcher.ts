@@ -11,8 +11,8 @@ import type { AgentIssue } from '@chamvi/http';
 import { messageOf, relativize } from '../../loader/helpers.ts';
 import { hashAgentFolder, listAgentFolders, loadAgent } from '../../loader/module.ts';
 import type { LoadedAgent } from '../../loader/types.ts';
-import { BOOT_LOAD_ATTEMPTS } from './constants.ts';
-import { isDirectory } from './helpers.ts';
+import { BOOT_LOAD_ATTEMPTS, EMPTY_ROOT_MESSAGE } from './constants.ts';
+import { isDirectory, isEmptyDirectory } from './helpers.ts';
 import type { AgentsWatcherOptions, IAgentsWatcher } from './types.ts';
 
 /**
@@ -166,6 +166,12 @@ export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatch
             rootGone = true;
             return;
         }
+        if (await isEmptyDirectory(root)) {
+            // an empty mount point (a volume not mounted yet) removes nothing either
+            if (!rootGone) logger.warn(EMPTY_ROOT_MESSAGE);
+            rootGone = true;
+            return;
+        }
         rootGone = false;
 
         const names = await listAgentFolders(root);
@@ -266,6 +272,12 @@ export function createAgentsWatcher(options: AgentsWatcherOptions): IAgentsWatch
             }
 
             if (!removeOrphans) return;
+            if (await isEmptyDirectory(root)) {
+                // an empty mount point must not remove every agent with a marker
+                logger.warn(EMPTY_ROOT_MESSAGE);
+                rootGone = true;
+                return;
+            }
             const folders = new Set(names);
             for (const marker of await engine.store.listAgentRevisions()) {
                 if (folders.has(marker.agent) || codeNames.has(marker.agent)) continue;

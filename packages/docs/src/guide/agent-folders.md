@@ -113,7 +113,7 @@ A folder that does not load never stops the app. A syntax error, a missing defau
 
 ## Live reload
 
-Each poll hashes every folder (sha256 over every file below it, dot-entries skipped). A changed folder loads once two polls in a row see the same hash, so a change lands within two intervals and a tree that is still being copied is not loaded half-way: the load hashes the folder again before and after it reads it, and registers the agent only when both equal the stable hash (otherwise the next stable poll decides). A folder missing on two polls in a row is removed. When the agents dir itself is gone (an unmounted volume), every agent stays loaded until it is back.
+Each poll hashes every folder (sha256 over every file below it, dot-entries skipped). A changed folder loads once two polls in a row see the same hash, so a change lands within two intervals and a tree that is still being copied is not loaded half-way: the load hashes the folder again before and after it reads it, and registers the agent only when both equal the stable hash (otherwise the next stable poll decides). A folder missing on two polls in a row is removed. When the agents dir itself is gone, or has no entry at all (the empty mount point of a volume that is not mounted), every agent stays loaded and nothing is removed until it is back; the boot removes no agent for such a dir either. To remove the last folder agent on purpose, leave any file in the dir (a `.keep`), so its empty listing counts.
 
 To replace a folder at once, write the new tree next to it under a dot-prefixed name (skipped by the loader) and rename it over the old one.
 

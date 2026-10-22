@@ -295,12 +295,32 @@ describe('agentsModule', () => {
             changedAt: START,
         });
         const runId = await queueRun(store, clock, 'gone');
+        // any entry makes an empty listing authoritative (no unmounted volume)
+        await writeFile(join(root.path, '.keep'), '');
 
         const { harness } = build({ store, clock });
         await harness.setup();
 
         expect((await store.getRun(runId))?.status).toBe('cancelled');
         expect(await store.getAgentRevision('gone')).toBeUndefined();
+    });
+
+    it('an empty agents dir (an unmounted volume) removes no marker at boot', async () => {
+        const clock = new ControllableClock(START);
+        const store = new MemoryStore({ clock });
+        await store.setAgentRevision({
+            agent: 'gone',
+            hash: 'h1',
+            changedAt: START,
+        });
+        const runId = await queueRun(store, clock, 'gone');
+
+        const { harness, logger } = build({ store, clock });
+        await harness.setup();
+
+        expect((await store.getRun(runId))?.status).toBe('queued');
+        expect(await store.getAgentRevision('gone')).toBeDefined();
+        expect(logger.entries.filter((entry) => entry.msg === 'the agents dir is empty; no agent is removed')).toHaveLength(1);
     });
 
     it('a marker of a code agent is left alone at boot', async () => {
@@ -419,7 +439,7 @@ describe('agentsModule', () => {
     });
 
     it('a removed folder removes the agent after two polls', async () => {
-        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1') });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1'), '.keep': '' });
         const {
             harness,
             engine,
@@ -437,6 +457,39 @@ describe('agentsModule', () => {
         await poll();
         expect(engine().getAgent('greeter')).toBeUndefined();
         expect(await store.getAgentRevision('greeter')).toBeUndefined();
+    });
+
+    it('an agents dir left empty (an unmounted volume) keeps every agent and its runs', async () => {
+        await writeTree(root.path, {
+            'greeter/agent.ts': agentFile('v1'),
+            'greeter/triggers/http.yaml': 'http: true\n',
+        });
+        const {
+            harness,
+            engine,
+            store,
+            logger,
+            watch,
+            poll,
+        } = build();
+        await harness.setup();
+        await watch();
+        const { runId } = await engine().dispatch({
+            agent: 'greeter',
+            trigger: 'http',
+            source: 'http',
+            payload: {},
+        });
+
+        await rm(folder(), { recursive: true, force: true });
+        await poll();
+        await poll();
+        await poll();
+
+        expect(engine().getAgent('greeter')).toBeDefined();
+        expect(await store.getAgentRevision('greeter')).toBeDefined();
+        expect((await store.getRun(runId))?.status).not.toBe('cancelled');
+        expect(logger.entries.filter((entry) => entry.msg === 'the agents dir is empty; no agent is removed')).toHaveLength(1);
     });
 
     it('a folder back after one missing poll stays loaded', async () => {
