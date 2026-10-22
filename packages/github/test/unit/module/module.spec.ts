@@ -7,8 +7,13 @@
 
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { InvalidAgentDefinitionError, defineAgent } from '@chamvi/core';
-import { githubWebhook } from '@chamvi/github';
+import {
+    InvalidAgentDefinitionError,
+    defineAgent,
+    defineTool,
+    http,
+} from '@chamvi/core';
+import { githubWebhook, injectGithubContext } from '@chamvi/github';
 import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
 import {
     afterEach,
@@ -16,6 +21,7 @@ import {
     expect,
     it,
 } from 'vitest';
+import { z } from 'zod';
 import {
     AppToken,
     configModule,
@@ -24,13 +30,16 @@ import {
     staticTokensModule,
     storeModule,
 } from '@chamvi/app';
-import { githubModule } from '@chamvi/app/github';
-import { createHarness } from '../../utils/harness.ts';
-import type { Harness } from '../../utils/harness.ts';
-import { SECRET, TOKENS } from '../../utils/app.ts';
-import { createRecordingLogger } from '../../utils/logger.ts';
-import { textModel } from '../../utils/model.ts';
-import { freePort } from '../../utils/port.ts';
+import { createModuleHarness } from '@chamvi/app/testing';
+import type { ModuleHarness } from '@chamvi/app/testing';
+import { githubModule } from '@chamvi/github/module';
+import { mockModel, textModel } from '../../utils/model.ts';
+import {
+    SECRET,
+    TOKENS,
+    createRecordingLogger,
+    freePort,
+} from '../../utils/module.ts';
 
 const clock = new ControllableClock(new Date('2026-10-20T10:00:00Z'));
 const fake = createFakeGithub({ appId: '1', clock });
@@ -48,7 +57,7 @@ function sign(body: string, secret: string): string {
     return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
 }
 
-let harnesses: Harness[] = [];
+let harnesses: ModuleHarness[] = [];
 
 afterEach(async () => {
     await Promise.all(harnesses.map((h) => h.stop()));
@@ -137,14 +146,14 @@ describe('githubModule', () => {
     });
 
     it('contributes the webhook route', async () => {
-        const harness = await createHarness({ modules: [githubModule({ env: githubEnv() })] });
+        const harness = await createModuleHarness({ modules: [githubModule({ env: githubEnv() })] });
         harnesses.push(harness);
         const routes = harness.container.resolveAll(AppToken.HTTP_ROUTES);
         expect(routes.map((route) => [route.method, route.path])).toEqual([['POST', '/webhooks/github']]);
     });
 
     it('contributes the webhook route at webhookPath', async () => {
-        const harness = await createHarness({ modules: [githubModule({ env: githubEnv(), webhookPath: '/gh' })] });
+        const harness = await createModuleHarness({ modules: [githubModule({ env: githubEnv(), webhookPath: '/gh' })] });
         harnesses.push(harness);
         const routes = harness.container.resolveAll(AppToken.HTTP_ROUTES);
         expect(routes.map((route) => route.path)).toEqual(['/gh']);
@@ -158,7 +167,7 @@ describe('githubModule', () => {
             instructions: 'triage',
             triggers: [githubWebhook({ events: ['issues.opened'] })],
         });
-        const harness = await createHarness({
+        const harness = await createModuleHarness({
             env: {
                 RESUME_SECRET: SECRET,
                 CHAMVI_TOKENS: TOKENS,
@@ -177,7 +186,7 @@ describe('githubModule', () => {
         });
         harnesses.push(harness);
 
-        const body = readFileSync(new URL('../../../../github/test/fixtures/deliveries/issues-opened.json', import.meta.url), 'utf8');
+        const body = readFileSync(new URL('../../fixtures/deliveries/issues-opened.json', import.meta.url), 'utf8');
         const response = await fetch(`http://127.0.0.1:${port}/webhooks/github`, {
             method: 'POST',
             headers: {
@@ -192,5 +201,56 @@ describe('githubModule', () => {
         const answer = await response.json() as { runs: Array<{ agent: string; runId: string }> };
         expect(answer.runs).toHaveLength(1);
         expect(answer.runs[0]!.agent).toBe('triage');
+    });
+
+    it('provides the app as context', async () => {
+        const module = githubModule({ env: githubEnv() });
+        const seen: boolean[] = [];
+        const probe = defineTool({
+            inputSchema: z.object({}),
+            execute: async (_input, { context }) => {
+                seen.push(injectGithubContext(context) === module.app);
+                return 'ok';
+            },
+        });
+        const agent = defineAgent({
+            name: 'probe',
+            model: mockModel([
+                {
+                    parts: [{
+                        type: 'tool-call', 
+                        toolName: 'probe', 
+                        input: {}, 
+                    }], 
+                },
+                { parts: [{ type: 'text', text: 'done' }] },
+            ]),
+            instructions: 'probe',
+            triggers: [http()],
+            tools: { probe },
+        });
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET },
+            agents: [agent],
+            modules: [
+                configModule({ logger: createRecordingLogger() }),
+                storeModule(),
+                engineModule(),
+                module,
+            ],
+        });
+        harnesses.push(harness);
+
+        const engine = harness.container.resolve(AppToken.ENGINE);
+        const { runId } = await engine.dispatch({
+            agent: 'probe',
+            trigger: 'http',
+            source: 'http',
+            payload: {},
+        });
+        await engine.idle();
+        expect((await engine.getRun(runId))?.status).toBe('completed');
+        expect(seen).toEqual([true]);
+        expect(harness.reported).toEqual([]);
     });
 });

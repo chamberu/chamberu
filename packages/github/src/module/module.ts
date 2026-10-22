@@ -5,17 +5,18 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { IGithubApp } from '@chamvi/github';
-import type { IContainer } from 'eldin';
-import type { IModule } from 'orkos';
-import { AppToken } from '../module/constants.ts';
+import { AppToken } from '@chamvi/app';
+import type { IContainer, IModule } from '@chamvi/app';
+import type { IGithubApp } from '../app/types.ts';
+import { provideGithubContext } from '../context/module.ts';
 import { GITHUB_MODULE_NAME } from './constants.ts';
 import { createGithubAppFromEnv } from './helpers.ts';
 import type { GithubModuleOptions } from './types.ts';
 
 /**
  * A GitHub App (`.app`, built when the factory is called) whose `setup`
- * contributes its signed webhook route to `AppToken.HTTP_ROUTES`.
+ * contributes its signed webhook route to `AppToken.HTTP_ROUTES` and provides
+ * the app on the engine (`injectGithubContext(ctx)`).
  */
 export class GithubModule implements IModule {
     readonly name: string = GITHUB_MODULE_NAME;
@@ -37,6 +38,12 @@ export class GithubModule implements IModule {
 
     async setup(container: IContainer): Promise<void> {
         container.registerMany(AppToken.HTTP_ROUTES, { useValue: this.app.webhookRoute(typeof this.webhookPath === 'string' ? { path: this.webhookPath } : undefined) });
+        container.registerMany(AppToken.LIFECYCLE_HOOKS, {
+            useValue: {
+                name: this.name,
+                engineCreated: (engine) => provideGithubContext(engine, this.app),
+            },
+        });
     }
 }
 

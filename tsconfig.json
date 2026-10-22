@@ -4,7 +4,6 @@
         "paths": {
             "@chamvi/app": ["./packages/app/src/index.ts"],
             "@chamvi/app/authup": ["./packages/app/src/authup/index.ts"],
-            "@chamvi/app/github": ["./packages/app/src/github/index.ts"],
             "@chamvi/app/openclaw": ["./packages/app/src/openclaw/index.ts"],
             "@chamvi/app/sandbox": ["./packages/app/src/sandbox/index.ts"],
             "@chamvi/app/testing": ["./packages/app/src/testing/index.ts"],
@@ -13,8 +12,10 @@
             "@chamvi/coding": ["./packages/coding/src/index.ts"],
             "@chamvi/core": ["./packages/core/src/index.ts"],
             "@chamvi/github": ["./packages/github/src/index.ts"],
+            "@chamvi/github/module": ["./packages/github/src/module/index.ts"],
             "@chamvi/http": ["./packages/http/src/index.ts"],
             "@chamvi/notify-github": ["./packages/notify-github/src/index.ts"],
+            "@chamvi/notify-github/module": ["./packages/notify-github/src/module/index.ts"],
             "@chamvi/notify-openclaw": ["./packages/notify-openclaw/src/index.ts"],
             "@chamvi/sandbox": ["./packages/sandbox/src/index.ts"],
             "@chamvi/sandbox-docker": ["./packages/sandbox-docker/src/index.ts"],

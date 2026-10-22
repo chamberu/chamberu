@@ -25,8 +25,6 @@ export default defineConfig({
             { find: /^@chamvi\/scheduler$/, replacement: fileURLToPath(new URL('../../scheduler/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/store-typeorm$/, replacement: fileURLToPath(new URL('../../store-typeorm/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/test-kit$/, replacement: fileURLToPath(new URL('../../test-kit/src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/github$/, replacement: fileURLToPath(new URL('../../github/src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/notify-github$/, replacement: fileURLToPath(new URL('../../notify-github/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/notify-openclaw$/, replacement: fileURLToPath(new URL('../../notify-openclaw/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/sandbox$/, replacement: fileURLToPath(new URL('../../sandbox/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/sandbox-local$/, replacement: fileURLToPath(new URL('../../sandbox-local/src/index.ts', import.meta.url)) },
@@ -34,7 +32,7 @@ export default defineConfig({
             { find: /^@chamvi\/sandbox-k8s$/, replacement: fileURLToPath(new URL('../../sandbox-k8s/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/ui$/, replacement: fileURLToPath(new URL('../../ui/src/index.ts', import.meta.url)) },
             { find: /^@chamvi\/app$/, replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)) },
-            { find: /^@chamvi\/app\/(github|sandbox|openclaw|ui|authup|testing)$/, replacement: `${fileURLToPath(new URL('../src/', import.meta.url))}$1/index.ts` },
+            { find: /^@chamvi\/app\/(sandbox|openclaw|ui|authup|testing)$/, replacement: `${fileURLToPath(new URL('../src/', import.meta.url))}$1/index.ts` },
         ],
     },
     test: {

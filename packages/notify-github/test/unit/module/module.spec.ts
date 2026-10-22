@@ -5,8 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { defineAgent } from '@chamvi/core';
+import { defineAgent, defineTool, http } from '@chamvi/core';
+import type { INotifier } from '@chamvi/core';
 import { createGithubApp, githubWebhook } from '@chamvi/github';
+import { injectGithubNotifierContext } from '@chamvi/notify-github';
 import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
 import { tool } from 'ai';
 import {
@@ -23,14 +25,13 @@ import {
     engineModule,
     storeModule,
 } from '@chamvi/app';
-import { githubNotifierModule } from '@chamvi/app/github';
-import { createHarness } from '../../utils/harness.ts';
-import type { Harness } from '../../utils/harness.ts';
-import { SECRET } from '../../utils/app.ts';
-import { createRecordingLogger } from '../../utils/logger.ts';
-import { approvalModel } from '../../utils/model.ts';
+import { createModuleHarness } from '@chamvi/app/testing';
+import type { ModuleHarness } from '@chamvi/app/testing';
+import { githubNotifierModule } from '@chamvi/notify-github/module';
+import { approvalModel, mockModel } from '../../utils/model.ts';
+import { SECRET, createRecordingLogger } from '../../utils/module.ts';
 
-let harnesses: Harness[] = [];
+let harnesses: ModuleHarness[] = [];
 
 afterEach(async () => {
     await Promise.all(harnesses.map((h) => h.stop()));
@@ -72,7 +73,7 @@ async function waitingComment(env: Record<string, string>) {
         approvals: { deploy: 'user' },
         notify: 'github',
     });
-    const harness = await createHarness({
+    const harness = await createModuleHarness({
         env: { RESUME_SECRET: SECRET, ...env },
         agents: [agent],
         clock,
@@ -126,5 +127,71 @@ describe('githubNotifierModule', () => {
         const { body } = await waitingComment({});
         expect(body).not.toContain('/ui/approvals?run=');
         expect(body).toContain('Answer it in the chamvi UI or through POST /runs/:id/approve.');
+    });
+
+    it('provides the notifier as context', async () => {
+        const clock = new ControllableClock(new Date('2026-10-21T09:00:00Z'));
+        const fake = createFakeGithub({
+            appId: '1', 
+            slug: 'chamvi-test', 
+            clock, 
+        });
+        const app = createGithubApp({
+            appId: '1',
+            privateKey: fake.privateKey,
+            webhookSecret: 's',
+            slug: 'chamvi-test',
+            clock,
+            fetch: fake.fetch,
+        });
+        const seen: INotifier[] = [];
+        const probe = defineTool({
+            inputSchema: z.object({}),
+            execute: async (_input, { context }) => {
+                seen.push(injectGithubNotifierContext(context));
+                return 'ok';
+            },
+        });
+        const agent = defineAgent({
+            name: 'probe',
+            model: mockModel([
+                {
+                    parts: [{
+                        type: 'tool-call', 
+                        toolName: 'probe', 
+                        input: {}, 
+                    }], 
+                },
+                { parts: [{ type: 'text', text: 'done' }] },
+            ]),
+            instructions: 'probe',
+            triggers: [http()],
+            tools: { probe },
+        });
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET },
+            agents: [agent],
+            clock,
+            modules: [
+                configModule({ clock, logger: createRecordingLogger(clock) }),
+                storeModule(),
+                engineModule(),
+                githubNotifierModule({ app }),
+            ],
+        });
+        harnesses.push(harness);
+
+        const engine = harness.container.resolve(AppToken.ENGINE);
+        const { runId } = await engine.dispatch({
+            agent: 'probe',
+            trigger: 'http',
+            source: 'http',
+            payload: {},
+        });
+        await engine.idle();
+        expect((await engine.getRun(runId))?.status).toBe('completed');
+        expect(seen).toHaveLength(1);
+        expect(seen[0]).toBe(harness.container.resolveAll(AppToken.NOTIFIERS)[0]);
+        expect(harness.reported).toEqual([]);
     });
 });

@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as pkg from '@chamvi/notify-github';
+import * as module from '@chamvi/notify-github/module';
 
 describe('public api', () => {
     it('exports githubNotifier', () => {
@@ -36,6 +37,19 @@ describe('public api', () => {
         'markerKey',
         'githubNotifierContextKey',
     ])('keeps %s internal', (name) => {
+        expect(pkg).not.toHaveProperty(name);
+    });
+
+    it('@chamvi/notify-github/module exports githubNotifierModule', () => {
+        expect(module.githubNotifierModule).toBeTypeOf('function');
+        expect(module.GithubNotifierModule).toBeTypeOf('function');
+        expect(module).not.toHaveProperty('DEFAULT_GITHUB_NOTIFIER_NAME');
+    });
+
+    it.each([
+        'githubNotifierModule',
+        'GithubNotifierModule',
+    ])('the main entry keeps %s out', (name) => {
         expect(pkg).not.toHaveProperty(name);
     });
 });

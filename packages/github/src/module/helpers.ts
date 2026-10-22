@@ -6,15 +6,15 @@
  */
 
 import { InvalidAgentDefinitionError } from '@chamvi/core';
-import { createGithubApp } from '@chamvi/github';
-import type { GithubAppOptions, IGithubApp } from '@chamvi/github';
 import {
     envInteger,
     envList,
     envString,
     envUrl,
-} from '../env/module.ts';
-import type { Env } from '../env/types.ts';
+} from '@chamvi/app';
+import type { Env } from '@chamvi/app';
+import { createGithubApp } from '../app/module.ts';
+import type { GithubAppOptions, IGithubApp } from '../app/types.ts';
 
 /** The env variable each createGithubApp option is read from. */
 const VARIABLES = {

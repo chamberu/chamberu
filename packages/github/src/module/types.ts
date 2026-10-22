@@ -5,9 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { GithubAppOptions, IGithubApp } from '@chamvi/github';
-import type { GithubNotifierOptions } from '@chamvi/notify-github';
-import type { Env } from '../env/types.ts';
+import type { Env } from '@chamvi/app';
+import type { GithubAppOptions, IGithubApp } from '../app/types.ts';
 
 export type GithubModuleOptions = Partial<GithubAppOptions> & {
     /** Used as is; no env is read then. */
@@ -17,6 +16,3 @@ export type GithubModuleOptions = Partial<GithubAppOptions> & {
     /** Default `/webhooks/github`. */
     webhookPath?: string;
 };
-
-/** `githubNotifier()` options; `approvalUrl` defaults to the UI link from `CHAMVI_PUBLIC_URL`, `clock` is the app's. */
-export type GithubNotifierModuleOptions = Omit<GithubNotifierOptions, 'clock'>;

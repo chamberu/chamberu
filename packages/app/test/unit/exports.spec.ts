@@ -8,7 +8,6 @@
 import { describe, expect, it } from 'vitest';
 import * as app from '@chamvi/app';
 import * as authup from '@chamvi/app/authup';
-import * as github from '@chamvi/app/github';
 import * as openclaw from '@chamvi/app/openclaw';
 import * as sandbox from '@chamvi/app/sandbox';
 import * as testing from '@chamvi/app/testing';
@@ -121,7 +120,6 @@ describe('public api', () => {
     });
 
     it.each([
-        ['github', github, ['githubModule', 'githubNotifierModule']],
         ['sandbox', sandbox, ['sandboxModule']],
         ['openclaw', openclaw, ['openclawModule']],
         ['ui', ui, ['uiModule']],
@@ -138,6 +136,7 @@ describe('public api', () => {
         'createPurgeTimer',
         'createLazyProvider',
         'githubModule',
+        'githubNotifierModule',
         'sandboxModule',
         'buildModuleHarness',
         'createModuleHarness',

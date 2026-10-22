@@ -11,7 +11,6 @@ npm install @chamvi/app ai typeorm pg
 | Entry | Exports | Needs |
 |---|---|---|
 | `@chamvi/app` | `createApp`, `isApp`, the built-in modules, tokens, env readers, `readConfig`, `createLogger`, `createModelRegistry` | |
-| `@chamvi/app/github` | `githubModule`, `githubNotifierModule` | `@chamvi/github`, `@chamvi/notify-github` |
 | `@chamvi/app/sandbox` | `sandboxModule` | `@chamvi/sandbox` and the provider package (`@chamvi/sandbox-local`, `-docker`, `-k8s`) |
 | `@chamvi/app/openclaw` | `openclawModule` | `@chamvi/notify-openclaw` |
 | `@chamvi/app/ui` | `uiModule` | `@chamvi/ui` |
@@ -136,8 +135,10 @@ Listing one of them in `createApp({ modules })` replaces the default instance.
 ## Optional modules
 
 ```ts
-// @chamvi/app/github
+// @chamvi/github/module
 function githubModule(options?: GithubModuleOptions): GithubModule;        // .app: IGithubApp, 'chamvi:github'
+
+// @chamvi/notify-github/module
 function githubNotifierModule(options: GithubNotifierModuleOptions): IModule; // 'chamvi:notifier:<name>', default name 'github'
 
 // @chamvi/app/sandbox
@@ -156,7 +157,9 @@ function oidcModule(options: OidcOptions): IModule;                        // 'c
 
 Each factory reads `options.env ?? process.env` when it is called and throws `InvalidAgentDefinitionError` naming a missing or malformed variable. Options win over env, except `CHAMVI_SANDBOX_PROVIDER`, `CHAMVI_SANDBOX_NAMESPACE` and `CHAMVI_SANDBOX_IMAGE`, which win over the sandbox options. The notifier modules default `approvalUrl` to the dashboard link built from `CHAMVI_PUBLIC_URL` and use the app's clock.
 
-<<< ../../../app/src/github/types.ts{ts}
+<<< ../../../github/src/module/types.ts{ts}
+
+<<< ../../../notify-github/src/module/types.ts{ts}
 
 <<< ../../../app/src/sandbox/types.ts{ts}
 

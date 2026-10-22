@@ -6,7 +6,7 @@
  */
 
 import { createApp } from '@chamvi/app';
-import { githubModule } from '@chamvi/app/github';
+import { githubModule } from '@chamvi/github/module';
 import { echo } from '../app/src/agents.ts';
 
 // an optional module reads its env when the factory is called, i.e. at import

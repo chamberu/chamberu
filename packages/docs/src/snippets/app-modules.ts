@@ -1,7 +1,7 @@
 // #region modules
 // src/index.ts
 import { createApp, defineAgent } from '@chamvi/app';
-import { githubModule } from '@chamvi/app/github';
+import { githubModule } from '@chamvi/github/module';
 import { openclawModule } from '@chamvi/app/openclaw';
 import { sandboxModule } from '@chamvi/app/sandbox';
 import { uiModule } from '@chamvi/app/ui';

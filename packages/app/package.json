@@ -22,10 +22,6 @@
             "types": "./dist/index.d.mts",
             "import": "./dist/index.mjs"
         },
-        "./github": {
-            "types": "./dist/github.d.mts",
-            "import": "./dist/github.mjs"
-        },
         "./sandbox": {
             "types": "./dist/sandbox.d.mts",
             "import": "./dist/sandbox.mjs"
@@ -87,8 +83,6 @@
         "@ai-sdk/anthropic": "^4.0.85",
         "@authup/core-http-kit": "^1.0.0-beta.70",
         "@authup/server-adapter-kit": "^1.0.0-beta.70",
-        "@chamvi/github": "^0.1.0",
-        "@chamvi/notify-github": "^0.1.0",
         "@chamvi/notify-openclaw": "^0.1.0",
         "@chamvi/sandbox": "^0.1.0",
         "@chamvi/sandbox-docker": "^0.1.0",
@@ -113,8 +107,6 @@
         "@ai-sdk/xai": "^5",
         "@authup/core-http-kit": "^1.0.0-beta.70",
         "@authup/server-adapter-kit": "^1.0.0-beta.70",
-        "@chamvi/github": "^0.1.0",
-        "@chamvi/notify-github": "^0.1.0",
         "@chamvi/notify-openclaw": "^0.1.0",
         "@chamvi/sandbox": "^0.1.0",
         "@chamvi/sandbox-docker": "^0.1.0",
@@ -145,12 +137,6 @@
             "optional": true
         },
         "@authup/server-adapter-kit": {
-            "optional": true
-        },
-        "@chamvi/github": {
-            "optional": true
-        },
-        "@chamvi/notify-github": {
             "optional": true
         },
         "@chamvi/notify-openclaw": {

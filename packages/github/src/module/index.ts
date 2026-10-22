@@ -5,7 +5,6 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export const GITHUB_MODULE_NAME = 'chamvi:github';
-
-/** The notifier name githubNotifierModule() uses unless `name` is given. */
-export const DEFAULT_GITHUB_NOTIFIER_NAME = 'github';
+export { GITHUB_MODULE_NAME } from './constants.ts';
+export * from './module.ts';
+export type * from './types.ts';
