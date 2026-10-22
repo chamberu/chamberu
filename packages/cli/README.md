@@ -66,7 +66,7 @@ Relative imports carry `.ts` and there is no `enum`, so `chamvi dev` (Node's typ
 
 | Command | Arguments and flags | Does |
 |---------|---------------------|------|
-| `dev` | `--entry` | Runs `node --watch --env-file-if-exists=.env <cli> start --dev --entry <source entry>`: restarts on a change of the entry, its imports or `.env` (Node watches the env file itself, so no `--watch-path` is needed) |
+| `dev` | `--entry` | Runs `node --watch [--env-file-if-exists=.env] <cli> start --dev --entry <source entry>`: restarts on a change of the entry, its imports or `.env` (Node watches the env file itself, so no `--watch-path` is needed). The env flag is passed only when `.env` exists at start (on Linux, `node --watch` fails on a missing env file), so a `.env` created later needs a restart of `chamvi dev` |
 | `build` | `--entry`, `--out-dir <dir>` (default `dist`) | Bundles the entry with tsdown into `<out-dir>/index.mjs` plus its source map: ESM, `node22`, every `dependencies` and `peerDependencies` package external, the app's own modules inlined. The out dir is emptied first, so one that is the project folder or above it, holds the entry, or holds anything but `.mjs` and `.mjs.map` files exits 2 |
 | `start` | `--entry` | Starts the app: store (and migrations), engine, scheduler, then HTTP |
 | `run-job` | `<agent>`, `[triggerId]`, `--entry` | Fires one cron trigger once and waits for its run (a Kubernetes CronJob); `triggerId` defaults to the agent's only cron trigger |

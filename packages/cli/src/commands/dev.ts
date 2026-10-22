@@ -5,6 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { access } from 'node:fs/promises';
+import path from 'node:path';
 import { defineCommand } from 'citty';
 import type { CommandDef } from 'citty';
 import { resolveEntry } from '../entry/module.ts';
@@ -40,9 +42,11 @@ export function createDevCommand(context: CliContext): CommandDef<typeof DEV_ARG
                 kind: 'source',
             });
 
+            // only for an existing file: on Linux, `node --watch` fails on a missing env file (ENOENT)
+            const envFile = await access(path.join(context.cwd, DOTENV_FILE)).then(() => true, () => false);
             const child = context.spawn(context.execPath, [
                 '--watch',
-                `--env-file-if-exists=${DOTENV_FILE}`,
+                ...(envFile ? [`--env-file-if-exists=${DOTENV_FILE}`] : []),
                 context.cliPath,
                 'start',
                 '--dev',

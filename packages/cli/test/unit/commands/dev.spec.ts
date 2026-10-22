@@ -7,6 +7,7 @@
 
 import type { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
     beforeEach,
@@ -15,7 +16,7 @@ import {
     it,
 } from 'vitest';
 import { runCli } from '../../../src/run/module.ts';
-import { FIXTURE_APP } from '../../utils/app.ts';
+import { FIXTURE_APP, copyFixtureApp } from '../../utils/app.ts';
 import { createFakeProcess } from '../../utils/process.ts';
 import type { FakeProcess } from '../../utils/process.ts';
 
@@ -57,7 +58,7 @@ describe('dev', () => {
         calls = [];
     });
 
-    function dev(args: string[] = []): Promise<void> {
+    function dev(args: string[] = [], cwd = FIXTURE_APP): Promise<void> {
         const fakeSpawn = ((command: string, spawnArgs: readonly string[], options: Record<string, unknown>) => {
             calls.push({
                 command,
@@ -68,7 +69,7 @@ describe('dev', () => {
         }) as unknown as typeof spawn;
 
         return runCli(['dev', ...args], {
-            ...fake.context({ cwd: FIXTURE_APP }),
+            ...fake.context({ cwd }),
             spawn: fakeSpawn,
             execPath: '/usr/bin/node',
             cliPath: '/opt/cli/dist/cli.mjs',
@@ -104,7 +105,6 @@ describe('dev', () => {
         expect(call.command).toBe('/usr/bin/node');
         expect(call.args).toEqual([
             '--watch',
-            '--env-file-if-exists=.env',
             '/opt/cli/dist/cli.mjs',
             'start',
             '--dev',
@@ -118,6 +118,20 @@ describe('dev', () => {
         child.end(0);
         await running;
         expect(fake.exitCodes).toEqual([0]);
+    });
+
+    it('loads .env only when it exists', async () => {
+        const app = await copyFixtureApp();
+        try {
+            await writeFile(path.join(app.cwd, '.env'), 'CHAMVI_LOG_LEVEL=info\n');
+            const running = dev([], app.cwd);
+            const call = await spawned(running);
+            expect(call.args.slice(0, 3)).toEqual(['--watch', '--env-file-if-exists=.env', '/opt/cli/dist/cli.mjs']);
+            child.end(0);
+            await running;
+        } finally {
+            await app.remove();
+        }
     });
 
     it('detached is set', async () => {

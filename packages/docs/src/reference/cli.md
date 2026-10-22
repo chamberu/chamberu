@@ -28,7 +28,7 @@ Node.js `>=22.18.0` (type stripping, so `dev` and a `.ts` entry run without a bu
 
 | Command | Arguments and flags | Does | Exit |
 |---|---|---|---|
-| `dev` | `--entry` | Spawns `node --watch --env-file-if-exists=.env <cli.mjs> start --dev --entry <source entry>`, forwards SIGINT and SIGTERM | the child's code |
+| `dev` | `--entry` | Spawns `node --watch [--env-file-if-exists=.env] <cli.mjs> start --dev --entry <source entry>` (the env flag only when `.env` exists at start: on Linux `node --watch` fails on a missing env file), forwards SIGINT and SIGTERM | the child's code |
 | `build` | `--entry`, `--out-dir <dir>` (default `dist`) | Bundles the entry with tsdown (missing: exit 2, "install tsdown as a devDependency"); the out dir is emptied first, so one that is the project folder or above it, holds the entry, or holds anything but `.mjs` and `.mjs.map` files exits 2 | 0, 1 build error, 2 usage |
 | `start` | `--entry`, `--dev` (hidden) | `app.start()`, then waits for a signal | 0 clean stop, 1 start failure or forced exit |
 | `run-job` | `<agent>`, `[triggerId]`, `--entry` | `app.runJob({ agent, trigger })`, prints `<agent>: <status> (run <id>)` (also after a signal); `triggerId` defaults to the agent's only cron trigger | 0 completed, waiting, skipped, queued behind an approval or interrupted by a signal; 1 failed or cancelled (also when a signal came meanwhile), an error or a failed stop; 2 usage |
