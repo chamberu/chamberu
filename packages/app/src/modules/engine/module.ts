@@ -11,7 +11,7 @@ import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { createModelRegistry, installDefaultProvider } from '../../models/module.ts';
 import { AppToken, ModuleName } from '../../module/constants.ts';
-import { runHooks, throwIfStopped } from '../../module/helpers.ts';
+import { registerStartStep, runHooks } from '../../module/helpers.ts';
 import type { EngineModuleOptions } from './types.ts';
 
 /**
@@ -19,8 +19,9 @@ import type { EngineModuleOptions } from './types.ts';
  * checks every string model against the provider registry and installs it as
  * the AI SDK default provider, unless one is set already; `onReady` builds the
  * engine from every `NOTIFIERS` contribution, registers `ENGINE`, runs the
- * `engineCreated` hooks and, in start mode, starts it. `teardown` drains it
- * and runs the `drained` hooks.
+ * `engineCreated` hooks and, in start mode, registers its start step (run
+ * once every module's `onReady` checked its configuration). `teardown` drains
+ * it and runs the `drained` hooks.
  */
 export class EngineModule implements IModule {
     readonly name: string = ModuleName.ENGINE;
@@ -90,8 +91,8 @@ export class EngineModule implements IModule {
         await runHooks(container, 'engineCreated', engine);
 
         if (context.mode === 'start') {
-            throwIfStopped(context);
-            await engine.start();
+            // started once every onReady checked its configuration (authenticators, routes, the scheduler)
+            registerStartStep(container, ModuleName.ENGINE, () => engine.start());
         }
     }
 

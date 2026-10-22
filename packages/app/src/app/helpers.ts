@@ -7,6 +7,7 @@
 
 import { ChamviError, InvalidAgentDefinitionError } from '@chamvi/core';
 import type { IContainer } from 'eldin';
+import { ApplicationError, ApplicationErrorCode } from 'orkos';
 import type { IModule } from 'orkos';
 import { isObject } from 'smob';
 import { APP_ERROR_CODE, AppToken } from '../module/constants.ts';
@@ -62,6 +63,25 @@ export function buildModules(modules: AppOptions['modules'] = []): IModule[] {
         ...builtins.map((module) => byName.get(module.name) ?? module),
         ...modules.filter((module) => !builtinNames.has(module.name)),
     ];
+}
+
+/** orkos' errors about the module graph, found before any module set up. */
+const GRAPH_ERROR_CODES: ReadonlySet<string> = new Set([
+    ApplicationErrorCode.MODULE_NOT_FOUND,
+    ApplicationErrorCode.CIRCULAR_DEPENDENCY,
+    ApplicationErrorCode.VERSION_MISMATCH,
+]);
+
+/**
+ * An orkos module graph error (a dependency the app does not register, a
+ * cycle, a version mismatch) as the configuration error it is
+ * (InvalidAgentDefinitionError, the CLI's exit 2); any other error as is.
+ */
+export function toSetupError(error: unknown): unknown {
+    if (error instanceof ApplicationError && GRAPH_ERROR_CODES.has(error.code)) {
+        return new InvalidAgentDefinitionError(error.message);
+    }
+    return error;
 }
 
 /** Logs a reported error through the app logger once registered, else to stderr. */

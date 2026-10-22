@@ -11,7 +11,7 @@ import type { IContainer } from 'eldin';
 import { Application } from 'orkos';
 import type { IModule } from 'orkos';
 import { AppToken } from '../../src/module/constants.ts';
-import { createStoppedError, reportingModule } from '../../src/module/helpers.ts';
+import { createStoppedError, reportingModule, runStartSteps } from '../../src/module/helpers.ts';
 import type { AppContext, AppMode } from '../../src/module/types.ts';
 import type { Env } from '../../src/env/types.ts';
 
@@ -34,7 +34,7 @@ export type Harness = {
     context: AppContext;
     controller: AbortController;
     reported: Reported[];
-    /** Runs `application.setup()`; tears down and rethrows when it fails. */
+    /** Runs `application.setup()` and the start steps, like the app; tears down and rethrows when it fails. */
     setup(): Promise<void>;
     /** Aborts the context signal (app_stopped) and tears every module down. */
     stop(): Promise<void>;
@@ -81,6 +81,7 @@ export function buildHarness(options: HarnessOptions = {}): Harness {
         async setup() {
             try {
                 await application.setup();
+                await runStartSteps(container);
             } catch (error) {
                 await application.teardown();
                 throw error;

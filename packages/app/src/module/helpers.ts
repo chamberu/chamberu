@@ -8,7 +8,7 @@
 import { ChamviError } from '@chamvi/core';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
-import { APP_ERROR_CODE, AppToken } from './constants.ts';
+import { APP_ERROR_CODE, AppToken, START_STEPS } from './constants.ts';
 import type {
     AppContext,
     ILifecycleHook,
@@ -51,6 +51,33 @@ export async function runHooks(container: IContainer, phase: LifecyclePhase, ...
         } catch (error) {
             context.report(error, { hook: hook.name, phase });
         }
+    }
+}
+
+/**
+ * Registers a start step (internal): `run` is called at most once, by the
+ * http module's `onReady` after it built the HTTP app, or by the app once
+ * every `onReady` ran, so a configuration error any of them finds starts nothing.
+ */
+export function registerStartStep(container: IContainer, name: string, run: () => Promise<void>): void {
+    let started: Promise<void> | undefined;
+    container.registerMany(START_STEPS, {
+        useValue: {
+            name,
+            run: () => {
+                started ??= run();
+                return started;
+            },
+        },
+    });
+}
+
+/** Runs every registered start step in registration order (internal); throws app_stopped once stop() was called. */
+export async function runStartSteps(container: IContainer): Promise<void> {
+    const context = container.resolve(AppToken.CONTEXT);
+    for (const step of container.resolveAll(START_STEPS)) {
+        throwIfStopped(context);
+        await step.run();
     }
 }
 

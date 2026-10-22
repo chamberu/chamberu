@@ -6,7 +6,10 @@
  */
 
 import {
+    Engine,
     InvalidAgentDefinitionError,
+    MemoryStore,
+    cron,
     defineAgent,
     http,
 } from '@chamvi/core';
@@ -16,12 +19,14 @@ import {
     describe,
     expect,
     it,
+    vi,
 } from 'vitest';
 import {
     APP_ERROR_CODE,
     ModuleName,
     configModule,
     createApp,
+    schedulerModule,
     storeModule,
 } from '@chamvi/app';
 import type { IApp } from '@chamvi/app';
@@ -176,5 +181,99 @@ describe('App.start', () => {
         expect(await rejectionOf(app.start({ env }))).toBe(failure);
         expect(events.filter((e) => e.endsWith('teardown'))).toEqual(['late teardown', 'store teardown']);
         expect(await isFree(port)).toBe(true);
+    });
+
+    it.each([
+        ['an unregistered dependency', [{ name: 'mine', dependencies: ['chamvi:github'], setup: async () => undefined }], 'chamvi:github'],
+        ['a dependency cycle', [
+            { name: 'a', dependencies: ['b'], setup: async () => undefined },
+            { name: 'b', dependencies: ['a'], setup: async () => undefined },
+        ], 'ircular'],
+    ])('a module graph error (%s) is an InvalidAgentDefinitionError', async (_label, modules, needle) => {
+        const app = track(createApp({ agents: [agent], modules: [quiet(), ...modules] }));
+        const { env } = await envFor();
+
+        const error = await rejectionOf(app.start({ env }));
+
+        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect(error.message).toContain(needle);
+    });
+
+    describe('a configuration error found in onReady starts nothing', () => {
+        async function queuedRun() {
+            let calls = 0;
+            const counting = textModel();
+            const doStream = counting.doStream.bind(counting);
+            counting.doStream = async (options) => {
+                calls++;
+                return doStream(options);
+            };
+            const queued = defineAgent({
+                name: 'queued',
+                model: counting,
+                instructions: 'x',
+                triggers: [http(), cron('*/5 * * * *')],
+            });
+            const store = new MemoryStore();
+            // another replica's run, waiting in the shared store
+            const other = new Engine({
+                store,
+                agents: [queued],
+                resumeSecret: SECRET,
+            });
+            const { runId } = await other.dispatch({
+                agent: 'queued',
+                trigger: 'http',
+                source: 'http',
+                payload: {},
+            });
+            return {
+                store,
+                queued,
+                runId,
+                calls: () => calls,
+            };
+        }
+
+        it('no authenticator', async () => {
+            const ctx = await queuedRun();
+            const app = track(createApp({ agents: [ctx.queued], modules: [quiet(), storeModule({ store: ctx.store })] }));
+            const { env } = await envFor({ CHAMVI_TOKENS: '' });
+
+            const error = await rejectionOf(app.start({ env }));
+
+            expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
+            expect(error.message).toContain('No authenticator');
+            expect(ctx.calls()).toBe(0);
+            expect((await ctx.store.getRun(ctx.runId))?.status).toBe('queued');
+        });
+
+        it('an app without the http module still starts the engine', async () => {
+            const ctx = await queuedRun();
+            const app = track(createApp({
+                agents: [ctx.queued],
+                modules: [quiet(), storeModule({ store: ctx.store }), { name: ModuleName.HTTP, setup: async () => undefined }],
+            }));
+            const { env } = await envFor({ CHAMVI_TOKENS: '' });
+
+            await app.start({ env });
+
+            await vi.waitFor(async () => {
+                expect((await ctx.store.getRun(ctx.runId))?.status).toBe('completed');
+            });
+        });
+
+        it('a scheduler definition error', async () => {
+            const ctx = await queuedRun();
+            const app = track(createApp({
+                agents: [ctx.queued],
+                modules: [quiet(), storeModule({ store: ctx.store }), schedulerModule({ lockTtlMs: 0 })],
+            }));
+            const { env } = await envFor();
+
+            expect(await rejectionOf(app.start({ env }))).toBeInstanceOf(InvalidAgentDefinitionError);
+            expect(ctx.calls()).toBe(0);
+            expect((await ctx.store.getRun(ctx.runId))?.status).toBe('queued');
+        });
     });
 });

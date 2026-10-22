@@ -11,7 +11,7 @@ import type { IContainer } from 'eldin';
 import type { IModule, ModuleDependency } from 'orkos';
 import { serve } from 'routup';
 import { AppToken, ModuleName } from '../../module/constants.ts';
-import { runHooks, throwIfStopped } from '../../module/helpers.ts';
+import { runHooks, runStartSteps, throwIfStopped } from '../../module/helpers.ts';
 import type { Server } from '../../module/types.ts';
 import { resolveAuthenticators } from './helpers.ts';
 import type { HttpModuleOptions } from './types.ts';
@@ -19,8 +19,9 @@ import type { HttpModuleOptions } from './types.ts';
 /**
  * Serves the HTTP app (start mode only). `onReady` builds the graceful
  * shutdown (`SHUTDOWN`), the routup app from every `AUTHENTICATORS` and
- * `HTTP_ROUTES` contribution, runs the `started` hooks and listens last
- * (`SERVER`). `teardown` runs the shutdown: readiness 503, scheduler stop and
+ * `HTTP_ROUTES` contribution, then runs the start steps (engine, scheduler),
+ * the `started` hooks and listens last (`SERVER`), so a configuration error
+ * starts nothing. `teardown` runs the shutdown: readiness 503, scheduler stop and
  * `stopping` hooks, the app's closers, server close, engine drain.
  */
 export class HttpModule implements IModule {
@@ -29,6 +30,8 @@ export class HttpModule implements IModule {
     readonly dependencies: (string | ModuleDependency)[] = [
         ModuleName.ENGINE,
         { name: ModuleName.SCHEDULER, optional: true },
+        // its onReady may contribute the dev token
+        { name: ModuleName.STATIC_TOKENS, optional: true },
     ];
 
     protected options: HttpModuleOptions;
@@ -85,6 +88,8 @@ export class HttpModule implements IModule {
             onError: (error) => logger.error('http error', error),
         });
 
+        // everything is configured: start the engine and the scheduler, then listen
+        await runStartSteps(container);
         await runHooks(container, 'started');
         throwIfStopped(context);
 

@@ -16,7 +16,7 @@ import { isObject } from 'smob';
 import type { Env } from '../env/types.ts';
 import type { ModelProviders } from '../models/types.ts';
 import { AppToken } from '../module/constants.ts';
-import { createStoppedError, reportingModule } from '../module/helpers.ts';
+import { createStoppedError, reportingModule, runStartSteps } from '../module/helpers.ts';
 import type { AppContext, AppMode } from '../module/types.ts';
 import { APP_BRAND } from './constants.ts';
 import {
@@ -24,6 +24,7 @@ import {
     createInUseError,
     createStopFailedError,
     logReported,
+    toSetupError,
 } from './helpers.ts';
 import type {
     AppLifecycleOptions,
@@ -146,12 +147,18 @@ export class App implements IApp {
      * modules down and rethrows, the app_stopped error when stop() interrupted it.
      */
     protected async setup(lifecycle: Lifecycle): Promise<void> {
-        const { application, controller } = lifecycle;
+        const { application, container, controller } = lifecycle;
         try {
             await application.setup();
+            // the steps the http module did not run (an app without it)
+            await runStartSteps(container);
         } catch (error) {
+            if (controller.signal.aborted && error !== controller.signal.reason) {
+                // the stop's reason answers, but the real failure must not vanish
+                logReported(container, error, { phase: 'setup' });
+            }
             await application.teardown();
-            throw controller.signal.aborted ? controller.signal.reason : error;
+            throw controller.signal.aborted ? controller.signal.reason : toSetupError(error);
         }
 
         if (controller.signal.aborted) {

@@ -10,13 +10,14 @@ import type { IScheduler } from '@chamvi/scheduler';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { AppToken, ModuleName } from '../../module/constants.ts';
-import { throwIfStopped } from '../../module/helpers.ts';
+import { registerStartStep } from '../../module/helpers.ts';
 import type { SchedulerModuleOptions } from './types.ts';
 
 /**
  * Fires the agents' cron triggers in-process: start mode with
- * `CHAMVI_SCHEDULER` on only. `onReady` builds and starts the scheduler and
- * registers `SCHEDULER`; `teardown` stops it (idempotent after the shutdown).
+ * `CHAMVI_SCHEDULER` on only. `onReady` builds the scheduler, registers
+ * `SCHEDULER` and its start step (after the engine's); `teardown` stops it
+ * (idempotent after the shutdown).
  */
 export class SchedulerModule implements IModule {
     readonly name: string = ModuleName.SCHEDULER;
@@ -50,8 +51,7 @@ export class SchedulerModule implements IModule {
         this.scheduler = scheduler;
         container.register(AppToken.SCHEDULER, { useValue: scheduler });
 
-        throwIfStopped(context);
-        await scheduler.start();
+        registerStartStep(container, ModuleName.SCHEDULER, () => scheduler.start());
     }
 
     async teardown(): Promise<void> {
