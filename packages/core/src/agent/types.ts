@@ -35,8 +35,7 @@ export type ToolPolicy = (toolName: string, ctx: { run: RunContext }) => boolean
 export type AgentDefinition<S extends StateSchema = StateSchema> = {
     name: string;
     model: LanguageModel;
-    /** System instructions; optional (a folder agent may take them from `instructions.md`). */
-    instructions?: string;
+    instructions: string;
     triggers?: TriggerDefinition[];
     /**
      * The agent's tools: a plain `ToolSet` (the default), or a factory for

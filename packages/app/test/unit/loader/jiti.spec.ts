@@ -44,29 +44,10 @@ describe('the default module reader', () => {
         expect((await loadAgent(dir)).agent.definition.instructions).toBe('two');
     });
 
-    it.each([
-        ['agent.ts', undefined],
-        ['agent.mts', undefined],
-        ['agent.mjs', undefined],
-        ['agent.js', JSON.stringify({ type: 'module' })],
-        ['agent.js', undefined],
-    ])('re-reading a changed %s returns the new code (package.json %s)', async (file, manifest) => {
-        if (manifest) await writeTree(root.path, { 'package.json': manifest });
-        const dir = join(root.path, 'triage');
-        const body = (text: string) => `import { defineAgent } from '@chamvi/core';\nexport default defineAgent({ name: 'triage', model: 'test:model', instructions: '${text}' });\n`;
-        await writeTree(dir, { [file]: body('one') });
-
-        expect((await loadAgent(dir)).agent.definition.instructions).toBe('one');
-
-        await writeFile(join(dir, file), body('two'));
-
-        expect((await loadAgent(dir)).agent.definition.instructions).toBe('two');
-    });
-
-    it('re-reading returns the new code of a .mts helper imported from an agent.mjs and a tool', async () => {
+    it('re-reading returns the new code of a .mts helper imported from agent.ts and from a tool file it imports', async () => {
         const dir = join(root.path, 'triage');
         await writeTree(dir, {
-            'agent.mjs': 'import { defineAgent } from \'@chamvi/core\';\nimport { text } from \'./_text.mts\';\nexport default defineAgent({ name: \'triage\', model: \'test:model\', instructions: text });\n',
+            'agent.ts': 'import { defineAgent } from \'@chamvi/core\';\nimport echo from \'./tools/echo.ts\';\nimport { text } from \'./_text.mts\';\nexport default defineAgent({ name: \'triage\', model: \'test:model\', instructions: text, tools: { echo } });\n',
             'tools/echo.ts': 'import { text } from \'../_text.mts\';\nexport default { description: text, inputSchema: { type: \'object\' } };\n',
             '_text.mts': 'export const text: string = \'one\';\n',
         });

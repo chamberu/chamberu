@@ -44,6 +44,7 @@ import {
     hangingModel,
     rejectionOf,
 } from '../../../utils/app.ts';
+import { HTTP_TRIGGER, agentFile, cronTrigger } from '../../../utils/agents-dir.ts';
 import { createTempDir, writeTree } from '../../../utils/folder.ts';
 import { buildHarness } from '../../../utils/harness.ts';
 import type { Harness } from '../../../utils/harness.ts';
@@ -53,10 +54,6 @@ import { freePort } from '../../../utils/port.ts';
 
 const START = new Date('2026-10-22T00:00:00Z');
 const POLL_MS = 1_000;
-
-function agentFile(instructions: string, model = 'test:model', name = 'greeter'): string {
-    return `export default { name: '${name}', definition: { model: '${model}', instructions: '${instructions}' } };\n`;
-}
 
 function provider() {
     const answers = Array.from({ length: 20 }, () => ({ parts: [{ type: 'text' as const, text: 'from folder' }] }));
@@ -343,10 +340,7 @@ describe('agentsModule', () => {
     });
 
     it('the watcher applies a change only once it is stable for one poll', async () => {
-        await writeTree(root.path, {
-            'greeter/agent.ts': agentFile('v1', 'test:hang'),
-            'greeter/triggers/http.yaml': 'http: true\n',
-        });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:hang', 'greeter', [HTTP_TRIGGER]) });
         const {
             harness,
             engine,
@@ -460,10 +454,7 @@ describe('agentsModule', () => {
     });
 
     it('an agents dir left empty (an unmounted volume) keeps every agent and its runs', async () => {
-        await writeTree(root.path, {
-            'greeter/agent.ts': agentFile('v1'),
-            'greeter/triggers/http.yaml': 'http: true\n',
-        });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:model', 'greeter', [HTTP_TRIGGER]) });
         const {
             harness,
             engine,
@@ -564,10 +555,7 @@ describe('agentsModule', () => {
     });
 
     it('job mode loads the folder and runs a folder agent\'s cron trigger', async () => {
-        await writeTree(root.path, {
-            'greeter/agent.ts': agentFile('v1'),
-            'greeter/triggers/daily.yaml': 'cron: \'0 9 * * *\'\n',
-        });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:model', 'greeter', [cronTrigger('0 9 * * *')]) });
         const clock = new ControllableClock(START);
         const store = new MemoryStore({ clock });
         const app = createApp({

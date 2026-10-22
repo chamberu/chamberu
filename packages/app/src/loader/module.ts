@@ -13,52 +13,29 @@ import { createRequire } from 'node:module';
 import {
     basename,
     dirname,
-    extname,
     join,
     relative,
     sep,
 } from 'node:path';
-import type {
-    AgentDefinition,
-    ApprovalPolicy,
-    StateSchema,
-    ToolContext,
-    TriggerDefinition,
-} from '@chamvi/core';
+import type { Agent, AgentDefinition } from '@chamvi/core';
 import { InvalidAgentDefinitionError, defineAgent } from '@chamvi/core';
 import { locateMany } from 'locter';
 import { isObject } from 'smob';
-import type { Tool, ToolSet } from 'ai';
 import {
     AGENT_FILE,
     AGENT_NAME_MAX_LENGTH,
     AGENT_NAME_PATTERN,
-    APPROVALS_FILE,
-    DATA_EXTENSIONS,
-    INSTRUCTIONS_FILE,
-    MODULE_EXTENSIONS,
     NODE_MODULES_DIR,
     SCRIPT_EXTENSIONS,
-    STATE_DIR,
-    TOOLS_DIR,
-    TOOL_NAME_PATTERN,
-    TRIGGERS_DIR,
 } from './constants.ts';
 import {
-    assertApprovals,
     compareCodePoints,
     defaultExportOf,
-    findFile,
     isDirectory,
     isFile,
-    isModuleFile,
-    isStandardSchema,
-    isTriggerDefinition,
-    listFiles,
     messageOf,
-    parseDataTrigger,
+    readFreshModule,
     relativize,
-    useRegistry,
 } from './helpers.ts';
 import type {
     AgentLoadIssue,
@@ -67,15 +44,12 @@ import type {
     LoadedAgent,
 } from './types.ts';
 
-type ToolEntry = Tool | ((ctx: ToolContext) => Tool);
-
 const requireCache = createRequire(import.meta.url).cache;
 
 /**
- * Loads one agent folder (`dir`, whose name is the agent's): `agent.*`
- * (default-exporting `defineAgent()`'s result, named like the folder),
- * `instructions.md`, `tools/`, `triggers/`, `state/` and
- * `approvals.*`. Every failure is an InvalidAgentDefinitionError naming the
+ * Loads one agent folder (`dir`, whose name is the agent's): its `agent.ts`,
+ * default-exporting `defineAgent()`'s result named like the folder. The rest
+ * of the folder is the agent's own: `agent.ts` imports or reads it. Every failure is an InvalidAgentDefinitionError naming the
  * file relative to the agents dir (the folder's parent), also a folder whose
  * content changed while it was read.
  */
@@ -83,20 +57,18 @@ export async function loadAgent(dir: string, options: LoadAgentOptions = {}): Pr
     const base = dirname(dir);
     try {
         await assertNoNodeModules(dir);
+        await assertNoScripts(dir);
         // Hashed before and after the read: a read that straddles an edit is
         // refused, so the returned hash always names the content that was read.
         const hash = await hashAgentFolder(dir);
-        const read = new Set<string>();
-        const load = options.load ?? ((path: string) => useRegistry().read(path));
+        const load = options.load ?? readFreshModule;
         const agent = await buildAgent(dir, async (path) => {
-            read.add(path);
             try {
                 return await load(path);
             } finally {
                 forgetRequired(dir);
             }
         });
-        await assertNoScriptHelpers(dir, read);
         if (await hashAgentFolder(dir) !== hash) {
             throw new InvalidAgentDefinitionError(`${basename(dir)}: changed while loading; load it again.`);
         }
@@ -156,48 +128,25 @@ async function assertNoNodeModules(dir: string): Promise<void> {
 }
 
 /**
- * Refuses a JavaScript file (`.js`, `.mjs`, `.cjs`) that is not one of the
- * module files the loader read itself (or would read: a shadowed `agent.mjs`
- * next to an `agent.ts`): Node caches a natively imported
- * JavaScript file for the life of the process, so a reload would not see an
- * edit of it. Helpers are `.ts` or `.mts`.
+ * Refuses a JavaScript file (`.js`, `.mjs`, `.cjs`) anywhere in the folder:
+ * Node caches a natively imported JavaScript file for the life of the
+ * process, so a reload would not see an edit of it. Helpers are `.ts` or
+ * `.mts`, which the loader transpiles fresh on every load.
  */
-async function assertNoScriptHelpers(dir: string, read: ReadonlySet<string>): Promise<void> {
+async function assertNoScripts(dir: string): Promise<void> {
     const found = await locateMany(`**/*{${SCRIPT_EXTENSIONS.join(',')}}`, {
         cwd: dir,
         onlyFiles: true,
         dot: false,
     });
-    const helpers = found
-        .map((info) => info.path)
-        .filter((path) => !read.has(path))
-        .map((path) => relative(dir, path).split(sep).join('/'))
-        .filter((path) => !isModulePosition(path))
+    const scripts = found
+        .map((info) => relative(dir, info.path).split(sep).join('/'))
         .sort(compareCodePoints);
-    if (helpers.length > 0) {
+    if (scripts.length > 0) {
         throw new InvalidAgentDefinitionError(
-            `${basename(dir)}/${helpers[0]}: a JavaScript helper is not reloaded fresh; write helpers as .ts or .mts.`,
+            `${basename(dir)}/${scripts[0]}: a JavaScript file is not reloaded fresh; write helpers as .ts or .mts.`,
         );
     }
-}
-
-/**
- * Whether a folder-relative POSIX path is where the loader looks for a module
- * file (`agent.*`, `approvals.*`, `tools/*`, `triggers/*`, `state/*`).
- */
-function isModulePosition(path: string): boolean {
-    const extension = extname(path);
-    if (!(MODULE_EXTENSIONS as readonly string[]).includes(extension)) return false;
-    const segments = path.split('/');
-    const name = segments[segments.length - 1] as string;
-    if (segments.length === 1) {
-        const stem = name.slice(0, -extension.length);
-        return stem === AGENT_FILE || stem === APPROVALS_FILE;
-    }
-    return segments.length === 2 &&
-        [TOOLS_DIR, TRIGGERS_DIR, STATE_DIR].includes(segments[0] as string) &&
-        !name.startsWith('.') &&
-        !name.startsWith('_');
 }
 
 /** Drops the CommonJS cache entries below `dir` (a required `.json` file), so the next load reads them again. */
@@ -236,146 +185,34 @@ export async function hashAgentFolder(dir: string): Promise<string> {
     return hash.digest('hex');
 }
 
-async function buildAgent(dir: string, load: (path: string) => Promise<unknown>) {
+async function buildAgent(dir: string, load: (path: string) => Promise<unknown>): Promise<Agent> {
     const name = basename(dir);
     if (name.length > AGENT_NAME_MAX_LENGTH || !AGENT_NAME_PATTERN.test(name)) {
         throw new InvalidAgentDefinitionError(
             `${name}: the folder name is no agent name (must match ${AGENT_NAME_PATTERN} and be at most ${AGENT_NAME_MAX_LENGTH} characters).`,
         );
     }
-    const rel = (path: string) => `${name}/${relative(dir, path).split(sep).join('/')}`;
-    const readModule = async (path: string) => defaultExportOf(await readWith(load, path, rel(path)), rel(path));
-    const readData = (path: string) => readWith((p) => useRegistry().read(p), path, rel(path));
-
-    const agentFile = await findFile(dir, AGENT_FILE, MODULE_EXTENSIONS);
-    if (!agentFile) {
-        throw new InvalidAgentDefinitionError(`${name}: has no agent.{ts,mts,js,mjs}.`);
+    const agentFile = join(dir, AGENT_FILE);
+    const rel = `${name}/${AGENT_FILE}`;
+    if (!await isFile(agentFile)) {
+        throw new InvalidAgentDefinitionError(`${name}: has no ${AGENT_FILE}.`);
     }
-    const declared = await readModule(agentFile);
+    let mod: unknown;
+    try {
+        mod = await load(agentFile);
+    } catch (error) {
+        throw new InvalidAgentDefinitionError(`${rel}: ${messageOf(error)}`);
+    }
+    const declared = defaultExportOf(mod, rel);
     // structural, so an agent built by another @chamvi/core copy passes too
     if (!isObject(declared) || typeof declared.name !== 'string' || !isObject(declared.definition)) {
-        throw new InvalidAgentDefinitionError(`${rel(agentFile)}: the default export must be defineAgent(...)'s result.`);
+        throw new InvalidAgentDefinitionError(`${rel}: the default export must be defineAgent(...)'s result.`);
     }
     if (declared.name !== name) {
         throw new InvalidAgentDefinitionError(
-            `${rel(agentFile)}: defineAgent names "${declared.name}", but the folder is "${name}"; the names must match.`,
+            `${rel}: defineAgent names "${declared.name}", but the folder is "${name}"; the names must match.`,
         );
     }
-    const definition = { ...declared.definition } as AgentDefinition;
-
-    const instructionsFile = join(dir, INSTRUCTIONS_FILE);
-    if (await isFile(instructionsFile)) {
-        if (definition.instructions !== undefined) {
-            throw new InvalidAgentDefinitionError(`${name}: sets instructions in both ${rel(agentFile)} and ${INSTRUCTIONS_FILE}.`);
-        }
-        definition.instructions = await readFile(instructionsFile, 'utf8');
-    }
-
-    const tools = new Map<string, ToolEntry>();
-    const toolFiles = await listFiles(join(dir, TOOLS_DIR), MODULE_EXTENSIONS);
-    for (const file of toolFiles) {
-        if (!TOOL_NAME_PATTERN.test(file.stem)) {
-            throw new InvalidAgentDefinitionError(`${rel(file.path)}: "${file.stem}" is no tool name (must match ${TOOL_NAME_PATTERN}).`);
-        }
-        if (tools.has(file.stem)) {
-            throw new InvalidAgentDefinitionError(`${rel(file.path)}: another file defines the tool "${file.stem}".`);
-        }
-        const tool = await readModule(file.path);
-        if (!isObject(tool) && typeof tool !== 'function') {
-            throw new InvalidAgentDefinitionError(`${rel(file.path)}: the default export must be a Tool or a (ctx) => Tool function.`);
-        }
-        tools.set(file.stem, tool as ToolEntry);
-    }
-    if (tools.size > 0) {
-        definition.tools = mergeTools(name, definition.tools, tools, rel(agentFile));
-    }
-
-    const triggers: TriggerDefinition[] = [...definition.triggers ?? []];
-    for (const file of await listFiles(join(dir, TRIGGERS_DIR), [...MODULE_EXTENSIONS, ...DATA_EXTENSIONS])) {
-        if (isModuleFile(file.path)) {
-            const trigger = await readModule(file.path);
-            if (!isTriggerDefinition(trigger)) {
-                throw new InvalidAgentDefinitionError(`${rel(file.path)}: the default export must be a TriggerDefinition.`);
-            }
-            triggers.push(trigger);
-        } else {
-            triggers.push(await parseDataTrigger(await readData(file.path), rel(file.path)));
-        }
-    }
-    if (triggers.length > 0) definition.triggers = triggers;
-
-    const stateFiles = await listFiles(join(dir, STATE_DIR), MODULE_EXTENSIONS);
-    if (stateFiles.length > 0) {
-        const state: StateSchema = { ...definition.state };
-        for (const file of stateFiles) {
-            if (file.stem in state) {
-                throw new InvalidAgentDefinitionError(`${rel(file.path)}: the collection "${file.stem}" is also in ${rel(agentFile)}'s state.`);
-            }
-            const schema = await readModule(file.path);
-            if (!isStandardSchema(schema)) {
-                throw new InvalidAgentDefinitionError(`${rel(file.path)}: the default export must be a Standard Schema.`);
-            }
-            state[file.stem] = schema as StateSchema[string];
-        }
-        definition.state = state;
-    }
-
-    const approvalsFile = await findFile(dir, APPROVALS_FILE, [...MODULE_EXTENSIONS, ...DATA_EXTENSIONS]);
-    if (approvalsFile) {
-        const data = !isModuleFile(approvalsFile);
-        const value = data ? await readData(approvalsFile) : await readModule(approvalsFile);
-        const approvals: Record<string, ApprovalPolicy> = { ...definition.approvals };
-        for (const [tool, policy] of Object.entries(assertApprovals(value, rel(approvalsFile), data))) {
-            if (tool in approvals) {
-                throw new InvalidAgentDefinitionError(`${rel(approvalsFile)}: the approval of "${tool}" is also in ${rel(agentFile)}'s approvals.`);
-            }
-            approvals[tool] = policy;
-        }
-        definition.approvals = approvals;
-    }
-
-    return defineAgent({ ...definition, name } as AgentDefinition);
-}
-
-async function readWith(load: (path: string) => Promise<unknown>, path: string, file: string): Promise<unknown> {
-    try {
-        return await load(path);
-    } catch (error) {
-        throw new InvalidAgentDefinitionError(`${file}: ${messageOf(error)}`);
-    }
-}
-
-/**
- * The agent file's tools plus the folder's: a plain set when both are plain, else a
- * factory. A name in both is refused here for a plain set, and by the
- * factory (at execution) for a factory set.
- */
-function mergeTools(
-    name: string,
-    configured: AgentDefinition['tools'],
-    files: Map<string, ToolEntry>,
-    agentFile: string,
-): AgentDefinition['tools'] {
-    if (typeof configured !== 'function') {
-        for (const tool of files.keys()) {
-            if (configured && tool in configured) {
-                throw new InvalidAgentDefinitionError(`${name}/${TOOLS_DIR}: the tool "${tool}" is also in ${agentFile}'s tools.`);
-            }
-        }
-        const factories = files.values().some((entry) => typeof entry === 'function');
-        if (!factories) {
-            return { ...configured, ...Object.fromEntries(files) } as ToolSet;
-        }
-    }
-    return (ctx: ToolContext) => {
-        const base: ToolSet = typeof configured === 'function' ? configured(ctx) : { ...configured };
-        const set: ToolSet = { ...base };
-        for (const [tool, entry] of files) {
-            if (tool in base) {
-                throw new InvalidAgentDefinitionError(`Agent "${name}": the tool "${tool}" of ${TOOLS_DIR}/ is also in the tools factory's set.`);
-            }
-            set[tool] = typeof entry === 'function' ? entry(ctx) : entry;
-        }
-        return set;
-    };
+    // through this copy of defineAgent, so its checks and budget defaults apply
+    return defineAgent({ ...declared.definition, name } as AgentDefinition);
 }

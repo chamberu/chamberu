@@ -20,9 +20,11 @@ import { configModule, createApp, schedulerModule } from '@chamvi/app';
 import type { IApp } from '@chamvi/app';
 import { SECRET, TOKEN, TOKENS } from '../../../utils/app.ts';
 import {
+    HTTP_TRIGGER,
     START,
     agentFile,
     buildAgentsDirHarness,
+    cronTrigger,
     provider,
     queueRun,
 } from '../../../utils/agents-dir.ts';
@@ -53,18 +55,9 @@ const LONG_NAME = 'a'.repeat(62);
 describe('the checks a folder agent passes before it is registered', () => {
     it.each([
         ['an unknown notifier', { 'broken/agent.ts': 'export default { name: \'broken\', definition: { model: \'test:model\', instructions: \'x\', notify: \'slack\' } };\n' }, 'broken', /unknown notifier "slack"/],
-        ['a cron timezone hubwire refuses', {
-            'broken/agent.ts': agentFile('x', 'test:model', 'broken'),
-            'broken/triggers/daily.yaml': 'cron: \'0 9 * * *\'\ntimezone: Mars/Base\n',
-        }, 'broken', /Invalid timezone/],
-        ['a cron expression croner refuses', {
-            'broken/agent.ts': agentFile('x', 'test:model', 'broken'),
-            'broken/triggers/daily.yaml': 'cron: \'0 0 * * 1/2\'\n',
-        }, 'broken', /0 0 \* \* 1\/2/],
-        ['a name whose run_<agent> MCP tool is too long', {
-            [`${LONG_NAME}/agent.ts`]: agentFile('x', 'test:model', LONG_NAME),
-            [`${LONG_NAME}/triggers/http.yaml`]: 'http: true\n',
-        }, LONG_NAME, /exceeds 64 characters/],
+        ['a cron timezone hubwire refuses', { 'broken/agent.ts': agentFile('x', 'test:model', 'broken', [cronTrigger('0 9 * * *', 'Mars/Base')]) }, 'broken', /Invalid timezone/],
+        ['a cron expression croner refuses', { 'broken/agent.ts': agentFile('x', 'test:model', 'broken', [cronTrigger('0 0 * * 1/2')]) }, 'broken', /0 0 \* \* 1\/2/],
+        ['a name whose run_<agent> MCP tool is too long', { [`${LONG_NAME}/agent.ts`]: agentFile('x', 'test:model', LONG_NAME, [HTTP_TRIGGER]) }, LONG_NAME, /exceeds 64 characters/],
     ])('%s is a load issue at boot, never a failed start', async (_label, tree, agent, message) => {
         await writeTree(root.path, { ...tree, 'greeter/agent.ts': agentFile('v1') });
         const clock = new ControllableClock(START);
@@ -93,7 +86,7 @@ describe('the checks a folder agent passes before it is registered', () => {
 
     it.each([
         ['an unknown notifier', { 'agent.ts': 'export default { name: \'greeter\', definition: { model: \'test:model\', instructions: \'v2\', notify: \'slack\' } };\n' }],
-        ['a cron trigger hubwire refuses', { 'triggers/daily.yaml': 'cron: \'0 0 * * 1/2\'\n' }],
+        ['a cron trigger hubwire refuses', { 'agent.ts': agentFile('v2', 'test:model', 'greeter', [cronTrigger('0 0 * * 1/2')]) }],
     ])('a change to %s keeps the old agent, cancels nothing and is tried once', async (_label, change) => {
         await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1') });
         const clock = new ControllableClock(START);
@@ -121,8 +114,7 @@ describe('the checks a folder agent passes before it is registered', () => {
         expect(setup.logger.entries.filter((entry) => entry.msg === 'agent reload failed')).toHaveLength(0);
 
         // fixed: applied once
-        await writeFile(join(root.path, 'greeter', 'agent.ts'), agentFile('v3'));
-        await writeTree(join(root.path, 'greeter'), { 'triggers/daily.yaml': 'cron: \'0 9 * * *\'\n' });
+        await writeFile(join(root.path, 'greeter', 'agent.ts'), agentFile('v3', 'test:model', 'greeter', [cronTrigger('0 9 * * *')]));
         await setup.poll();
         await setup.poll();
         expect(setup.engine().getAgent('greeter')?.definition.instructions).toBe('v3');

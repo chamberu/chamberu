@@ -5,16 +5,10 @@ An app can load agents from a folder while it runs, next to the agents passed to
 ```
 agents/
   triage/
-    agent.ts             # defineAgent({ name: 'triage', ... }): model, budgets, triggers, notify, ...
-    instructions.md      # the system prompt
+    agent.ts             # the one required file: export default defineAgent({ name: 'triage', ... })
+    prompt.md            # yours: agent.ts reads it
     tools/
-      lookup_issue.ts    # the tool lookup_issue
-    triggers/
-      daily.yaml         # a cron trigger as data
-      issues.ts          # a webhook trigger with a key function
-    state/
-      issues.ts          # the schema of the collection issues
-    approvals.yaml       # which tools need an approval
+      lookup-issue.ts    # yours: agent.ts imports it
   digest/
     agent.ts
 ```
@@ -34,78 +28,27 @@ The built-in module `chamvi:agents` (`agentsModule()`) does the work: `start` an
 
 The agents dir may live anywhere, also outside the app (a volume at `/data/agents`): `@chamvi/*`, `ai` and `@ai-sdk/*` always resolve to the copies the app itself uses, wherever the importing file is. Other packages resolve like Node resolves them, from the importing file upwards, so keep the dir inside the app's directory (for example `/app/agents` next to `/app/node_modules`) when folder code imports them.
 
-## The layout
+## The folder
 
-The folder name is the agent name (`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 characters). Every file but `agent.*` is optional.
+An agent folder holds an `agent.ts`, and chamvi enforces nothing else. The folder name is the agent name (`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 characters). `agent.ts` default-exports `defineAgent({ name, ... })`'s result, whose `name` must equal the folder name (anything else is an error); a folder without `agent.ts` is reported as an issue (`<name>: has no agent.ts.`).
 
-| File | Holds |
-|---|---|
-| `agent.{ts,mts,js,mjs}` | Default export: `defineAgent({ name, ... })`'s result, whose `name` must equal the folder name (anything else is an error). It carries what has no file of its own: `model`, `budget`, `output`, `toolPolicy`, `notify`, `toolsContext`, and may hold `instructions`, `tools`, `triggers`, `state` and `approvals` too |
-| `instructions.md` | The system prompt, read as is. Setting `instructions` in `agent.ts` as well is an error; an agent with instructions in neither place runs without a system prompt |
-| `tools/<tool>.{ts,mts,js,mjs}` | Default export: an AI SDK `Tool` or a `(ctx: ToolContext) => Tool` factory. The file name is the tool name (`^[A-Za-z0-9_-]{1,64}$`) |
-| `triggers/<file>.{ts,mts,js,mjs}` | Default export: a `TriggerDefinition` (`cron()`, `http()`, `webhook()`, `githubWebhook()`) |
-| `triggers/<file>.{yaml,yml,json}` | A trigger as data (see below) |
-| `state/<collection>.{ts,mts,js,mjs}` | Default export: the Standard Schema of the collection |
-| `approvals.{ts,mts,js,mjs,yaml,yml,json}` | `{ <tool>: 'user' }`; a module file may also give a policy function |
-
-What the files add is merged with the same key of `agent.ts`, and a name in both is an error: a tool of `tools/` and of `agent.ts`'s `tools`, a collection, an approval. Triggers add up. A trigger keeps its own id whatever the file is called (`cron:<expression>`, `http`, `webhook:<path>`), and ids must stay unique, as for every agent, so two files with the same cron expression are an error. When a tool file exports a factory, or `agent.ts`'s `tools` is one, the merged set is a factory too; a clash with that factory's tools then fails the run's execution instead of the load.
-
-Entries whose name starts with `.` or `_` are skipped: a `_shared.ts` helper next to the tools is no tool, and an `_archive/` folder in the agents dir is no agent (a `node_modules` folder is never an agent either, and refused, see [Imports](#imports)).
+Everything else in the folder is the agent's own: `agent.ts` loads its tools, instructions, triggers and helpers with plain imports or file reads, organised however you like. `prompt.md` and `tools/` in the tree above are an example, not a convention.
 
 <<< @/snippets/agent-folder/agent.ts#agent
 
-`instructions` is optional in `defineAgent()`, so an `agent.ts` that leaves them to `instructions.md` type-checks as is. `defineAgent()` checks `toolsContext` before the folder's files are merged in, so a `toolsContext` entry in `agent.ts` can only name a tool that `agent.ts` defines itself, never one of `tools/`.
+<<< @/snippets/agent-folder/tools/lookup-issue.ts#tool
 
-<<< @/snippets/agent-folder/tools/lookup_issue.ts#tool
-
-<<< @/snippets/agent-folder/state/issues.ts#state
-
-### Triggers
-
-A module file exports any trigger, with key functions or a payload schema:
-
-<<< @/snippets/agent-folder/triggers/issues.ts#trigger
-
-A data file holds exactly one of three forms; any other key is an error:
-
-```yaml
-# triggers/daily.yaml: cron(expression, { timezone, overlap, payload })
-cron: '0 9 * * 1-5'
-timezone: Europe/Berlin   # optional
-overlap: queue-one        # optional: skip (default), queue-one, allow
-payload: { kind: daily }  # optional
-```
-
-```yaml
-# triggers/http.yaml: http(), the REST, dashboard and MCP start
-http: true
-```
-
-```yaml
-# triggers/hook.yaml: webhook({ path })
-webhook: /issues
-```
-
-A trigger that needs a function (an `idempotencyKey`, a `concurrencyKey`, a payload `schema`, a GitHub `filter`) is a module file.
-
-### Approvals
-
-```yaml
-# approvals.yaml
-github_close_issue: user
-```
-
-A data file allows only `'user'`; an `approvals.ts` may map a tool to a policy function (see [Approvals](/guide/approvals)).
+Folders in the agents dir whose name starts with `.` or `_` are skipped, so an `_archive/` folder is no agent (a `node_modules` folder is never an agent either, and refused, see [Imports](#imports)).
 
 ## Imports
 
-Folder files may import their own files (relative imports, also outside `tools/`) and packages installed in the app. The module files the loader reads itself (`agent.*`, `tools/*`, `triggers/*`, `state/*`, `approvals.*`) may be TypeScript or JavaScript; jiti transpiles each of them on every load, without a module cache, so a reload sees every edit. A helper they import must be TypeScript (`.ts` or `.mts`, also transpiled fresh) or JSON: Node caches a natively imported `.js`, `.mjs` or `.cjs` file for the life of the process, so a JavaScript helper is a load error (`a JavaScript helper is not reloaded fresh; write helpers as .ts or .mts.`). For the same reason, do not import one loader-read module file from another.
+`agent.ts` may import its own files (relative imports, any depth) and packages installed in the app. jiti transpiles `agent.ts` and every `.ts` or `.mts` file it imports on every load, without a module cache, so a reload sees every edit; a file `agent.ts` reads itself (`readFileSync(new URL('./prompt.md', import.meta.url), 'utf8')`) is read again on every load too, and JSON imports are read fresh. Helpers must be TypeScript: Node caches a natively imported `.js`, `.mjs` or `.cjs` file for the life of the process, so a JavaScript file anywhere in the folder is a load error (`a JavaScript file is not reloaded fresh; write helpers as .ts or .mts.`).
 
 Packages load natively, as the same instance the app uses, and `@chamvi/*`, `ai` and `@ai-sdk/*` resolve to the app's copies. That matters: a second copy of `@chamvi/core` would break context keys (`defineContextKey()` refuses a key of another copy), `instanceof` checks of chamvi errors and the tool context marker. So an agent folder and the agents dir never have a `node_modules` folder (a load error); a package folder code needs is installed in the app.
 
 ## Load errors
 
-A folder that does not load never stops the app. A syntax error, a missing default export, a schema the data form refuses, a duplicate tool, a model string whose provider is not installed, a `notify` naming no notifier, a cron trigger the scheduler cannot schedule (a timezone or an expression it refuses), a `run_<agent>` MCP tool that cannot be built (an agent name above 60 characters with an `http` trigger, a payload schema MCP cannot compile): the agent is reported as failed to load, with a message naming the file relative to the agents dir. Each module checks a folder agent before it is registered (the `AGENT_CHECKS` contributions), so a refused agent writes no marker and cancels nothing.
+A folder that does not load never stops the app. A missing `agent.ts`, a syntax error, a missing default export, a definition `defineAgent()` refuses (a duplicate trigger id), a model string whose provider is not installed, a `notify` naming no notifier, a cron trigger the scheduler cannot schedule (a timezone or an expression it refuses), a `run_<agent>` MCP tool that cannot be built (an agent name above 60 characters with an `http` trigger, a payload schema MCP cannot compile): the agent is reported as failed to load, with a message naming the file relative to the agents dir. Each module checks a folder agent before it is registered (the `AGENT_CHECKS` contributions), so a refused agent writes no marker and cancels nothing.
 
 - The log gets `agent load failed` with the agent and the message.
 - `GET /agents` lists it in `issues: [{ agent, message, at }]` next to `data`, and the [dashboard](/guide/ui)'s agents page shows a notice.
@@ -113,7 +56,7 @@ A folder that does not load never stops the app. A syntax error, a missing defau
 
 ## Live reload
 
-Each poll hashes every folder (sha256 over every file below it, dot-entries skipped). A changed folder loads once two polls in a row see the same hash, so a change lands within two intervals and a tree that is still being copied is not loaded half-way: the load hashes the folder again before and after it reads it, and registers the agent only when both equal the stable hash (otherwise the next stable poll decides). A folder missing on two polls in a row is removed. When the agents dir itself is gone, or has no entry at all (the empty mount point of a volume that is not mounted), every agent stays loaded and nothing is removed until it is back; the boot removes no agent for such a dir either. To remove the last folder agent on purpose, leave any file in the dir (a `.keep`), so its empty listing counts.
+Each poll hashes every folder (sha256 over every file below it, dot-entries skipped), so a change to any file of the folder, also one `agent.ts` only reads, reloads the agent. A changed folder loads once two polls in a row see the same hash, so a change lands within two intervals and a tree that is still being copied is not loaded half-way: the load hashes the folder again before and after it reads it, and registers the agent only when both equal the stable hash (otherwise the next stable poll decides). A folder missing on two polls in a row is removed. When the agents dir itself is gone, or has no entry at all (the empty mount point of a volume that is not mounted), every agent stays loaded and nothing is removed until it is back; the boot removes no agent for such a dir either. To remove the last folder agent on purpose, leave any file in the dir (a `.keep`), so its empty listing counts.
 
 To replace a folder at once, write the new tree next to it under a dot-prefixed name (skipped by the loader) and rename it over the old one.
 

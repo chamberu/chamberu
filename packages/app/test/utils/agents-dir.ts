@@ -32,9 +32,23 @@ import { mockModel, textModel } from './model.ts';
 export const START = new Date('2026-10-22T00:00:00Z');
 export const POLL_MS = 1_000;
 
-/** An `agent.ts` default-exporting `defineAgent()`'s shape (structural: the temp folder cannot import @chamvi/core). */
-export function agentFile(instructions: string, model = 'test:model', name = 'greeter'): string {
-    return `export default { name: '${name}', definition: { model: '${model}', instructions: '${instructions}' } };\n`;
+/**
+ * An `agent.ts` default-exporting `defineAgent()`'s shape (structural, so the
+ * fixture does not depend on the built @chamvi/core); `triggers` are source
+ * expressions (`HTTP_TRIGGER`, `cronTrigger()`).
+ */
+export function agentFile(instructions: string, model = 'test:model', name = 'greeter', triggers: string[] = []): string {
+    const list = triggers.length > 0 ? `, triggers: [${triggers.join(', ')}]` : '';
+    return `export default { name: '${name}', definition: { model: '${model}', instructions: '${instructions}'${list} } };\n`;
+}
+
+/** `http()`'s definition as a source expression. */
+export const HTTP_TRIGGER = '{ source: \'http\', id: \'http\', options: {} }';
+
+/** `cron(expression, { timezone })`'s definition as a source expression (structural: no cron-parser check). */
+export function cronTrigger(expression: string, timezone?: string): string {
+    const zone = timezone ? `, timezone: '${timezone}'` : '';
+    return `{ source: 'cron', id: 'cron:${expression}', options: { expression: '${expression}'${zone}, overlap: 'skip' } }`;
 }
 
 /** The `test` provider: `test:model` answers 'from folder', `test:hang` never answers. */

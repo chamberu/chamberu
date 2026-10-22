@@ -152,7 +152,7 @@ function registerReadTools(server: McpServer, ctx: HttpContext, principal: Princ
 }
 
 function describeAgent(agent: Agent): string {
-    const [firstLine = ''] = (agent.definition.instructions ?? '').trim().split('\n');
+    const [firstLine = ''] = agent.definition.instructions.trim().split('\n');
     return firstLine.trim().slice(0, DESCRIPTION_MAX_LENGTH) || `Starts a run of agent "${agent.name}".`;
 }
 

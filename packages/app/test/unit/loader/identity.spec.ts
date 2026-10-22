@@ -34,8 +34,7 @@ describe('a folder agent on the built packages', () => {
 
     it('injects a context key a module provided (one @chamvi/core instance)', async () => {
         await writeTree(join(root.path, 'greeter'), {
-            'agent.ts': 'import { defineAgent } from \'@chamvi/core\';\nexport default defineAgent({ name: \'greeter\', model: (globalThis as any).chamviModel, instructions: \'Greet.\' });\n',
-            'triggers/daily.yaml': 'cron: \'0 9 * * *\'\n',
+            'agent.ts': 'import { cron, defineAgent } from \'@chamvi/core\';\nimport greet from \'./tools/greet.ts\';\nexport default defineAgent({ name: \'greeter\', model: (globalThis as any).chamviModel, instructions: \'Greet.\', tools: { greet }, triggers: [cron(\'0 9 * * *\')] });\n',
             'tools/greet.ts': [
                 'import { defineTool, inject } from \'@chamvi/core\';',
                 'import { jsonSchema } from \'ai\';',

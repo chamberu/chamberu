@@ -39,12 +39,6 @@ describe('defineAgent', () => {
         expect(() => defineAgent({ ...base, name: 'a'.repeat(64) })).not.toThrow();
     });
 
-    it('accepts an agent without instructions', () => {
-        const agent = defineAgent({ model, name: 'bare' });
-        expect(agent.name).toBe('bare');
-        expect(agent.definition.instructions).toBeUndefined();
-    });
-
     it('applies budget defaults', () => {
         const agent = defineAgent({ ...base, name: 'a' });
         expect(agent.definition.budget.maxSteps).toBe(20);

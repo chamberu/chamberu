@@ -24,8 +24,7 @@ export type AgentLoadIssue = {
 
 export type LoadAgentOptions = {
     /**
-     * Reads a module file (`.ts`, `.mts`, `.js`, `.mjs`) by absolute path and
-     * returns its module namespace. Default: a jiti reader without module
+     * Reads `agent.ts` by absolute path and returns its module namespace. Default: a jiti reader without module
      * cache, so a re-read sees edits (imported files included), while
      * packages from `node_modules` load natively (one instance).
      */
@@ -35,12 +34,4 @@ export type LoadAgentOptions = {
 export type LoadAgentsResult = {
     agents: LoadedAgent[];
     issues: AgentLoadIssue[];
-};
-
-/** A file of an agent folder (internal): its absolute path, its name, the name without extension and the extension. */
-export type FolderFile = {
-    path: string;
-    name: string;
-    stem: string;
-    extension: string;
 };

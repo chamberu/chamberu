@@ -12,62 +12,29 @@ import {
     realpathSync,
     statSync,
 } from 'node:fs';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import {
     basename,
     dirname,
-    extname,
     join,
     sep,
 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type { ApprovalPolicy, TriggerDefinition } from '@chamvi/core';
-import {
-    InvalidAgentDefinitionError,
-    cron,
-    http,
-    webhook,
-} from '@chamvi/core';
-import { IssueCode, flattenIssueItems } from '@ebec/core';
+import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { createJiti } from 'jiti';
 import type { Jiti } from 'jiti';
-import { FormatRegistry } from 'locter';
 import { isObject } from 'smob';
-import {
-    Container,
-    createValidupError,
-    defineValidator,
-    isValidupError,
-} from 'validup';
-import type { ValidatorDescriptor } from 'validup';
-import {
-    DATA_TRIGGER_KEYS,
-    MODULE_EXTENSIONS,
-    OVERLAP_POLICIES,
-    PINNED_PACKAGE_SCOPES,
-} from './constants.ts';
-import type { FolderFile } from './types.ts';
+import { PINNED_PACKAGE_SCOPES } from './constants.ts';
 
-let registry: FormatRegistry | undefined;
+let moduleJiti: Jiti | undefined;
 
 /**
- * One scoped locter registry (never `setModuleReader`, which is process
- * global): module files through `readModule` on one jiti that pins the
- * app's packages (`createPackageAliases`), YAML and JSON through locter's
- * built-ins.
+ * The default reader of `agent.ts`: `readModule` on one jiti that pins the
+ * app's packages (`createPackageAliases`), created on first use.
  */
-export function useRegistry(): FormatRegistry {
-    if (!registry) {
-        const jiti = createModuleJiti(import.meta.url);
-        registry = new FormatRegistry({
-            rules: [{
-                id: 'chamvi-agent-module',
-                test: [...MODULE_EXTENSIONS],
-                reader: { read: (id: string) => readModule(jiti, id), readSync: (id: string) => jiti(id) },
-            }],
-        });
-    }
-    return registry;
+export function readFreshModule(path: string): Promise<unknown> {
+    moduleJiti ??= createModuleJiti(import.meta.url);
+    return readModule(moduleJiti, path);
 }
 
 /**
@@ -85,10 +52,9 @@ export function createModuleJiti(from: string): Jiti {
 }
 
 /**
- * Evaluates a module file fresh on every call: its source is transpiled
- * whatever its extension, since Node's ESM loader caches a natively imported
- * `.mjs` or `.js` file for the life of the process. Its relative `.ts`/`.mts`
- * imports are transpiled fresh too; packages load natively (one instance).
+ * Evaluates a module file fresh on every call (transpiled, never from Node's
+ * module cache). Its relative `.ts`/`.mts` imports are transpiled fresh too;
+ * packages load natively (one instance).
  */
 export async function readModule(jiti: Jiti, path: string): Promise<unknown> {
     const source = await readFile(path, 'utf8');
@@ -190,54 +156,12 @@ export async function isDirectory(path: string): Promise<boolean> {
     }
 }
 
-export function isModuleFile(path: string): boolean {
-    return (MODULE_EXTENSIONS as readonly string[]).includes(extname(path));
-}
-
-/** The first `<stem><extension>` file of `dir`, in the order of `extensions`. */
-export async function findFile(dir: string, stem: string, extensions: readonly string[]): Promise<string | undefined> {
-    for (const extension of extensions) {
-        const path = join(dir, `${stem}${extension}`);
-        if (await isFile(path)) return path;
-    }
-    return undefined;
-}
-
 export async function isFile(path: string): Promise<boolean> {
     try {
         return (await stat(path)).isFile();
     } catch {
         return false;
     }
-}
-
-/**
- * The files of `dir` with one of `extensions`, by name in code-point order;
- * dot- and underscore-prefixed entries, folders and other files are left
- * out. A missing folder has none.
- */
-export async function listFiles(dir: string, extensions: readonly string[]): Promise<FolderFile[]> {
-    let names: string[];
-    try {
-        names = await readdir(dir);
-    } catch {
-        return [];
-    }
-    const files: FolderFile[] = [];
-    for (const name of names.sort(compareCodePoints)) {
-        if (name.startsWith('.') || name.startsWith('_')) continue;
-        const extension = extname(name);
-        if (!extensions.includes(extension)) continue;
-        const path = join(dir, name);
-        if (!await isFile(path)) continue;
-        files.push({
-            path,
-            name,
-            stem: name.slice(0, -extension.length),
-            extension,
-        });
-    }
-    return files;
 }
 
 export function compareCodePoints(a: string, b: string): number {
@@ -281,148 +205,4 @@ export function defaultExportOf(mod: unknown, file: string): unknown {
         return (mod as { default: unknown }).default;
     }
     throw new InvalidAgentDefinitionError(`${file}: has no default export.`);
-}
-
-export function isStandardSchema(value: unknown): boolean {
-    return (isObject(value) || typeof value === 'function') && isObject((value as Record<string, unknown>)['~standard']);
-}
-
-export function isTriggerDefinition(value: unknown): value is TriggerDefinition {
-    return isObject(value) &&
-        typeof value.source === 'string' &&
-        typeof value.id === 'string' &&
-        value.id.length > 0 &&
-        isObject(value.options);
-}
-
-/**
- * `Record<tool, ApprovalPolicy>`: `'user'` or (module files only) a policy
- * function per tool name.
- */
-export function assertApprovals(value: unknown, file: string, data: boolean): Record<string, ApprovalPolicy> {
-    if (!isObject(value)) {
-        throw new InvalidAgentDefinitionError(`${file}: must map tool names to approval policies.`);
-    }
-    for (const [tool, policy] of Object.entries(value)) {
-        if (policy === 'user') continue;
-        if (!data && typeof policy === 'function') continue;
-        throw new InvalidAgentDefinitionError(data ?
-            `${file}: the approval of "${tool}" must be "user" in a data file.` :
-            `${file}: the approval of "${tool}" must be "user" or a policy function.`);
-    }
-    return value as Record<string, ApprovalPolicy>;
-}
-
-type DataTriggerForm = keyof typeof DATA_TRIGGER_KEYS;
-
-type CronData = {
-    cron: string; 
-    timezone?: string; 
-    overlap?: typeof OVERLAP_POLICIES[number]; 
-    payload?: unknown 
-};
-
-/**
- * A data trigger (`triggers/<file>.{yaml,yml,json}`): exactly one of
- * `{ cron, timezone?, overlap?, payload? }`, `{ http: true }` and
- * `{ webhook: '/path' }`, any other key an error.
- */
-export async function parseDataTrigger(value: unknown, file: string): Promise<TriggerDefinition> {
-    if (!isObject(value)) {
-        throw new InvalidAgentDefinitionError(`${file}: must be an object.`);
-    }
-    const forms = (Object.keys(DATA_TRIGGER_KEYS) as DataTriggerForm[]).filter((form) => form in value);
-    if (forms.length !== 1) {
-        throw new InvalidAgentDefinitionError(`${file}: must name exactly one of cron, http and webhook.`);
-    }
-    const form = forms[0] as DataTriggerForm;
-    const allowed: readonly string[] = DATA_TRIGGER_KEYS[form];
-    const unknown = Object.keys(value).filter((key) => !allowed.includes(key));
-    if (unknown.length > 0) {
-        throw new InvalidAgentDefinitionError(`${file}: unknown key ${unknown.map((key) => `"${key}"`).join(', ')} for a ${form} trigger.`);
-    }
-
-    try {
-        if (form === 'cron') {
-            const data = await createCronContainer().run(value);
-            const { cron: expression, ...options } = data;
-            return cron(expression, options);
-        }
-        if (form === 'http') {
-            await createHttpContainer().run(value);
-            return http();
-        }
-        const data = await createWebhookContainer().run(value);
-        return webhook({ path: data.webhook });
-    } catch (error) {
-        if (isValidupError(error)) {
-            const issues = flattenIssueItems(error.issues)
-                .map((issue) => `${issue.path.join('.')} ${issue.message}`)
-                .join('; ');
-            throw new InvalidAgentDefinitionError(`${file}: ${issues}.`);
-        }
-        if (error instanceof InvalidAgentDefinitionError) {
-            throw new InvalidAgentDefinitionError(`${file}: ${error.message}`);
-        }
-        throw error;
-    }
-}
-
-function createCronContainer(): Container<CronData> {
-    const container = new Container<CronData>();
-    container.mount('cron', isText());
-    container.mount('timezone', { optional: true }, isText());
-    container.mount('overlap', { optional: true }, isOneOf(OVERLAP_POLICIES));
-    container.mount('payload', { optional: true }, isAny());
-    return container;
-}
-
-function createHttpContainer(): Container<{ http: true }> {
-    const container = new Container<{ http: true }>();
-    container.mount('http', defineValidator({
-        run: ({ value }) => {
-            if (value !== true) throw createValidupError(value, IssueCode.VALUE_INVALID, 'must be true');
-            return value;
-        },
-    }));
-    return container;
-}
-
-function createWebhookContainer(): Container<{ webhook: string }> {
-    const container = new Container<{ webhook: string }>();
-    container.mount('webhook', defineValidator({
-        run: ({ value }) => {
-            if (typeof value !== 'string' || !value.startsWith('/')) {
-                throw createValidupError(value, IssueCode.VALUE_INVALID, 'must be a path starting with /');
-            }
-            return value;
-        },
-    }));
-    return container;
-}
-
-function isText(): ValidatorDescriptor {
-    return defineValidator({
-        run: ({ value }) => {
-            if (typeof value !== 'string' || value.length === 0) {
-                throw createValidupError(value, IssueCode.VALUE_INVALID, 'must be a non-empty string');
-            }
-            return value;
-        },
-    });
-}
-
-function isOneOf(values: readonly string[]): ValidatorDescriptor {
-    return defineValidator({
-        run: ({ value }) => {
-            if (typeof value !== 'string' || !values.includes(value)) {
-                throw createValidupError(value, IssueCode.VALUE_INVALID, `must be one of ${values.join(', ')}`);
-            }
-            return value;
-        },
-    });
-}
-
-function isAny(): ValidatorDescriptor {
-    return defineValidator({ run: ({ value }) => value });
 }

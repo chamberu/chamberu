@@ -22,7 +22,7 @@ The engine checks the rest when you construct it: agent names must be unique wit
 |---|---|---|---|
 | `name` | `string` | required | Unique per engine, lowercase words joined by `-`, at most 64 characters |
 | `model` | `LanguageModel` | required | Any AI SDK model |
-| `instructions` | `string` | none | System instructions (a folder agent may take them from `instructions.md`) |
+| `instructions` | `string` | required | System instructions |
 | `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()`. See [Triggers](/guide/triggers) |
 | `tools` | `ToolSet \| (ctx) => ToolSet` | none | A plain tool set, or a factory called for each execution. See [Tools and their context](#tools-and-their-context) |
 | `toolsContext` | `Record<string, unknown>` | none | Per tool name, the context of a third-party tool. See [Tools](/guide/tools#third-party-tools-with-their-own-context) |

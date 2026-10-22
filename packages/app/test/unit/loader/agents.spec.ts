@@ -31,14 +31,14 @@ describe('loadAgents', () => {
 
     it('loadAgents skips dot and underscore folders and reports broken folders as issues without absolute paths', async () => {
         await writeTree(root.path, {
-            'beta/agent.mjs': agent('beta'),
-            'alpha/agent.mjs': agent('alpha'),
-            'broken/agent.mjs': 'export default {\n',
-            'Bad_Name/agent.mjs': agent('Bad_Name'),
+            'beta/agent.ts': agent('beta'),
+            'alpha/agent.ts': agent('alpha'),
+            'broken/agent.ts': 'export default {\n',
+            'Bad_Name/agent.ts': agent('Bad_Name'),
             'empty/notes.md': 'nothing here',
-            '.tmp-upload/agent.mjs': agent('.tmp-upload'),
-            '_shared/agent.mjs': agent('_shared'),
-            'loose-file.mjs': agent('loose-file'),
+            '.tmp-upload/agent.ts': agent('.tmp-upload'),
+            '_shared/agent.ts': agent('_shared'),
+            'loose-file.ts': agent('loose-file'),
         });
 
         const { agents, issues } = await loadAgents(root.path);
@@ -50,15 +50,15 @@ describe('loadAgents', () => {
             expect(issue.message).not.toContain(root.path);
             expect(issue.message.length).toBeGreaterThan(0);
         }
-        expect(issues[1]?.message).toMatch(/^broken\/agent\.mjs: /);
+        expect(issues[1]?.message).toMatch(/^broken\/agent\.ts: /);
     });
 
     it('lists the agent folders by name', async () => {
         await writeTree(root.path, {
-            'b/agent.mjs': agent('b'),
-            'a/agent.mjs': agent('a'),
+            'b/agent.ts': agent('b'),
+            'a/agent.ts': agent('a'),
             '.git/HEAD': 'x',
-            '_x/agent.mjs': agent('_x'),
+            '_x/agent.ts': agent('_x'),
             'file.txt': 'x',
         });
 
