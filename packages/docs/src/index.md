@@ -45,7 +45,7 @@ flow:
 packages:
     eyebrow: Packages
     title: Small today, planned in the open.
-    lead: The engine, the cron scheduler, the HTTP and MCP API, the dashboard, the TypeORM store, the GitHub connector, sandboxes, notifiers and the test helpers ship now. The rest is designed milestone by milestone.
+    lead: The engine, the cron scheduler, the HTTP and MCP API, the dashboard, the TypeORM store, the GitHub connector, sandboxes, notifiers, the app and CLI and the test helpers ship now. The rest is designed milestone by milestone.
     shipped:
         -   name: '@chamvi/core'
             body: Agents, triggers, the run engine, checkpoints, budgets, effect tools, approvals, agent state and the in-memory store.
@@ -62,6 +62,9 @@ packages:
         -   name: '@chamvi/http'
             body: REST, server-sent events, webhooks and an MCP endpoint, with bearer, authup and OIDC authentication.
             link: /guide/http
+        -   name: '@chamvi/app + @chamvi/cli'
+            body: One createApp() default export booted from env, and the chamvi bin with dev, build, start, run-job and migrate.
+            link: /guide/app
         -   name: '@chamvi/ui'
             body: A dashboard with an agents overview, runs started from the agent page, live steps, an approvals inbox, agent state and schedules, served by uiRoutes().
             link: /guide/ui
@@ -75,9 +78,9 @@ packages:
             body: Approval requests into an OpenClaw chat or as one comment on the run's GitHub issue, once per approval.
             link: /guide/notifiers
     planned:
-        -   name: 'chamvi'
+        -   name: 'deploy kit'
             milestone: M1
-            body: The umbrella package and CLI, with a base image, a Helm chart and a template repository.
+            body: A base image, a Helm chart and a template repository around the app and the CLI.
     link:
         text: Roadmap
         link: /roadmap

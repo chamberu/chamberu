@@ -1,7 +1,7 @@
 # Docker Image <Badge type="warning" text="Planned" />
 
 ::: warning Planned
-Neither the base image nor the CLI build command exists yet. The [sandbox image](#sandbox-image) does.
+The base image does not exist yet. The [`chamvi build`](/reference/cli#build-output) command and the [sandbox image](#sandbox-image) do.
 :::
 
 ## Base image

@@ -33,6 +33,12 @@ chamvi/
 │   │   ├── src/                     # Node entry (tsdown -> dist/index.mjs): uiRoutes()
 │   │   ├── app/                     # The SPA (Vite root -> dist/app), own tsconfig for vue-tsc
 │   │   └── test/{unit,e2e}/         # Vitest (routes, app modules), Playwright smoke spec + demo server
+│   ├── app/                         # @chamvi/app (aliases every workspace package it imports, itself and its subpaths to src)
+│   │   ├── src/                     # main entry src/index.ts, subpath entries src/{github,sandbox,openclaw,ui,authup}/index.ts
+│   │   └── test/                    # global-setup.ts (postgres:18-alpine via testcontainers), utils/harness.ts (one module set up on a container)
+│   ├── cli/                         # @chamvi/cli (bin chamvi -> dist/cli.mjs; aliases app and its imports to src)
+│   │   ├── src/cli.ts               # the bin (shebang, then the header)
+│   │   └── test/fixtures/           # apps the commands and the spawned bin run: app (README), failing, hang, slow, keyless, broken
 │   ├── store-typeorm/               # @chamvi/store-typeorm (same layout)
 │   │   ├── src/{entities,migrations,schema,store}/
 │   │   └── test/global-setup.ts     # Starts postgres:18-alpine via testcontainers for the suite
@@ -75,11 +81,12 @@ chamvi/
 | `@chamvi/sandbox-k8s` | Exists (0.1.0) | `createKubernetesSandbox()`, `createPodClient()`: one hardened pod per workspace; depends on `@kubernetes/client-node`, `smob`, peer on core and sandbox |
 | `@chamvi/coding` | Exists (0.1.0) | `codingTools()` (read_file, write_file, edit_file, grep, list_files, bash, git_diff), the `ICodingBackend` contract; depends on `smob`, peer on core, sandbox and `ai` |
 | `@chamvi/ui` | Exists (0.1.0) | `uiRoutes()`: serves the prebuilt Vue 3 + vuecs dashboard (runs, run detail, approvals, agent state, schedules) as one extra route of `createHttpApp({ routes })`; peer on core and http (types only), every SPA library a bundled devDependency |
+| `@chamvi/app` | Exists (0.1.0) | `createApp()` (`IApp`: `start`, `stop`, `runJob`, `migrate`), built-in orkos modules (config, store, static tokens, engine, scheduler, http, console notifier) over an eldin container, `AppToken`s, env readers, `readConfig()`, the JSON line logger, the model registry; optional modules on subpaths (`/github`, `/sandbox`, `/openclaw`, `/ui`, `/authup`); re-exports core and part of http; depends on core, http, scheduler, store-typeorm, `orkos`, `eldin`, `envix`, `routup`, `smob`, peer on `ai`, `typeorm`, `pg` (optional: the provider packages and the optional modules' packages) |
+| `@chamvi/cli` | Exists (0.1.0) | The `chamvi` bin (citty): `dev`, `build`, `start`, `run-job`, `migrate`, entry loading, signals, exit codes `0/1/2`; `runCli()`; depends on `citty`, peer on app (optional `tsdown`) |
 | `@chamvi/coding-claude-code` | Planned | Claude Code coding backend |
 | `@chamvi/github` | Exists (0.1.0) | `createGithubApp()` (App JWT, `IClock` installation-token cache, Octokit per installation), `githubWebhook()` trigger, the signed webhook route for `createHttpApp({ routes })`, read tools and effect write tools; depends on `@octokit/core` + `plugin-paginate-rest`, peer on core, http (types only) and `ai` |
 | `@chamvi/notify-openclaw` | Exists (0.1.0) | `openclaw()`: `POST <hooksPath>/agent` with `Idempotency-Key`, a deterministic message, an `IClock` timeout; no runtime dependencies, peer on core |
 | `@chamvi/notify-github` | Exists (0.1.0) | `githubNotifier()`: one comment on the run's issue/PR (or `target`), deduplicated by `effectMarker()` found before posting; depends on `smob`, peer on core and github |
-| `chamvi` | Planned | Umbrella package and CLI |
 
 The memory store lives inside `@chamvi/core` (no separate `store-memory` package), because every test needs it.
 
@@ -188,6 +195,30 @@ Folders without an `index.ts` export nothing public; other modules import the fi
 |------|---------|
 | `tools/` | `codingTools()` (`module.ts`); `read_file`, `write_file`, `edit_file` (`files.ts`), `grep`, `list_files` (`search.ts`), `bash` (`shell.ts`), `git_diff` (`git.ts`); input checks, `workspaceOf()`, `objectSchema()` (`helpers.ts`); `READ_MAX_LINES`, `READ_MAX_CHARS`, `SEARCH_MAX_RESULTS`, `LIST_MAX_RESULTS`, `LINE_MAX_CHARS` (public) and defaults (`constants.ts`); result types (`types.ts`) |
 | `backend/` | `ICodingBackend`, `CodingTask`, `CodingResult`, `CodingBudget` (types only) |
+
+## App Module Map (`packages/app/src`)
+
+| Path | Purpose |
+|------|---------|
+| `app/` | `createApp()`, `isApp()` and the `App` class (`module.ts`, the lifecycle: one orkos `Application` over a fresh eldin `Container` per `start`/`runJob`/`migrate`, memoized `stop()`), `buildModules()` (built-ins replaced by name, duplicate names refused), `createInUseError()`, `createStopFailedError()` (`helpers.ts`), `APP_BRAND` (`constants.ts`), `AppOptions`, `IApp` and the lifecycle option/result types (`types.ts`) |
+| `module/` | `AppToken`, `ModuleName`, `AUTHENTICATOR_ORDER`, `APP_ERROR_CODE` (`constants.ts`), `runHooks()`, `throwIfStopped()`, `reportingModule()`, `createStoppedError()` (`helpers.ts`, the last two internal), `AppContext`, `ILifecycleHook`, `AuthenticatorEntry`, `Server`, `AppTokens` (`types.ts`) |
+| `env/` | `envString()`, `envInteger()`, `envBoolean()`, `envUrl()`, `envList()`, `envJson()`, `envOneOf()` (`module.ts`, never echoing a value), `Env` and the reader options (`types.ts`) |
+| `config/` | `readConfig(env, { mode, dev })` (`module.ts`), `readTokens()`, `approvalUrlOf()` (`helpers.ts`), defaults and patterns (`constants.ts`), `AppConfig`, `LogLevel`, `ReadConfigOptions`, `ApprovalRef` (`types.ts`) |
+| `logger/` | `createLogger()` (`module.ts`, JSON lines on stderr), `serializeError()`, `toLine()` (`helpers.ts`), `LOG_LEVEL_RANK` |
+| `models/` | `createModelRegistry()`, `installDefaultProvider()` (`module.ts`), `isPackageNotFound()`, `defaultImporter()` (`helpers.ts`), `BUILTIN_PROVIDERS`, `MODEL_SEPARATOR` (`constants.ts`) |
+| `core/` | The re-export of `@chamvi/core` and named `@chamvi/http` symbols (the documented exception, see conventions) |
+| `modules/` | The built-ins, one folder each: `config/`, `store/` (`purge.ts` the purge timer, `maskPassword()`, `destroyQuietly()`, `isPurgingStore()` in `helpers.ts`), `static-tokens/` (the dev `*` token), `engine/`, `scheduler/`, `http/` (`resolveAuthenticators()` in `helpers.ts`), `console-notifier/` |
+| `github/`, `sandbox/`, `openclaw/`, `ui/`, `authup/` | The subpath entries: `githubModule()` + `githubNotifierModule()` (`notifier.ts`), `createGithubAppFromEnv()`; `sandboxModule()` with `createLazyProvider()` (`provider.ts`); `openclawModule()`; `uiModule()`; `authupModule()` + `oidcModule()` (`oidc.ts`); each with its `*_MODULE_NAME` and options type |
+
+## CLI Module Map (`packages/cli/src`)
+
+| Path | Purpose |
+|------|---------|
+| `cli.ts` | The bin: `await runCli(process.argv.slice(2), processContext(fileURLToPath(import.meta.url)))` |
+| `run/` | `runCli()` (`module.ts`: `--help`/`--version`, citty `runCommand`, errors to stderr with `exitCodeOf`), `processContext()`, `exitCodeOf()`, `createUsageError()`, `assertKnownArgs()`, `messageOf()`, `isRecord()` (`helpers.ts`), `EXIT_CODE`, `CLI_USAGE_ERROR_CODE` (public), `CITTY_ERROR_NAME`, `USAGE_ERROR_CODES`, `APP_STOPPED_ERROR_CODE` (`constants.ts`), `CliContext` (`types.ts`) |
+| `commands/` | `createMainCommand()` (`module.ts`), one file per command (`dev.ts`, `build.ts`, `start.ts`, `run-job.ts`, `migrate.ts`), `readVersion()`, `loadDotEnv()` (`helpers.ts`, `node:util` `parseEnv`), `FORCE_EXIT_MS`, `DEV_FORCE_EXIT_MS`, `BUILD_OUT_DIR`, `TSDOWN_PACKAGE`, ... (`constants.ts`) |
+| `entry/` | `resolveEntry()` (`--entry`, `package.json` `chamvi.entry` for source commands only, `SOURCE_ENTRY`/`BUILT_ENTRY`), `loadApp()` (`isApp` check) (`module.ts`), `EntryKind`, `ResolveEntryInput` (`types.ts`); not re-exported from the main entry |
+| `signals/` | `installSignalHandlers()` (`module.ts`: first signal stops, second exits 1, the force-exit timer on the `IClock`), `ISignalTarget` (public), `ProcessEvent`, `StopSignal`, `SignalHandlersInput`, `SignalHandlers` (`types.ts`) |
 
 ## Store-TypeORM Module Map (`packages/store-typeorm/src`)
 

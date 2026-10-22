@@ -17,7 +17,7 @@ This guide describes `@chamvi/core` as it is built today. Every sample on these 
 | **Store** | `Store` | Runs, steps, checkpoints, keys, locks, effects and state. Pluggable |
 | **Workspace** | `@chamvi/sandbox` | A disposable directory or container a run executes commands in, optionally a checkout of a repository. See [Workspaces & Coding](/guide/workspaces) |
 
-The **App** concept (one app with HTTP, scheduler and UI) belongs to [planned packages](/roadmap).
+The **App** concept (one app with store, HTTP, scheduler and UI, booted from env) is [`@chamvi/app`](/guide/app).
 
 ## The engine in one picture
 

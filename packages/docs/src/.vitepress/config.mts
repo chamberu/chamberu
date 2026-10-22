@@ -132,6 +132,7 @@ export default defineConfig({
                 {
                     text: 'Operations',
                     items: [
+                        { text: 'Apps & Modules', link: '/guide/app' },
                         { text: 'Concurrency, Leases & Multi-Replica', link: '/guide/concurrency' },
                         { text: 'Cancel, Drain & Recovery', link: '/guide/recovery' },
                         { text: 'Cron Scheduling', link: '/guide/scheduler' },
@@ -171,6 +172,8 @@ export default defineConfig({
                     text: 'Reference',
                     items: [
                         { text: '@chamvi/core', link: '/reference/' },
+                        { text: '@chamvi/app', link: '/reference/app' },
+                        { text: '@chamvi/cli', link: '/reference/cli' },
                         { text: '@chamvi/coding', link: '/reference/coding' },
                         { text: '@chamvi/github', link: '/reference/github' },
                         { text: '@chamvi/http', link: '/reference/http' },
