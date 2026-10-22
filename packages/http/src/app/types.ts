@@ -86,7 +86,8 @@ export type HttpRouteRequest = {
     /**
      * The raw body, at most `bodyLimit` bytes: 413 above it (content-length
      * refused unread, else drained like readJsonBody), 415 for a non-JSON
-     * media type with a non-empty body; an empty body is a 0-length array.
+     * media type with a non-empty body unless the route sets `anyBody`;
+     * an empty body is a 0-length array.
      * Memoized: every call answers the same bytes (or the same error).
      */
     readBody(): Promise<Uint8Array>;
@@ -130,6 +131,11 @@ export type HttpRoute = {
      * handing the rest as `request.subpath`; labelled `<path>/*` in metrics.
      */
     prefix?: true;
+    /**
+     * true: readBody() takes any media type (form-encoded Slack interactions,
+     * Twilio webhooks), still bounded by `bodyLimit`. Default: JSON only.
+     */
+    anyBody?: true;
     /**
      * Not authenticated by the app's authenticators: the route checks its own
      * credentials. Thrown @ebec/http and core errors render like any route's.

@@ -186,6 +186,30 @@ describe('extra routes', () => {
         expect(await response.json()).toMatchObject({ status: 415, code: 'unsupported_media_type' });
     });
 
+    it('reads a form body for an anyBody route, still bounded by bodyLimit', async () => {
+        let read: string | undefined;
+        const reading = route({
+            anyBody: true,
+            handler: async (request) => {
+                read = new TextDecoder().decode(await request.readBody());
+                return { status: 202 };
+            },
+        });
+        const { app } = createTestApp({ bodyLimit: 16, routes: [reading] });
+        const response = await send(app, '/extra', {
+            body: 'payload=x',
+            contentType: 'application/x-www-form-urlencoded',
+        });
+        expect(response.status).toBe(202);
+        expect(read).toBe('payload=x');
+
+        const tooLarge = await send(app, '/extra', {
+            body: 'payload=0123456789abcdef',
+            contentType: 'application/x-www-form-urlencoded',
+        });
+        expect(tooLarge.status).toBe(413);
+    });
+
     it('answers 413 above bodyLimit', async () => {
         const reading = route({
             handler: async (request) => {

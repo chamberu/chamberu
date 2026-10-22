@@ -37,7 +37,7 @@ function toRouteRequest(event: IAppEvent, ctx: HttpContext, route: HttpRoute): H
         readBody: () => {
             body ??= (async () => {
                 assertContentLength(event, ctx.bodyLimit);
-                return readBodyBytes(event, ctx.bodyLimit, isJsonMediaType(request.headers.get('content-type')));
+                return readBodyBytes(event, ctx.bodyLimit, route.anyBody === true || isJsonMediaType(request.headers.get('content-type')));
             })();
             return body;
         },
