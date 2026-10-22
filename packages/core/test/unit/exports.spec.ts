@@ -39,6 +39,7 @@ describe('public api', () => {
         'requireToolPermission',
         'isArtifactMediaType',
         'assertTriggerKey',
+        'normalizeEnvelope',
         'consoleChannel',
         'injectChannel',
         'replyChannel',

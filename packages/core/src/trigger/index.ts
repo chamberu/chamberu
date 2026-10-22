@@ -6,5 +6,6 @@
  */
 
 export * from './constants.ts';
+export { normalizeEnvelope } from './helpers.ts';
 export * from './key.ts';
 export type * from './types.ts';

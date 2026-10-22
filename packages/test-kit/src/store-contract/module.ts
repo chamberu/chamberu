@@ -367,7 +367,7 @@ export function describeStoreContract(
             const { store } = await setup();
             await store.createRun(makeRun('r1', {
                 concurrencyKey: 'k', 
-                thread: 't', 
+                address: 't', 
                 usage: { inputTokens: 3, outputTokens: 4 }, 
             }));
             await store.claimRun('r1', 'w1', 1_000);
@@ -375,11 +375,33 @@ export function describeStoreContract(
             const updated = await store.updateRun('r1', { status: RunStatus.RUNNING });
             expect(updated.claim).toEqual(before?.claim);
             expect(updated.concurrencyKey).toBe('k');
-            expect(updated.thread).toBe('t');
+            expect(updated.address).toBe('t');
             expect(updated.usage).toEqual({ inputTokens: 3, outputTokens: 4 });
             expect(updated.agent).toBe('a');
             expect(updated.createdAt).toEqual(before?.createdAt);
             expect((await store.getRun('r1'))?.claim).toEqual(before?.claim);
+        });
+
+        it('run.address and trigger.channel round-trip', async () => {
+            const { store } = await setup();
+            const run = makeRun('r1', { address: 'owner/repo#7' });
+            run.trigger = {
+                ...run.trigger,
+                channel: 'github',
+                address: 'owner/repo#7',
+            };
+            await store.createRun(run);
+            const stored = await store.getRun('r1');
+            expect(stored?.address).toBe('owner/repo#7');
+            expect(stored?.trigger.channel).toBe('github');
+            expect(stored?.trigger.address).toBe('owner/repo#7');
+            expect(stored?.trigger).not.toHaveProperty('source');
+            expect(stored?.trigger).not.toHaveProperty('thread');
+            const updated = await store.updateRun('r1', { address: 'owner/repo#8' });
+            expect(updated.address).toBe('owner/repo#8');
+            const listed = await store.listRuns({});
+            expect(listed.data[0]?.address).toBe('owner/repo#8');
+            expect(listed.data[0]?.trigger.channel).toBe('github');
         });
 
         it('listRuns breaks createdAt ties by id ascending', async () => {
@@ -409,11 +431,11 @@ export function describeStoreContract(
         it('createRun inserts only when the id is absent, also under concurrency', async () => {
             const { store } = await setup();
             const results = await Promise.all(
-                Array.from({ length: 5 }, (_, i) => store.createRun(makeRun('r1', { thread: `t${i}` }))),
+                Array.from({ length: 5 }, (_, i) => store.createRun(makeRun('r1', { address: `t${i}` }))),
             );
             expect(results.filter(Boolean)).toHaveLength(1);
             const winner = results.indexOf(true);
-            expect((await store.getRun('r1'))?.thread).toBe(`t${winner}`);
+            expect((await store.getRun('r1'))?.address).toBe(`t${winner}`);
             await store.updateRun('r1', { status: RunStatus.RUNNING });
             expect(await store.createRun(makeRun('r1'))).toBe(false);
             expect((await store.getRun('r1'))?.status).toBe(RunStatus.RUNNING);

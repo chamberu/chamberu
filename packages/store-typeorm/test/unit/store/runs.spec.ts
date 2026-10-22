@@ -29,7 +29,7 @@ function makeRun(id: string, overrides: Partial<Run> = {}): Run {
             id: `t-${id}`,
             agent: 'a',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: { n: 1 },
             receivedAt: new Date(1_234_567),
         },
@@ -62,14 +62,18 @@ describePostgres('TypeormStore runs', () => {
     it('roundtrips every Run field with Date instances', async () => {
         const run = makeRun('r1', {
             concurrencyKey: 'ck',
-            thread: 'th',
+            address: 'th',
             output: { ok: true },
             error: { code: 'X', message: 'm' },
             waiting: {
                 kind: 'approval',
                 approvalId: 'ap1',
                 toolName: 'tool',
-                input: { a: [1, 2] },
+                toolCallId: 'call-1',
+                title: 'Approve tool',
+                body: 'details',
+                channel: 'github',
+                address: 'o/r#1',
                 expiresAt: new Date('2026-03-08T07:15:00.456Z'),
                 tokenId: 'tok',
                 notifiedAt: new Date(2_000_001),
@@ -104,7 +108,7 @@ describePostgres('TypeormStore runs', () => {
         const gotMinimal = await store.getRun('r2');
         expect(gotMinimal).toEqual(minimal);
         const keys = Object.keys(gotMinimal!);
-        for (const key of ['output', 'error', 'waiting', 'claim', 'cancelRequested', 'concurrencyKey', 'thread', 'startedAt', 'finishedAt']) {
+        for (const key of ['output', 'error', 'waiting', 'claim', 'cancelRequested', 'concurrencyKey', 'address', 'startedAt', 'finishedAt']) {
             expect(keys).not.toContain(key);
         }
     });
@@ -135,22 +139,23 @@ describePostgres('TypeormStore runs', () => {
     });
 
     it('createRun keeps the stored run on a duplicate id', async () => {
-        await expect(store.createRun(makeRun('r1', { thread: 'first' }))).resolves.toBe(true);
-        await expect(store.createRun(makeRun('r1', { thread: 'second' }))).resolves.toBe(false);
-        expect((await store.getRun('r1'))!.thread).toBe('first');
+        await expect(store.createRun(makeRun('r1', { address: 'first' }))).resolves.toBe(true);
+        await expect(store.createRun(makeRun('r1', { address: 'second' }))).resolves.toBe(false);
+        expect((await store.getRun('r1'))!.address).toBe('first');
         await expect(store.getRun('missing')).resolves.toBeUndefined();
     });
 
     it('updateRun clears columns for keys set to undefined and keeps absent ones', async () => {
         await store.createRun(makeRun('r1', {
             status: 'waiting',
-            thread: 'th',
+            address: 'th',
             error: { code: 'X', message: 'm' },
             waiting: {
                 kind: 'approval',
                 approvalId: 'ap1',
                 toolName: 'tool',
-                input: null,
+                toolCallId: 'call-1',
+                title: 'Approve tool',
                 expiresAt: new Date(50_000),
                 tokenId: 'tok',
             },
@@ -169,7 +174,7 @@ describePostgres('TypeormStore runs', () => {
             expect(Object.keys(run)).not.toContain('error');
             expect(Object.keys(run)).not.toContain('claim');
             expect(run.status).toBe('queued');
-            expect(run.thread).toBe('th');
+            expect(run.address).toBe('th');
             expect(run.usage).toEqual({ inputTokens: 1, outputTokens: 2 });
         }
     });
@@ -190,18 +195,18 @@ describePostgres('TypeormStore runs', () => {
     });
 
     it('updateRun reports a missing run and a foreign owner', async () => {
-        await expect(store.updateRun('missing', { thread: 'x' })).rejects.toBeInstanceOf(RunNotFoundError);
+        await expect(store.updateRun('missing', { address: 'x' })).rejects.toBeInstanceOf(RunNotFoundError);
         await store.createRun(makeRun('r1'));
         await store.claimRun('r1', 'o1', 1_000);
-        await expect(store.updateRun('r1', { thread: 'x' }, { expectOwner: 'o2' })).rejects.toBeInstanceOf(InvalidRunStateError);
-        await expect(store.updateRun('r1', { thread: 'x' }, { expectOwner: 'o1', expectStatus: ['queued'] }))
-            .resolves.toMatchObject({ thread: 'x' });
+        await expect(store.updateRun('r1', { address: 'x' }, { expectOwner: 'o2' })).rejects.toBeInstanceOf(InvalidRunStateError);
+        await expect(store.updateRun('r1', { address: 'x' }, { expectOwner: 'o1', expectStatus: ['queued'] }))
+            .resolves.toMatchObject({ address: 'x' });
     });
 
     it('updateRun sets updatedAt from the clock unless the patch has one', async () => {
         await store.createRun(makeRun('r1'));
         clock.advance(500);
-        const a = await store.updateRun('r1', { thread: 'x' });
+        const a = await store.updateRun('r1', { address: 'x' });
         expect(a.updatedAt.getTime()).toBe(10_500);
         const b = await store.updateRun('r1', { updatedAt: new Date(42) });
         expect(b.updatedAt.getTime()).toBe(42);
