@@ -143,6 +143,24 @@ Every failure throws a `ChamviError` with code `github_request` (`GitHub <status
 - The body is cut to 60 000 characters (GitHub refuses comments over 65 536), never inside a surrogate pair.
 - A comment by anyone but the App bot that copies the marker does not count as delivered.
 
+## Context
+
+`provideGithubNotifierContext(engine, notifier)` provides the notifier on the engine under its name; a tool reads it with `injectGithubNotifierContext(ctx, name?)` (default `github`). Each name has its own key, so two GitHub notifiers are both reachable; an unknown name throws `ContextNotProvidedError` naming `notify-github:<name>`.
+
+## With @chamvi/app
+
+`githubNotifierModule({ app })` from `@chamvi/notify-github/module` contributes the notifier (default name `github`) with the dashboard approval link from `CHAMVI_PUBLIC_URL` and the app's clock, and provides it on the engine. `@chamvi/app` is an optional peer; the main entry never imports it.
+
+```ts
+import { createApp } from '@chamvi/app';
+import { githubModule } from '@chamvi/github/module';
+import { githubNotifierModule } from '@chamvi/notify-github/module';
+
+const github = githubModule();
+
+export default createApp({ agents, modules: [github, githubNotifierModule({ app: github.app })] });
+```
+
 ## Options
 
 | Option | Type | Default | Description |
@@ -162,10 +180,13 @@ Every option is checked when `githubNotifier()` is called; a bad one throws `Inv
 | Export | Kind | Purpose |
 |---|---|---|
 | `githubNotifier` | function | `githubNotifier(options)`: an `INotifier` commenting on the run's issue or pull request |
+| `provideGithubNotifierContext`, `injectGithubNotifierContext` | function | Provide a notifier on the engine by its name, read it from a `ToolContext` |
 | `GITHUB_NOTIFIER_TIMEOUT_MS` | constant | `30_000`, the default `timeoutMs` |
 | `COMMENT_BODY_MAX_LENGTH` | constant | `60_000`, the cut of `Notification.body` in the comment |
 
 Types: `GithubNotifierOptions`, `GithubNotifierTarget`.
+
+`@chamvi/notify-github/module`: `githubNotifierModule`, `GithubNotifierModule`, type `GithubNotifierModuleOptions`.
 
 ## License
 

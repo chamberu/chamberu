@@ -188,6 +188,36 @@ Approvals live on the agent: `approvals: { github_close_issue: 'user' }` pauses 
 - `requireToolPermission()` from `@chamvi/core` denies every tool to runs without an invoker, and delivery runs have none. GitHub agents use `requireToolPermission({ withoutInvoker: 'allow' })` or wrap it.
 - Webhook secrets can be rotated: pass `webhookSecret: [old, new]` while GitHub switches over.
 
+## Context
+
+`provideGithubContext(engine, gh)` provides the App on the engine; a tool or a tools factory reads it with `injectGithubContext(ctx)`, so the tools need no closure over the instance:
+
+```ts
+import { injectGithubContext, provideGithubContext } from '@chamvi/github';
+
+const triage = defineAgent({
+    name: 'triage',
+    model,
+    instructions: 'Label the issue.',
+    tools: (ctx) => injectGithubContext(ctx).readTools(),
+});
+
+provideGithubContext(engine, gh); // once, after new Engine()
+```
+
+A missing App throws `ContextNotProvidedError` naming `github` (in the factory the run fails before any model call).
+
+## With @chamvi/app
+
+`githubModule()` from `@chamvi/github/module` builds the App from `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_INSTALLATION_ID`, `GITHUB_APP_SLUG` and `GITHUB_API_URL` when it is called (`.app` at once), contributes the webhook route and provides the App on the engine. `@chamvi/app` is an optional peer; the main entry never imports it.
+
+```ts
+import { createApp } from '@chamvi/app';
+import { githubModule } from '@chamvi/github/module';
+
+export default createApp({ agents: [triage], modules: [githubModule()] });
+```
+
 ## Options
 
 `createGithubApp(options)`:
@@ -213,9 +243,12 @@ Approvals live on the agent: `approvals: { github_close_issue: 'user' }` pauses 
 | `githubWebhook` | function | The trigger factory |
 | `DEFAULT_WEBHOOK_PATH`, `DEFAULT_GITHUB_API_URL` | constant | `/webhooks/github`, `https://api.github.com` |
 | `GITHUB_REQUEST_ERROR_CODE` | constant | `'github_request'`, the `code` of a failed GitHub request |
+| `provideGithubContext`, `injectGithubContext` | function | Provide the App on the engine, read it from a `ToolContext` |
 | `REPO_PATTERN` | constant | The `owner/name` pattern the tools accept (a regular expression source; `.` and `..` segments never match) |
 
 Types: `GithubAppOptions`, `IGithubApp`, `GithubOctokit`, `GithubEvent`, `GithubPayload`, `GithubWebhookTriggerOptions`, `GithubWebhookRouteOptions`, `GithubWebhookResult`, `GithubIssue`, `GithubIssueSearch`, `GithubLabel`, `GithubPullRequest`, `GithubFile`, `GithubDirectory`, `GithubRelease`, `GithubComment`, `GithubIssueLabels`, `GithubClosedIssue`.
+
+`@chamvi/github/module`: `githubModule`, `GithubModule`, `GITHUB_MODULE_NAME`, type `GithubModuleOptions`.
 
 ## License
 

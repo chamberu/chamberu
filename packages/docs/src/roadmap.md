@@ -18,6 +18,7 @@ chamvi is built milestone by milestone, each defined by one real agent that has 
 | `@chamvi/notify-github` | The GitHub notifier: approval requests as a comment on the run's issue or pull request, deduplicated by a hidden marker |
 | `@chamvi/coding` | Coding tools (`read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash`, `git_diff`) over a run's workspaces and the `ICodingBackend` contract |
 | `@chamvi/ui` | Vue 3 dashboard served by `uiRoutes()`: an agents overview, runs started from the agent page, runs with live steps, an approvals inbox, agent state, schedules |
+| `@chamvi/app`, `@chamvi/cli` | `createApp()` with orkos modules booted from env (store, engine, scheduler, HTTP, GitHub, sandbox, notifiers, UI, authup) and the `chamvi` bin with `dev`, `build`, `start`, `run-job` and `migrate`. See [Apps & Modules](/guide/app) |
 
 ## Milestones
 
@@ -42,7 +43,7 @@ When Renovate opens a pull request, an agent reads the changelog of the bumped p
 | Coding backend on the own tools | Planned (M1) | An `ICodingBackend` that runs the coding tools in a nested tool loop |
 | Workspace re-attach | Planned | A run resumed on another replica or after a restart finds its container or pod by label instead of a fresh workspace |
 | `@chamvi/coding-claude-code` | Planned (M3) | A coding backend that runs Claude Code inside the sandbox |
-| `chamvi` (CLI and deploy kit) | Planned (M1) | Umbrella package with `createApp()` and the `dev`, `build`, `start`, `run-job` and `migrate` commands, plus a base image, a Helm chart and a template repository. See [Deployment](/deployment/) |
+| Deploy kit | Planned (M1) | A base image, a Helm chart and a template repository around `@chamvi/app` and `@chamvi/cli`. See [Deployment](/deployment/) |
 | `@chamvi/mail` | Planned (M2) | IMAP connector and tools |
 
 Two changes happened upstream first: a lock hook, timezone support and the scheduled time per tick shipped in [hubwire](https://github.com/tada5hi/hubwire) 0.2.2 (for the scheduler), and a fetch-native token verification in [authup](https://github.com/authup/authup) 1.0.0-beta.70 (for the HTTP API).

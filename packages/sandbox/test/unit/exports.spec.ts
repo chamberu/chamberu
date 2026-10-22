@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as sandbox from '@chamvi/sandbox';
+import * as module from '@chamvi/sandbox/module';
 
 describe('public api', () => {
     it.each([
@@ -33,6 +34,8 @@ describe('public api', () => {
         'collectionError',
         'createSinkStream',
         'delay',
+        'injectSandboxContext',
+        'provideSandboxContext',
     ])('exports %s', (name) => {
         expect(sandbox).toHaveProperty(name);
         expect(sandbox[name as keyof typeof sandbox]).toBeTypeOf('function');
@@ -105,7 +108,38 @@ describe('public api', () => {
         'wrapTimeout',
         'isTimeoutExit',
         'isName',
+        'SANDBOX_CONTEXT',
     ])('keeps %s internal', (name) => {
         expect(sandbox).not.toHaveProperty(name);
+    });
+
+    it('@chamvi/sandbox/module exports sandboxModule', () => {
+        expect(Object.keys(module).sort()).toEqual([
+            'SANDBOX_MODULE_NAME',
+            'SANDBOX_PROVIDER_NAMES',
+            'SandboxModule',
+            'sandboxModule',
+        ]);
+        expect(module.SANDBOX_MODULE_NAME).toBe('chamvi:sandbox');
+        expect(module.SANDBOX_PROVIDER_NAMES).toEqual(['local', 'docker', 'kubernetes']);
+    });
+
+    it.each([
+        'SANDBOX_MODULE_NAME',
+        'SANDBOX_PROVIDER_NAMES',
+        'SandboxModule',
+        'sandboxModule',
+        'createLazyProvider',
+    ])('the main entry keeps %s out', (name) => {
+        expect(sandbox).not.toHaveProperty(name);
+    });
+
+    it.each([
+        'createLazyProvider',
+        'isPackageNotFound',
+        'SANDBOX_PROVIDER_PACKAGES',
+        'SANDBOX_PROVIDER_IDS',
+    ])('the module entry keeps %s internal', (name) => {
+        expect(module).not.toHaveProperty(name);
     });
 });

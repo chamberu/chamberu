@@ -112,6 +112,17 @@ Invalid options throw `InvalidAgentDefinitionError` of `@chamvi/core`. A missing
 
 Behind a proxy that mounts the app under a prefix, set the app's `basePath`; the dashboard follows it.
 
+## With @chamvi/app
+
+`uiModule()` from `@chamvi/ui/module` contributes the dashboard route (`/ui` under `CHAMVI_BASE_PATH`) and reads `CHAMVI_UI_AUTHUP_CLIENT_ID`, `CHAMVI_UI_AUTHUP_REALM_ID` and `AUTHUP_URL` when it is called, unless `auth` is given. `@chamvi/app` is an optional peer; the main entry never imports it.
+
+```ts
+import { createApp } from '@chamvi/app';
+import { uiModule } from '@chamvi/ui/module';
+
+export default createApp({ agents, modules: [uiModule()] });
+```
+
 ## API
 
 | Export | Kind | Purpose |
@@ -123,6 +134,8 @@ Behind a proxy that mounts the app under a prefix, set the app's `basePath`; the
 | `CONFIG_ELEMENT_ID` | constant | `'chamvi-config'`, the id of the injected config block |
 
 Types: `UiRoutesOptions`, `UiConfig`, `UiAuthupConfig`.
+
+`@chamvi/ui/module`: `uiModule`, `UiModule`, `UI_MODULE_NAME`, type `UiModuleOptions`.
 
 ## License
 

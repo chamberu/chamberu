@@ -114,3 +114,8 @@ export function mockModel(responses: MockResponse[]) {
         },
     });
 }
+
+/** One text turn (finish `stop`). */
+export function textModel(text = 'done') {
+    return mockModel([{ parts: [{ type: 'text', text }] }]);
+}

@@ -7,6 +7,7 @@
 
 import type { Agent } from '../../agent/types.ts';
 import type { IClock } from '../../clock/index.ts';
+import type { ContextKey } from '../../context/types.ts';
 import type { Run, Step, Usage } from '../../run/types.ts';
 import type { IStore } from '../../store/types.ts';
 import type { RunDelta } from '../types.ts';
@@ -40,6 +41,11 @@ export type ExecuteContext = {
      * recovered); checked before every step and checkpoint write.
      */
     ownsRun?: () => Promise<boolean>;
+    /**
+     * The engine's provided values (by reference), bound to the execution's
+     * ToolContext for inject() before the tools factory runs.
+     */
+    provided?: ReadonlyMap<ContextKey<unknown>, unknown>;
 };
 
 /** A tool call waiting for the owner's decision. */

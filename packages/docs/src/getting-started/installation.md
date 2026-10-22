@@ -44,6 +44,17 @@ npm install @chamvi/sandbox @chamvi/coding @chamvi/sandbox-local    # developmen
 
 `@chamvi/core` and `ai` are peer dependencies of all of them. See [Workspaces & Coding](/guide/workspaces).
 
+## App and CLI
+
+An agent repository that runs as a service (HTTP, cron, the store from `DATABASE_URL`, a graceful shutdown) exports one `createApp()` and runs it with the `chamvi` bin:
+
+```bash
+npm install @chamvi/app @chamvi/cli ai @ai-sdk/anthropic typeorm pg
+npm install --save-dev tsdown   # only for chamvi build
+```
+
+`@chamvi/app` re-exports `@chamvi/core`, so the repository imports one package; the CLI needs Node.js 22.18 or newer. See [Apps & Modules](/guide/app).
+
 ## Packages
 
 | Package | Status |
@@ -57,6 +68,8 @@ npm install @chamvi/sandbox @chamvi/coding @chamvi/sandbox-local    # developmen
 | `@chamvi/sandbox`, `@chamvi/sandbox-local`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s` | Shipped (0.x), disposable workspaces |
 | `@chamvi/coding` | Shipped (0.x), coding tools over a workspace |
 | `@chamvi/notify-openclaw`, `@chamvi/notify-github` | Shipped (0.x), approval notifications to OpenClaw and GitHub |
-| `@chamvi/ui`, `chamvi` (CLI) | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
+| `@chamvi/ui` | Shipped (0.x), the dashboard |
+| `@chamvi/app`, `@chamvi/cli` | Shipped (0.x), `createApp()` and the `chamvi` bin |
+| Base image, Helm chart, template | <Badge type="warning" text="Planned" /> See the [roadmap](/roadmap) |
 
 chamvi is pre-1.0: a minor version may contain breaking changes, including changes to the store schema.

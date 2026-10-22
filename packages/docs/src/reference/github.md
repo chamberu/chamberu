@@ -49,3 +49,23 @@ Throws `InvalidAgentDefinitionError` without events or for an event that is not 
 `gh.readTools()` and `gh.writeTools()` return plain AI SDK `ToolSet`s; the results are these shapes.
 
 <<< ../../../github/src/tools/types.ts{ts}
+
+## Context
+
+```ts
+function provideGithubContext(provider: IContextProvider, app: IGithubApp): void; // engine.provide under the key 'github'
+function injectGithubContext(ctx: ToolContext): IGithubApp;                    // else ContextNotProvidedError
+```
+
+`githubModule()` provides its app; with a hand-built engine call `provideGithubContext(engine, gh)` after `new Engine()`. Inject in a tools factory (`tools: (ctx) => injectGithubContext(ctx).readTools()`), in a tool's `execute` or in an effect hook; see [Context](/guide/tools#context-shared-instances-for-tools). One app per engine: a second provide throws `InvalidAgentDefinitionError`.
+
+## Module
+
+```ts
+// @chamvi/github/module, needs @chamvi/app
+function githubModule(options?: GithubModuleOptions): GithubModule; // name GITHUB_MODULE_NAME 'chamvi:github', .app: IGithubApp
+```
+
+Reads `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` (comma-separated), `GITHUB_INSTALLATION_ID`, `GITHUB_APP_SLUG` and `GITHUB_API_URL` from `options.env ?? process.env` when it is called, unless `options.app` is given; explicit options win. `setup` contributes the signed webhook route (`webhookPath`, default `/webhooks/github`) to the app's routes, and the `engineCreated` hook provides `.app`. `@chamvi/app` is an optional peer: the main entry never imports it. See [Apps & Modules](/guide/app#modules).
+
+<<< ../../../github/src/module/types.ts{ts}

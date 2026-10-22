@@ -25,6 +25,13 @@ export type RunJobOptions = {
     pollMs?: number;
     /** Passed to engine.drain, default 30_000. */
     drainTimeoutMs?: number;
+    /**
+     * Stops the job: already aborted, nothing is fired and the engine is never
+     * started (`skipped`); aborted while waiting, the wait ends and the engine
+     * drains, and the result is the run as stored after the drain. The abort
+     * reason is never thrown.
+     */
+    signal?: AbortSignal;
 };
 
 export type RunJobResult = {
@@ -32,9 +39,12 @@ export type RunJobResult = {
     /**
      * The run's status when the job returned: `completed`, `failed`,
      * `cancelled`, `waiting`, `queued` (behind a run of its concurrency key
-     * that waits for an approval), or 'skipped' (overlap).
+     * that waits for an approval), or 'skipped' (overlap, or a signal
+     * aborted before the call). After an abort while waiting: the status the
+     * drain left, usually `interrupted`, or `running` when the drain timed out
+     * before the run was marked.
      */
     status: RunStatusLiteral | 'skipped';
-    /** 0 for completed, waiting, queued and skipped; 1 for failed and cancelled. */
+    /** 1 for failed and cancelled; 0 otherwise (an interrupted run is resumed by a replica). */
     exitCode: 0 | 1;
 };

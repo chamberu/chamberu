@@ -15,6 +15,8 @@ import { attachmentIds, storeArtifact } from '../artifact/module.ts';
 import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
 import type { IClock } from '../clock/index.ts';
+import { contextKeyName, isContextKey } from '../context/helpers.ts';
+import type { ContextKey, IContextProvider } from '../context/types.ts';
 import {
     InvalidAgentDefinitionError,
     InvalidResumeTokenError,
@@ -54,7 +56,7 @@ import type {
     RunEvent,
 } from './types.ts';
 
-export class Engine {
+export class Engine implements IContextProvider {
     /** The store runs, steps and state live in; packages built on the engine read through it. */
     readonly store: IStore;
 
@@ -93,6 +95,9 @@ export class Engine {
     protected draining = false;
 
     protected lastCreatedAt = 0;
+
+    /** Values tools reach through inject(ctx, key), by reference. */
+    protected readonly provided = new Map<ContextKey<unknown>, unknown>();
 
     constructor(opts: EngineOptions) {
         this.store = opts.store;
@@ -203,6 +208,25 @@ export class Engine {
         this.emit({ type: 'run.updated', run });
         if (this.started) void this.queue.pump();
         return { runId, deduplicated: false };
+    }
+
+    /**
+     * Provides `value` (by reference, never cloned, stored or serialized) to
+     * every execution's tools, tools factory and effect hooks through
+     * inject(ctx, key); also after start(). Refuses a key not made by this
+     * copy's defineContextKey(), `undefined` and a second value for one key.
+     */
+    provide<T>(key: ContextKey<T>, value: T): void {
+        const name = contextKeyName(key);
+        if (!isContextKey(key)) {
+            throw new InvalidAgentDefinitionError(
+                `Context "${name}" has no key from defineContextKey() of the engine's @chamvi/core: ` +
+                'a key from another copy of @chamvi/core (a package that resolved its own) is refused.',
+            );
+        }
+        if (value === undefined) throw new InvalidAgentDefinitionError(`Context "${name}" needs a value.`);
+        if (this.provided.has(key)) throw new InvalidAgentDefinitionError(`Context "${name}" is already provided.`);
+        this.provided.set(key, value);
     }
 
     /** The registered agent of that name. */
@@ -692,6 +716,7 @@ export class Engine {
             pause: (request, usage) => this.pause(run, agent, request, usage),
             toolApprovalSecret: this.resumeSecret,
             ownsRun: () => this.ownsRun(run.id),
+            provided: this.provided,
         });
     }
 

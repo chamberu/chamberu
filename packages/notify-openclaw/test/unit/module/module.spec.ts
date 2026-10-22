@@ -1,0 +1,288 @@
+/*
+ * Copyright (c) 2026.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
+import {
+    InvalidAgentDefinitionError,
+    consoleNotifier,
+    defineAgent,
+    defineTool,
+    http,
+} from '@chamvi/core';
+import type { INotifier, ToolContext } from '@chamvi/core';
+import { injectOpenclawContext, provideOpenclawContext } from '@chamvi/notify-openclaw';
+import { ControllableClock } from '@chamvi/test-kit';
+import { tool } from 'ai';
+import {
+    afterEach,
+    describe,
+    expect,
+    it,
+} from 'vitest';
+import { z } from 'zod';
+import {
+    AppToken,
+    ModuleName,
+    configModule,
+    engineModule,
+    storeModule,
+} from '@chamvi/app';
+import type { ILifecycleHook, IModule } from '@chamvi/app';
+import { createModuleHarness } from '@chamvi/app/testing';
+import type { ModuleHarness } from '@chamvi/app/testing';
+import { openclawModule } from '@chamvi/notify-openclaw/module';
+import { approvalModel, mockModel } from '../../utils/model.ts';
+import { SECRET, createRecordingLogger } from '../../utils/module.ts';
+import { createFakeOpenclaw } from '../../utils/openclaw.ts';
+
+const HOOKS_TOKEN = 'hooks-token-value';
+
+function openclawEnv(patch: Record<string, string | undefined> = {}): Record<string, string | undefined> {
+    return {
+        OPENCLAW_BASE_URL: 'http://openclaw:18789',
+        OPENCLAW_HOOKS_TOKEN: HOOKS_TOKEN,
+        OPENCLAW_CHANNEL: 'telegram',
+        OPENCLAW_TO: '12345',
+        ...patch,
+    };
+}
+
+let harnesses: ModuleHarness[] = [];
+
+afterEach(async () => {
+    await Promise.all(harnesses.map((h) => h.stop()));
+    harnesses = [];
+    globalThis.AI_SDK_DEFAULT_PROVIDER = undefined;
+});
+
+describe('openclawModule', () => {
+    it('is named after the notifier and depends on config', () => {
+        const module = openclawModule({ env: openclawEnv() });
+        expect(module.name).toBe('chamvi:notifier:openclaw');
+        expect(module.dependencies).toEqual([ModuleName.CONFIG]);
+    });
+
+    it.each([
+        ['OPENCLAW_BASE_URL'],
+        ['OPENCLAW_HOOKS_TOKEN'],
+        ['OPENCLAW_CHANNEL'],
+        ['OPENCLAW_TO'],
+    ])('reads env when called and names a missing %s', (name) => {
+        expect(() => openclawModule({ env: openclawEnv({ [name]: '' }) }))
+            .toThrow(new InvalidAgentDefinitionError(`${name} is required.`));
+    });
+
+    it('a malformed OPENCLAW_BASE_URL names it', () => {
+        expect(() => openclawModule({ env: openclawEnv({ OPENCLAW_BASE_URL: 'openclaw' }) }))
+            .toThrow('OPENCLAW_BASE_URL must be an absolute URL.');
+    });
+
+    it.each([
+        ['OPENCLAW_HOOKS_TOKEN', 'tok\n', 'OPENCLAW_HOOKS_TOKEN must not hold control characters'],
+        ['OPENCLAW_CHANNEL', 'last', 'OPENCLAW_CHANNEL must name a channel'],
+        ['OPENCLAW_HOOKS_PATH', 'hooks', 'OPENCLAW_HOOKS_PATH must start with "/"'],
+    ])('a malformed %s throws when called, naming the variable', (name, value, message) => {
+        let error: unknown;
+        try {
+            openclawModule({ env: openclawEnv({ [name]: value }) });
+        } catch (e) {
+            error = e;
+        }
+        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((error as Error).message.startsWith(message)).toBe(true);
+    });
+
+    it('a malformed option keeps the option name', () => {
+        expect(() => openclawModule({ env: openclawEnv(), hooksToken: ' padded' }))
+            .toThrow('openclaw: hooksToken must not hold');
+    });
+
+    it('options win over env', () => {
+        expect(() => openclawModule({
+            env: {},
+            baseUrl: 'http://openclaw',
+            hooksToken: HOOKS_TOKEN,
+            deliver: { channel: 'slack', to: 'ops' },
+        })).not.toThrow();
+    });
+
+    it('delivers through the fake gateway', async () => {
+        const clock = new ControllableClock(new Date('2026-10-21T09:00:00Z'));
+        const fake = createFakeOpenclaw({
+            token: HOOKS_TOKEN,
+            hooksPath: '/oc',
+            clock,
+        });
+        const agent = defineAgent({
+            name: 'deploy',
+            model: approvalModel('ship'),
+            instructions: 'deploy',
+            triggers: [http()],
+            tools: {
+                ship: tool({
+                    inputSchema: z.object({}),
+                    execute: async () => 'shipped',
+                }),
+            },
+            approvals: { ship: 'user' },
+            notify: 'openclaw',
+        });
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET, CHAMVI_PUBLIC_URL: 'https://chamvi.example' },
+            agents: [agent],
+            modules: [
+                configModule({ clock, logger: createRecordingLogger(clock) }),
+                storeModule(),
+                engineModule(),
+                openclawModule({
+                    env: openclawEnv({ OPENCLAW_HOOKS_PATH: '/oc', OPENCLAW_ACCOUNT_ID: 'bot' }),
+                    fetch: fake.fetch,
+                }),
+            ],
+        });
+        harnesses.push(harness);
+
+        const engine = harness.container.resolve(AppToken.ENGINE);
+        const { runId } = await engine.dispatch({
+            agent: 'deploy',
+            trigger: 'http',
+            source: 'http',
+            payload: {},
+        });
+        await engine.idle();
+        expect((await engine.getRun(runId))?.status).toBe('waiting');
+
+        expect(fake.dispatched).toHaveLength(1);
+        const [body] = fake.dispatched;
+        expect(body).toMatchObject({
+            channel: 'telegram',
+            to: '12345',
+            accountId: 'bot',
+        });
+        expect(body!.message).toContain(`https://chamvi.example/ui/approvals?run=${runId}&approval=`);
+    });
+
+    it('two names give two modules', async () => {
+        const a = openclawModule({ env: openclawEnv() });
+        const b = openclawModule({ env: openclawEnv(), name: 'ops' });
+        expect(a.name).toBe('chamvi:notifier:openclaw');
+        expect(b.name).toBe('chamvi:notifier:ops');
+
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET },
+            modules: [configModule({ logger: createRecordingLogger() }), a, b],
+        });
+        harnesses.push(harness);
+        expect(harness.container.resolveAll(AppToken.NOTIFIERS).map((n) => n.name)).toEqual(['openclaw', 'ops']);
+    });
+
+    it('provides the notifier as context', async () => {
+        const seen: INotifier[] = [];
+        const harness = await probeHarness([openclawModule({ env: openclawEnv() })], (notifier) => {
+            seen.push(notifier);
+        });
+
+        const engine = harness.container.resolve(AppToken.ENGINE);
+        const { runId } = await engine.dispatch({
+            agent: 'probe',
+            trigger: 'http',
+            source: 'http',
+            payload: {},
+        });
+        await engine.idle();
+        expect((await engine.getRun(runId))?.status).toBe('completed');
+        expect(seen).toHaveLength(1);
+        expect(seen[0]).toBe(harness.container.resolveAll(AppToken.NOTIFIERS)[0]);
+        expect(harness.reported).toEqual([]);
+    });
+
+    it('two modules provide two notifiers', async () => {
+        const seen: INotifier[] = [];
+        const harness = await probeHarness(
+            [openclawModule({ env: openclawEnv() }), openclawModule({ env: openclawEnv(), name: 'ops' })],
+            (_notifier, context) => {
+                seen.push(injectOpenclawContext(context, 'ops'));
+            },
+        );
+
+        const engine = harness.container.resolve(AppToken.ENGINE);
+        await engine.dispatch({
+            agent: 'probe',
+            trigger: 'http',
+            source: 'http',
+            payload: {},
+        });
+        await engine.idle();
+        const notifiers = harness.container.resolveAll(AppToken.NOTIFIERS);
+        expect(seen).toHaveLength(1);
+        expect(seen[0]!.name).toBe('ops');
+        expect(seen[0]).toBe(notifiers.find((n) => n.name === 'ops'));
+        expect(seen[0]).not.toBe(notifiers.find((n) => n.name === 'openclaw'));
+        expect(harness.reported).toEqual([]);
+    });
+
+    it('reports a refused provide instead of failing setup', async () => {
+        // provides the default notifier's context before the module's own engineCreated hook runs
+        const earlier: IModule = {
+            name: 'earlier',
+            async setup(container) {
+                const hook: ILifecycleHook = {
+                    name: 'earlier',
+                    engineCreated: (engine) => provideOpenclawContext(engine, consoleNotifier({ name: 'openclaw' })),
+                };
+                container.registerMany(AppToken.LIFECYCLE_HOOKS, { useValue: hook });
+            },
+        };
+        const harness = await probeHarness([earlier, openclawModule({ env: openclawEnv() })], () => undefined);
+
+        expect(harness.reported).toHaveLength(1);
+        expect(harness.reported[0]!.error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect((harness.reported[0]!.error as Error).message).toBe('Context "openclaw:openclaw" is already provided.');
+        expect(harness.reported[0]!.context).toEqual({ hook: 'chamvi:notifier:openclaw', phase: 'engineCreated' });
+    });
+});
+
+/** A started harness whose `probe` agent calls one tool that injects the default OpenClaw notifier. */
+async function probeHarness(
+    modules: IModule[],
+    record: (notifier: INotifier, context: ToolContext) => void,
+): Promise<ModuleHarness> {
+    const probe = defineTool({
+        inputSchema: z.object({}),
+        execute: async (_input, { context }) => {
+            record(injectOpenclawContext(context), context);
+            return 'ok';
+        },
+    });
+    const agent = defineAgent({
+        name: 'probe',
+        model: mockModel([
+            {
+                parts: [{
+                    type: 'tool-call',
+                    toolName: 'probe',
+                    input: {},
+                }],
+            },
+            { parts: [{ type: 'text', text: 'done' }] },
+        ]),
+        instructions: 'probe',
+        triggers: [http()],
+        tools: { probe },
+    });
+    const harness = await createModuleHarness({
+        env: { RESUME_SECRET: SECRET },
+        agents: [agent],
+        modules: [
+            configModule({ logger: createRecordingLogger() }),
+            storeModule(),
+            engineModule(),
+            ...modules,
+        ],
+    });
+    harnesses.push(harness);
+    return harness;
+}

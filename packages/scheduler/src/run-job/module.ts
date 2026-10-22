@@ -19,7 +19,8 @@ import type { RunJobOptions, RunJobResult } from './types.ts';
  * and executed even when the tick is skipped. It waits for the dispatched run
  * to complete, fail, be cancelled, wait for an approval, or stay queued behind
  * a run of its concurrency key that waits for an approval, then drains the
- * engine. Never calls process.exit; set `process.exitCode` from `exitCode`.
+ * engine. An aborted `signal` ends the wait (or, aborted before the call,
+ * fires nothing). Never calls process.exit; set `process.exitCode` from `exitCode`.
  *
  * Caveats: `engine.start()` recovers and executes **every** queued run of
  * **every** agent in the shared store, not only the cron run, and the final
@@ -34,9 +35,12 @@ export async function runJob(opts: RunJobOptions): Promise<RunJobResult> {
         agent,
         pollMs = 1_000,
         drainTimeoutMs = 30_000,
+        signal,
     } = opts;
     const { clock, store } = engine;
     const trigger = resolveCronTrigger(agent, opts.trigger);
+    // a stop that arrived before the job must not recover and execute the store's queued runs
+    if (signal?.aborted) return { status: 'skipped', exitCode: 0 };
 
     const tick = await fireCronTrigger({
         engine,
@@ -47,19 +51,24 @@ export async function runJob(opts: RunJobOptions): Promise<RunJobResult> {
 
     let timer: { clear(): void } | undefined;
     let unsubscribe: (() => void) | undefined;
+    let onAbort: (() => void) | undefined;
     let settled = false;
     let run: Run | undefined;
     try {
         // recovery, the queue and the approval tick also run when the tick was skipped
-        await engine.start();
-        await engine.tick();
-        if (tick.dispatched) {
+        // checked again after start: a stop that arrived meanwhile must not deny approvals or notify
+        if (!signal?.aborted) await engine.start();
+        if (!signal?.aborted) await engine.tick();
+        if (tick.dispatched && !signal?.aborted) {
             const { runId } = tick;
-            run = await new Promise<Run>((resolve, reject) => {
-                const done = (candidate: Run) => {
+            run = await new Promise<Run | undefined>((resolve, reject) => {
+                const done = (candidate: Run | undefined) => {
                     settled = true;
                     resolve(candidate);
                 };
+                // a signal is a request to stop, not an error: the wait ends and the drain runs
+                onAbort = () => done(undefined);
+                signal?.addEventListener('abort', onAbort, { once: true });
                 // the event only shortens the wait; the poll covers a run executed elsewhere
                 unsubscribe = engine.on('run.updated', (e) => {
                     if (e.type === 'run.updated' && e.run.id === runId && SETTLING.includes(e.run.status)) done(e.run);
@@ -87,9 +96,12 @@ export async function runJob(opts: RunJobOptions): Promise<RunJobResult> {
         settled = true;
         timer?.clear();
         unsubscribe?.();
+        if (onAbort) signal?.removeEventListener('abort', onAbort);
     }
     await engine.drain({ timeoutMs: drainTimeoutMs });
 
+    // aborted: the run as the drain left it (interrupted, or running when the drain timed out)
+    if (!run && tick.dispatched) run = await engine.getRun(tick.runId);
     if (!run) return { status: 'skipped', exitCode: 0 };
     return {
         runId: run.id,

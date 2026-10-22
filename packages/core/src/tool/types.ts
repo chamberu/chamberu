@@ -12,7 +12,8 @@ import type { IAgentState, StateSchema } from '../state/types.ts';
 /**
  * What a chamvi tool (built with `defineTool` or `defineEffectTool`) gets as
  * `context` in `execute`: one object per execution, shared by every call of
- * it and by the tools factory. Treat it as immutable.
+ * it and by the tools factory. Treat it as immutable. Values provided on the
+ * engine (`engine.provide`) are reached with `inject(ctx, key)`, never as a field.
  */
 export type ToolContext<S extends StateSchema = StateSchema> = {
     run: RunContext;

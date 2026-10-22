@@ -57,3 +57,23 @@ The fence is one backtick longer than the longest backtick run in the body (at l
 ### Dedupe and failures
 
 Before posting, the notifier pages the issue's comments (`since` = the run's `receivedAt` minus one hour, 100 per page) and resolves without posting when one by the App bot (`IGithubApp.botLogin()`, compared case-insensitively) holds the marker; a copy by anyone else does not count. Every failure throws a `ChamviError` with `code` `github_request` (`GitHub <status>: <message>`, `GitHub request failed: <message>`); a list or post that takes longer than `timeoutMs` throws `GitHub did not answer within <ms>ms.` The token exchange and `GET /app` are not bound by `timeoutMs`; `@chamvi/github` aborts each after 30 s itself.
+
+## Context
+
+```ts
+function provideGithubNotifierContext(provider: IContextProvider, notifier: INotifier): void; // key 'notify-github:<notifier.name>'
+function injectGithubNotifierContext(ctx: ToolContext, name?: string): INotifier;          // name default 'github'
+```
+
+One key per notifier name, so two GitHub notifiers of different names are both provided; injecting a name never provided throws `ContextNotProvidedError` naming `notify-github:<name>`. `githubNotifierModule()` provides its notifier; see [Context](/guide/tools#context-shared-instances-for-tools).
+
+## Module
+
+```ts
+// @chamvi/notify-github/module, needs @chamvi/app
+function githubNotifierModule(options: GithubNotifierModuleOptions): IModule; // name 'chamvi:notifier:<name>', default name 'github'
+```
+
+Contributes `githubNotifier()` to the app's notifiers, with the dashboard approval link from `CHAMVI_PUBLIC_URL` unless `approvalUrl` is given, on the app's clock, and provides it on the engine in its `engineCreated` hook. `options.app` is the `IGithubApp` (`githubModule().app`). `@chamvi/app` is an optional peer: the main entry never imports it.
+
+<<< ../../../notify-github/src/module/types.ts{ts}

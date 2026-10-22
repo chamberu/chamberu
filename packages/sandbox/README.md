@@ -179,6 +179,40 @@ No host environment reaches a workspace. Containers and pods get `SANDBOX_ENV` (
 
 A provider implements `ISandboxProvider` (`name`, `create(options)`, `collectGarbage()`). A container-like provider only needs an `IExecTransport` (`exec(argv, { stdin, stdout, stderr, signal })` that streams the output into the given sinks and resolves `{ exitCode }`, `remove()` and optionally `alive(signal)`, asked after a failed exec: `false` marks the workspace gone): `createRemoteWorkspace({ id, info, transport, clock })` adds the rest. It runs argv through `sh -c` with the working directory and the `timeout` wrapper and has the script report the exit status on stderr, so an exec returns 2 s after the command exited even when a background job holds the output; it adds the client-side guard, path checks, output caps, file reads and writes and dispose semantics. After creating, call `prepareWorkspace(workspace, { repo, ref, signal })` and set `info.commit`. `describeWorkspaceContract()` from `@chamvi/test-kit` is the Vitest suite every provider must pass.
 
+## Context
+
+`provideSandboxContext(engine, manager)` provides the manager on the engine; a tools factory reads it with `injectSandboxContext(ctx)` and builds the workspace and coding tools per execution:
+
+```ts
+import { injectSandboxContext, provideSandboxContext } from '@chamvi/sandbox';
+import { codingTools } from '@chamvi/coding';
+
+const coder = defineAgent({
+    name: 'coder',
+    model,
+    instructions: 'Fix the failing test.',
+    tools: (ctx) => {
+        const manager = injectSandboxContext(ctx);
+        return { ...manager.tools(), ...codingTools(manager) };
+    },
+});
+
+provideSandboxContext(engine, workspaces); // once, after new Engine()
+```
+
+A missing manager throws `ContextNotProvidedError` naming `sandbox` (in the factory the run fails before any model call).
+
+## With @chamvi/app
+
+`sandboxModule()` from `@chamvi/sandbox/module` picks the provider from `CHAMVI_SANDBOX_PROVIDER` (`local`, `docker`, `kubernetes`), else `options.provider`, else `local`, builds the manager when it is called (`.manager` at once), imports the provider package on start (`@chamvi/sandbox-local`, `@chamvi/sandbox-docker` or `@chamvi/sandbox-k8s`; install the one you use beside `@chamvi/sandbox`, it is no declared peer; under Yarn PnP or pnpm with `hoist=false`, where `@chamvi/sandbox` cannot resolve an undeclared package, pass a built provider instead: `sandboxModule({ provider: createDockerSandbox() })`), attaches the manager, provides it on the engine and closes it after the engine drained. `@chamvi/app` is an optional peer; the main entry never imports it.
+
+```ts
+import { createApp } from '@chamvi/app';
+import { sandboxModule } from '@chamvi/sandbox/module';
+
+export default createApp({ agents: [coder], modules: [sandboxModule({ provider: 'docker' })] });
+```
+
 ## Options
 
 `createWorkspaceManager(options)`:
@@ -203,6 +237,7 @@ Misconfiguration throws core `InvalidAgentDefinitionError`.
 | Export | Kind | Purpose |
 |---|---|---|
 | `createWorkspaceManager` | function | Run-scoped workspaces and the workspace tools |
+| `provideSandboxContext`, `injectSandboxContext` | function | Provide the manager on the engine, read it from a `ToolContext` |
 | `createRemoteWorkspace` | function | An `IWorkspace` over an `IExecTransport` |
 | `prepareWorkspace` | function | The checkout inside a workspace |
 | `normalizeRepo`, `assertGitRef` | function | Repository and ref rules |
@@ -215,6 +250,8 @@ Misconfiguration throws core `InvalidAgentDefinitionError`.
 | `TIMEOUT_KILL_AFTER_SECONDS`, `EXEC_GRACE_MS`, `ALIVE_PROBE_TIMEOUT_MS` | constant | Remote timeout handling and the liveness probe bound |
 
 Types: `IWorkspace`, `WorkspaceInfo`, `ExecOptions`, `ExecResult`, `ISandboxProvider`, `WorkspaceCreateOptions`, `SandboxLimits`, `IExecTransport`, `TransportExecOptions`, `TransportExecResult`, `RemoteWorkspaceInput`, `IWorkspaceManager`, `WorkspaceManagerOptions`, `AcquireInput`, `AcquireResult`, `CloseOptions`, `WorkspaceToolResult`, `DisposeWorkspaceResult`, `IOutputCollector`, `NormalizeRepoOptions`.
+
+`@chamvi/sandbox/module`: `sandboxModule`, `SandboxModule`, `SANDBOX_MODULE_NAME`, `SANDBOX_PROVIDER_NAMES`, types `SandboxModuleOptions`, `SandboxProviderName`.
 
 ## License
 

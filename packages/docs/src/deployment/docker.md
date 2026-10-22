@@ -1,7 +1,7 @@
 # Docker Image <Badge type="warning" text="Planned" />
 
 ::: warning Planned
-The CLI build command and the template repository do not exist yet. The [base image](#base-image) and the [sandbox image](#sandbox-image) do.
+The template repository does not exist yet. The [base image](#base-image), the [`chamvi build`](/reference/cli#build-output) command and the [sandbox image](#sandbox-image) do.
 :::
 
 ## Base image
@@ -21,7 +21,7 @@ Agent repositories use a two-stage Dockerfile from the template:
 1. **Build stage:** install dependencies and bundle the app entry with `chamvi build`.
 2. **Runtime stage:** copy the bundle onto the base image and start it with an exec-form `CMD`, so `SIGTERM` reaches Node (forwarded by the base image's tini) and the engine can [drain](/guide/recovery#drain).
 
-The same image serves every mode: the long-running app, and a one-shot `chamvi run-job <agent> <trigger>` for clusters that prefer Kubernetes CronJobs over in-process scheduling.
+The same image serves every mode: the long-running app, and a one-shot `chamvi run-job <agent> [triggerId]` (the agent's only cron trigger by default) for clusters that prefer Kubernetes CronJobs over in-process scheduling.
 
 ## Tags for Flux
 

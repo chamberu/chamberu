@@ -142,6 +142,21 @@ With **`resumeTool: true`** the message also carries the MCP call `resume_run` w
 - OpenClaw ignores an `Idempotency-Key` over 256 characters; such keys (and keys with whitespace or non-ASCII characters) are sent as `sha256:<hex>`.
 - Errors never carry the hooks token or the resume token (sent with `resumeTool` only): both are replaced by `[redacted]` in the response text and the network failure message, each cut to 500 characters. A `hooksToken` that `fetch` could not send as a header (control characters, characters above U+00FF, surrounding whitespace) is refused when `openclaw()` is called.
 
+## Context
+
+`provideOpenclawContext(engine, notifier)` provides the notifier on the engine under its name; a tool reads it with `injectOpenclawContext(ctx, name?)` (default `openclaw`). Each name has its own key, so `openclaw()` beside `openclaw({ name: 'ops', ... })` are both reachable; an unknown name throws `ContextNotProvidedError` naming `openclaw:<name>`.
+
+## With @chamvi/app
+
+`openclawModule()` from `@chamvi/notify-openclaw/module` reads `OPENCLAW_BASE_URL`, `OPENCLAW_HOOKS_TOKEN`, `OPENCLAW_CHANNEL`, `OPENCLAW_TO`, `OPENCLAW_HOOKS_PATH`, `OPENCLAW_AGENT_ID` and `OPENCLAW_ACCOUNT_ID` when it is called, links approvals to the dashboard from `CHAMVI_PUBLIC_URL`, contributes the notifier and provides it on the engine. `@chamvi/app` is an optional peer; the main entry never imports it.
+
+```ts
+import { createApp } from '@chamvi/app';
+import { openclawModule } from '@chamvi/notify-openclaw/module';
+
+export default createApp({ agents, modules: [openclawModule(), openclawModule({ name: 'ops' })] });
+```
+
 ## Options
 
 | Option | Type | Default | Description |
@@ -165,12 +180,15 @@ Every option is checked when `openclaw()` is called; a bad one throws `InvalidAg
 | Export | Kind | Purpose |
 |---|---|---|
 | `openclaw` | function | `openclaw(options)`: an `INotifier` posting to OpenClaw's hooks endpoint |
+| `provideOpenclawContext`, `injectOpenclawContext` | function | Provide a notifier on the engine by its name, read it from a `ToolContext` |
 | `DEFAULT_HOOKS_PATH` | constant | `'/hooks'` |
 | `OPENCLAW_TIMEOUT_MS` | constant | `30_000`, the default `timeoutMs` |
 | `OPENCLAW_REQUEST_ERROR_CODE` | constant | `'openclaw_request'`, the `code` of every send failure |
 | `MESSAGE_BODY_MAX_LENGTH` | constant | `8_000`, the cut of `Notification.body` in the message |
 
 Types: `OpenclawNotifierOptions`, `OpenclawDelivery`, `OpenclawHookBody`.
+
+`@chamvi/notify-openclaw/module`: `openclawModule`, `OpenclawModule`, type `OpenclawModuleOptions`.
 
 ## License
 

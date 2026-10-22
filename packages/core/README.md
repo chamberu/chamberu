@@ -292,6 +292,26 @@ describeStoreContract((clock) => new MemoryStore({ clock }));
 
 The factory receives a `ControllableClock` and must use it for every expiry decision. The suite runs on Vitest.
 
+### Context
+
+A tool reaches a shared instance (an API client, the GitHub App, a workspace manager) through a typed key instead of a closure. The engine keeps the value by reference; `inject(ctx, key)` reads it in a tool's `execute`, in the tools factory and in the effect hooks, and nothing provided is ever stored or serialized (`ToolContext` stays `{ run, state, artifacts }`).
+
+```ts
+import { defineContextKey, defineTool, inject } from '@chamvi/core';
+
+const DEPLOY = defineContextKey<IDeployClient>('deploy');
+
+const deploy = defineTool({
+    description: 'Deploys a version.',
+    inputSchema: z.object({ version: z.string() }),
+    execute: async ({ version }, { context }) => inject(context, DEPLOY).deploy(version),
+});
+
+engine.provide(DEPLOY, client); // once per key, after new Engine()
+```
+
+A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming the key only): a tool error in `execute` and the effect hooks, a failed run (before any model call) in the tools factory. `tryInject(ctx, key)` returns `undefined` instead. `provide` refuses `undefined`, a key not from `defineContextKey()` and a second value for one key.
+
 ## Options
 
 `new Engine(options)`:
@@ -333,9 +353,10 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
 | `cron`, `http`, `webhook` | function | Trigger definitions |
-| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
+| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `provide`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineTool` | function | An AI SDK `tool()` whose `execute` gets the run's `ToolContext` as `context` |
+| `defineContextKey`, `inject`, `tryInject` | function | Typed context keys, and reading a value provided on the engine from a `ToolContext` |
 | `toolContextSchema` | object | The `contextSchema` that marks a chamvi tool |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |
 | `EFFECT` | symbol | Marks a tool created by `defineEffectTool()` |
@@ -349,12 +370,13 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 | `ChamviError` | class | Base class of every error below |
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `IncompleteResponseError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
+| `ContextNotProvidedError` | class | `inject()` found no value for the key (`context_not_provided`) |
 | `ToolNotAllowedError` | class | The tool error recorded for a call to a tool the `toolPolicy` refuses |
 | `SandboxError` | class | A sandbox workspace or provider failed (`@chamvi/sandbox` and its providers); a tool error, never a failed run |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `ToolContext`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `NotifyOptions`, `ConsoleNotifierOptions`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
+Types: `Agent`, `AgentDefinition`, `ToolContext`, `ContextKey`, `IContextProvider`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `NotifyOptions`, `ConsoleNotifierOptions`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
 
 Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamvi/test-kit`](../test-kit).
 

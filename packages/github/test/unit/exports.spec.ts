@@ -7,11 +7,14 @@
 
 import { describe, expect, it } from 'vitest';
 import * as github from '@chamvi/github';
+import * as module from '@chamvi/github/module';
 
 describe('public api', () => {
     it.each([
         'createGithubApp',
         'githubWebhook',
+        'injectGithubContext',
+        'provideGithubContext',
     ])('exports %s', (name) => {
         expect(github).toHaveProperty(name);
         expect(github[name as keyof typeof github]).toBeTypeOf('function');
@@ -35,6 +38,7 @@ describe('public api', () => {
         'createAppJwt',
         'createInstallationTokens',
         'createWebhookRoute',
+        'GITHUB_CONTEXT',
         'createReadTools',
         'createWriteTools',
         'matchesGithubTrigger',
@@ -42,5 +46,23 @@ describe('public api', () => {
         'stepOf',
     ])('keeps %s internal', (name) => {
         expect(github).not.toHaveProperty(name);
+    });
+
+    it('@chamvi/github/module exports githubModule', () => {
+        expect(module.githubModule).toBeTypeOf('function');
+        expect(module.GithubModule).toBeTypeOf('function');
+        expect(module.GITHUB_MODULE_NAME).toBe('chamvi:github');
+    });
+
+    it.each([
+        'githubModule',
+        'GithubModule',
+        'GITHUB_MODULE_NAME',
+    ])('the main entry keeps %s out', (name) => {
+        expect(github).not.toHaveProperty(name);
+    });
+
+    it('the module entry keeps its helpers internal', () => {
+        expect(module).not.toHaveProperty('createGithubAppFromEnv');
     });
 });

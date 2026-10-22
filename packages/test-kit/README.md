@@ -22,7 +22,7 @@
 npm install --save-dev @chamvi/test-kit @chamvi/core vitest
 ```
 
-`@chamvi/core` and `vitest` are peer dependencies. `@chamvi/sandbox` is an optional peer, needed only for the workspace contract.
+`@chamvi/core` and `vitest` are peer dependencies. The workspace contract takes any `IWorkspace` of `@chamvi/sandbox` (typed structurally as `ContractWorkspace`, so the kit does not depend on `@chamvi/sandbox`).
 
 ## Usage
 
@@ -101,7 +101,7 @@ fake.failNext('POST', '/repos/octo/demo/issues/7/comments', 502); // one injecte
 | `createGitFixture` | function | A temporary git repository with one commit (branch `main`, tag `v1`) |
 | `createFakeGithub` | function | An in-process GitHub (App JWTs, installation tokens, repository routes) for `createGithubApp({ fetch })` |
 
-Types: `WorkspaceContractFactory`, `GitFixture`, `FakeGithub`, `FakeGithubOptions`, `FakeRequest`, `FakeRouteInput`, `FakeRouteResult`, `FakeRouteHandler`, `JwtClaims`.
+Types: `ContractWorkspace`, `WorkspaceContractFactory`, `GitFixture`, `FakeGithub`, `FakeGithubOptions`, `FakeRequest`, `FakeRouteInput`, `FakeRouteResult`, `FakeRouteHandler`, `JwtClaims`.
 
 ## License
 
