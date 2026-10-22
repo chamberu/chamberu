@@ -14,8 +14,7 @@ import {
     it,
 } from 'vitest';
 import { SandboxError, ValidationError } from '@chamvi/core';
-import type { IWorkspace } from '@chamvi/sandbox';
-import type { WorkspaceContractFactory } from './types.ts';
+import type { ContractWorkspace, WorkspaceContractFactory } from './types.ts';
 
 const TEST_TIMEOUT_MS = 30_000;
 
@@ -37,7 +36,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => {
  */
 export function describeWorkspaceContract(name: string, factory: WorkspaceContractFactory): void {
     describe(`workspace contract: ${name}`, () => {
-        let workspace: IWorkspace;
+        let workspace: ContractWorkspace;
 
         beforeAll(async () => {
             workspace = await factory();

@@ -60,10 +60,5 @@
     },
     "peerDependencies": {
         "@chamvi/core": "^0.1.0"
-    },
-    "nx": {
-        "implicitDependencies": [
-            "!@chamvi/test-kit"
-        ]
     }
 }

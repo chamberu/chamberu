@@ -6,7 +6,7 @@ Test helpers for chamvi: a controllable clock, the store and workspace contract 
 npm install --save-dev @chamvi/test-kit @chamvi/core vitest
 ```
 
-`@chamvi/core` and `vitest` are peer dependencies; `@chamvi/sandbox` is an optional peer for the workspace contract.
+`@chamvi/core` and `vitest` are peer dependencies; the workspace contract takes any `IWorkspace` of `@chamvi/sandbox`, typed structurally (`ContractWorkspace`), so the kit does not depend on `@chamvi/sandbox`.
 
 ## describeStoreContract
 
@@ -27,7 +27,7 @@ See [Writing a Store](/stores/writing-a-store) for what the suite covers.
 ```ts
 function describeWorkspaceContract(name: string, factory: WorkspaceContractFactory): void;
 
-type WorkspaceContractFactory = () => Promise<IWorkspace>;
+type WorkspaceContractFactory = () => Promise<ContractWorkspace>; // every IWorkspace is a ContractWorkspace
 ```
 
 Registers the Vitest suite every sandbox provider's workspaces must pass: argv exec and exit codes (127 for a command that cannot start), stdin, `cwd` and path escapes (`../..`, `/etc`, an empty path, a NUL byte), the 64 KiB output caps under a flood, a process-group kill on timeout that takes a backgrounded grandchild with it, abort, UTF-8 files and their size cap, and dispose during an exec. `factory` returns a fresh, repo-less workspace per test; the suite disposes it. It runs real processes with short real timeouts, not a `ControllableClock`.

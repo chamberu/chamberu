@@ -23,7 +23,7 @@ chamvi/
 │   │   └── test/fixtures/deliveries/ # Recorded GitHub webhook bodies (issues.opened, a bot's issue_comment)
 │   ├── notify-openclaw/             # @chamvi/notify-openclaw (aliases core, test-kit, itself and its /module, plus app, app/testing, http, scheduler, store-typeorm; fake gateway in test/utils/openclaw.ts)
 │   ├── notify-github/               # @chamvi/notify-github (aliases core, github, http, test-kit, itself and its /module, plus app, app/testing, http, scheduler, store-typeorm)
-│   ├── sandbox/                     # @chamvi/sandbox (same layout; aliases core, itself and its /module, sandbox-local, app, app/testing, http, scheduler, store-typeorm; private test/utils/clock.ts, since test-kit peers on it)
+│   ├── sandbox/                     # @chamvi/sandbox (same layout; aliases core, itself and its /module, sandbox-local, app, app/testing, http, scheduler, store-typeorm; private test/utils/clock.ts)
 │   ├── sandbox-local/               # @chamvi/sandbox-local (aliases core, sandbox, test-kit and itself)
 │   ├── sandbox-docker/              # @chamvi/sandbox-docker (same aliases as local)
 │   │   └── test/global-setup.ts     # dockerode ping() gate, builds images/sandbox-node as chamvi/sandbox-node:test
@@ -71,7 +71,7 @@ chamvi/
 | Package | Status | Responsibility |
 |---------|--------|----------------|
 | `@chamvi/core` | Exists (0.1.0) | defineAgent, run engine (streaming, structured output), `provide`/`inject` context for tools (`defineContextKey`, `inject`, `tryInject`), checkpoints, trigger model, run artifacts, state API, budgets, IStore/INotifier interfaces (`NotifyOptions` with the run's trigger), `consoleNotifier()`, in-memory store |
-| `@chamvi/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`, `describeWorkspaceContract()`, `createGitFixture()`, `createFakeGithub()` (in-process GitHub for `createGithubApp({ fetch })`); depends on core, optional peer on sandbox (types only); core and sandbox never depend on it |
+| `@chamvi/test-kit` | Exists (0.1.0) | `ControllableClock`, `describeStoreContract()`, `describeWorkspaceContract()`, `createGitFixture()`, `createFakeGithub()` (in-process GitHub for `createGithubApp({ fetch })`); depends on core only (the workspace contract types `IWorkspace` structurally as `ContractWorkspace`: a sandbox edge would close a release-please cycle through app); core and sandbox never depend on it |
 | `@chamvi/http` | Exists (0.1.0) | `createHttpApp()` (routup v6): REST control API, SSE run stream, webhook intake, MCP endpoint, authenticators (static tokens, authup, oidc), health, metrics, `createShutdown()`; peer on core |
 | `@chamvi/scheduler` | Exists (0.1.0) | `createScheduler()` (one locked hubwire component per cron trigger), `runJob()`; depends on `hubwire`, peer on core |
 | `@chamvi/store-typeorm` | Exists (0.1.0) | `TypeormStore`, entities, initial migration, `migrateStore`, `purgeExpired` |

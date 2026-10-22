@@ -115,10 +115,5 @@
         "@authup/server-adapter-kit": {
             "optional": true
         }
-    },
-    "nx": {
-        "implicitDependencies": [
-            "!@chamvi/test-kit"
-        ]
     }
 }

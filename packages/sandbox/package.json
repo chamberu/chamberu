@@ -58,37 +58,17 @@
     "devDependencies": {
         "@chamvi/app": "^0.1.0",
         "@chamvi/core": "^0.1.0",
-        "@chamvi/sandbox-local": "^0.1.0",
         "ai": "^7.0.143",
         "zod": "^4.6.7"
     },
     "peerDependencies": {
         "@chamvi/app": "^0.1.0",
         "@chamvi/core": "^0.1.0",
-        "@chamvi/sandbox-docker": "^0.1.0",
-        "@chamvi/sandbox-k8s": "^0.1.0",
-        "@chamvi/sandbox-local": "^0.1.0",
         "ai": "^7"
     },
     "peerDependenciesMeta": {
         "@chamvi/app": {
             "optional": true
-        },
-        "@chamvi/sandbox-docker": {
-            "optional": true
-        },
-        "@chamvi/sandbox-k8s": {
-            "optional": true
-        },
-        "@chamvi/sandbox-local": {
-            "optional": true
         }
-    },
-    "nx": {
-        "implicitDependencies": [
-            "!@chamvi/sandbox-local",
-            "!@chamvi/sandbox-docker",
-            "!@chamvi/sandbox-k8s"
-        ]
     }
 }
