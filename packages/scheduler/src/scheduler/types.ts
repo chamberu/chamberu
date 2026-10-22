@@ -36,8 +36,11 @@ export type SchedulerOptions = {
 };
 
 export interface IScheduler {
-    /** Schedules every cron trigger; never fires on start. Idempotent. */
+    /** Schedules every cron trigger; never fires on start. Idempotent; does nothing after stop(). */
     start(): Promise<void>;
-    /** Unschedules every trigger, then waits for ticks in flight. */
+    /**
+     * Stops following agent changes, unschedules every trigger, then waits for
+     * ticks in flight (also of replaced and removed agents). Idempotent.
+     */
     stop(): Promise<void>;
 }

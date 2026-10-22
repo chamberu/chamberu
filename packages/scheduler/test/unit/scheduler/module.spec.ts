@@ -200,6 +200,148 @@ describe('createScheduler', () => {
         expect(() => make(store, agents, { agents: ['sweep', 'sweep'] })).toThrow(InvalidAgentDefinitionError);
     });
 
+    describe('agents changed at runtime', () => {
+        const other = () => defineAgent({
+            name: 'other',
+            model: textModel(),
+            instructions: 'x',
+            triggers: [http()],
+        });
+
+        const live = (agents: Agent[], opts: Partial<SchedulerOptions> = {}) => {
+            const store = new MemoryStore();
+            const engine = new Engine({
+                store,
+                agents,
+                resumeSecret: 's',
+            });
+            const scheduler = createScheduler({
+                engine,
+                onError: () => {},
+                ...opts,
+            });
+            schedulers.push(scheduler);
+            return {
+                store,
+                engine,
+                scheduler,
+            };
+        };
+
+        it('schedules an agent added after start', async () => {
+            const {
+                store, 
+                engine, 
+                scheduler, 
+            } = live([other()]);
+            await scheduler.start();
+
+            await engine.putAgent(agentWith([cron('* * * * *', { overlap: 'allow' })]));
+            await vi.advanceTimersByTimeAsync(60_000);
+
+            expect(await runs(store)).toHaveLength(1);
+        });
+
+        it('starts an agent added before start only once started', async () => {
+            const {
+                store, 
+                engine, 
+                scheduler, 
+            } = live([other()]);
+            await engine.putAgent(agentWith([cron('* * * * *', { overlap: 'allow' })]));
+
+            await vi.advanceTimersByTimeAsync(60_000);
+            expect(await runs(store)).toHaveLength(0);
+
+            await scheduler.start();
+            await vi.advanceTimersByTimeAsync(60_000);
+            expect(await runs(store)).toHaveLength(1);
+        });
+
+        it('a replaced agent fires on its new expression only', async () => {
+            const {
+                store, 
+                engine, 
+                scheduler, 
+            } = live([agentWith([cron('* * * * *', { overlap: 'allow' })])]);
+            await scheduler.start();
+
+            await engine.putAgent(agentWith([cron('0 9 * * *', { timezone: 'UTC' })]));
+            await vi.advanceTimersByTimeAsync(120_000);
+            expect(await runs(store)).toHaveLength(0);
+
+            await vi.advanceTimersByTimeAsync(3_600_000);
+            const fired = await runs(store);
+            expect(fired.map((run) => run.trigger.trigger)).toEqual(['cron:0 9 * * *']);
+        });
+
+        it('a removed agent no longer fires', async () => {
+            const onError = vi.fn();
+            const {
+                store, 
+                engine, 
+                scheduler, 
+            } = live([agentWith([cron('* * * * *', { overlap: 'allow' })]), other()], { onError });
+            await scheduler.start();
+
+            await engine.removeAgent('sweep');
+            await vi.advanceTimersByTimeAsync(120_000);
+
+            expect(await runs(store)).toHaveLength(0);
+            expect(onError).not.toHaveBeenCalled();
+        });
+
+        it('ignores agents outside the agents filter', async () => {
+            const {
+                store, 
+                engine, 
+                scheduler, 
+            } = live([other()], { agents: ['other'] });
+            await scheduler.start();
+
+            await engine.putAgent(agentWith([cron('* * * * *', { overlap: 'allow' })]));
+            await vi.advanceTimersByTimeAsync(120_000);
+
+            expect(await runs(store)).toHaveLength(0);
+        });
+
+        it('reports a replaced agent hubwire cannot schedule', async () => {
+            const onError = vi.fn();
+            const {
+                store, 
+                engine, 
+                scheduler, 
+            } = live([agentWith([cron('* * * * *', { overlap: 'allow' })])], { onError });
+            await scheduler.start();
+
+            await engine.putAgent(agentWith([cron('0 0 * * 1/2')]));
+
+            expect(onError).toHaveBeenCalledTimes(1);
+            expect(onError).toHaveBeenCalledWith(expect.any(InvalidAgentDefinitionError), {
+                agent: 'sweep',
+                trigger: 'cron:0 0 * * 1/2',
+            });
+            await vi.advanceTimersByTimeAsync(120_000);
+            expect(await runs(store)).toHaveLength(0);
+        });
+
+        it('stop() ends the subscription', async () => {
+            const {
+                store, 
+                engine, 
+                scheduler, 
+            } = live([other()]);
+            await scheduler.start();
+            await scheduler.stop();
+
+            await engine.putAgent(agentWith([cron('* * * * *', { overlap: 'allow' })]));
+            await scheduler.start();
+            await vi.advanceTimersByTimeAsync(120_000);
+
+            expect(await runs(store)).toHaveLength(0);
+        });
+    });
+
     it('rejects an invalid lockTtlMs', () => {
         const store = new MemoryStore();
         const agents = [agentWith([cron('* * * * *')])];
