@@ -33,6 +33,8 @@ describe('public api', () => {
         'collectionError',
         'createSinkStream',
         'delay',
+        'injectSandboxContext',
+        'provideSandboxContext',
     ])('exports %s', (name) => {
         expect(sandbox).toHaveProperty(name);
         expect(sandbox[name as keyof typeof sandbox]).toBeTypeOf('function');
@@ -105,6 +107,7 @@ describe('public api', () => {
         'wrapTimeout',
         'isTimeoutExit',
         'isName',
+        'SANDBOX_CONTEXT',
     ])('keeps %s internal', (name) => {
         expect(sandbox).not.toHaveProperty(name);
     });
