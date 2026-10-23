@@ -224,7 +224,7 @@ Agents subscribe to channels (`defineAgent({ channels: [...] })`, see `@chamvi/c
 
 ## Shutdown
 
-`createShutdown()` runs the shutdown in order: fail readiness, wait `readinessDelayMs`, stop the scheduler, end open SSE streams and MCP `run_<agent>` waits (a wait answers with the run as stored), close MCP (the app registers that; new streams and MCP requests then answer 503), stop accepting connections, `engine.drain()`, then wait at most `closeTimeoutMs` for open connections before closing them. Pass `gracefulShutdown: false` to `serve()` so srvx does not install its own signal handler:
+`createShutdown()` runs the shutdown in order: fail readiness, wait `readinessDelayMs`, run the `onShutdown` callbacks in the order added (the http app's own one ends open SSE streams and MCP `run_<agent>` waits (a wait answers with the run as stored), closes MCP; new streams and MCP requests then answer 503), stop accepting connections, `engine.drain()` (which stops every channel first, the cron schedule among them), then wait at most `closeTimeoutMs` for open connections before closing them. Pass `gracefulShutdown: false` to `serve()` so srvx does not install its own signal handler:
 
 ```ts
 import { serve } from 'routup';
@@ -232,7 +232,6 @@ import { serve } from 'routup';
 let server: ReturnType<typeof serve> | undefined;
 const shutdown = createShutdown({
     engine,
-    scheduler,
     // the server is created after the app; the helper only calls close() at shutdown
     server: { close: async (force) => { await server?.close(force); } },
 });
@@ -244,7 +243,7 @@ process.once('SIGTERM', () => {
 });
 ```
 
-`shutdown.onShutdown(fn)` adds your own cleanup; it runs after the scheduler stopped and before the server closes.
+`shutdown.onShutdown(fn)` adds your own cleanup; it runs after readiness failed and before the server closes.
 
 ## Options
 
@@ -275,7 +274,6 @@ process.once('SIGTERM', () => {
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `engine` | `Engine` | required | Drained during the shutdown; its `clock` drives the delays |
-| `scheduler` | `{ stop(): Promise<void> }` | none | Stopped first; an extra background service of your own (the cron channel needs none: `engine.drain()` stops every channel) |
 | `server` | `{ close(force?): Promise<void> }` | none | The srvx server |
 | `readinessDelayMs` | `number` | `0` | Time for load balancers to see the failing readiness |
 | `drainTimeoutMs` | `number` | `30_000` | Passed to `engine.drain()` |

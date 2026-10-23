@@ -19,9 +19,9 @@ function delay(clock: IClock, ms: number): { promise: Promise<'timeout'>; clear(
 }
 
 /**
- * Graceful shutdown: fail readiness, wait `readinessDelayMs`, stop the
- * scheduler, run the `onShutdown` callbacks, stop intake (`server.close()`),
- * drain the engine, then wait at most `closeTimeoutMs` for open connections
+ * Graceful shutdown: fail readiness, wait `readinessDelayMs`, run the
+ * `onShutdown` callbacks in the order added, stop intake (`server.close()`),
+ * drain the engine (which stops every channel first), then wait at most `closeTimeoutMs` for open connections
  * before closing them. Failures go to `onError` and never abort the sequence.
  */
 export function createShutdown(options: ShutdownOptions): IShutdown {
@@ -44,10 +44,6 @@ export function createShutdown(options: ShutdownOptions): IShutdown {
         const readinessDelayMs = options.readinessDelayMs ?? 0;
         if (readinessDelayMs > 0) await delay(clock, readinessDelayMs).promise;
 
-        if (options.scheduler) {
-            const { scheduler } = options;
-            await guard(() => scheduler.stop());
-        }
         for (const callback of [...callbacks]) {
             await guard(callback);
         }

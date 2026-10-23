@@ -27,11 +27,6 @@ function setup(overrides: Partial<ShutdownOptions> = {}) {
     });
     const engine = { drain, clock } as unknown as Engine;
     const errors: unknown[] = [];
-    const scheduler = {
-        stop: vi.fn(async () => {
-            order.push('scheduler');
-        }),
-    };
     const server = {
         close: vi.fn<(force?: boolean) => Promise<void>>(async () => {
             order.push('server');
@@ -39,7 +34,6 @@ function setup(overrides: Partial<ShutdownOptions> = {}) {
     };
     const shutdown = createShutdown({
         engine,
-        scheduler,
         server,
         onError: (error) => {
             errors.push(error);
@@ -50,7 +44,6 @@ function setup(overrides: Partial<ShutdownOptions> = {}) {
         order,
         clock,
         drain,
-        scheduler,
         server,
         shutdown,
         errors,
@@ -58,12 +51,12 @@ function setup(overrides: Partial<ShutdownOptions> = {}) {
 }
 
 describe('createShutdown', () => {
-    it('fails readiness, stops the scheduler, runs callbacks, closes the server and drains', async () => {
+    it('fails readiness, runs callbacks in the order added, closes the server and drains', async () => {
         const ctx = setup();
         let readyFailedFirst = false;
-        ctx.scheduler.stop.mockImplementation(async () => {
+        ctx.shutdown.onShutdown(async () => {
             readyFailedFirst = ctx.shutdown.shuttingDown;
-            ctx.order.push('scheduler');
+            ctx.order.push('first');
         });
         ctx.shutdown.onShutdown(() => {
             ctx.order.push('callback');
@@ -72,7 +65,7 @@ describe('createShutdown', () => {
 
         await ctx.shutdown.shutdown();
 
-        expect(ctx.order).toEqual(['scheduler', 'callback', 'server', 'drain']);
+        expect(ctx.order).toEqual(['first', 'callback', 'server', 'drain']);
         expect(readyFailedFirst).toBe(true);
         expect(ctx.drain).toHaveBeenCalledWith({ timeoutMs: 30_000 });
         expect(ctx.server.close).toHaveBeenCalledTimes(1);
@@ -80,13 +73,16 @@ describe('createShutdown', () => {
 
     it('waits readinessDelayMs before stopping anything', async () => {
         const ctx = setup({ readinessDelayMs: 5_000 });
+        const callback = vi.fn();
+        ctx.shutdown.onShutdown(callback);
         const done = ctx.shutdown.shutdown();
         await flush();
         expect(ctx.shutdown.shuttingDown).toBe(true);
-        expect(ctx.scheduler.stop).not.toHaveBeenCalled();
+        expect(callback).not.toHaveBeenCalled();
+        expect(ctx.drain).not.toHaveBeenCalled();
         ctx.clock.advance(5_000);
         await done;
-        expect(ctx.scheduler.stop).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledTimes(1);
     });
 
     it('is idempotent', async () => {

@@ -138,7 +138,7 @@ export type HttpRouteContext = {
 
 export type HttpRoute = {
     method: HttpRouteMethod;
-    /** Static path under basePath (no ':' '*' '{'), e.g. '/webhooks/github'; also its metrics label. */
+    /** Static path under basePath (no ':' '*' '{'), e.g. '/ui'; also its metrics label. */
     path: string;
     /** false: skipped by the app's rate limiter (callers that never retry, e.g. webhook senders). Default: limited. */
     rateLimit?: false;

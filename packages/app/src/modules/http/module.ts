@@ -90,14 +90,14 @@ export class HttpModule implements IModule {
         let server: Server | undefined;
         const shutdown = createShutdown({
             engine,
-            // the shutdown's first step: the stopping hooks (the purge timer); the drain stops the channels
-            scheduler: { stop: () => runHooks(container, 'stopping') },
             server: { close: (force) => (server ? server.close(force) : Promise.resolve()) },
             readinessDelayMs: config.http.readinessDelayMs,
             drainTimeoutMs: config.http.drainTimeoutMs,
             closeTimeoutMs: config.http.closeTimeoutMs,
             onError: (error) => context.report(error, { phase: 'shutdown' }),
         });
+        // the first callback, before the http app's own: the stopping hooks (the purge timer); the drain stops the channels
+        shutdown.onShutdown(() => runHooks(container, 'stopping'));
         this.shutdown = shutdown;
         container.register(AppToken.SHUTDOWN, { useValue: shutdown });
 
