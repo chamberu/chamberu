@@ -106,7 +106,7 @@ function make(opts: Partial<EngineOptions> & { store?: MemoryStore } = {}) {
 const env = (extra: Record<string, unknown> = {}) => ({
     agent: 'triage',
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: {},
     ...extra,
 });
@@ -144,7 +144,7 @@ describe('Engine.dispatch', () => {
         expect((await store.listRuns({})).total).toBe(1);
     });
 
-    it.each(['idempotencyKey', 'concurrencyKey', 'thread'])('refuses a %s above TRIGGER_KEY_MAX_LENGTH or with a NUL before any store write', async (key) => {
+    it.each(['idempotencyKey', 'concurrencyKey', 'address'])('refuses a %s above TRIGGER_KEY_MAX_LENGTH or with a NUL before any store write', async (key) => {
         const { engine, store } = make();
         for (const value of ['k'.repeat(TRIGGER_KEY_MAX_LENGTH + 1), 'a\u0000b']) {
             await expect(engine.dispatch(env({ [key]: value }))).rejects.toBeInstanceOf(ValidationError);

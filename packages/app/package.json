@@ -66,9 +66,9 @@
     },
     "license": "Apache-2.0",
     "dependencies": {
+        "@chamvi/channel-cron": "^0.1.0",
         "@chamvi/core": "^0.1.0",
         "@chamvi/http": "^0.1.0",
-        "@chamvi/scheduler": "^0.1.0",
         "@chamvi/store-typeorm": "^0.1.0",
         "eldin": "^1.3.0",
         "envix": "^1.5.0",

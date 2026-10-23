@@ -5,13 +5,16 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { RunStatusLiteral, TriggerSource } from '@chamvi/core';
+import type { RunStatusLiteral } from '@chamvi/core';
 import type { RunWire, ScheduleWire } from '../api/types.ts';
 
-export type TriggerChip = {
-    source: TriggerSource;
+/** One subscription of an agent, as its chip shows it. */
+export type ChannelChip = {
+    /** The channel's name (`http`, `cron`, `github`, `webhook`, or a custom one). */
+    channel: string;
+    /** The subscription id. */
     id: string;
-    /** The event names, cron expression or hook path. */
+    /** What it listens to: the event names, cron expression or hook path. */
     detail?: string;
     hook?: string;
 };

@@ -7,9 +7,9 @@
 
 import type {
     Agent,
+    ChannelSubscription,
     Run,
     RunStatusLiteral,
-    TriggerDefinition,
 } from '@chamvi/core';
 import type { StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
@@ -27,7 +27,9 @@ export type RunToolResult = {
     error?: { code: string; message: string };
     waiting?: {
         toolName: string;
-        input: unknown;
+        /** What the tool asks the owner to approve. */
+        title: string;
+        body?: string;
         expiresAt: string;
     };
 };
@@ -58,14 +60,14 @@ export type WaitForRunOptions = {
 export type RunAgentArgs = {
     payload?: unknown;
     idempotencyKey?: string;
-    thread?: string;
+    address?: string;
     waitSeconds?: number;
 };
 
 /** A `run_<agent>` tool definition, built once per agent object; internal. */
 export type McpRunTool = {
     agent: Agent;
-    trigger: TriggerDefinition;
+    subscription: ChannelSubscription;
     schema?: StandardSchemaV1;
     description: string;
     inputSchema: StandardSchemaWithJSON<RunAgentArgs, RunAgentArgs>;

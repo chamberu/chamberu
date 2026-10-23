@@ -8,7 +8,8 @@
 import type { HttpAppOptions } from '@chamvi/http';
 
 /**
- * `createHttpApp` options the module passes through; `engine`, `auth`,
- * `shutdown`, `routes`, `basePath` and `onError` come from the app.
+ * `createHttpApp` options the module passes through (`bodyLimit` also bounds
+ * the webhook channel's deliveries); `engine`, `auth`, `shutdown`, `routes`,
+ * `channels`, `basePath` and `onError` come from the app.
  */
-export type HttpModuleOptions = Omit<HttpAppOptions, 'engine' | 'auth' | 'shutdown' | 'routes' | 'basePath' | 'onError'>;
+export type HttpModuleOptions = Omit<HttpAppOptions, 'engine' | 'auth' | 'shutdown' | 'routes' | 'channels' | 'basePath' | 'onError'>;

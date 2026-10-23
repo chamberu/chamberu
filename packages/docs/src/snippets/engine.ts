@@ -2,9 +2,9 @@ import type { LanguageModel } from 'ai';
 import {
     Engine,
     MemoryStore,
+    consoleChannel,
     defineAgent,
 } from '@chamvi/core';
-import { ConsoleNotifier } from './notifiers.ts';
 
 export function createEngine(model: LanguageModel) {
     // #region many
@@ -17,13 +17,13 @@ export function createEngine(model: LanguageModel) {
         name: 'digest',
         model,
         instructions: 'Summarize the day.',
-        notify: 'console',
     });
 
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage, digest],
-        notifiers: { console: new ConsoleNotifier() },
+        // tools reach it with ctx.channels.findOneOrFail('console')
+        channels: [consoleChannel()],
         resumeSecret: 'change-me',
         maxConcurrentRuns: 8,
         claimTtlMs: 30_000,

@@ -80,4 +80,18 @@ describe('workspace dependency graph', () => {
         expect(graph.size).toBeGreaterThan(10);
         expect(findCycles(graph)).toEqual([]);
     });
+
+    it('holds the channel packages and not the ones they replaced', () => {
+        const graph = releaseGraph();
+        expect(graph.keys().toArray()).toEqual(expect.arrayContaining([
+            '@chamvi/channel-cron',
+            '@chamvi/channel-openclaw',
+            '@chamvi/github',
+        ]));
+        for (const name of ['@chamvi/scheduler', '@chamvi/notify-github', '@chamvi/notify-openclaw']) {
+            expect(graph.has(name)).toBe(false);
+            for (const edges of graph.values()) expect(edges).not.toContain(name);
+        }
+        expect(graph.get('@chamvi/app')).toContain('@chamvi/channel-cron');
+    });
 });

@@ -15,7 +15,7 @@ import {
     wrapToolsForRun,
 } from '@chamvi/core';
 import type { ToolSet } from 'ai';
-import { createGithubApp, githubWebhook } from '@chamvi/github';
+import { createGithubApp, github, githubChannel } from '@chamvi/github';
 import type { GithubAppOptions } from '@chamvi/github';
 import { WEBHOOK_SECRET, createGithubFixture } from '../../utils/app.ts';
 import { callTool, toolContext } from '../../utils/tools.ts';
@@ -230,14 +230,46 @@ describe('read tools', () => {
     });
 
     it('uses the configured installation for non-github runs', async () => {
-        const { fake, call } = setup({ installationId: 7 }, { source: 'cron' });
+        const { fake, call } = setup({ installationId: 7 }, { channel: 'cron' });
+        fake.issues.set('octo/demo#5', { ...ISSUE });
+        await call('github_get_issue', { repo: 'octo/demo', number: 5 });
+        expect(fake.tokenInstallations).toEqual([7]);
+    });
+
+    it('uses the delivery installation for a run of a renamed github channel of the app', async () => {
+        const fixture = createGithubFixture({ installationId: 7 });
+        githubChannel({ app: fixture.gh, name: 'github-ent' });
+        const event = {
+            name: 'issues',
+            action: 'opened',
+            delivery: 'd-1',
+            installationId: 42,
+            payload: {},
+        };
+        const ctx = toolContext({ channel: 'github-ent', payload: event });
+        const tools: ToolSet = wrapToolsForRun(fixture.gh.readTools(), ctx, new MemoryStore());
+        fixture.fake.issues.set('octo/demo#5', { ...ISSUE });
+        await callTool(tools, 'github_get_issue', { repo: 'octo/demo', number: 5 }, ctx);
+        expect(fixture.fake.tokenInstallations).toEqual([42]);
+    });
+
+    it('never takes the installation from the payload of another channel', async () => {
+        const { fake, call } = setup({ installationId: 7 }, {
+            channel: 'http',
+            payload: {
+                name: 'issues',
+                delivery: 'd-1',
+                installationId: 42,
+                payload: {},
+            },
+        });
         fake.issues.set('octo/demo#5', { ...ISSUE });
         await call('github_get_issue', { repo: 'octo/demo', number: 5 });
         expect(fake.tokenInstallations).toEqual([7]);
     });
 
     it('fails the run without an installation', async () => {
-        const { call } = setup({}, { source: 'http' });
+        const { call } = setup({}, { channel: 'http' });
         await expect(call('github_get_issue', { repo: 'octo/demo', number: 5 })).rejects.toBeInstanceOf(FatalToolError);
     });
 
@@ -302,12 +334,13 @@ describe('read tools', () => {
                 { parts: [{ type: 'text', text: 'no such issue' }] },
             ]),
             instructions: 'Triage.',
-            triggers: [githubWebhook({ events: ['issues.opened'] })],
+            channels: [github.on('issues.opened')],
             tools: () => gh.readTools(),
         });
         const engine = new Engine({
             store,
             agents: [agent],
+            channels: [githubChannel({ app: gh, clock })],
             resumeSecret: 'test-secret',
             clock,
             onError: () => {},
@@ -315,7 +348,7 @@ describe('read tools', () => {
         const { runId } = await engine.dispatch({
             agent: 'triage',
             trigger: 'github:issues.opened',
-            source: 'github',
+            channel: 'github',
             payload: {
                 name: 'issues',
                 action: 'opened',

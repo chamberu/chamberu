@@ -5,7 +5,7 @@
 <h1 align="center">chamvi</h1>
 
 <p align="center">
-    <b>Self-hosted, trigger-driven AI agents with durable runs, built on the Vercel AI SDK.</b><br>
+    <b>Self-hosted, channel-driven AI agents with durable runs, built on the Vercel AI SDK.</b><br>
     You write the agent with the AI SDK. chamvi queues its runs, checkpoints every step,<br>
     pauses for approvals and resumes interrupted runs, in your own Node process and database.
 </p>
@@ -28,7 +28,7 @@
 
 ---
 
-> chamvi is at an early stage. The engine, HTTP, scheduler, TypeORM store, GitHub, sandbox, coding, notifier and dashboard packages exist; the CLI is planned.
+> chamvi is at an early stage. The engine, the cron, HTTP, GitHub and OpenClaw channels, the TypeORM store, sandbox, coding, dashboard, app and CLI packages exist; the base image, Helm chart and template repository are planned.
 
 ## Why chamvi?
 
@@ -53,7 +53,7 @@ Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageM
     <img src="./.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
 </p>
 
-A run moves from `queued` to `running` and settles `completed`, `failed` or `cancelled`. An approval parks it in `waiting` until `resume()` requeues it; `drain()` or a crash leaves it `interrupted` (or with a lapsed claim) until `recover()` requeues it. Every requeued run continues from its latest checkpoint.
+A run moves from `queued` to `running` and settles `completed`, `failed` or `cancelled`. A tool that awaits `approve()` parks it in `waiting` until the answer requeues it (the call then runs again with the decision); `drain()` or a crash leaves it `interrupted` (or with a lapsed claim) until `recover()` requeues it. Every requeued run continues from its latest checkpoint.
 
 ### Compared with other durable runtimes
 
@@ -64,8 +64,8 @@ Other tools also make agent runs durable. They differ in where the runs live and
 | **Runs in** | Your Node process, one PostgreSQL database | Your process with the Postgres World (a reference implementation), or Vercel | Your process or a Mastra server, with a storage adapter | The Inngest server, which calls your app's endpoint | The Trigger.dev platform (cloud, or self-hosted with Postgres, Redis, ClickHouse and more) |
 | **Checkpoint per LLM and tool step** | Yes | LLM calls; tools only when marked `"use step"` | Durable agents (beta) resume from a snapshot, per step only when enabled | Yes, with `step.ai` | No, a retry restarts the task; waits are snapshotted |
 | **Tool side effects after a crash** | Recorded per effect key, `alreadyApplied` checks the remote system | Completed steps memoized; pass `stepId` to the API | May run twice, unless on the Inngest runner | Completed steps memoized; pass a stable key | Repeat in the parent task; child tasks deduped |
-| **Approval that waits for days** | Signed, expiring resume token; approver needs `agent:<name>:approve` | Hook tokens, which are not credentials; your route authorizes | Resume by `runId` and `toolCallId` | `waitForEvent` with a timeout | Wait tokens |
-| **Deduplicated intake** | Per agent, source and caller, 7 days | A pattern you build with hooks | Not documented | Yes, 24 hours | Yes, 30 days by default |
+| **Approval that waits for days** | `await approve(ctx, { title })` inside the tool, durable across restarts; approver needs `agent:<name>:approve` | Hook tokens, which are not credentials; your route authorizes | Resume by `runId` and `toolCallId` | `waitForEvent` with a timeout | Wait tokens |
+| **Deduplicated intake** | Per agent, channel and caller, 7 days | A pattern you build with hooks | Not documented | Yes, 24 hours | Yes, 30 days by default |
 | **One run at a time per key** | `concurrencyKey` | Not documented | Not documented | `concurrency.key` | `concurrencyKey` |
 | **Cron across replicas** | Once per tick, overlap `skip`, `queue-one` or `allow` | No cron | Yes, overlap not documented | Yes, overlap through concurrency settings | Yes, no skip-if-running policy |
 | **Agents as an MCP server** | `/mcp`, one `run_<agent>` tool per agent | No | `MCPServer` | No | No (its MCP server is developer tooling) |
@@ -83,17 +83,20 @@ Pick one of the others when you want what chamvi does not have yet: a hosted ser
 
 | Package | Version | Description |
 |---|---|---|
-| [`@chamvi/core`](./packages/core) | [![npm](https://img.shields.io/npm/v/@chamvi/core)](https://www.npmjs.com/package/@chamvi/core) | Agents, triggers, the run engine, checkpoints, effect tools, approvals, agent state and the in-memory store |
-| [`@chamvi/http`](./packages/http) | [![npm](https://img.shields.io/npm/v/@chamvi/http)](https://www.npmjs.com/package/@chamvi/http) | REST, server-sent events, webhooks and an MCP endpoint over the run engine, with bearer, authup and OIDC authentication |
-| [`@chamvi/scheduler`](./packages/scheduler) | [![npm](https://img.shields.io/npm/v/@chamvi/scheduler)](https://www.npmjs.com/package/@chamvi/scheduler) | Fires `cron()` triggers once per tick across replicas, with overlap policies, timezones and one-shot jobs |
+| [`@chamvi/core`](./packages/core) | [![npm](https://img.shields.io/npm/v/@chamvi/core)](https://www.npmjs.com/package/@chamvi/core) | Agents, the channel contract, the run engine, checkpoints, effect tools, durable approvals, agent hooks, agent state and the in-memory store |
+| [`@chamvi/http`](./packages/http) | [![npm](https://img.shields.io/npm/v/@chamvi/http)](https://www.npmjs.com/package/@chamvi/http) | REST, server-sent events, an MCP endpoint, the `http`, `mcp` and `webhook` channels and the `/channels/<name>` mount, with bearer, authup and OIDC authentication |
+| [`@chamvi/channel-cron`](./packages/channel-cron) | [![npm](https://img.shields.io/npm/v/@chamvi/channel-cron)](https://www.npmjs.com/package/@chamvi/channel-cron) | The cron channel: fires `cron.on()` subscriptions once per tick across replicas, with overlap policies, timezones and one-shot jobs |
 | [`@chamvi/store-typeorm`](./packages/store-typeorm) | [![npm](https://img.shields.io/npm/v/@chamvi/store-typeorm)](https://www.npmjs.com/package/@chamvi/store-typeorm) | TypeORM store (PostgreSQL): durable runs, leases and agent state across replicas |
-| [`@chamvi/github`](./packages/github) | [![npm](https://img.shields.io/npm/v/@chamvi/github)](https://www.npmjs.com/package/@chamvi/github) | GitHub App authentication, verified webhook triggers deduplicated by delivery id, and issue, label, comment and search tools |
+| [`@chamvi/github`](./packages/github) | [![npm](https://img.shields.io/npm/v/@chamvi/github)](https://www.npmjs.com/package/@chamvi/github) | GitHub App authentication, the GitHub channel (verified deliveries in, deduplicated by delivery id; issue comments out), and issue, label, comment and search tools |
+| [`@chamvi/channel-openclaw`](./packages/channel-openclaw) | [![npm](https://img.shields.io/npm/v/@chamvi/channel-openclaw)](https://www.npmjs.com/package/@chamvi/channel-openclaw) | The OpenClaw channel: messages and approval requests into an OpenClaw chat |
 | [`@chamvi/sandbox`](./packages/sandbox) | [![npm](https://img.shields.io/npm/v/@chamvi/sandbox)](https://www.npmjs.com/package/@chamvi/sandbox) | Sandbox contracts and the workspace manager: one workspace per run and repository, `create_workspace` / `dispose_workspace` tools, cleanup when the run settles |
 | [`@chamvi/sandbox-local`](./packages/sandbox-local) | [![npm](https://img.shields.io/npm/v/@chamvi/sandbox-local)](https://www.npmjs.com/package/@chamvi/sandbox-local) | Workspaces in a temporary directory, for development and tests (no isolation) |
 | [`@chamvi/sandbox-docker`](./packages/sandbox-docker) | [![npm](https://img.shields.io/npm/v/@chamvi/sandbox-docker)](https://www.npmjs.com/package/@chamvi/sandbox-docker) | One hardened container per workspace: non-root, read-only root, no capabilities, resource limits |
 | [`@chamvi/sandbox-k8s`](./packages/sandbox-k8s) | [![npm](https://img.shields.io/npm/v/@chamvi/sandbox-k8s)](https://www.npmjs.com/package/@chamvi/sandbox-k8s) | One hardened pod per workspace, without a service account token |
 | [`@chamvi/coding`](./packages/coding) | [![npm](https://img.shields.io/npm/v/@chamvi/coding)](https://www.npmjs.com/package/@chamvi/coding) | `read_file`, `write_file`, `edit_file`, `grep`, `list_files`, `bash` and `git_diff` inside a workspace |
 | [`@chamvi/ui`](./packages/ui) | [![npm](https://img.shields.io/npm/v/@chamvi/ui)](https://www.npmjs.com/package/@chamvi/ui) | The dashboard: an agents overview with runs started from the agent page, runs with live steps, an approvals inbox, agent state and schedules, served by `uiRoutes()` |
+| [`@chamvi/app`](./packages/app) | [![npm](https://img.shields.io/npm/v/@chamvi/app)](https://www.npmjs.com/package/@chamvi/app) | `createApp()`: config, store, engine, channels and HTTP as modules booted from env |
+| [`@chamvi/cli`](./packages/cli) | [![npm](https://img.shields.io/npm/v/@chamvi/cli)](https://www.npmjs.com/package/@chamvi/cli) | The `chamvi` bin: `dev`, `build`, `start`, `run-job`, `migrate` |
 | [`@chamvi/test-kit`](./packages/test-kit) | [![npm](https://img.shields.io/npm/v/@chamvi/test-kit)](https://www.npmjs.com/package/@chamvi/test-kit) | `ControllableClock`, the store and workspace contract suites, and a git fixture |
 
 ## Quick start
@@ -110,22 +113,26 @@ import { z } from 'zod';
 import {
     MemoryStore,
     Engine,
+    consoleChannel,
     defineAgent,
     defineEffectTool,
-    http,
+    replyChannel,
 } from '@chamvi/core';
 
 const triage = defineAgent({
     name: 'triage',
     model: anthropic('claude-sonnet-5-5'),
-    instructions: 'Label the issue in the trigger payload as bug, feature or question.',
-    triggers: [http()],
+    instructions: 'Label the issue in the payload as bug, feature or question.',
     tools: {
         // recorded per (run, tool, input): a recovered run reuses the result
         addLabel: defineEffectTool({
             description: 'Adds a label to the issue.',
             inputSchema: z.object({ label: z.enum(['bug', 'feature', 'question']) }),
-            execute: async ({ label }) => ({ added: label }),
+            execute: async ({ label }, { context }) => {
+                // answers where the run came from, once per message
+                await replyChannel(context)?.emit({ body: `Labelled as ${label}.` });
+                return { added: label };
+            },
         }),
     },
 });
@@ -133,14 +140,17 @@ const triage = defineAgent({
 const engine = new Engine({
     store: new MemoryStore(),
     agents: [triage],
+    // channels are what runs come from and talk to: cron, HTTP, GitHub, OpenClaw, ...
+    channels: [consoleChannel()],
     resumeSecret: process.env.RESUME_SECRET ?? 'change-me',
 });
 await engine.start();
 
 const { runId } = await engine.dispatch({
     agent: 'triage',
-    trigger: 'http',
-    source: 'http',
+    trigger: 'manual',
+    channel: 'console',
+    address: 'issue-1',
     payload: { title: 'App crashes on start' },
 });
 
@@ -150,7 +160,7 @@ console.log(await engine.getRun(runId)); // status: 'completed', output: the mod
 await engine.drain();
 ```
 
-`MemoryStore` keeps everything in process memory; it is for development and tests. Effect tools, approvals, agent state, budgets and the full option reference are in the [`@chamvi/core` README](./packages/core#readme).
+`MemoryStore` keeps everything in process memory; it is for development and tests. Channels, effect tools, approvals, hooks, agent state, budgets and the full option reference are in the [`@chamvi/core` README](./packages/core#readme).
 
 ### Give the agent a workspace
 
@@ -159,6 +169,7 @@ npm install @chamvi/sandbox @chamvi/sandbox-docker @chamvi/coding --save
 ```
 
 ```typescript
+import { ToolDeniedError, approve } from '@chamvi/core';
 import { codingTools } from '@chamvi/coding';
 import { createWorkspaceManager } from '@chamvi/sandbox';
 import { createDockerSandbox } from '@chamvi/sandbox-docker';
@@ -175,10 +186,16 @@ const repro = defineAgent({
     model: anthropic('claude-sonnet-5-5'),
     instructions: 'Check out the repository from the payload, write a failing test for the reported bug ' +
         'and answer with the output and the diff.',
-    triggers: [http()],
     tools: { ...workspaces.tools(), ...codingTools(workspaces) },
-    // every shell command waits for a human
-    approvals: { bash: 'user' },
+    hooks: {
+        // every shell command waits for a human; the run pauses durably until answered
+        async beforeToolExecution({ toolName, input }, ctx) {
+            if (toolName !== 'bash') return input;
+            const { approved } = await approve(ctx, { title: 'Run a shell command?', body: (input as { command: string }).command });
+            if (!approved) throw new ToolDeniedError('Command refused.');
+            return input;
+        },
+    },
 });
 
 // add repro to the Engine's agents, then: a run's workspaces go once it settled

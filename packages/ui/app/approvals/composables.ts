@@ -80,7 +80,7 @@ export function useApprovals(client: IApiClient) {
 }
 
 /**
- * The approval a notifier's deep link names: its run when readable (else
+ * The approval a channel message's deep link names: its run when readable (else
  * only the ids decoded from the token), answered through `POST /resume`
  * with the token; any final answer clears the stored token. An invalid,
  * expired or spent token (400) and a run that moved on (409) are

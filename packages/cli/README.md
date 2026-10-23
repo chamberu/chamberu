@@ -74,8 +74,8 @@ Relative imports carry `.ts` and there is no `enum`, so `chamvi dev` (Node's typ
 |---------|---------------------|------|
 | `dev` | `--entry` | Runs `node --watch [--env-file-if-exists=.env] <cli> start --dev --entry <source entry>`: restarts on a change of the entry, its imports or `.env` (Node watches the env file itself, so no `--watch-path` is needed). The env flag is passed only when `.env` exists at start (on Linux, `node --watch` fails on a missing env file), so a `.env` created later needs a restart of `chamvi dev` |
 | `build` | `--entry`, `--out-dir <dir>` (default `dist`) | Bundles the entry with tsdown into `<out-dir>/index.mjs` plus its source map: ESM, `node22`, every `dependencies` and `peerDependencies` package external, the app's own modules inlined. The out dir is emptied first, so one that is the project folder or above it, holds the entry, or holds anything but `.mjs` and `.mjs.map` files exits 2 |
-| `start` | `--entry` | Starts the app: store (and migrations), engine, scheduler, then HTTP |
-| `run-job` | `<agent>`, `[triggerId]`, `--entry` | Fires one cron trigger once and waits for its run (a Kubernetes CronJob); `triggerId` defaults to the agent's only cron trigger |
+| `start` | `--entry` | Starts the app: store (and migrations), engine and its channels (cron among them), then HTTP |
+| `run-job` | `<agent>`, `[subscriptionId]`, `--entry` | Fires one cron subscription once and waits for its run (a Kubernetes CronJob; no channel is started); `subscriptionId` defaults to the agent's only cron subscription |
 | `migrate` | `--entry` | Migrates the Postgres store (`DATABASE_URL` required) |
 
 The entry is `--entry`, else for the source commands (`dev`, `build`) the `package.json` field `"chamvi": { "entry": "<path>" }`, else `src/index.ts`. The built commands (`start`, `run-job`, `migrate`) never read that field and default to `dist/index.mjs`, so an image built from a repository that sets it still starts; a `.ts` entry runs through type stripping too.
@@ -96,7 +96,7 @@ The CLI sets `process.exitCode` and lets Node exit; it calls `process.exit()` on
 
 `start` and `run-job`:
 
-- The first SIGTERM or SIGINT stops the app (`/readyz` 503, scheduler stop, HTTP close, engine drain up to `CHAMVI_DRAIN_TIMEOUT_MS`, store close), then exits 0, or 1 when the stop reported an error.
+- The first SIGTERM or SIGINT stops the app (`/readyz` 503, HTTP close, engine drain (channels stop first) up to `CHAMVI_DRAIN_TIMEOUT_MS`, store close), then exits 0, or 1 when the stop reported an error.
 - A second signal exits 1 at once. A signal within 1 s of the first counts as the same one, since `npm run dev` and `npm start` deliver one Ctrl-C twice (npm forwards SIGINT to the script while the terminal signals the whole group).
 - `CHAMVI_FORCE_EXIT_MS` (default 90000) after the first signal, a stop still running exits 1.
 

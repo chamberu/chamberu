@@ -39,7 +39,7 @@ async function readRun(request: APIRequestContext, id: string) {
     return await response.json() as { status: string; steps: Array<{ kind: string; output?: Record<string, unknown> }> };
 }
 
-/** The demo notifier's latest token once it names `runId`. */
+/** A token for the demo channel's latest approval message once it names `runId`. */
 async function tokenFor(request: APIRequestContext, runId: string): Promise<string> {
     let token = '';
     await expect.poll(async () => {
@@ -72,8 +72,10 @@ test('dispatch, live run, approve, completed', async ({ page, request }) => {
     await page.getByRole('link', { name: 'Approvals' }).first().click();
     const approval = page.locator(`[data-testid="approval"][data-run="${runId}"]`);
     await expect(approval).toBeVisible();
-    await expect(approval.locator('pre.code')).toContainText('"env": "prod"');
-    await expect(approval.getByTestId('notified')).toHaveText('capture');
+    await expect(approval.getByTestId('approval-title')).toHaveText('Deploy prod?');
+    await expect(approval.getByTestId('approval-body')).toHaveText('Rolls the demo release out to prod.');
+    await expect(approval.getByTestId('approval-tool')).toHaveText('deploy');
+    await expect(approval.getByTestId('notified')).toHaveText('capture · ops');
     await approval.getByRole('button', { name: 'Approve' }).click();
 
     const decided = page.getByTestId('decided').filter({ hasText: runId.slice(0, 8) });
@@ -100,8 +102,8 @@ test('open an agent and start a run from its page', async ({ page }) => {
     await expect(page).toHaveURL(/\/ui\/agents$/);
     await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible();
     const card = page.locator('[data-testid="agent-card"][data-agent="deploy"]');
-    await expect(card).toContainText('http');
-    await expect(page.locator('[data-testid="agent-card"][data-agent="digest"]')).toContainText('0 8 * * 1-5');
+    await expect(card.getByTestId('channel-chip')).toHaveText(['http']);
+    await expect(page.locator('[data-testid="agent-card"][data-agent="digest"]').getByTestId('channel-chip')).toHaveText(['cron0 8 * * 1-5']);
     await card.getByRole('link', { name: 'deploy', exact: true }).click();
 
     await expect(page).toHaveURL(/\/ui\/agents\/deploy$/);

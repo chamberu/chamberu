@@ -7,19 +7,6 @@
 
 import type { Artifact } from '../artifact/types.ts';
 
-export type TriggerSource = 'cron' | 'http' | 'webhook' | 'github' | 'mcp';
-
-export type TriggerDefinition<P = unknown> = {
-    source: TriggerSource;
-    /** Unique within an agent, e.g. 'cron:*\/30 * * * *'. */
-    id: string;
-    /** Source-specific (cron: { expression, timezone?, overlap }). */
-    options: Record<string, unknown>;
-    // method signatures (bivariant): a TriggerDefinition<P> fits AgentDefinition.triggers
-    concurrencyKey?(payload: P): string | undefined;
-    idempotencyKey?(payload: P): string | undefined;
-};
-
 /**
  * Who started a run (or answered an approval), as an authenticator resolved
  * it: a snapshot of identity and grants taken at dispatch, never a token.
@@ -41,17 +28,20 @@ export type Invoker = {
 export type TriggerEnvelope<P = unknown> = {
     id: string;
     agent: string;
+    /** The id of the agent's subscription that started the run. */
     trigger: string;
-    source: TriggerSource;
+    /** The name of the channel the run came from. */
+    channel: string;
     payload: P;
     idempotencyKey?: string;
     concurrencyKey?: string;
-    thread?: string;
+    /** Where the run came from on that channel (an issue, a thread, a caller); the channel defines it. */
+    address?: string;
     /** Files the run was started with, stored as artifacts of the run; the model gets them as file parts. */
     attachments?: Artifact[];
     /**
      * Who started the run; only ever set from an authenticator (never from a
-     * payload). Absent for cron and webhook runs. With an invoker the
+     * payload). Absent for runs a channel started without one (cron, webhooks). With an invoker the
      * idempotency key is scoped to it, so only the same invoker's dispatch
      * is deduplicated (and gets its own first run).
      */

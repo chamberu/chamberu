@@ -29,7 +29,7 @@ async function pausedGate(overrides: TestAppOverrides = {}) {
     return {
         ...ctx,
         runId,
-        token: ctx.notifier.lastToken,
+        token: await ctx.tokenOf(runId),
         waiting: run!.waiting!,
     };
 }

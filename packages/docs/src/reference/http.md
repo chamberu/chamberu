@@ -1,6 +1,6 @@
 # @chamvi/http
 
-REST, SSE, webhooks and MCP for chamvi agents, on routup. The public API of `packages/http/src/index.ts`.
+REST, SSE, MCP, the `http`, `mcp` and `webhook` channels and the `/channels/<name>` mount for chamvi agents, on routup. The public API of `packages/http/src/index.ts`.
 
 ```bash
 npm install @chamvi/http @chamvi/core --save
@@ -14,13 +14,35 @@ npm install @chamvi/http @chamvi/core --save
 function createHttpApp(options: HttpAppOptions): App; // routup App
 ```
 
-The store, the agents and the clock come from `engine` (`engine.store`, `engine.listAgents()`, `engine.clock`). The agents are read from the engine on every request, so an agent registered, replaced or removed at runtime gets (or loses) its routes, hooks, `GET /agents` entry, schedules and MCP `run_<agent>` tool at once; a `run_<agent>` definition is built once per agent object, and one that fails for an agent registered after construction goes to `onError` and that tool is left out. `agents` narrows the served agents to the named ones, checked at construction: the others, also agents registered later, get no routes, MCP tools or hooks in this app, and a named agent removed from the engine answers 404. `agentIssues` lists agents that failed to load as `GET /agents` `issues`. `HttpRouteContext.agents` is read from the engine on every access. Throws `InvalidAgentDefinitionError` for a name in `agents` the engine lacks or that is given twice, an empty `auth` array and an invalid `routes` entry (a path that is not static, a duplicate method and path, a first segment of a built-in route such as `agents`, `runs` or `hooks`, or the metrics path, all compared case-insensitively).
+The store, the agents and the clock come from `engine` (`engine.store`, `engine.listAgents()`, `engine.clock`). The agents are read from the engine on every request, so an agent registered, replaced or removed at runtime gets (or loses) its routes, webhook subscriptions, `GET /agents` entry, schedules and MCP `run_<agent>` tool at once; a `run_<agent>` definition is built once per agent object, and one that fails for an agent registered after construction goes to `onError` and that tool is left out. `agents` narrows the served agents to the named ones, checked at construction: the others, also agents registered later, get no routes or MCP tools in this app (a mounted channel serves every agent subscribing to it), and a named agent removed from the engine answers 404. `agentIssues` lists agents that failed to load as `GET /agents` `issues`. `HttpRouteContext.agents` is read from the engine on every access. Throws `InvalidAgentDefinitionError` for a name in `agents` the engine lacks or that is given twice, an empty `auth` array and an invalid `routes` entry (a path that is not static, a duplicate method and path, a first segment of a built-in route such as `agents`, `runs` or `channels`, or the metrics path, all compared case-insensitively).
 
 <<< ../../../http/src/app/types.ts#options{ts}
 
-`routes` takes extra routes from other packages, such as the GitHub webhook of `@chamvi/github`:
+`channels` lists the channels mounted at `POST /channels/<name>` (each needs an `in` and must be the object the engine holds under its name, else `InvalidAgentDefinitionError`). `routes` takes extra routes from other packages, such as the dashboard of `@chamvi/ui`:
 
 <<< ../../../http/src/app/types.ts#routes{ts}
+
+## Channels
+
+```ts
+function httpChannel(): IChannel;                                // name 'http': REST runs; no in, no out
+function mcpChannel(): IChannel;                                 // name 'mcp': MCP run_<agent> runs; no in, no out
+function webhookChannel(options: WebhookChannelOptions): WebhookChannel; // in at /channels/<name>/<agent><path>; on() bound to its name
+function readRequestBody(request: Request, options: ReadRequestBodyOptions): Promise<Uint8Array>; // for a channel's in: 413 above options.limit
+
+const http: HttpSubscriber;       // http.on({ schema? }): id 'http', at most one per agent
+const webhook: WebhookSubscriber; // webhook.on(path, options?): id 'webhook:<path>'
+
+const HTTP_CHANNEL_NAME: 'http';
+const MCP_CHANNEL_NAME: 'mcp';
+const WEBHOOK_CHANNEL_NAME: 'webhook';
+```
+
+<<< ../../../http/src/channels/types.ts{ts}
+
+<<< ../../../http/src/subscriptions/types.ts{ts}
+
+The engine refuses an `http.on()` subscription unless it holds `httpChannel()` (REST and MCP keep separate idempotency scopes through the two channel names), and a `webhook.on()` one unless it holds the webhook channel. `webhook.on()` throws `InvalidAgentDefinitionError` for a path that does not start with `/`. See [Channels](/guide/http#channels).
 
 ## Authenticators
 

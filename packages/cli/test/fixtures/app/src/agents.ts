@@ -52,8 +52,8 @@ export const echo = defineAgent({
     name: 'echo',
     model: echoModel('echo'),
     instructions: 'Echo the payload back.',
-    triggers: [
-        http(),
-        cron('0 0 1 1 *'),
+    channels: [
+        http.on(),
+        cron.on('0 0 1 1 *'),
     ],
 });

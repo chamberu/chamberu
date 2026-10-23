@@ -26,6 +26,7 @@ import {
     RESERVED_ROUTE_SEGMENTS,
     STREAM_RETRY_AFTER_SECONDS,
 } from './constants.ts';
+import { validateChannels } from '../channels/helpers.ts';
 import { boundIssues } from '../request/helpers.ts';
 import type { AgentIssue } from '../agents/types.ts';
 import type {
@@ -191,6 +192,7 @@ export function buildContext(options: HttpAppOptions): HttpContext {
         closers: new Set(),
         closed: false,
         routes: validateRoutes(options),
+        channels: validateChannels(options.engine, options.channels),
         // eslint-disable-next-line no-console
         onError: options.onError ?? ((error) => console.error('[chamvi]', error)),
     };

@@ -41,12 +41,13 @@ function toolContext(store: MemoryStore): ToolContext {
         trigger: {
             agent: 'alpha',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         } as RunContext['trigger'],
         signal: new AbortController().signal,
     };
     return {
+        channels: {} as ToolContext['channels'],
         run,
         state: createAgentState('alpha', schema, store),
         artifacts: createRunArtifacts(store, { id: 'r1', agent: 'alpha' }, systemClock),
@@ -76,7 +77,7 @@ async function runOnce(store: MemoryStore, agent: Parameters<typeof defineAgent>
     const { runId } = await engine.dispatch({
         agent: agent.name,
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: {},
     });
     await engine.idle();

@@ -10,7 +10,6 @@ import {
     InvalidAgentDefinitionError,
     MemoryStore,
     defineAgent,
-    http,
 } from '@chamvi/core';
 import type { Agent } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
@@ -35,7 +34,6 @@ function agentWith(model: Agent['definition']['model'], name = 'triage'): Agent 
         name,
         model,
         instructions: 'triage',
-        triggers: [http()],
     });
 }
 
@@ -333,7 +331,7 @@ describe('installDefaultProvider', () => {
             const { runId } = await engine.dispatch({
                 agent: 'triage',
                 trigger: 'http',
-                source: 'http',
+                channel: 'http',
                 payload: {},
             });
             await engine.idle();

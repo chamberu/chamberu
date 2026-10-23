@@ -7,22 +7,23 @@
 
 import type {
     FinishReason,
+    JSONValue,
     LanguageModelResponseMetadata,
     LanguageModelUsage,
     ModelMessage,
     OutputInterface,
     StepResult,
-    ToolApprovalStatus,
-    ToolLoopAgentSettings,
+    ToolResultPart,
     ToolSet,
 } from 'ai';
-import { NoSuchToolError, TypeValidationError } from 'ai';
+import { NoSuchToolError, TypeValidationError, asSchema } from 'ai';
 import { isObject } from 'smob';
-import { assertToolsContext } from '../../agent/helpers.ts';
-import type { ApprovalPolicy } from '../../agent/types.ts';
+import { assertNoNeedsApproval, assertToolsContext } from '../../agent/helpers.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
+import { createToolChannels } from '../../channel/helpers.ts';
 import { bindProvided } from '../../context/helpers.ts';
+import { validateToolInput } from '../../effect/helpers.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
 import {
     BudgetExceededError,
@@ -42,7 +43,7 @@ import type { ApprovalRequest, ExecuteContext } from './types.ts';
 
 export function renderTrigger(envelope: TriggerEnvelope): string {
     const json = JSON.stringify({
-        source: envelope.source,
+        channel: envelope.channel,
         trigger: envelope.trigger,
         payload: envelope.payload,
     }, null, 2);
@@ -118,16 +119,25 @@ export function toRunError(error: unknown): { code: string; message: string } {
 /**
  * The tools handed to the agent: generated state tools (when the agent declares
  * `state`) merged with the user's tools (a plain set or the factory's result),
- * which win on a name clash. Every tool stays executable, so an approved call
- * from an older history still gets an answer; `activeTools` (the names the
+ * which win on a name clash. Every tool stays executable, so a call pending
+ * on an approval still gets an answer; `activeTools` (the names the
  * agent's toolPolicy allows, undefined without a policy) is what the model is
  * offered. wrapToolsForRun memoizes effects and re-checks the policy per call,
- * so a refused call is a tool error. `toolsContext` maps every chamvi tool
+ * so a refused call is a tool error, and runs the agent's hooks around every
+ * call; a call approve() suspended is reported to `onSuspend`, and
+ * `stepIndex` names the step whose calls run (part of the approval id). `toolsContext`
+ * maps every chamvi tool
  * (policy-hidden ones included) to the execution's one ToolContext, plus the
  * agent's own `toolsContext` entries for the other tools, by reference.
- * Throws InvalidAgentDefinitionError for a misconfigured `toolsContext`.
+ * Throws InvalidAgentDefinitionError for a misconfigured `toolsContext` and
+ * for a tool declaring `needsApproval`.
  */
-export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
+export function assembleTools(
+    ctx: ExecuteContext,
+    runContext: RunContext,
+    onSuspend?: (request: ApprovalRequest) => void,
+    stepIndex?: () => number,
+): {
     tools: ToolSet;
     activeTools?: string[];
     toolsContext: Record<string, unknown>;
@@ -137,6 +147,7 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         state: schema,
         toolPolicy,
         toolsContext: agentToolsContext,
+        hooks,
     } = ctx.agent.definition;
     if (!userTools && !schema) {
         if (agentToolsContext) assertToolsContext(ctx.agent.name, {}, agentToolsContext);
@@ -146,6 +157,7 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         run: runContext,
         state: createAgentState(ctx.agent.name, schema, ctx.store),
         artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
+        channels: createToolChannels(runContext, ctx.store, ctx.engine),
     };
     // before the factory, so inject() works there, in execute and in the effect hooks
     if (ctx.provided) bindProvided(toolContext, ctx.provided);
@@ -153,6 +165,9 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         ...(schema ? createStateTools(schema) : {}),
         ...(typeof userTools === 'function' ? userTools(toolContext) : userTools),
     };
+
+    // a factory's set is only known here: refused like defineAgent refuses a plain one
+    assertNoNeedsApproval(ctx.agent.name, tools);
 
     const toolsContext: Record<string, unknown> = {};
     for (const [name, tool] of Object.entries(tools)) {
@@ -163,10 +178,24 @@ export function assembleTools(ctx: ExecuteContext, runContext: RunContext): {
         for (const [name, value] of Object.entries(agentToolsContext)) toolsContext[name] = value;
     }
 
-    if (!toolPolicy) return { tools: wrapToolsForRun(tools, toolContext, ctx.store), toolsContext };
+    if (!toolPolicy) {
+        return {
+            tools: wrapToolsForRun(tools, toolContext, ctx.store, {
+                hooks,
+                onSuspend,
+                stepIndex,
+            }),
+            toolsContext,
+        };
+    }
     const allow = (name: string) => toolPolicy(name, { run: runContext });
     return {
-        tools: wrapToolsForRun(tools, toolContext, ctx.store, allow),
+        tools: wrapToolsForRun(tools, toolContext, ctx.store, {
+            allow,
+            hooks,
+            onSuspend,
+            stepIndex,
+        }),
         activeTools: Object.keys(tools).filter(allow),
         toolsContext,
     };
@@ -191,97 +220,177 @@ export function refusedCallError(
     return NoSuchToolError.isInstance(error) ? new ToolNotAllowedError(part.toolName) : undefined;
 }
 
-export function toApprovalStatus(decision: 'user' | 'allow' | 'deny'): ToolApprovalStatus {
-    if (decision === 'user') return 'user-approval';
-    if (decision === 'deny') return { type: 'denied' };
-    return undefined;
-}
-
-/** `def.approvals` as AI SDK toolApproval: 'user' asks the owner, a function decides per call. */
-export function toToolApproval(
-    approvals: Record<string, ApprovalPolicy> | undefined,
-    runContext: RunContext,
-): ToolLoopAgentSettings<never, ToolSet>['toolApproval'] {
-    if (!approvals) return undefined;
-    const config: Record<string, ToolApprovalStatus | ((input: unknown) => ToolApprovalStatus)> = {};
-    for (const [name, policy] of Object.entries(approvals)) {
-        config[name] = policy === 'user' ?
-            'user-approval' :
-            (input: unknown) => toApprovalStatus(policy(input, { runtimeContext: runContext }));
-    }
-    return config;
-}
+/** A tool call of the checkpoint that has no result yet: suspended by approve(). */
+export type PendingToolCall = {
+    toolCallId: string;
+    toolName: string;
+    input: unknown;
+};
 
 /**
- * The first approval request in `messages` that has no response yet: the
- * checkpoint of a run that paused (or was about to) on it.
+ * The tool calls of the last assistant message in `messages` that have no
+ * tool result (in any message): the calls a suspended approve() left
+ * pending, in call order. Provider-executed calls are never pending.
  */
-export function pendingApproval(messages: ModelMessage[]): ApprovalRequest | undefined {
+export function pendingToolCalls(messages: ModelMessage[]): PendingToolCall[] {
+    const index = messages.findLastIndex((message) => message.role === 'assistant');
+    const assistant = messages[index];
+    if (!assistant || assistant.role !== 'assistant' || typeof assistant.content === 'string') return [];
     const answered = new Set<string>();
-    const calls = new Map<string, { toolName: string; input: unknown }>();
-    for (const message of messages) {
+    for (const message of messages.slice(index)) {
         if (typeof message.content === 'string') continue;
-        for (const part of message.content) {
-            if (part.type === 'tool-approval-response') answered.add(part.approvalId);
-            if (part.type === 'tool-call') calls.set(part.toolCallId, part);
-        }
+        for (const part of message.content) if (part.type === 'tool-result') answered.add(part.toolCallId);
     }
-    for (const message of messages) {
-        if (message.role !== 'assistant' || typeof message.content === 'string') continue;
-        for (const part of message.content) {
-            if (part.type !== 'tool-approval-request' || answered.has(part.approvalId)) continue;
-            const call = calls.get(part.toolCallId);
-            if (call) {
-                return {
-                    approvalId: part.approvalId,
-                    toolName: call.toolName,
-                    input: call.input,
-                };
-            }
-        }
+    const pending: PendingToolCall[] = [];
+    for (const part of assistant.content) {
+        if (part.type !== 'tool-call' || part.providerExecuted || answered.has(part.toolCallId)) continue;
+        pending.push({
+            toolCallId: part.toolCallId,
+            toolName: part.toolName,
+            input: part.input,
+        });
     }
-    return undefined;
+    return pending;
 }
 
 /**
- * True when `messages` end on an approval response whose tool call has no
- * result yet: the AI SDK executes (or denies) that call before the first model
- * call, which the step budget does not count.
+ * Drops the tool results of `toolCallIds` (the suspended calls' placeholders)
+ * from tool messages, and a tool message left empty; the calls stay in the
+ * assistant message, pending.
  */
-export function endsOnApprovalResponse(messages: ModelMessage[]): boolean {
+export function withoutResults(messages: ModelMessage[], toolCallIds: ReadonlySet<string>): ModelMessage[] {
+    const out: ModelMessage[] = [];
+    for (const message of messages) {
+        if (message.role !== 'tool') {
+            out.push(message);
+            continue;
+        }
+        const content = message.content.filter((part) => !(part.type === 'tool-result' && toolCallIds.has(part.toolCallId)));
+        if (content.length > 0) out.push({ ...message, content });
+    }
+    return out;
+}
+
+/** `messages` with `parts` added to their trailing tool message (a new one when they end otherwise). */
+export function withToolResults(messages: ModelMessage[], parts: ToolResultPart[]): ModelMessage[] {
+    if (parts.length === 0) return messages;
     const last = messages.at(-1);
-    if (last?.role !== 'tool') return false;
-    const answered = new Set<string>();
-    for (const part of last.content) if (part.type === 'tool-approval-response') answered.add(part.approvalId);
-    if (answered.size === 0) return false;
-    const calls = new Set<string>();
-    const results = new Set<string>();
-    for (const message of messages) {
-        if (typeof message.content === 'string') continue;
-        for (const part of message.content) {
-            if (part.type === 'tool-approval-request' && answered.has(part.approvalId)) calls.add(part.toolCallId);
-            if (part.type === 'tool-result') results.add(part.toolCallId);
-        }
+    if (last?.role === 'tool') {
+        return [...messages.slice(0, -1), { ...last, content: [...last.content, ...parts] }];
     }
-    return calls.values().some((id) => !results.has(id));
+    return [...messages, { role: 'tool', content: parts }];
+}
+
+/** The message of anything thrown, as the AI SDK words a tool error for the model. */
+function errorMessage(error: unknown): string {
+    if (error == null) return 'unknown error';
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) return error.message;
+    return JSON.stringify(error);
+}
+
+function toJsonValue(value: unknown): JSONValue {
+    if (value === undefined) return null;
+    const serialized = JSON.stringify(value);
+    return serialized === undefined ? null : JSON.parse(serialized) as JSONValue;
+}
+
+/** The tool result the model sees for an output or error, as the AI SDK builds it. */
+export async function toToolResultPart(
+    call: PendingToolCall,
+    tool: ToolSet[string] | undefined,
+    outcome: { output: unknown } | { error: unknown },
+): Promise<ToolResultPart> {
+    let output: ToolResultPart['output'];
+    if ('error' in outcome) {
+        output = { type: 'error-text', value: errorMessage(outcome.error) };
+    } else if (tool?.toModelOutput) {
+        output = await tool.toModelOutput({
+            toolCallId: call.toolCallId,
+            input: call.input as never,
+            output: outcome.output as never,
+        });
+    } else {
+        output = typeof outcome.output === 'string' ?
+            { type: 'text', value: outcome.output } :
+            { type: 'json', value: toJsonValue(outcome.output) };
+    }
+    return {
+        type: 'tool-result',
+        toolCallId: call.toolCallId,
+        toolName: call.toolName,
+        output,
+    };
 }
 
 /**
- * Drops the tool calls (and their approval requests) of `toolCallIds` from
- * assistant messages: one approval per pause, so the model sees only the
- * answered call and requests the dropped ones again if it still needs them.
+ * Runs a pending tool call outside the AI SDK, re-applying what the SDK
+ * would: the toolPolicy (a refused call answers ToolNotAllowedError), the
+ * input schema parse (a failure is a ValidationError result) and the
+ * `contextSchema` check (a failure throws the SDK's TypeValidationError, which
+ * fails the run); the wrapped tool runs the hooks and the effect logic.
+ * Resolves the call's output or its tool error; a suspended call resolves the
+ * placeholder (the caller reads the suspension from its `onSuspend`).
  */
-export function withoutToolCalls(messages: ModelMessage[], toolCallIds: Set<string>): ModelMessage[] {
-    return messages.map((message) => {
-        if (message.role !== 'assistant' || typeof message.content === 'string') return message;
-        return {
-            ...message,
-            content: message.content.filter((part) => !(
-                (part.type === 'tool-call' || part.type === 'tool-approval-request') &&
-                toolCallIds.has(part.toolCallId)
-            )),
-        };
-    });
+export async function executePendingCall(input: {
+    call: PendingToolCall;
+    tools: ToolSet;
+    activeTools?: string[];
+    toolsContext: Record<string, unknown>;
+    messages: ModelMessage[];
+    signal: AbortSignal;
+}): Promise<{ output: unknown } | { error: unknown }> {
+    const {
+        call,
+        tools,
+        activeTools,
+        toolsContext,
+    } = input;
+    const tool = Object.hasOwn(tools, call.toolName) ? tools[call.toolName] : undefined;
+    if (!tool || typeof tool.execute !== 'function') {
+        return { error: new ValidationError(`Tool "${call.toolName}" is not available any more.`) };
+    }
+    if (activeTools && !activeTools.includes(call.toolName)) return { error: new ToolNotAllowedError(call.toolName) };
+
+    let parsed: unknown;
+    try {
+        parsed = await validateToolInput(call.toolName, tool.inputSchema, call.input, 'the pending call\'s input');
+    } catch (error) {
+        return { error };
+    }
+
+    let context = Object.hasOwn(toolsContext, call.toolName) ? toolsContext[call.toolName] : undefined;
+    if (tool.contextSchema) {
+        const { validate } = asSchema(tool.contextSchema);
+        if (validate) {
+            const result = await validate(context);
+            if (!result.success) {
+                throw new TypeValidationError({
+                    value: context,
+                    cause: result.error,
+                    context: { field: 'tool context', entityName: call.toolName },
+                });
+            }
+            context = result.value;
+        }
+    }
+
+    try {
+        let output: unknown = await (tool.execute as (input: unknown, options: unknown) => unknown)(parsed, {
+            toolCallId: call.toolCallId,
+            messages: input.messages,
+            abortSignal: input.signal,
+            context,
+        });
+        if (isObject(output) && Symbol.asyncIterator in output) {
+            let last: unknown;
+            for await (const chunk of output as AsyncIterable<unknown>) last = chunk;
+            output = last;
+        }
+        return { output };
+    } catch (error) {
+        return { error };
+    }
 }
 
 /** Rejects with the abort reason as soon as `signal` aborts, even if `work` ignores the signal. */

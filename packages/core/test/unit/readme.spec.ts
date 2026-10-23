@@ -31,10 +31,16 @@ describe('README example', () => {
             { parts: [{ type: 'text', text: 'Labelled as bug.' }] },
         ]);
 
-        const { run, labels } = await triageIssue(model);
+        const {
+            run, 
+            labels, 
+            lines, 
+        } = await triageIssue(model);
 
         expect(run?.status).toBe('completed');
         expect(run?.output).toBe('Labelled as bug.');
         expect(labels).toEqual(['bug']);
+        expect(lines[0]).toMatch(/^\[chamvi\] message: Labelled as bug\. \(agent triage, run /);
+        expect(lines.slice(1)).toEqual(['Labelled as bug.']);
     });
 });

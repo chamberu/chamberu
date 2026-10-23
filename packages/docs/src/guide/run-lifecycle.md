@@ -25,8 +25,8 @@ queued   -- slot, key and claim -----> running
 running  -- model finished ----------> completed
 running  -- budget, timeout, fatal --> failed
 running  -- cancel() ----------------> cancelled
-running  -- tool call needs approval > waiting
-waiting  -- resume() or timeout -----> queued     (then running again)
+running  -- a tool awaits approve() --> waiting
+waiting  -- answered or timed out ---> queued     (then running again)
 waiting  -- cancel() ----------------> cancelled
 running  -- drain() -----------------> interrupted
 interrupted -- recover() ------------> queued     (then running again)
@@ -44,7 +44,7 @@ While a run executes, the engine appends `Step` records to the store:
 |---|---|---|---|
 | `llm` | after every model call, a failed one included (finish reason `error`) | the model id | output: text, tool calls, finish reason, token usage |
 | `tool` | for every tool result or tool error of that step | the tool name | the tool input and its output, or `error: { code, message }` (`tool_not_allowed` for a call to a tool the [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) refuses) |
-| `wait` | when an approval is answered | the tool name | the tool input; output `{ approvalId, approved, reason }` |
+| `wait` | when an approval is answered | the tool name | input `{ toolCallId, title, body? }`; output `{ approvalId, approved, reason, approver? }` |
 
 Steps are append-only and numbered per run (`index`). They are the run's audit log; the checkpoint, not the steps, is what a resumed run continues from.
 

@@ -12,8 +12,8 @@ import {
     vi,
 } from 'vitest';
 import { z } from 'zod';
-import { defineAgent, http } from '@chamvi/core';
-import { staticTokens } from '@chamvi/http';
+import { defineAgent } from '@chamvi/core';
+import { http, staticTokens } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
@@ -24,7 +24,7 @@ import {
 import { textModel } from '../../utils/model.ts';
 
 describe('POST /agents/:name/runs', () => {
-    it('dispatches through the http trigger', async () => {
+    it('dispatches through the http channel', async () => {
         const { app, store } = createRunTestApp();
         const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { payload: { n: 1 } } });
         expect(response.status).toBe(202);
@@ -33,7 +33,7 @@ describe('POST /agents/:name/runs', () => {
 
         const run = await store.getRun(body.runId);
         expect(run?.trigger).toMatchObject({
-            source: 'http',
+            channel: 'http',
             trigger: 'http',
             payload: { n: 1 },
         });
@@ -96,9 +96,9 @@ describe('POST /agents/:name/runs', () => {
         expect(response.status).toBe(400);
     });
 
-    it('bounds thread and idempotencyKey at 255 characters, the store column width', async () => {
+    it('bounds address and idempotencyKey at 255 characters, the store column width', async () => {
         const { app } = createRunTestApp();
-        for (const key of ['thread', 'idempotencyKey']) {
+        for (const key of ['address', 'idempotencyKey']) {
             const fits = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { [key]: 'x'.repeat(255) } });
             expect(fits.status).toBe(202);
             const over = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { [key]: 'y'.repeat(256) } });
@@ -113,11 +113,11 @@ describe('POST /agents/:name/runs', () => {
         expect((await response.json()).message).toBe('Agent "nope" was not found.');
     });
 
-    it.each(['sweep', 'hooked'])('answers 404 for %s, which declares no http() trigger', async (name) => {
+    it.each(['sweep', 'hooked'])('answers 404 for %s, which has no http subscription', async (name) => {
         const { app } = createRunTestApp();
         const response = await call(app, 'POST', `/agents/${name}/runs`, { token: ADMIN_TOKEN });
         expect(response.status).toBe(404);
-        expect((await response.json()).message).toBe(`Agent "${name}" declares no http() trigger.`);
+        expect((await response.json()).message).toBe(`Agent "${name}" has no http subscription.`);
     });
 
     it('needs agent:<name>:run', async () => {
@@ -152,12 +152,12 @@ describe('POST /agents/:name/runs', () => {
         expect(response.status).toBe(202);
     });
 
-    it('validates the payload with the trigger schema', async () => {
+    it('validates the payload with the subscription schema', async () => {
         const typed = defineAgent({
             name: 'typed',
             model: textModel(),
             instructions: 'Typed.',
-            triggers: [http({ schema: z.object({ n: z.number() }) })],
+            channels: [http.on({ schema: z.object({ n: z.number() }) })],
         });
         const { app, store } = createRunTestApp({ agents: [...createRunAgents(), typed] });
         const response = await call(app, 'POST', '/agents/typed/runs', { token: ADMIN_TOKEN, body: { payload: { n: 'x' } } });
@@ -267,7 +267,7 @@ describe('POST /agents/:name/runs', () => {
             ['an oversized list of large attachments', { attachments: Array.from({ length: 17 }, () => ({ mediaType: 'text/plain', data: b64('x'.repeat(45_000)) })) }, ['attachments']],
             ['a long string as attachments', { attachments: 'A'.repeat(100_000) }, ['attachments']],
             ['a long mediaType', { attachments: [{ mediaType: 'x'.repeat(100_000), data: 'aGk=' }] }, ['attachments', 0, 'mediaType']],
-            ['a long thread', { thread: 'x'.repeat(500_000) }, ['thread']],
+            ['a long address', { address: 'x'.repeat(500_000) }, ['address']],
         ])('answers %s with a small 400 body', async (_, body, path) => {
             const { app } = createRunTestApp({ bodyLimit: 4 * 1024 * 1024 });
             const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body });

@@ -38,7 +38,8 @@ export type RunListQuery = {
 export type StartRunBody = {
     payload?: unknown;
     idempotencyKey?: string;
-    thread?: string;
+    /** Where the run came from on the http channel (a caller-defined thread or conversation). */
+    address?: string;
     /** Decoded from base64 by the validator; unknown item keys are dropped by the route. */
     attachments?: ArtifactInput[];
 };

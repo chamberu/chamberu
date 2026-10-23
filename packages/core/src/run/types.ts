@@ -34,14 +34,21 @@ export type RunContext = {
     signal: AbortSignal;
 };
 
+/** The approval a `waiting` run waits on, as approve() requested it. */
 export type WaitPoint = {
     kind: 'approval';
+    /** `<stepIndex>:<toolCallId>:<n>` of the stored checkpoint's pending call: never changes after the pause. */
     approvalId: string;
     toolName: string;
-    input: unknown;
+    toolCallId: string;
+    title: string;
+    body?: string;
+    /** The channel the request is delivered through; none for the inbox and API only. */
+    channel?: string;
+    address?: string;
     expiresAt: Date;
     tokenId: string;
-    /** Set once the agent's notifier accepted the approval request; tick() re-sends until then. */
+    /** Set once the approval message went out through `channel`; tick() re-sends while it is missing. */
     notifiedAt?: Date;
 };
 
@@ -51,7 +58,8 @@ export type Run = {
     status: RunStatusLiteral;
     trigger: TriggerEnvelope;
     concurrencyKey?: string;
-    thread?: string;
+    /** Where the run came from on its channel (`trigger.address`). */
+    address?: string;
     output?: unknown;
     error?: { code: string; message: string };
     usage: Usage;

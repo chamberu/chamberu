@@ -8,11 +8,8 @@
 import { ToolLoopAgent, isStepCount } from 'ai';
 import type {
     ModelMessage,
-    PrepareStepFunction,
     StepResult,
     StopCondition,
-    ToolApprovalRequestOutput,
-    ToolExecutionEndEvent,
     ToolSet,
 } from 'ai';
 import { hydrateMessages } from '../../artifact/helpers.ts';
@@ -33,27 +30,31 @@ import {
 import {
     assembleTools,
     budgetExceeded,
-    endsOnApprovalResponse,
+    executePendingCall,
     incompleteOutput,
     initialMessage,
     lastAssistantText,
     outputContext,
-    pendingApproval,
+    pendingToolCalls,
     refusedCallError,
     toRunError,
-    toToolApproval,
+    toToolResultPart,
     toValidationError,
     unansweredToolNames,
     untilAborted,
+    withToolResults,
     withoutPartialOutput,
-    withoutToolCalls,
+    withoutResults,
 } from './helpers.ts';
 import type { ApprovalRequest, ExecuteContext } from './types.ts';
 
 /**
- * One execution of a claimed, `running` run: streams a ToolLoopAgent from the
- * latest checkpoint (emitting text and reasoning deltas), checkpoints every
- * step and settles the run.
+ * One execution of a claimed, `running` run: first runs the tool calls a
+ * suspended approve() left pending in the latest checkpoint (pausing again,
+ * without a model call, when one suspends again), then streams a
+ * ToolLoopAgent from there (emitting text and reasoning deltas), checkpoints
+ * every step and settles the run, or pauses it on the first call an
+ * approve() suspended.
  */
 export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const {
@@ -65,21 +66,17 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     const budget = resolveBudget(agent);
     const checkpoint = await store.latestCheckpoint(run.id);
     // stored form: file parts hold artifact markers; the model gets a hydrated copy
-    const initial: ModelMessage[] = checkpoint?.messages ?? [initialMessage(run.trigger)];
+    let initial: ModelMessage[] = checkpoint?.messages ?? [initialMessage(run.trigger)];
     const usage: Usage = { ...run.usage };
     let stepIndex = checkpoint ? checkpoint.stepIndex + 1 : 0;
     let stepSeq = (await store.listSteps(run.id)).length;
 
-    // paused (or about to) on an approval nobody answered yet: wait again, without a model call
-    const unanswered = checkpoint ? pendingApproval(checkpoint.messages) : undefined;
-    if (unanswered) {
-        await ctx.pause(unanswered, usage);
-        return;
-    }
+    // calls a suspended approve() left without a result: run before any model call
+    const pending = checkpoint ? pendingToolCalls(checkpoint.messages) : [];
 
     // a resumed approval gets exactly one step beyond maxSteps, so an approval
     // granted (or denied) on the last allowed step still runs and is answered
-    const extraSteps = checkpoint && endsOnApprovalResponse(checkpoint.messages) ? 1 : 0;
+    const extraSteps = pending.length > 0 ? 1 : 0;
     const remainingSteps = budget.maxSteps + extraSteps - stepIndex;
     if (remainingSteps <= 0) {
         // the step limit was reached by an earlier execution that did not settle the run
@@ -127,9 +124,15 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         signal,
     };
 
+    // the calls approve() suspended in this execution, in the order they suspended
+    const suspended: ApprovalRequest[] = [];
+    // while the pending calls run they belong to the checkpoint's step, later ones to the step being made
+    let replaying = pending.length > 0;
     let assembled: ReturnType<typeof assembleTools>;
     try {
-        assembled = assembleTools(ctx, runContext);
+        assembled = assembleTools(ctx, runContext, (request) => {
+            suspended.push(request);
+        }, () => (replaying ? checkpoint!.stepIndex : stepIndex));
     } catch (error) {
         local.abort();
         timeout?.clear();
@@ -150,11 +153,8 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
     let abandoned = false;
     let pendingStepEnd: Promise<void> = Promise.resolve();
     let stepStartedAt = clock.now();
-    // the approval the last step asked for; the loop stops on it
+    // the approval the last step suspended on (the first in call order); the loop stops on it
     let approval: ApprovalRequest | undefined;
-    // errors of approved calls the AI SDK executes before the first model call, by toolCallId
-    const preStepErrors = new Map<string, unknown>();
-    let beforeFirstStep = true;
     // set when the provider's finish part arrived for the current step; without
     // it the AI SDK synthesizes a finish ('other') and never runs the step's tools
     let modelCallEnded = false;
@@ -208,7 +208,10 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                 startedAt: stepStartedAt,
                 finishedAt,
             });
+            // the suspended calls stay pending: no tool step, no result in the checkpoint
+            const suspendedIds = new Set(suspended.map((request) => request.toolCallId));
             for (const part of step.content) {
+                if ((part.type === 'tool-result' || part.type === 'tool-error') && suspendedIds.has(part.toolCallId)) continue;
                 if (part.type === 'tool-result') {
                     await append({
                         kind: 'tool',
@@ -231,20 +234,13 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                     if (part.error instanceof FatalToolError) fatal ??= { error: part.error };
                 }
             }
-            const requests = step.content.filter(
-                (part): part is ToolApprovalRequestOutput<ToolSet> => part.type === 'tool-approval-request' && !part.isAutomatic,
-            );
             let { messages }: { messages: ModelMessage[] } = step.response;
-            const [first, ...others] = requests;
-            if (first) {
-                approval = {
-                    approvalId: first.approvalId,
-                    toolName: first.toolCall.toolName,
-                    input: first.toolCall.input,
-                };
-                if (others.length > 0) {
-                    messages = withoutToolCalls(messages, new Set(others.map((r) => r.toolCall.toolCallId)));
-                }
+            if (suspendedIds.size > 0) {
+                messages = withoutResults(messages, suspendedIds);
+                const order = step.toolCalls.map((c) => c.toolCallId);
+                approval = suspended
+                    .filter((request) => order.includes(request.toolCallId))
+                    .sort((a, b) => order.indexOf(a.toolCallId) - order.indexOf(b.toolCallId))[0] ?? suspended[0];
             }
             responseMessages.push(...messages);
             await guarded(() => store.saveCheckpoint({
@@ -269,48 +265,59 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         }
     };
 
+    // the write of the pending call that finished last; an abort waits for it before settling
+    let pendingWrite: Promise<void> = Promise.resolve();
+
     /**
-     * Before the first model call: the tool messages the AI SDK produced from
-     * an approval response in `initial` (an approved call executed, or denied).
-     * They are no step's response messages, so they are recorded here.
+     * Runs the pending calls in call order. After each finished call the
+     * checkpoint (under its own index, replacing it) gets the call's result
+     * before its tool step is appended, so a drain, crash or lost lease
+     * after that call never runs it again. Stops before the next call once
+     * the execution was aborted. Resolves `paused` when a call suspended
+     * again (the results before it are kept), `failed` on a FatalToolError
+     * result.
      */
-    const prepareStep: PrepareStepFunction<ToolSet> = async ({ stepNumber, responseMessages: initialResponses }) => {
-        if (stepNumber !== 0) return undefined;
-        beforeFirstStep = false;
-        const at = clock.now();
-        const calls = new Map<string, unknown>();
-        for (const message of initial) {
-            if (message.role !== 'assistant' || typeof message.content === 'string') continue;
-            for (const part of message.content) if (part.type === 'tool-call') calls.set(part.toolCallId, part.input);
-        }
-        for (const message of initialResponses) {
-            responseMessages.push(message);
-            if (message.role !== 'tool') continue;
-            for (const part of message.content) {
-                if (part.type !== 'tool-result') continue;
-                // the AI SDK turns a thrown error into an error-text result; record the error itself
-                const failed = preStepErrors.has(part.toolCallId);
-                const error = preStepErrors.get(part.toolCallId);
+    const runPending = async (): Promise<'paused' | 'failed' | 'done'> => {
+        for (const call of pending) {
+            if (signal.aborted) return 'done';
+            const startedAt = clock.now();
+            const result = await executePendingCall({
+                call,
+                tools,
+                activeTools,
+                toolsContext,
+                messages: prompt,
+                signal,
+            });
+            if (suspended.length > 0) return 'paused';
+            const finishedAt = clock.now();
+            pendingWrite = (async () => {
+                const part = await toToolResultPart(call, Object.hasOwn(tools, call.toolName) ? tools[call.toolName] : undefined, result);
+                initial = withToolResults(initial, [part]);
+                prompt = withToolResults(prompt, [part]);
+                await guarded(() => store.saveCheckpoint({
+                    runId: run.id,
+                    stepIndex: checkpoint!.stepIndex,
+                    messages: initial,
+                    ...(checkpoint!.finishReason !== undefined ? { finishReason: checkpoint!.finishReason } : {}),
+                    createdAt: finishedAt,
+                }));
                 await append({
                     kind: 'tool',
-                    name: part.toolName,
-                    input: calls.get(part.toolCallId),
-                    ...(failed ? { error: toRunError(error) } : { output: part.output }),
-                    startedAt: stepStartedAt,
-                    finishedAt: at,
+                    name: call.toolName,
+                    input: call.input,
+                    ...('error' in result ? { error: toRunError(result.error) } : { output: result.output }),
+                    startedAt,
+                    finishedAt,
                 });
-                if (error instanceof FatalToolError) fatal ??= { error };
+            })();
+            await pendingWrite;
+            if ('error' in result && result.error instanceof FatalToolError) {
+                fatal ??= { error: result.error };
+                return 'failed';
             }
         }
-        // stopWhen only runs after a model call: fail before making one
-        if (fatal) throw fatal.error;
-        return undefined;
-    };
-
-    const onToolExecutionEnd = (event: ToolExecutionEndEvent): void => {
-        if (beforeFirstStep && event.toolOutput.type === 'tool-error') {
-            preStepErrors.set(event.toolOutput.toolCallId, event.toolOutput.error);
-        }
+        return 'done';
     };
 
     const onStepEnd = (step: StepResult<ToolSet>): Promise<void> => {
@@ -318,7 +325,62 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         return pendingStepEnd;
     };
 
-    const stopWhen: StopCondition<ToolSet>[] = [isStepCount(remainingSteps), () => fatal !== undefined];
+    if (pending.length > 0) {
+        let outcome: Awaited<ReturnType<typeof runPending>>;
+        try {
+            const work = runPending();
+            work.catch(() => {});
+            outcome = await untilAborted(work, signal);
+        } catch (error) {
+            local.abort();
+            timeout?.clear();
+            // the write of a call that finished before the abort lands before the run settles, never after
+            let settled: Promise<void>;
+            do {
+                settled = pendingWrite;
+                await settled.catch(() => {});
+            } while (settled !== pendingWrite);
+            abandoned = true;
+            if (ctx.signal.aborted) {
+                await ctx.finish({ status: RunStatus.CANCELLED, usage });
+            } else if (timeout?.signal.aborted) {
+                await ctx.finish({
+                    status: RunStatus.FAILED, 
+                    usage, 
+                    error: toRunError(timeout.signal.reason), 
+                });
+            } else {
+                await ctx.finish({
+                    status: RunStatus.FAILED, 
+                    usage, 
+                    error: toRunError(error), 
+                });
+            }
+            return;
+        }
+        replaying = false;
+        if (outcome !== 'done') {
+            local.abort();
+            timeout?.clear();
+            if (outcome === 'failed' && fatal) {
+                await ctx.finish({
+                    status: RunStatus.FAILED, 
+                    usage, 
+                    error: toRunError(fatal.error), 
+                });
+            } else {
+                await ctx.pause(suspended[0]!, usage);
+            }
+            return;
+        }
+    }
+
+    const stopWhen: StopCondition<ToolSet>[] = [
+        isStepCount(remainingSteps),
+        () => fatal !== undefined,
+        // a call approve() suspended ends the loop after its step
+        () => suspended.length > 0,
+    ];
     const spentTokens = run.usage.inputTokens + run.usage.outputTokens;
     if (budget.maxTokens !== undefined) stopWhen.push(tokensExceeded(budget.maxTokens, spentTokens));
 
@@ -329,10 +391,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         activeTools,
         // the AI SDK types toolsContext from a concrete tool set; a ToolSet infers none
         toolsContext: toolsContext as never,
-        toolApproval: toToolApproval(agent.definition.approvals, runContext),
-        experimental_toolApprovalSecret: ctx.toolApprovalSecret,
         stopWhen,
-        prepareStep,
         onLanguageModelCallEnd: () => {
             modelCallEnded = true;
         },
@@ -349,7 +408,6 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         const options = {
             messages: prompt,
             abortSignal: signal,
-            onToolExecutionEnd,
             onError: () => {},
         };
         const stream = await loop.stream(options);

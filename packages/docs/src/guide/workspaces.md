@@ -26,6 +26,8 @@ The container providers use `ghcr.io/chamvi/sandbox-node:24` by default (Node.js
 
 <<< @/snippets/workspaces.ts#setup
 
+The coding tools are not yours to edit, so the approval for `bash` sits in the agent's `beforeToolExecution` hook: `approve()` there pauses the run (keeping its workspaces on this replica) until someone answers, and a refused command reaches the model as a `ToolDeniedError` tool error. See [Approvals & Hooks](/guide/approvals#gating-tools-you-did-not-write).
+
 `workspaces.tools()` gives the model two tools; `codingTools(workspaces)` adds seven more. Every tool resolves its workspace with the calling run's id, so a run can only reach its own workspaces.
 
 | Tool | Package | What it does |
@@ -80,7 +82,7 @@ Re-applying is safe instead: `write_file` is idempotent, `edit_file` fails with 
 
 ## Security model
 
-- **The model runs untrusted code.** Whatever it reads (an issue body, a README, a test's output) can steer what it runs: prompt injection. Run untrusted repositories on Docker or Kubernetes, never local, narrow `allowRepo`, and put `bash` behind an [approval](/guide/approvals) (`approvals: { bash: 'user' }`) where a human should see each command.
+- **The model runs untrusted code.** Whatever it reads (an issue body, a README, a test's output) can steer what it runs: prompt injection. Run untrusted repositories on Docker or Kubernetes, never local, narrow `allowRepo`, and put `bash` behind an [approval](/guide/approvals#gating-tools-you-did-not-write) (a `beforeToolExecution` hook calling `approve()`, as above) where a human should see each command.
 - **Local isolates nothing.** Commands run as the host user with your files and network in reach. It only keeps the host environment out (just `PATH`, its own `HOME` and `TMPDIR`) and kills process groups.
 - **Docker and Kubernetes enforce** a non-root user, a read-only root filesystem, no capabilities, no privilege escalation, cpu and memory limits (pids on Docker, the kubelet's `podPidsLimit` on Kubernetes; storage on Kubernetes), a lifetime, and no host or chamvi environment. Kubernetes mounts no service account token.
 - **No credentials enter a workspace.** URLs with credentials are refused (and never echoed in an error), git's credential helpers are reset for the fetch, and only `SANDBOX_ENV` plus your configured `env` reach a command. Private repositories are not supported yet.

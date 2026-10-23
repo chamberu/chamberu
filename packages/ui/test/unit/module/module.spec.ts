@@ -6,7 +6,8 @@
  */
 
 import { fileURLToPath } from 'node:url';
-import { InvalidAgentDefinitionError, defineAgent, http } from '@chamvi/core';
+import { InvalidAgentDefinitionError, defineAgent } from '@chamvi/core';
+import { http } from '@chamvi/http';
 import {
     afterEach,
     describe,
@@ -55,7 +56,7 @@ async function served(env: Record<string, string> = {}, basePath = '') {
             name: 'triage',
             model: textModel(),
             instructions: 'triage',
-            triggers: [http()],
+            channels: [http.on()],
         })],
         modules: [
             configModule({ logger: createRecordingLogger() }),

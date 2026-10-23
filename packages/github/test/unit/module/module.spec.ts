@@ -11,9 +11,13 @@ import {
     InvalidAgentDefinitionError,
     defineAgent,
     defineTool,
-    http,
 } from '@chamvi/core';
-import { githubWebhook, injectGithubContext, provideGithubContext } from '@chamvi/github';
+import {
+    createGithubApp,
+    github,
+    injectGithubContext,
+    provideGithubContext,
+} from '@chamvi/github';
 import { ControllableClock, createFakeGithub } from '@chamvi/test-kit';
 import {
     afterEach,
@@ -146,18 +150,71 @@ describe('githubModule', () => {
         expect(githubModule({ app, env: {} }).app).toBe(app);
     });
 
-    it('contributes the webhook route', async () => {
-        const harness = await createModuleHarness({ modules: [githubModule({ env: githubEnv() })] });
+    it('contributes the github channel and no route', async () => {
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET },
+            modules: [configModule({ logger: createRecordingLogger() }), githubModule({ env: githubEnv() })],
+        });
         harnesses.push(harness);
-        const routes = harness.container.resolveAll(AppToken.HTTP_ROUTES);
-        expect(routes.map((route) => [route.method, route.path])).toEqual([['POST', '/webhooks/github']]);
+        const channels = harness.container.resolveAll(AppToken.CHANNELS);
+        expect(channels.map((channel) => channel.name)).toEqual(['github']);
+        expect(channels[0]!.in).toBeTypeOf('function');
+        expect(channels[0]!.out).toBeTypeOf('function');
+        expect(harness.container.resolveAll(AppToken.HTTP_ROUTES)).toEqual([]);
     });
 
-    it('contributes the webhook route at webhookPath', async () => {
-        const harness = await createModuleHarness({ modules: [githubModule({ env: githubEnv(), webhookPath: '/gh' })] });
+    it('takes the channel options', async () => {
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET },
+            modules: [
+                configModule({ logger: createRecordingLogger() }),
+                githubModule({ env: githubEnv(), channel: { name: 'github-ent' } }),
+            ],
+        });
         harnesses.push(harness);
-        const routes = harness.container.resolveAll(AppToken.HTTP_ROUTES);
-        expect(routes.map((route) => route.path)).toEqual(['/gh']);
+        expect(harness.container.resolveAll(AppToken.CHANNELS).map((channel) => channel.name)).toEqual(['github-ent']);
+    });
+
+    it('links approvals to the UI of CHAMVI_PUBLIC_URL', async () => {
+        const gh = createGithubApp({
+            appId: '1',
+            privateKey: fake.privateKey,
+            webhookSecret: 'a',
+            slug: 'chamvi-test',
+            // an http run has no delivery: the channel comments as the app's installation
+            installationId: 42,
+            clock,
+            fetch: fake.fetch,
+        });
+        fake.issues.set('octo/demo#7', { number: 7, state: 'open' });
+        const harness = await createModuleHarness({
+            env: { RESUME_SECRET: SECRET, CHAMVI_PUBLIC_URL: 'https://chamvi.example' },
+            modules: [configModule({ logger: createRecordingLogger() }), githubModule({ app: gh, env: {} })],
+        });
+        harnesses.push(harness);
+        const [channel] = harness.container.resolveAll(AppToken.CHANNELS);
+        await channel!.out!({
+            kind: 'approval',
+            key: 'r1:a1',
+            runId: 'r1',
+            agent: 'triage',
+            title: 'Close?',
+            body: '',
+            approvalId: 'a1',
+            expiresAt: new Date('2026-10-21T10:00:00Z'),
+        }, 'octo/demo#7', {
+            signal: new AbortController().signal,
+            trigger: {
+                id: 'e1',
+                agent: 'triage',
+                trigger: 'http',
+                channel: 'http',
+                payload: {},
+                receivedAt: clock.now(),
+            },
+        });
+        const posted = String(fake.comments.get('octo/demo#7')?.[0]?.body);
+        expect(posted).toContain('Approve or deny: https://chamvi.example/ui/approvals?run=r1&approval=a1');
     });
 
     it('end to end', async () => {
@@ -166,7 +223,7 @@ describe('githubModule', () => {
             name: 'triage',
             model: textModel(),
             instructions: 'triage',
-            triggers: [githubWebhook({ events: ['issues.opened'] })],
+            channels: [github.on('issues.opened')],
         });
         const harness = await createModuleHarness({
             env: {
@@ -188,7 +245,7 @@ describe('githubModule', () => {
         harnesses.push(harness);
 
         const body = readFileSync(new URL('../../fixtures/deliveries/issues-opened.json', import.meta.url), 'utf8');
-        const response = await fetch(`http://127.0.0.1:${port}/webhooks/github`, {
+        const response = await fetch(`http://127.0.0.1:${port}/channels/github`, {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -202,6 +259,55 @@ describe('githubModule', () => {
         const answer = await response.json() as { runs: Array<{ agent: string; runId: string }> };
         expect(answer.runs).toHaveLength(1);
         expect(answer.runs[0]!.agent).toBe('triage');
+    });
+
+    it('logs the failed agents of a delivery through the app logger', async () => {
+        const port = await freePort();
+        const logger = createRecordingLogger();
+        const agent = defineAgent({
+            name: 'triage',
+            model: textModel(),
+            instructions: 'triage',
+            channels: [github.on('issues.opened', {
+                filter: () => {
+                    throw new Error('filter broke');
+                },
+            })],
+        });
+        const harness = await createModuleHarness({
+            env: {
+                RESUME_SECRET: SECRET,
+                CHAMVI_TOKENS: TOKENS,
+                HOST: '127.0.0.1',
+                PORT: String(port),
+            },
+            agents: [agent],
+            modules: [
+                configModule({ logger }),
+                storeModule(),
+                staticTokensModule(),
+                engineModule(),
+                httpModule({ metrics: false, rateLimit: false }),
+                githubModule({ env: githubEnv({ GITHUB_APP_SLUG: 'chamvi-test' }) }),
+            ],
+        });
+        harnesses.push(harness);
+
+        const body = readFileSync(new URL('../../fixtures/deliveries/issues-opened.json', import.meta.url), 'utf8');
+        const response = await fetch(`http://127.0.0.1:${port}/channels/github`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-github-event': 'issues',
+                'x-github-delivery': 'd-2',
+                'x-hub-signature-256': sign(body, 'a'),
+            },
+            body,
+        });
+        expect(response.status).toBe(500);
+        const entry = logger.entries.find((e) => e.msg === 'github channel error');
+        expect(entry?.level).toBe('error');
+        expect(JSON.stringify(entry)).toContain('filter broke');
     });
 
     it('provides the app as context', async () => {
@@ -227,7 +333,6 @@ describe('githubModule', () => {
                 { parts: [{ type: 'text', text: 'done' }] },
             ]),
             instructions: 'probe',
-            triggers: [http()],
             tools: { probe },
         });
         const harness = await createModuleHarness({
@@ -246,7 +351,7 @@ describe('githubModule', () => {
         const { runId } = await engine.dispatch({
             agent: 'probe',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         await engine.idle();
@@ -275,7 +380,6 @@ describe('githubModule', () => {
                 name: 'probe',
                 model: textModel('ok'),
                 instructions: 'probe',
-                triggers: [http()],
             })],
             modules: [
                 configModule({ logger: createRecordingLogger() }),

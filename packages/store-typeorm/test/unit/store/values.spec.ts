@@ -168,7 +168,7 @@ describePostgres('TypeormStore values', () => {
                 id: 't1',
                 agent: 'a',
                 trigger: 'http',
-                source: 'http',
+                channel: 'http',
                 payload: raw,
                 receivedAt: at,
             },

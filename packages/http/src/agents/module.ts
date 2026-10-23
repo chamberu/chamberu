@@ -10,6 +10,7 @@ import type { App, IAppEvent } from 'routup';
 import type { HttpContext } from '../app/types.ts';
 import { authorize } from '../auth/helpers.ts';
 import { Permission } from '../auth/constants.ts';
+import { isWebhookChannel } from '../channels/helpers.ts';
 import { readJsonBody, validateBody } from '../request/helpers.ts';
 import {
     assertCollection,
@@ -35,8 +36,9 @@ export function registerAgentRoutes(app: App, ctx: HttpContext): void {
 
     app.get('/agents', defineCoreHandler(async (event) => {
         await authorize(event, ctx, Permission.RUN_READ);
+        const hookChannels = new Set(ctx.channels.filter(isWebhookChannel).map((channel) => channel.name));
         return {
-            data: ctx.agents.list().map((agent) => summarizeAgent(agent, ctx.basePath)),
+            data: ctx.agents.list().map((agent) => summarizeAgent(agent, ctx.basePath, hookChannels)),
             issues: ctx.agentIssues(),
         };
     }));

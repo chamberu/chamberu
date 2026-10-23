@@ -10,9 +10,12 @@ import type { IClock } from '../../clock/index.ts';
 import type { ContextKey } from '../../context/types.ts';
 import type { Run, Step, Usage } from '../../run/types.ts';
 import type { IStore } from '../../store/types.ts';
+import type { Engine } from '../module.ts';
 import type { RunDelta } from '../types.ts';
 
 export type ExecuteContext = {
+    /** The executing engine, handed to the execution's ToolContext as `engine`. */
+    engine: Engine;
     run: Run;
     agent: Agent;
     store: IStore;
@@ -31,11 +34,9 @@ export type ExecuteContext = {
     onDelta: (delta: RunDelta) => void;
     /**
      * Moves the still `running` run to `waiting` on `request` (releasing its
-     * claim and slot) and notifies the owner.
+     * claim and slot).
      */
     pause: (request: ApprovalRequest, usage: Usage) => Promise<void>;
-    /** HMAC secret the AI SDK signs approval requests with. */
-    toolApprovalSecret?: string;
     /**
      * False once another owner took the run over (its lease expired and it was
      * recovered); checked before every step and checkpoint write.
@@ -48,9 +49,20 @@ export type ExecuteContext = {
     provided?: ReadonlyMap<ContextKey<unknown>, unknown>;
 };
 
-/** A tool call waiting for the owner's decision. */
+/** What a suspended approve() asks for: the run pauses on it (`Run.waiting`). */
 export type ApprovalRequest = {
+    /**
+     * `<stepIndex>:<toolCallId>:<n>`: the checkpoint step index of the model
+     * step that made the call, its call id, n the 0-based ordinal of the
+     * approve() within the call.
+     */
     approvalId: string;
     toolName: string;
-    input: unknown;
+    toolCallId: string;
+    title: string;
+    body?: string;
+    /** The channel to deliver the request through; none for the inbox and API only. */
+    channel?: string;
+    address?: string;
+    timeoutMs: number;
 };

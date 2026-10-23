@@ -9,7 +9,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { TRIGGER_KEY_MAX_LENGTH } from '@chamvi/core';
 import { BadRequestError } from '@ebec/http';
 import { isObject } from 'smob';
-import type { GithubEvent, GithubPayload } from '../trigger/types.ts';
+import type { GithubEvent, GithubPayload } from '../subscription/types.ts';
 import { EVENT_HEADER_PATTERN, SIGNATURE_PATTERN } from './constants.ts';
 
 /**
@@ -62,4 +62,10 @@ export function toGithubEvent(body: Uint8Array, name: string, delivery: string):
     const { installation } = payload;
     if (isObject(installation) && typeof installation.id === 'number') event.installationId = installation.id;
     return event;
+}
+
+/** True for `application/json` and `application/<x>+json`, parameters ignored. */
+export function isJsonMediaType(header: string | null): boolean {
+    const type = (header ?? '').split(';')[0]!.trim().toLowerCase();
+    return type === 'application/json' || /^application\/[\w.!#$&^-]+\+json$/.test(type);
 }

@@ -7,7 +7,8 @@
 
 import { UnauthorizedError } from '@ebec/http';
 import { describe, expect, it } from 'vitest';
-import { InvalidAgentDefinitionError, defineAgent, http } from '@chamvi/core';
+import { InvalidAgentDefinitionError, defineAgent } from '@chamvi/core';
+import { http } from '@chamvi/http';
 import type { HttpRoute, HttpRouteContext, HttpRouteRequest } from '@chamvi/http';
 import type { App } from 'routup';
 import { createTestApp } from '../../utils/app.ts';
@@ -241,7 +242,7 @@ describe('extra routes', () => {
         ['a path with a wildcard', [route({ path: '/extra/*' })]],
         ['a path with a brace', [route({ path: '/extra{/x}' })]],
         ['a duplicate method and path', [route(), route()]],
-        ...['agents', 'runs', 'resume', 'hooks', 'mcp', 'healthz', 'me', 'readyz', 'schedules']
+        ...['agents', 'channels', 'runs', 'resume', 'mcp', 'healthz', 'me', 'readyz', 'schedules']
             .map((segment): [string, HttpRoute[]] => [`the reserved segment ${segment}`, [route({ path: `/${segment}/x` })]]),
         ['the metrics path', [route({ method: 'GET', path: '/metrics' })]],
         ['a reserved segment in another case', [route({ path: '/AGENTS/x' })]],
@@ -249,6 +250,10 @@ describe('extra routes', () => {
         ['a duplicate path in another case', [route(), route({ path: '/EXTRA' })]],
     ])('refuses %s at construction', (_name, routes) => {
         expect(() => createTestApp({ metrics: undefined, routes })).toThrow(InvalidAgentDefinitionError);
+    });
+
+    it('accepts a path under /hooks, no longer a built-in route', () => {
+        expect(() => createTestApp({ routes: [route({ path: '/hooks/x' })] })).not.toThrow();
     });
 
     it('accepts the same path under two methods', () => {
@@ -487,7 +492,7 @@ describe('prefix routes, headers and byte bodies', () => {
             name: 'late',
             model: textModel(),
             instructions: 'Late.',
-            triggers: [http()],
+            channels: [http.on()],
         }));
         await send(app, '/extra');
         expect(names).toEqual(['echo', 'late']);

@@ -6,7 +6,8 @@
  */
 
 export * from './app/index.ts';
+export * from './channel/index.ts';
 export * from './context/index.ts';
+export * from './subscription/index.ts';
 export * from './tools/index.ts';
-export * from './trigger/index.ts';
 export * from './webhook/index.ts';

@@ -1,12 +1,13 @@
-import { tool } from 'ai';
 import type { LanguageModel } from 'ai';
 import { z } from 'zod';
+import { cron } from '@chamvi/channel-cron';
 import {
-    cron,
+    ToolDeniedError,
     defineAgent,
     defineEffectTool,
-    webhook,
+    defineTool,
 } from '@chamvi/core';
+import { webhook } from '@chamvi/http';
 
 declare const model: LanguageModel;
 declare function addLabel(issue: number, label: string): Promise<void>;
@@ -17,9 +18,9 @@ export const triage = defineAgent({
     name: 'triage',
     model,
     instructions: 'Label new issues and close duplicates.',
-    triggers: [
-        webhook({ path: '/issues' }),
-        cron('0 * * * *'),
+    channels: [
+        webhook.on('/issues'),
+        cron.on('0 * * * *'),
     ],
     tools: {
         // recorded per effect key: retries never relabel
@@ -31,14 +32,17 @@ export const triage = defineAgent({
             }),
             execute: async (i) => addLabel(i.issue, i.label),
         }),
-        close: tool({
+        close: defineTool({
             description: 'Closes an issue as a duplicate.',
             inputSchema: z.object({ issue: z.number() }),
-            execute: async ({ issue }) => closeIssue(issue),
+            execute: async ({ issue }, { context }) => {
+                // waits in `waiting` until the owner signs off, across restarts
+                const { approved } = await context.channels.findOneOrFail('owner')
+                    .approve({ title: `Close #${issue}?`, address: 'ops' });
+                if (!approved) throw new ToolDeniedError('The owner keeps it open.');
+                return closeIssue(issue);
+            },
         }),
     },
-    // waits in `waiting` until the owner signs off
-    approvals: { close: 'user' },
-    notify: 'owner',
 });
 // #endregion agent

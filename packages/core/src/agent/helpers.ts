@@ -29,3 +29,18 @@ export function assertToolsContext(agent: string, tools: ToolSet, toolsContext: 
         }
     }
 }
+
+/**
+ * No tool may declare the AI SDK's own `needsApproval` (`false` aside):
+ * nothing answers that request, so a gate belongs in the agent's hooks.
+ */
+export function assertNoNeedsApproval(agent: string, tools: ToolSet): void {
+    for (const [name, tool] of Object.entries(tools)) {
+        const { needsApproval } = tool as { needsApproval?: unknown };
+        if (needsApproval !== undefined && needsApproval !== false) {
+            throw new InvalidAgentDefinitionError(
+                `Agent "${agent}": tool "${name}" declares needsApproval, which nothing answers; gate it in the agent's beforeToolExecution hook instead.`,
+            );
+        }
+    }
+}

@@ -3,6 +3,8 @@ import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import {
     FatalToolError,
+    ToolDeniedError,
+    approve,
     defineAgent,
     defineTool,
     hasPermission,
@@ -68,11 +70,14 @@ export const ops = defineAgent({
     // offers deploy only to invokers holding tool:ops:deploy (or tool:ops:*, or *)
     toolPolicy,
     tools: { status, deploy },
-    approvals: {
+    hooks: {
         // a release manager deploys without asking, everyone else waits for the owner
-        deploy: (_input, { runtimeContext }) => {
-            const { invoker } = runtimeContext.trigger;
-            return invoker && hasPermission(invoker.permissions, 'release:manage') ? 'allow' : 'user';
+        async beforeToolExecution({ toolName, input }, ctx) {
+            const { invoker } = ctx.run.trigger;
+            if (toolName !== 'deploy' || (invoker && hasPermission(invoker.permissions, 'release:manage'))) return input;
+            const { approved } = await approve(ctx, { title: 'Deploy?', body: JSON.stringify(input) });
+            if (!approved) throw new ToolDeniedError('The owner refused the deploy.');
+            return input;
         },
     },
 });

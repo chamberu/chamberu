@@ -8,7 +8,7 @@
 
 import { computed, ref } from 'vue';
 import { useAgentRollups } from '../agents/composables.ts';
-import { matchesName, triggerChips } from '../agents/helpers.ts';
+import { channelChips, matchesName } from '../agents/helpers.ts';
 import AgentCard from '../components/agent-card/AgentCard.vue';
 import EmptyState from '../components/empty-state/EmptyState.vue';
 import PageHead from '../components/page-head/PageHead.vue';
@@ -91,7 +91,7 @@ const shown = computed(() => agents.value.filter((agent) => matchesName(agent, q
                 v-for="agent in shown"
                 :key="agent.name"
                 :agent="agent"
-                :chips="triggerChips(agent, schedules)"
+                :chips="channelChips(agent, schedules)"
                 :rollup="rollups[agent.name]"
             />
         </div>

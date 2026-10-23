@@ -28,16 +28,14 @@ import { flush } from '../../../utils/timers.ts';
 const AGENTS: AgentWire[] = [
     {
         name: 'deploy',
-        triggers: [{ source: 'http', id: 'http' }],
+        channels: [{ channel: 'http', id: 'http' }],
         budget: { maxSteps: 20 },
-        approvals: ['deploy'],
         state: [],
     },
     {
         name: 'digest',
-        triggers: [{ source: 'cron', id: 'cron:0 8 * * *' }],
+        channels: [{ channel: 'cron', id: 'cron:0 8 * * *' }],
         budget: { maxSteps: 12 },
-        approvals: [],
         state: ['sent'],
     },
 ];
@@ -90,6 +88,7 @@ describe('useAgentRollups', () => {
             listAgents: async () => ({ data: AGENTS, issues: [] }),
             listSchedules: async () => [{
                 agent: 'digest',
+                channel: 'cron',
                 trigger: 'cron:0 8 * * *',
                 expression: '0 8 * * *',
                 overlap: 'skip',
@@ -218,7 +217,8 @@ describe('useAgentDetail', () => {
                     kind: 'approval',
                     approvalId: 'a1',
                     toolName: 'deploy',
-                    input: {},
+                    toolCallId: 'call-1',
+                    title: 'Deploy prod?',
                     expiresAt: now,
                     tokenId: 't1',
                 },

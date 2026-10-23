@@ -9,10 +9,11 @@ import { describe, expect, it } from 'vitest';
 import { ACTIVITY_WINDOW_MS } from '../../../../app/agents/constants.ts';
 import {
     activityLabel,
+    channelChips,
     createStartKeys,
     failedSummary,
     formatBudgetTime,
-    hasHttpTrigger,
+    hasHttpSubscription,
     lastRunOf,
     matchesName,
     newIdempotencyKey,
@@ -21,7 +22,6 @@ import {
     parsePayload,
     summarizeActivity,
     tokenShares,
-    triggerChips,
 } from '../../../../app/agents/helpers.ts';
 import type { AgentWire, ScheduleWire } from '../../../../app/api/types.ts';
 import { withoutIteratorHelpers } from '../../../utils/iterator.ts';
@@ -32,15 +32,15 @@ const ago = (hours: number) => new Date(NOW - hours * 3_600_000).toISOString();
 
 const agent = (overrides: Partial<AgentWire> = {}): AgentWire => ({
     name: 'triage',
-    triggers: [],
+    channels: [],
     budget: { maxSteps: 20 },
-    approvals: [],
     state: [],
     ...overrides,
 });
 
 const schedule = (overrides: Partial<ScheduleWire> = {}): ScheduleWire => ({
     agent: 'triage',
+    channel: 'cron',
     trigger: 'cron:0 */2 * * *',
     expression: '0 */2 * * *',
     overlap: 'skip',
@@ -48,43 +48,75 @@ const schedule = (overrides: Partial<ScheduleWire> = {}): ScheduleWire => ({
     ...overrides,
 });
 
-describe('triggerChips', () => {
-    it('labels each trigger by source with its detail', () => {
-        const chips = triggerChips(agent({
-            triggers: [
-                { source: 'github', id: 'github:issues.opened,issue_comment.created' },
-                { source: 'cron', id: 'nightly' },
+describe('channelChips', () => {
+    it('renders github events, the cron expression and the webhook path', () => {
+        const chips = channelChips(agent({
+            channels: [
+                { channel: 'github', id: 'github:issues.opened,issue_comment.created' },
+                { channel: 'cron', id: 'nightly' },
                 {
-                    source: 'webhook', 
-                    id: 'webhook:/refresh', 
-                    hook: '/hooks/triage/refresh', 
+                    channel: 'webhook',
+                    id: 'webhook:/refresh',
+                    hook: '/channels/webhook/triage/refresh',
                 },
-                { source: 'http', id: 'http' },
+                { channel: 'http', id: 'http' },
             ],
         }), [schedule({ trigger: 'nightly', expression: '0 2 * * *' })]);
         expect(chips).toEqual([
             {
-                source: 'github', 
-                id: 'github:issues.opened,issue_comment.created', 
-                detail: 'issues.opened,issue_comment.created', 
+                channel: 'github',
+                id: 'github:issues.opened,issue_comment.created',
+                detail: 'issues.opened,issue_comment.created',
             },
             {
-                source: 'cron', 
-                id: 'nightly', 
-                detail: '0 2 * * *', 
+                channel: 'cron',
+                id: 'nightly',
+                detail: '0 2 * * *',
             },
             {
-                source: 'webhook', 
-                id: 'webhook:/refresh', 
-                detail: '/refresh', 
-                hook: '/hooks/triage/refresh', 
+                channel: 'webhook',
+                id: 'webhook:/refresh',
+                detail: '/refresh',
+                hook: '/channels/webhook/triage/refresh',
             },
-            { source: 'http', id: 'http' },
+            { channel: 'http', id: 'http' },
         ]);
     });
 
-    it('falls back to the id for a cron trigger without a schedule', () => {
-        expect(triggerChips(agent({ triggers: [{ source: 'cron', id: 'cron:0 8 * * *' }] }), [])[0]!.detail).toBe('0 8 * * *');
+    it('falls back to the id for a cron subscription without a schedule', () => {
+        expect(channelChips(agent({ channels: [{ channel: 'cron', id: 'cron:0 8 * * *' }] }), [])[0]!.detail).toBe('0 8 * * *');
+    });
+
+    it('matches a schedule by agent, channel and subscription id', () => {
+        const chips = channelChips(agent({ channels: [{ channel: 'cron-eu', id: 'nightly' }] }), [
+            schedule({ trigger: 'nightly', expression: '0 2 * * *' }),
+            schedule({
+                channel: 'cron-eu',
+                trigger: 'nightly',
+                expression: '0 3 * * *',
+            }),
+        ]);
+        expect(chips).toEqual([{
+            channel: 'cron-eu',
+            id: 'nightly',
+            detail: '0 3 * * *',
+        }]);
+    });
+
+    it('shows the part after the first colon for another channel, nothing without one', () => {
+        expect(channelChips(agent({
+            channels: [
+                { channel: 'slack', id: 'slack:C0OPS' },
+                { channel: 'mail', id: 'inbox' },
+            ],
+        }), [])).toEqual([
+            {
+                channel: 'slack',
+                id: 'slack:C0OPS',
+                detail: 'C0OPS',
+            },
+            { channel: 'mail', id: 'inbox' },
+        ]);
     });
 });
 
@@ -173,9 +205,9 @@ describe('activityLabel', () => {
 });
 
 describe('agent helpers', () => {
-    it('hasHttpTrigger', () => {
-        expect(hasHttpTrigger(agent({ triggers: [{ source: 'http', id: 'http' }] }))).toBe(true);
-        expect(hasHttpTrigger(agent({ triggers: [{ source: 'cron', id: 'c' }] }))).toBe(false);
+    it('hasHttpSubscription', () => {
+        expect(hasHttpSubscription(agent({ channels: [{ channel: 'http', id: 'http' }] }))).toBe(true);
+        expect(hasHttpSubscription(agent({ channels: [{ channel: 'cron', id: 'c' }] }))).toBe(false);
     });
 
     it('matchesName ignores case and blanks', () => {

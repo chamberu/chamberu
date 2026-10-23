@@ -14,7 +14,7 @@ function token<K extends keyof AppTokens>(key: K): TypedToken<AppTokens[K]> {
 
 /**
  * The container keys modules share. `HTTP_ROUTES`, `AUTHENTICATORS`,
- * `NOTIFIERS`, `LIFECYCLE_HOOKS` and `AGENT_CHECKS` are collections (`registerMany` in
+ * `CHANNELS`, `LIFECYCLE_HOOKS` and `AGENT_CHECKS` are collections (`registerMany` in
  * `setup`, `resolveAll` in `onReady`); every other token holds one value.
  */
 export const AppToken = {
@@ -25,19 +25,21 @@ export const AppToken = {
     STORE: token('STORE'),
     DATA_SOURCE: token('DATA_SOURCE'),
     ENGINE: token('ENGINE'),
-    SCHEDULER: token('SCHEDULER'),
     SHUTDOWN: token('SHUTDOWN'),
     SERVER: token('SERVER'),
     HTTP_ROUTES: token('HTTP_ROUTES'),
     AUTHENTICATORS: token('AUTHENTICATORS'),
-    NOTIFIERS: token('NOTIFIERS'),
+    CHANNELS: token('CHANNELS'),
     LIFECYCLE_HOOKS: token('LIFECYCLE_HOOKS'),
     AGENT_ISSUES: token('AGENT_ISSUES'),
     AGENT_CHECKS: token('AGENT_CHECKS'),
     MODEL_CHECK: token('MODEL_CHECK'),
 } as const;
 
-/** The built-in modules' names; list a module of the same name to replace one. */
+/**
+ * The built-in modules' names; list a module of the same name to replace one.
+ * `CONSOLE` names the optional `consoleChannelModule()`.
+ */
 export const ModuleName = {
     CONFIG: 'chamvi:config',
     STORE: 'chamvi:store',
@@ -46,6 +48,7 @@ export const ModuleName = {
     AGENTS: 'chamvi:agents',
     SCHEDULER: 'chamvi:scheduler',
     HTTP: 'chamvi:http',
+    CONSOLE: 'chamvi:console',
 } as const;
 
 /** The order of the authenticator chain (lowest first). */

@@ -7,8 +7,6 @@
 
 import type { ToolSet } from 'ai';
 import type { IClock } from '@chamvi/core';
-import type { HttpRoute } from '@chamvi/http';
-import type { GithubWebhookRouteOptions } from '../webhook/types.ts';
 import type { PaginatedOctokit } from './helpers.ts';
 
 export type GithubAppOptions = {
@@ -17,7 +15,7 @@ export type GithubAppOptions = {
     privateKey: string;
     /** Several during a secret rotation; a delivery verifies under any. */
     webhookSecret: string | readonly string[];
-    /** For runs not started by a delivery (cron, http, mcp). */
+    /** For runs not started by a delivery (cron, http, mcp) and comments on their behalf. */
     installationId?: number;
     /** The App's slug; skips `GET /app` for the bot login. */
     slug?: string;
@@ -39,8 +37,6 @@ export interface IGithubApp {
     botLogin(): Promise<string>;
     /** `sha256=<hex>` of the raw body under any webhook secret, compared in constant time. */
     verifySignature(body: Uint8Array, signature: string | null): boolean;
-    /** The webhook route for `createHttpApp({ routes })`: `POST /webhooks/github` unless `path` is given. */
-    webhookRoute(options?: GithubWebhookRouteOptions): HttpRoute;
     /** The read-only tools (`github_get_issue`, `github_search_issues`, ...), acting as the run's installation. */
     readTools(): ToolSet;
     /**

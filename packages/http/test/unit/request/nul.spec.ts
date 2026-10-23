@@ -6,7 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { defineAgent, webhook } from '@chamvi/core';
+import { defineAgent } from '@chamvi/core';
+import { webhook } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     call,
@@ -30,7 +31,7 @@ describe('a NUL character', () => {
         expect(response.status).toBe(400);
     });
 
-    it.each(['idempotencyKey', 'thread'])('in a REST %s answers 400', async (key) => {
+    it.each(['idempotencyKey', 'address'])('in a REST %s answers 400', async (key) => {
         const { app, store } = createRunTestApp();
         const response = await call(app, 'POST', '/agents/echo/runs', { token: ADMIN_TOKEN, body: { [key]: 'a\u0000b' } });
         expect(response.status).toBe(400);
@@ -42,16 +43,16 @@ describe('a NUL character', () => {
             name: 'keyed',
             model: textModel(),
             instructions: 'Keyed.',
-            triggers: [webhook({ path: '/k', concurrencyKey: (p) => String((p as { k: string }).k) })],
+            channels: [webhook.on('/k', { concurrencyKey: (p) => String((p as { k: string }).k) })],
         });
         const { app } = createRunTestApp({ agents: [...createRunAgents(), agent] });
-        const response = await call(app, 'POST', '/hooks/keyed/k', { token: ADMIN_TOKEN, body: { k: 'a\u0000b' } });
+        const response = await call(app, 'POST', '/channels/webhook/keyed/k', { token: ADMIN_TOKEN, body: { k: 'a\u0000b' } });
         expect(response.status).toBe(400);
     });
 
     it.each([
         ['run_echo', { idempotencyKey: 'a\u0000b' }],
-        ['run_echo', { thread: 'a\u0000b' }],
+        ['run_echo', { address: 'a\u0000b' }],
         ['get_run', { runId: 'a\u0000b' }],
         ['list_runs', { agent: 'a\u0000b' }],
     ])('in MCP %s %j is a tool error', async (tool, args) => {

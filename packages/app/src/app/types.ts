@@ -31,8 +31,8 @@ export type AppStartOptions = AppLifecycleOptions & {
 
 export type AppRunJobOptions = AppLifecycleOptions & {
     agent: string;
-    /** Cron trigger id; optional when the agent has exactly one cron trigger. */
-    trigger?: string;
+    /** Cron subscription id; optional when the agent has exactly one cron subscription. */
+    subscription?: string;
 };
 
 export type AppRunJobResult = {
@@ -56,7 +56,7 @@ export interface IApp {
      * rejects with `app_stop_failed` when anything was reported meanwhile.
      */
     stop(): Promise<void>;
-    /** Fires one cron trigger once and waits for its run (no scheduler, no HTTP). */
+    /** Fires one cron subscription once and waits for its run (no channel started, no HTTP). */
     runJob(options: AppRunJobOptions): Promise<AppRunJobResult>;
     /** Migrates the store (DATABASE_URL required) and closes it. */
     migrate(options?: AppLifecycleOptions): Promise<void>;

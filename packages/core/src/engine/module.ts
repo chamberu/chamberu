@@ -9,9 +9,12 @@ import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { pid } from 'node:process';
 import type { Agent } from '../agent/types.ts';
-import { createResumeToken, verifyResumeToken } from '../approval/module.ts';
+import { approvalDecisionKey } from '../approval/helpers.ts';
+import { verifyResumeToken } from '../approval/module.ts';
 import { assertArtifactInput } from '../artifact/helpers.ts';
 import { attachmentIds, storeArtifact } from '../artifact/module.ts';
+import { assertChannelName, assertDefaultAddress, createChannelContext } from '../channel/helpers.ts';
+import type { IChannel } from '../channel/types.ts';
 import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
 import type { IClock } from '../clock/index.ts';
@@ -19,6 +22,9 @@ import { contextKeyName, isContextKey } from '../context/helpers.ts';
 import type { ContextKey, IContextProvider } from '../context/types.ts';
 import {
     AgentNotFoundError,
+    ChamviError,
+    ChannelNotFoundError,
+    ErrorCode,
     InvalidAgentDefinitionError,
     InvalidResumeTokenError,
     InvalidRunStateError,
@@ -26,7 +32,6 @@ import {
     RunNotFoundError,
     ValidationError,
 } from '../errors/index.ts';
-import type { INotifier } from '../notify/types.ts';
 import { RunStatus } from '../run/constants.ts';
 import type {
     Run,
@@ -40,7 +45,6 @@ import { assertTriggerKey } from '../trigger/key.ts';
 import type { TriggerEnvelope } from '../trigger/types.ts';
 import {
     APPROVAL_TIMED_OUT,
-    DEFAULT_APPROVAL_TIMEOUT_MS,
     DEFAULT_DRAIN_TIMEOUT_MS,
     IDEMPOTENCY_TTL_MS,
 } from './constants.ts';
@@ -56,6 +60,7 @@ import type {
     DispatchEnvelope,
     EngineEvent,
     EngineOptions,
+    EngineStartOptions,
     ResumeDecision,
 } from './types.ts';
 
@@ -74,7 +79,14 @@ export class Engine implements IContextProvider {
     /** Agents removed here whose store cleanup is still to finish, with the revision they had. */
     protected readonly removals = new Map<string, string | undefined>();
 
-    protected readonly notifiers: Record<string, INotifier>;
+    /** The registered channels by name, in registration order. */
+    protected readonly channels: Map<string, IChannel<any, any>>;
+
+    /** Channels started by the last start(), until a drain() or stop() stops them. */
+    protected startedChannels: IChannel<any, any>[] = [];
+
+    /** The stop of the channels started last, shared by drain() and stop(). */
+    protected stoppingChannels: Promise<void> | undefined;
 
     protected readonly owner: string;
 
@@ -102,6 +114,13 @@ export class Engine implements IContextProvider {
         stop?: 'cancel' | 'drain' | 'lease-lost';
     }>();
 
+    /**
+     * Approval deliveries started by a pause, detached from the execution so
+     * a slow channel holds neither the slot nor the executions entry (a resume
+     * meanwhile starts the next execution); idle() and drain() wait for them.
+     */
+    protected readonly deliveries = new Set<Promise<void>>();
+
     protected started = false;
 
     protected draining = false;
@@ -114,7 +133,16 @@ export class Engine implements IContextProvider {
     constructor(opts: EngineOptions) {
         this.store = opts.store;
         this.agents = new Map(opts.agents.map((a) => [a.name, a]));
-        this.notifiers = opts.notifiers ?? {};
+        const channels = opts.channels ?? [];
+        this.channels = new Map();
+        for (const channel of channels) {
+            assertChannelName(channel.name);
+            assertDefaultAddress(channel);
+            if (this.channels.has(channel.name)) {
+                throw new InvalidAgentDefinitionError(`The channel "${channel.name}" is registered more than once.`);
+            }
+            this.channels.set(channel.name, channel);
+        }
         this.owner = opts.owner ?? `${hostname()}-${pid}`;
         this.clock = opts.clock ?? systemClock;
         this.resumeSecret = opts.resumeSecret;
@@ -163,7 +191,7 @@ export class Engine implements IContextProvider {
         attachments?.forEach((attachment, i) => assertArtifactInput(attachment, `attachment ${i}`));
         assertTriggerKey('idempotency key', envelope.idempotencyKey);
         assertTriggerKey('concurrency key', envelope.concurrencyKey);
-        assertTriggerKey('thread', envelope.thread);
+        assertTriggerKey('address', envelope.address);
         const snapshot = invoker !== undefined ? toInvoker(invoker) : undefined;
         const now = this.nextCreatedAt();
         const trigger: TriggerEnvelope = {
@@ -205,7 +233,7 @@ export class Engine implements IContextProvider {
             status: RunStatus.QUEUED,
             trigger,
             concurrencyKey: trigger.concurrencyKey,
-            thread: trigger.thread,
+            address: trigger.address,
             usage: { inputTokens: 0, outputTokens: 0 },
             createdAt: now,
             updatedAt: now,
@@ -243,6 +271,16 @@ export class Engine implements IContextProvider {
     /** The registered agents in registration order, as a new array. */
     listAgents(): Agent[] {
         return this.agents.values().toArray();
+    }
+
+    /** The registered channel of that name. */
+    getChannel(name: string): IChannel | undefined {
+        return this.channels.get(name);
+    }
+
+    /** The registered channels in registration order, as a new array. */
+    listChannels(): IChannel[] {
+        return Array.from(this.channels.values());
     }
 
     /** The revision the registered agent was loaded at (undefined for a code agent). */
@@ -335,21 +373,64 @@ export class Engine implements IContextProvider {
         return this.draining;
     }
 
-    /** Recovers abandoned runs, then starts executing queued runs and polling. */
-    async start(): Promise<void> {
+    /**
+     * Recovers abandoned runs, starts every channel (in registration order,
+     * unless `channels: false`), then starts executing queued runs and
+     * polling. A throwing channel start rejects after the channels already
+     * started were stopped and polling stopped.
+     */
+    async start(options: EngineStartOptions = {}): Promise<void> {
         this.draining = false;
         this.started = true;
         this.queue.resume();
         this.queue.startPolling();
         // like a failing pass, a failing recovery is reported; the next poll retries it
         await this.recover().catch((error: unknown) => this.onError(error));
+        if (options.channels ?? true) await this.startChannels();
         await this.queue.pump();
     }
 
-    /** Stops the poll for newly runnable work only; dispatch and running runs are unaffected. */
-    stop(): void {
+    /**
+     * Stops the poll for newly runnable work at once, and the channels
+     * started last (their stop errors go to onError); resolves once every
+     * channel stopped (e.g. the cron ticks in flight finished). Dispatch and
+     * running runs are unaffected.
+     */
+    stop(): Promise<void> {
         this.started = false;
         this.queue.stopPolling();
+        return this.stopChannels();
+    }
+
+    protected async startChannels(): Promise<void> {
+        // a channel left over from an earlier start must stop before it starts again
+        await this.stopChannels();
+        for (const channel of this.channels.values()) {
+            if (!channel.start) continue;
+            try {
+                await channel.start(createChannelContext(this, channel));
+            } catch (error) {
+                await this.stop();
+                throw error;
+            }
+            this.startedChannels.push(channel);
+        }
+    }
+
+    /** Stops every started channel once, concurrently; a rejection goes to onError. */
+    protected stopChannels(): Promise<void> {
+        if (this.startedChannels.length > 0) {
+            const channels = this.startedChannels;
+            this.startedChannels = [];
+            const previous = this.stoppingChannels ?? Promise.resolve();
+            this.stoppingChannels = previous.then(async () => {
+                const results = await Promise.allSettled(channels.map((channel) => channel.stop?.()));
+                for (const result of results) {
+                    if (result.status === 'rejected') this.onError(result.reason);
+                }
+            });
+        }
+        return this.stoppingChannels ?? Promise.resolve();
     }
 
     /**
@@ -405,7 +486,8 @@ export class Engine implements IContextProvider {
      */
     async drain(opts: { timeoutMs?: number } = {}): Promise<void> {
         this.draining = true;
-        this.stop();
+        // no new inbound before the wait
+        await this.stop();
         await this.queue.halt();
 
         let timer: { clear(): void } | undefined;
@@ -425,11 +507,16 @@ export class Engine implements IContextProvider {
             }
             await Promise.all(pending.map((execution) => execution.done));
         }
-        await this.queue.idle();
+        await this.idle();
     }
 
-    idle(): Promise<void> {
-        return this.queue.idle();
+    /** Resolves when nothing runs, nothing more can be started and no approval delivery is in flight. */
+    async idle(): Promise<void> {
+        await this.queue.idle();
+        while (this.deliveries.size > 0) {
+            await Promise.all(this.deliveries);
+            await this.queue.idle();
+        }
     }
 
     /**
@@ -564,8 +651,9 @@ export class Engine implements IContextProvider {
 
     /**
      * Denies every approval past its expiresAt ('approval timed out') and
-     * re-sends the notification of every other approval not delivered yet
-     * (a failed send, or a crash mid-send). Also runs on every poll.
+     * re-sends the approval message of every other approval not delivered
+     * yet (a failed send, or a crash between the pause and the send). Also
+     * runs on every poll.
      */
     async tick(): Promise<void> {
         const now = this.clock.now().getTime();
@@ -573,8 +661,7 @@ export class Engine implements IContextProvider {
         for (const listed of data) {
             if (!listed.waiting) continue;
             if (listed.waiting.expiresAt.getTime() > now) {
-                const agent = this.agents.get(listed.agent);
-                if (!listed.waiting.notifiedAt && agent) await this.notifyApproval(listed, agent, listed.waiting);
+                if (!listed.waiting.notifiedAt) await this.deliverApproval(listed, listed.waiting);
                 continue;
             }
             try {
@@ -592,12 +679,14 @@ export class Engine implements IContextProvider {
     }
 
     /**
-     * waiting → queued, then the approval response is checkpointed. The
-     * transition comes first and is guarded by expectStatus, so only one answer
-     * ever writes; the run stays claimed by us until the checkpoint landed, so no
-     * pass executes it from the unanswered checkpoint.
+     * waiting → queued, then the decision is recorded under
+     * `approval:<runId>:<approvalId>` (where the suspended approve() finds it
+     * when its call runs again) and the `wait` step appended. The transition
+     * comes first and is guarded by expectStatus, so only one answer ever
+     * records; the run stays claimed by us until the decision landed, so no
+     * pass executes it before.
      *
-     * `waiting` survives the transition and is cleared only after the response
+     * `waiting` survives the transition and is cleared only after the decision
      * landed: if we die in between, the run re-pauses on the same wait point, so
      * the token the owner already holds stays valid.
      */
@@ -620,30 +709,21 @@ export class Engine implements IContextProvider {
             if (transitioned.waiting?.tokenId !== waiting.tokenId) {
                 throw stale();
             }
-            const checkpoint = await this.store.latestCheckpoint(run.id);
-            if (!checkpoint) throw new InvalidRunStateError(`Run "${run.id}" has no checkpoint to resume from.`);
-            await this.store.saveCheckpoint({
-                ...checkpoint,
-                messages: [
-                    ...checkpoint.messages,
-                    {
-                        role: 'tool',
-                        content: [{
-                            type: 'tool-approval-response',
-                            approvalId: waiting.approvalId,
-                            approved: decision.approved,
-                            reason: decision.reason,
-                        }],
-                    },
-                ],
-                createdAt: now,
+            await this.store.putEffect(approvalDecisionKey(run.id, waiting.approvalId), {
+                approved: decision.approved,
+                ...(decision.reason !== undefined ? { reason: decision.reason } : {}),
+                ...(decision.approver ? { approver: decision.approver } : {}),
             });
             const step: Step = {
                 runId: run.id,
                 index: (await this.store.listSteps(run.id)).length,
                 kind: 'wait',
                 name: waiting.toolName,
-                input: waiting.input,
+                input: {
+                    toolCallId: waiting.toolCallId,
+                    title: waiting.title,
+                    ...(waiting.body !== undefined ? { body: waiting.body } : {}),
+                },
                 output: {
                     approvalId: waiting.approvalId,
                     approved: decision.approved,
@@ -676,16 +756,17 @@ export class Engine implements IContextProvider {
     /**
      * running → waiting on `request`, releasing claim and slot (a keyed run keeps
      * its key blocked while waiting). Re-pausing on the same approval keeps the
-     * wait point, so tokens sent earlier stay valid; the owner is notified once.
+     * wait point, so tokens handed out earlier stay valid.
      */
-    protected async pause(run: Run, agent: Agent, request: ApprovalRequest, usage: Usage): Promise<void> {
+    protected async pause(run: Run, request: ApprovalRequest, usage: Usage): Promise<void> {
         const now = this.clock.now();
+        const { timeoutMs, ...asked } = request;
         const waiting: WaitPoint = run.waiting?.approvalId === request.approvalId ?
             run.waiting :
             {
                 kind: 'approval',
-                ...request,
-                expiresAt: new Date(now.getTime() + (agent.definition.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS)),
+                ...asked,
+                expiresAt: new Date(now.getTime() + timeoutMs),
                 tokenId: randomUUID(),
             };
         const updated = await this.ownedUpdate(run.id, {
@@ -697,55 +778,77 @@ export class Engine implements IContextProvider {
         });
         if (!updated) return;
         this.emit({ type: 'run.updated', run: updated });
-        // a cancel arrived while pausing (an abort cannot interrupt this write): settle, do not notify
+        // a cancel arrived while pausing (an abort cannot interrupt this write): settle, do not deliver
         if (updated.cancelRequested || this.executions.get(run.id)?.stop === 'cancel') {
             await this.cancelStored(run.id, [RunStatus.WAITING]).catch((error: unknown) => {
                 if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
             });
             return;
         }
-        await this.notifyApproval(updated, agent, waiting);
+        if (!waiting.notifiedAt) {
+            // detached: the execution ends with the waiting write, so a resume
+            // during a slow send starts the next execution cleanly
+            const delivery: Promise<void> = this.deliverApproval(updated, waiting)
+                .catch((error: unknown) => this.onError(error, updated))
+                .finally(() => this.deliveries.delete(delivery));
+            this.deliveries.add(delivery);
+        }
     }
 
     /**
-     * Sends the approval notification unless it was delivered already: a
-     * successful send records `waiting.notifiedAt`. A store lock (held for one
-     * attempt, at most claimTtlMs) keeps replicas from sending concurrently;
-     * the notifier's idempotencyKey dedupes a send whose record was lost. A
-     * failed or crashed attempt goes to onError and is retried by tick() on the
+     * Sends the approval message of `waiting` through the channel it names
+     * (none: inbox and API only, nothing to send) unless it was delivered
+     * already: a successful send records `waiting.notifiedAt`. The message
+     * never carries the resume token; its key `<runId>:<approvalId>` is fixed
+     * once the wait point is stored, so the channel dedupes a send whose
+     * record was lost. A store lock `notify:<runId>:<approvalId>` held for one
+     * attempt keeps replicas from sending concurrently; the attempt is aborted
+     * after claimTtlMs (the lock's TTL). A failed attempt, or a channel the
+     * engine does not have, goes to onError and is retried by tick() on the
      * next poll; the run keeps waiting.
      */
-    protected async notifyApproval(run: Run, agent: Agent, waiting: WaitPoint): Promise<void> {
-        const name = agent.definition.notify;
-        const notifier = name === undefined ? undefined : this.notifiers[name];
-        if (!notifier) return;
-        const idempotencyKey = `${run.id}:${waiting.approvalId}`;
-        const lockKey = `notify:${idempotencyKey}`;
+    protected async deliverApproval(run: Run, waiting: WaitPoint): Promise<void> {
+        if (waiting.channel === undefined) return;
+        const channel = this.channels.get(waiting.channel);
+        if (!channel || typeof channel.out !== 'function') {
+            this.onError(new ChannelNotFoundError(waiting.channel), run);
+            return;
+        }
+        const key = `${run.id}:${waiting.approvalId}`;
+        const lockKey = `notify:${key}`;
         const attempt = randomUUID();
         let acquired = false;
         const isCurrent = (current: Run | undefined) => current?.status === RunStatus.WAITING &&
             current.waiting?.tokenId === waiting.tokenId;
+        const controller = new AbortController();
+        const timer = this.clock.setTimeout(() => controller.abort(new ChamviError({
+            message: `Channel "${channel.name}" did not deliver approval "${waiting.approvalId}" within ${this.claimTtlMs}ms.`,
+            code: ErrorCode.TIMEOUT,
+        })), this.claimTtlMs);
         try {
             acquired = await this.store.acquire(lockKey, attempt, this.claimTtlMs);
             if (!acquired) return;
             // another attempt may have delivered it since `run` was read
             const current = await this.store.getRun(run.id);
             if (!isCurrent(current) || current?.waiting?.notifiedAt) return;
-            await notifier.notify({
-                kind: 'approval',
-                agent: run.agent,
-                runId: run.id,
-                title: `Approval required: ${waiting.toolName}`,
-                body: `Agent "${run.agent}" wants to call "${waiting.toolName}" with:\n${JSON.stringify(waiting.input, null, 2)}`,
-                approvalId: waiting.approvalId,
-                resumeToken: createResumeToken(this.resumeSecret, {
+            const aborted = new Promise<never>((_, reject) => {
+                if (controller.signal.aborted) reject(controller.signal.reason);
+                controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true });
+            });
+            // a transport that ignores the signal must not hold the pause (or tick) forever
+            await Promise.race([
+                channel.out({
+                    kind: 'approval',
+                    key,
                     runId: run.id,
+                    agent: run.agent,
+                    title: waiting.title,
+                    body: waiting.body ?? '',
                     approvalId: waiting.approvalId,
-                    tokenId: waiting.tokenId,
                     expiresAt: waiting.expiresAt,
-                }),
-                expiresAt: waiting.expiresAt,
-            }, { idempotencyKey, trigger: run.trigger });
+                }, waiting.address ?? '', { signal: controller.signal, trigger: run.trigger }),
+                aborted,
+            ]);
             // answered meanwhile: nothing left to record
             if (!isCurrent(await this.store.getRun(run.id))) return;
             const notified = await this.store.updateRun(
@@ -757,6 +860,7 @@ export class Engine implements IContextProvider {
         } catch (error) {
             if (!(error instanceof InvalidRunStateError)) this.onError(error, run);
         } finally {
+            timer.clear();
             if (acquired) {
                 await this.store.release(lockKey, attempt).catch((releaseError: unknown) => this.onError(releaseError, run));
             }
@@ -786,6 +890,7 @@ export class Engine implements IContextProvider {
             return;
         }
         await executeRun({
+            engine: this,
             run,
             agent,
             store: this.store,
@@ -800,8 +905,7 @@ export class Engine implements IContextProvider {
             },
             onStepAppended: (step) => this.emit({ type: 'step.appended', step }),
             onDelta: (delta) => this.emit({ type: 'run.delta', delta }),
-            pause: (request, usage) => this.pause(run, agent, request, usage),
-            toolApprovalSecret: this.resumeSecret,
+            pause: (request, usage) => this.pause(run, request, usage),
             ownsRun: () => this.ownsRun(run.id),
             provided: this.provided,
         });
@@ -837,7 +941,10 @@ export class Engine implements IContextProvider {
     /** A throwing execution fails the run (and releases its claim) instead of leaking. */
     protected guardedExecute(run: Run): Promise<void> {
         const controller = new AbortController();
-        const done = (async () => {
+        const { promise: done, resolve: release } = Promise.withResolvers<void>();
+        const entry = { controller, done };
+        this.executions.set(run.id, entry);
+        return (async () => {
             try {
                 await this.execute(run, controller.signal);
             } catch (error) {
@@ -846,11 +953,11 @@ export class Engine implements IContextProvider {
                 await this.finish(run.id, { status: RunStatus.FAILED, error: toRunError(error) });
                 this.onError(error, run);
             } finally {
-                this.executions.delete(run.id);
+                // a later execution of the same run may hold the entry by now
+                if (this.executions.get(run.id) === entry) this.executions.delete(run.id);
+                release();
             }
         })();
-        this.executions.set(run.id, { controller, done: done.catch(() => {}) });
-        return done;
     }
 
     /**
@@ -916,11 +1023,12 @@ export class Engine implements IContextProvider {
         this.onError(new LeaseLostError(id));
     }
 
-    /** Refuses an agent the engine cannot run: a notifier it does not have. */
+    /** Refuses an agent the engine cannot run: one subscribing to a channel it does not have. */
     protected assertRegistrable(agent: Agent): void {
-        const { notify } = agent.definition;
-        if (notify !== undefined && !this.notifiers[notify]) {
-            throw new InvalidAgentDefinitionError(`Agent "${agent.name}" uses unknown notifier "${notify}".`);
+        for (const subscription of agent.definition.channels ?? []) {
+            if (!this.channels.has(subscription.channel)) {
+                throw new InvalidAgentDefinitionError(`Agent "${agent.name}" subscribes to unknown channel "${subscription.channel}".`);
+            }
         }
     }
 

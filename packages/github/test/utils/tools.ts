@@ -11,7 +11,6 @@ import type {
     IRunArtifacts,
     ToolContext,
     TriggerEnvelope,
-    TriggerSource,
 } from '@chamvi/core';
 import { START } from './app.ts';
 
@@ -23,7 +22,8 @@ const NO_ARTIFACTS: IRunArtifacts = {
 
 export type ToolContextInput = {
     runId?: string;
-    source?: TriggerSource;
+    /** The run's channel; default `github`. */
+    channel?: string;
     /** Default: a GithubEvent for installation 42. */
     payload?: unknown;
     receivedAt?: Date;
@@ -31,11 +31,11 @@ export type ToolContextInput = {
     signal?: AbortSignal;
 };
 
-/** A ToolContext of a run started by `source` (default a github delivery for installation 42). */
+/** A ToolContext of a run started on `channel` (default a github delivery for installation 42). */
 export function toolContext(input: ToolContextInput = {}): ToolContext {
     const runId = input.runId ?? 'run-1';
-    const source = input.source ?? 'github';
-    const payload = input.payload ?? (source === 'github' ?
+    const channel = input.channel ?? 'github';
+    const payload = input.payload ?? (channel === 'github' ?
         {
             name: 'issues',
             action: 'opened',
@@ -47,12 +47,14 @@ export function toolContext(input: ToolContextInput = {}): ToolContext {
     const trigger: TriggerEnvelope = {
         id: `env-${runId}`,
         agent: 'triage',
-        trigger: source,
-        source,
+        trigger: channel,
+        channel,
         payload,
         receivedAt: input.receivedAt ?? START,
     };
     return {
+        // these tools reach no channel
+        channels: {} as ToolContext['channels'],
         run: {
             runId,
             agent: 'triage',

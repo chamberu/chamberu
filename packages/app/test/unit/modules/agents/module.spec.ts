@@ -12,7 +12,6 @@ import {
     InvalidAgentDefinitionError,
     MemoryStore,
     defineAgent,
-    http,
 } from '@chamvi/core';
 import type { Agent, IStore } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
@@ -44,7 +43,7 @@ import {
     hangingModel,
     rejectionOf,
 } from '../../../utils/app.ts';
-import { HTTP_TRIGGER, agentFile, cronTrigger } from '../../../utils/agents-dir.ts';
+import { agentFile, cronTrigger } from '../../../utils/agents-dir.ts';
 import { createTempDir, writeTree } from '../../../utils/folder.ts';
 import { buildHarness } from '../../../utils/harness.ts';
 import type { Harness } from '../../../utils/harness.ts';
@@ -65,7 +64,6 @@ function codeAgent(name: string): Agent {
         name,
         model: textModel('from code'),
         instructions: 'x',
-        triggers: [http()],
     });
 }
 
@@ -80,7 +78,7 @@ async function queueRun(store: IStore, clock: ControllableClock, name: string): 
     const { runId } = await engine.dispatch({
         agent: name,
         trigger: 'http',
-        source: 'http',
+        channel: 'http',
         payload: {},
     });
     return runId;
@@ -340,7 +338,7 @@ describe('agentsModule', () => {
     });
 
     it('the watcher applies a change only once it is stable for one poll', async () => {
-        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:hang', 'greeter', [HTTP_TRIGGER]) });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:hang') });
         const {
             harness,
             engine,
@@ -354,7 +352,7 @@ describe('agentsModule', () => {
         const { runId } = await engine().dispatch({
             agent: 'greeter',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         await expect.poll(async () => (await store.getRun(runId))?.status).toBe('running');
@@ -454,7 +452,7 @@ describe('agentsModule', () => {
     });
 
     it('an agents dir left empty (an unmounted volume) keeps every agent and its runs', async () => {
-        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:model', 'greeter', [HTTP_TRIGGER]) });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1') });
         const {
             harness,
             engine,
@@ -468,7 +466,7 @@ describe('agentsModule', () => {
         const { runId } = await engine().dispatch({
             agent: 'greeter',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
 

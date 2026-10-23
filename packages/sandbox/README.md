@@ -171,7 +171,7 @@ No host environment reaches a workspace. Containers and pods get `SANDBOX_ENV` (
 
 ## Security
 
-- **Untrusted code**: the model decides what runs, and an issue body or a README it reads can steer it (prompt injection). Run untrusted repositories on Docker or Kubernetes, never local, and put `bash` behind an approval (`approvals: { bash: 'user' }`) where a human should see each command.
+- **Untrusted code**: the model decides what runs, and an issue body or a README it reads can steer it (prompt injection). Run untrusted repositories on Docker or Kubernetes, never local, and put `bash` behind an approval where a human should see each command: a `beforeToolExecution` hook on the agent that calls `approve()` for `toolName === 'bash'` (see [`@chamvi/coding`](../coding#usage)).
 - **No credentials**: repository URLs with credentials are refused, `credential.helper` is reset for the fetch, and no token, service account or host variable enters a workspace. Private repositories are not supported yet.
 - **Not a network boundary**: a container sandbox stops code from touching the host, not from reaching the network. On a Docker `bridge` network a workspace reaches the host gateway (the chamvi API, Postgres), other containers and cloud metadata (`169.254.169.254`); on Kubernetes every cluster service by DNS. Add an egress firewall or a NetworkPolicy (the Helm chart's is planned), and narrow `allowRepo`.
 

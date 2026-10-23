@@ -36,7 +36,7 @@ const hang = defineAgent({
     name: 'hang',
     model: hangingModel,
     instructions: 'Never answer.',
-    triggers: [http(), cron('0 0 1 1 *')],
+    channels: [http.on(), cron.on('0 0 1 1 *')],
 });
 
 export default createApp({ agents: [hang] });

@@ -14,6 +14,7 @@ import type { HttpContext } from '../app/types.ts';
 import { authenticate, authorize, toInvoker } from '../auth/helpers.ts';
 import { Permission } from '../auth/constants.ts';
 import { agentPermission } from '../auth/module.ts';
+import { HTTP_CHANNEL_NAME } from '../channels/constants.ts';
 import {
     readIdempotencyHeader,
     readJsonBody,
@@ -30,7 +31,7 @@ import {
     loadReadableRun,
     loadRunArtifact,
     parseRunListQuery,
-    requireHttpTrigger,
+    requireHttpSubscription,
     resolveResumeTarget,
     serializeRun,
     serializeStep,
@@ -59,19 +60,19 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
     app.post('/agents/:name/runs', defineCoreHandler(async (event) => {
         const name = param(event, 'name');
         const principal = await authorize(event, ctx, agentPermission(name, 'run'));
-        const trigger = requireHttpTrigger(requireAgent(ctx.agents, name));
+        const subscription = requireHttpSubscription(requireAgent(ctx.agents, name));
 
         const body = await validateBody(startContainer, await readJsonBody(event, ctx.bodyLimit));
         const idempotencyKey = body.idempotencyKey ?? readIdempotencyHeader(event.request);
-        const payload = await validatePayload(trigger.options.schema as StandardSchemaV1 | undefined, body.payload);
+        const payload = await validatePayload(subscription.options.schema as StandardSchemaV1 | undefined, body.payload);
 
         const result = await ctx.engine.dispatch({
             agent: name,
-            trigger: trigger.id,
-            source: 'http',
+            trigger: subscription.id,
+            channel: HTTP_CHANNEL_NAME,
             payload,
             ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
-            ...(body.thread !== undefined ? { thread: body.thread } : {}),
+            ...(body.address !== undefined ? { address: body.address } : {}),
             ...(body.attachments?.length ? { attachments: body.attachments } : {}),
             invoker: toInvoker(principal),
         });

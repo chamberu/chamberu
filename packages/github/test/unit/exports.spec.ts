@@ -6,31 +6,47 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as github from '@chamvi/github';
-import * as module from '@chamvi/github/module';
+import * as pkg from '@chamvi/github';
 
 describe('public api', () => {
     it.each([
         'createGithubApp',
-        'githubWebhook',
+        'githubChannel',
         'injectGithubContext',
         'provideGithubContext',
     ])('exports %s', (name) => {
-        expect(github).toHaveProperty(name);
-        expect(github[name as keyof typeof github]).toBeTypeOf('function');
+        expect(pkg).toHaveProperty(name);
+        expect(pkg[name as keyof typeof pkg]).toBeTypeOf('function');
+    });
+
+    it('exports the github subscriber', () => {
+        expect(pkg.github.on).toBeTypeOf('function');
+        expect(pkg.github.to).toBeTypeOf('function');
     });
 
     it('exports the defaults', () => {
-        expect(github.DEFAULT_WEBHOOK_PATH).toBe('/webhooks/github');
-        expect(github.DEFAULT_GITHUB_API_URL).toBe('https://api.github.com');
+        expect(pkg.GITHUB_CHANNEL_NAME).toBe('github');
+        expect(pkg.GITHUB_CHANNEL_TIMEOUT_MS).toBe(30_000);
+        expect(pkg.COMMENT_BODY_MAX_LENGTH).toBe(60_000);
+        expect(pkg.DEFAULT_GITHUB_API_URL).toBe('https://api.github.com');
     });
 
     it('exports the request error code and the repository pattern', () => {
-        expect(github.GITHUB_REQUEST_ERROR_CODE).toBe('github_request');
-        const repo = new RegExp(github.REPO_PATTERN);
+        expect(pkg.GITHUB_REQUEST_ERROR_CODE).toBe('github_request');
+        const repo = new RegExp(pkg.REPO_PATTERN);
         expect(repo.test('octo/demo')).toBe(true);
         expect(repo.test('a/../b')).toBe(false);
         expect(repo.test('../x')).toBe(false);
+    });
+
+    it.each([
+        'githubWebhook',
+        'DEFAULT_WEBHOOK_PATH',
+        'githubNotifier',
+        'provideGithubNotifierContext',
+        'injectGithubNotifierContext',
+    ])('no longer exports %s', (name) => {
+        expect(pkg).not.toHaveProperty(name);
     });
 
     it.each([
@@ -38,20 +54,20 @@ describe('public api', () => {
         'createAppJwt',
         'createInstallationTokens',
         'createWebhookRoute',
+        'receiveDelivery',
         'GITHUB_CONTEXT',
         'createReadTools',
         'createWriteTools',
-        'matchesGithubTrigger',
+        'matchesGithubSubscription',
+        'createGithubSubscription',
         'normalizePrivateKey',
+        'parseAddress',
+        'renderComment',
+        'resolveOptions',
+        'markerKey',
         'stepOf',
     ])('keeps %s internal', (name) => {
-        expect(github).not.toHaveProperty(name);
-    });
-
-    it('@chamvi/github/module exports githubModule', () => {
-        expect(module.githubModule).toBeTypeOf('function');
-        expect(module.GithubModule).toBeTypeOf('function');
-        expect(module.GITHUB_MODULE_NAME).toBe('chamvi:github');
+        expect(pkg).not.toHaveProperty(name);
     });
 
     it.each([
@@ -59,10 +75,6 @@ describe('public api', () => {
         'GithubModule',
         'GITHUB_MODULE_NAME',
     ])('the main entry keeps %s out', (name) => {
-        expect(github).not.toHaveProperty(name);
-    });
-
-    it('the module entry keeps its helpers internal', () => {
-        expect(module).not.toHaveProperty('createGithubAppFromEnv');
+        expect(pkg).not.toHaveProperty(name);
     });
 });

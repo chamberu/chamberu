@@ -1,6 +1,6 @@
 # @chamvi/core
 
-The public API of `@chamvi/core`, taken from `packages/core/src/index.ts`. Contract interfaces carry an `I` prefix (`IStore`, `IClock`, `INotifier`, `IAgentState`); data shapes are unprefixed types.
+The public API of `@chamvi/core`, taken from `packages/core/src/index.ts`. Contract interfaces carry an `I` prefix (`IStore`, `IClock`, `IChannel`, `IAgentState`); data shapes are unprefixed types.
 
 ```ts
 import { Engine, defineAgent } from '@chamvi/core';
@@ -17,7 +17,7 @@ const DEFAULT_MAX_STEPS: 20;
 const DEFAULT_TIMEOUT_MS: 900_000; // 15 minutes
 ```
 
-Throws `InvalidAgentDefinitionError` for an invalid name, duplicate trigger ids, or a `toolsContext` entry naming a chamvi tool or no tool of a plain tool set. See [Agents](/guide/agents).
+Throws `InvalidAgentDefinitionError` for an invalid name, duplicate subscription ids, a tool with `needsApproval` or a `toolsContext` entry naming a chamvi tool or no tool of a plain tool set (both in a plain tool set; a tools factory fails the run instead). See [Agents](/guide/agents).
 
 A folder agent's `agent.ts` default-exports `defineAgent()`'s result, named like its folder; `AgentRevision` is the store's revision marker of a folder agent (see [Agent Folders](/guide/agent-folders)):
 
@@ -36,27 +36,25 @@ function requireToolPermission(opts?: RequireToolPermissionOptions): ToolPolicy;
 
 <<< ../../../core/src/permission/types.ts{ts}
 
-## Triggers
+## Channels
 
 ```ts
-function cron(expression: string, opts?: CronOptions): TriggerDefinition;
-function http(opts?: HttpTriggerOptions): TriggerDefinition;
-function webhook(opts: WebhookTriggerOptions): TriggerDefinition;
+function consoleChannel(options?: ConsoleChannelOptions): IChannel;           // out only, name 'console'
+function normalizeEnvelope(raw: Record<string, unknown>): TriggerEnvelope;    // for stores: legacy source/thread read back as channel/address
+function assertTriggerKey(name: string, value: string | undefined): void;     // 255 characters, no NUL
 ```
 
-`TriggerSource`, `TriggerDefinition` and `TriggerEnvelope`:
+`IChannel`, `ChannelRequest`, `ChannelContext`, `ChannelDispatchEnvelope`, `DispatchResult`, `ChannelMessage`, `ChannelSendOptions`, `ChannelSubscription`, `EmitMessage`, `ChannelHandle`, `ToolChannels` (`ToolContext.channels`) and `ConsoleChannelOptions`:
+
+<<< ../../../core/src/channel/types.ts{ts}
+
+`consoleChannel()` writes `[chamvi] <kind>: <title or the body's first line> (agent <agent>, run <runId>, key <key>)`, then the body lines and, for an approval, `approval <approvalId> waits until <ISO>`, one `write` call per line. It never throws; an invalid `name` throws `InvalidAgentDefinitionError`.
+
+The envelope (`TriggerEnvelope`, `Invoker`):
 
 <<< ../../../core/src/trigger/types.ts{ts}
 
-`CronOptions` and `OverlapPolicy`, `HttpTriggerOptions`, `WebhookTriggerOptions`:
-
-<<< ../../../core/src/trigger/cron/types.ts{ts}
-
-<<< ../../../core/src/trigger/http/types.ts{ts}
-
-<<< ../../../core/src/trigger/webhook/types.ts{ts}
-
-See [Triggers & the Envelope](/guide/triggers).
+Subscription builders live in the channel packages: `http.on()` and `webhook.on()` in [`@chamvi/http`](/reference/http), `cron.on()` in [`@chamvi/channel-cron`](/reference/channel-cron), `github.on()` in [`@chamvi/github`](/reference/github). See [Channels & the Envelope](/guide/channels).
 
 ## Engine
 
@@ -68,6 +66,8 @@ class Engine {
     readonly clock: IClock;
     getAgent(name: string): Agent | undefined;
     listAgents(): Agent[];
+    getChannel(name: string): IChannel | undefined;
+    listChannels(): IChannel[];
     putAgent(agent: Agent, options?: { revision?: string }): Promise<'added' | 'replaced' | 'unchanged'>;
     removeAgent(name: string): Promise<boolean>;
     agentRevision(name: string): string | undefined;
@@ -77,7 +77,7 @@ class Engine {
     getRun(id: string): Promise<Run | undefined>;
     on<T extends EngineEvent['type']>(event: T, listener: (e: Extract<EngineEvent, { type: T }>) => void): () => void;
 
-    start(): Promise<void>;
+    start(options?: { channels?: boolean }): Promise<void>;
     stop(): void;
     drain(opts?: { timeoutMs?: number }): Promise<void>;
     idle(): Promise<void>;
@@ -85,6 +85,8 @@ class Engine {
 
     cancel(runId: string): Promise<void>;
     resume(token: string, decision: ResumeDecision): Promise<void>;
+    approve(runId: string, answer: ApprovalAnswer): Promise<void>;
+    inspectResumeToken(token: string): ResumeTokenClaims;
     tick(): Promise<void>;
     recover(): Promise<number>;
 }
@@ -94,33 +96,35 @@ class Engine {
 |---|---|---|
 | `store`, `clock` | The store and clock the engine was built with (`clock` defaults to `systemClock`) | |
 | `getAgent`, `listAgents` | One registered agent by name; all of them in registration order (a new array), read at call time | |
-| `putAgent` | Registers an agent or replaces the one of the same name in place (a new one goes last); refuses an unknown `notify` like the constructor. Replacing cancels the agent's unsettled runs created before now. With a `revision` (a folder's content hash) the store's marker is brought to it under the lock `agents:<name>` instead, cancelling once across replicas and only when a marker existed (swept before and again after the marker write; no run of the agent starts on this engine meanwhile). Resolves `unchanged` (no event) for the same agent object at the same revision | [Agent Folders](/guide/agent-folders) |
+| `getChannel`, `listChannels` | One registered channel by name; all of them in registration order | [Channels](/guide/channels) |
+| `putAgent` | Registers an agent or replaces the one of the same name in place (a new one goes last); refuses a subscription to an unknown channel like the constructor. Replacing cancels the agent's unsettled runs created before now. With a `revision` (a folder's content hash) the store's marker is brought to it under the lock `agents:<name>` instead, cancelling once across replicas and only when a marker existed (swept before and again after the marker write; no run of the agent starts on this engine meanwhile). Resolves `unchanged` (no event) for the same agent object at the same revision | [Agent Folders](/guide/agent-folders) |
 | `removeAgent` | Unregisters the agent here first (no further dispatch), then under the same lock cancels its unsettled runs and deletes its marker (when it has one, unless this engine had it at another revision: a newer one registered elsewhere stays), or without a marker cancels the runs of an agent registered here; resolves whether it was registered here | [Agent Folders](/guide/agent-folders) |
 | `agentRevision` | The revision an agent was registered at; `undefined` for a code agent | |
-| `dispatch` | Stores a `queued` run (and its attachments as artifacts); deduplicates by `idempotencyKey` | [Triggers](/guide/triggers) |
+| `dispatch` | Stores a `queued` run (and its attachments as artifacts); deduplicates by `idempotencyKey` under `<agent>:<channel>[:<kind>:<id>]` | [Channels](/guide/channels#idempotency-keys) |
 | `getRun` | Reads a run from the store | [Run Lifecycle](/guide/run-lifecycle) |
 | `on` | Subscribes to `run.updated`, `step.appended`, `run.delta` or `agents.changed`; returns an unsubscribe function | [Run Lifecycle](/guide/run-lifecycle#watching-runs) |
-| `start` | Recovers, starts polling and starts queued runs: only runs of an agent it holds, a folder agent only at the stored revision (the others stay `queued`) | [Recovery](/guide/recovery) |
-| `stop` | Stops polling only | [Recovery](/guide/recovery) |
-| `drain` | Waits for in-flight runs (default 30 s), then marks the rest `interrupted` | [Recovery](/guide/recovery#drain) |
+| `start` | Recovers, starts every channel (unless `{ channels: false }`; a throwing `start` stops those already started and rejects), starts polling and starts queued runs: only runs of an agent it holds, a folder agent only at the stored revision (the others stay `queued`) | [Recovery](/guide/recovery) |
+| `stop` | Stops every channel, then polling only | [Recovery](/guide/recovery) |
+| `drain` | Stops every channel first (a throwing `stop` goes to `onError`), waits for in-flight runs (default 30 s), then marks the rest `interrupted` | [Recovery](/guide/recovery#drain) |
 | `idle` | Resolves when nothing runs and nothing more can start | |
 | `cancel` | Cancels locally, in the store, or requests it from the owning replica | [Recovery](/guide/recovery#cancel) |
-| `resume` | Answers the approval a waiting run waits on | [Approvals](/guide/approvals) |
-| `tick` | Denies expired approvals and re-sends undelivered notifications; runs every poll | [Approvals](/guide/approvals) |
+| `resume` | Answers the approval a waiting run waits on, with a resume token | [Approvals](/guide/approvals#answering) |
+| `approve` | Answers the current wait point by `approvalId`, without a token | [Approvals](/guide/approvals#answering) |
+| `inspectResumeToken` | Checks a token's signature and expiry and returns its claims, without touching the store | |
+| `tick` | Denies expired approvals and re-sends approval messages a channel has not delivered; runs every poll | [Approvals](/guide/approvals#asking-through-a-channel) |
 | `recover` | Requeues abandoned runs; runs on start and every poll | [Recovery](/guide/recovery#recovery) |
 
 <<< ../../../core/src/engine/types.ts{ts}
 
 | Option | Default |
 |---|---|
-| `notifiers` | `{}` |
+| `channels` | `[]` |
 | `owner` | `` `${hostname}-${pid}` `` |
 | `maxConcurrentRuns` | `4` |
 | `claimTtlMs` | `60_000`, renewed and polled every `claimTtlMs / 3` |
 | `clock` | `systemClock` |
 | `onError` | logs to `console.error` |
 
-`ApprovalRequest` (`{ approvalId, toolName, input }`) is the tool call a waiting run waits on.
 
 ## Runs
 
@@ -150,7 +154,7 @@ class MemoryStore implements IStore {
 
 `isArtifactMediaType(value: unknown): value is string` is the media type rule `dispatch` and `artifacts.put()` apply: `type/subtype` (RFC 6838 restricted names) without parameters. An intake layer can check attachments with it before dispatching (`@chamvi/http` does).
 
-See [Files](/guide/agents#files) and [Attachments](/guide/triggers#attachments).
+See [Files](/guide/agents#files) and [Attachments](/guide/channels#attachments).
 
 ## Tools
 
@@ -179,7 +183,7 @@ function inject<T>(ctx: ToolContext, key: ContextKey<T>): T;                    
 function tryInject<T>(ctx: ToolContext, key: ContextKey<T>): T | undefined;
 ```
 
-`engine.provide(key, value)` (`Engine` implements `IContextProvider`) keeps the value by reference and refuses a foreign key, `undefined` and a second value for one key (`InvalidAgentDefinitionError` naming the key). `inject` reads the engine's values for the `ToolContext` the engine built for the execution (tool `execute`, the tools factory, `alreadyApplied`, `effectKey`); `ToolContext` itself gains no field, and nothing provided is stored or serialized. A missing value is a tool error in `execute` and the effect hooks and fails the run in the factory. See [Context](/guide/tools#context-shared-instances-for-tools).
+`engine.provide(key, value)` (`Engine` implements `IContextProvider`) keeps the value by reference and refuses a foreign key, `undefined` and a second value for one key (`InvalidAgentDefinitionError` naming the key). `inject` reads the engine's values for the `ToolContext` the engine built for the execution (tool `execute`, the tools factory, `alreadyApplied`, `effectKey`); `ToolContext` (`{ run, state, artifacts, channels }`) gains no field for a provided value, and nothing provided is stored or serialized. A missing value is a tool error in `execute` and the effect hooks and fails the run in the factory. See [Context](/guide/tools#context-shared-instances-for-tools).
 
 <<< ../../../core/src/context/types.ts{ts}
 
@@ -199,7 +203,7 @@ function wrapToolsForRun(
     tools: ToolSet,
     ctx: ToolContext,
     store: IEffectStore,
-    allow?: (toolName: string) => boolean,
+    options?: { allow?: (toolName: string) => boolean; hooks?: AgentHooks },
 ): ToolSet;
 
 const EFFECT: unique symbol; // marks a tool as an effect tool
@@ -210,13 +214,18 @@ See [Effect Tools & Reconciliation](/guide/effect-tools).
 ## Approvals
 
 ```ts
+function approve(ctx: ToolContext, request: ApprovalRequestInput): Promise<ApprovalDecision>; // inside a tool call only
+
 function createResumeToken(secret: string, p: ResumeTokenClaims & { expiresAt: Date }): string;
 function verifyResumeToken(secret: string, token: string, now: Date): ResumeTokenClaims;
 
-type ResumeTokenClaims = { runId: string; approvalId: string; tokenId: string };
+const DEFAULT_APPROVAL_TIMEOUT_MS: 86_400_000; // 24 hours
+const APPROVAL_TIMEOUT_MAX_MS: 2_147_483_647;
 ```
 
-`verifyResumeToken` throws `InvalidResumeTokenError` for every failure. See [Approvals & Resume Tokens](/guide/approvals).
+<<< ../../../core/src/approval/types.ts{ts}
+
+`approve()` outside a tool call, or in a streaming tool's body, throws `InvalidRunStateError`; a `timeoutMs` that is no positive integer up to `APPROVAL_TIMEOUT_MAX_MS` is a `ValidationError`. `ChannelHandle.approve()` is the same with the request delivered through the channel. `verifyResumeToken` throws `InvalidResumeTokenError` for every failure. The agent hooks (`AgentHooks`, `ToolCallInfo`) are on `AgentDefinition` above. See [Approvals & Hooks](/guide/approvals).
 
 ## State
 
@@ -234,20 +243,6 @@ function createStateTools<S extends StateSchema>(schema: S): ToolSet; // the too
 
 See [Agent State](/guide/state).
 
-## Notifiers
-
-`INotifier`, `Notification`, `NotifyOptions` and `ConsoleNotifierOptions`:
-
-<<< ../../../core/src/notify/types.ts{ts}
-
-```ts
-function consoleNotifier(options?: ConsoleNotifierOptions): INotifier;
-```
-
-A development notifier: writes `[chamvi] <kind>: <title> (agent <agent>, run <runId>, key <idempotencyKey>)`, the body and, for an approval, `resume token: <token> (expires <ISO>)`, one `write` call per line. It never throws; an empty `name` throws `InvalidAgentDefinitionError`.
-
-See [Notifiers](/guide/notifiers).
-
 ## Clock
 
 ```ts
@@ -260,7 +255,7 @@ const systemClock: IClock;
 
 ## Errors
 
-`ChamviError`, `InvalidAgentDefinitionError`, `AgentNotFoundError`, `ContextNotProvidedError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
+`ChamviError`, `InvalidAgentDefinitionError`, `AgentNotFoundError`, `ChannelNotFoundError`, `ContextNotProvidedError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `ToolDeniedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
 
 <<< ../../../core/src/errors/constants.ts{ts}
 

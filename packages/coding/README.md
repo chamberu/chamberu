@@ -42,7 +42,7 @@ ESM only, Node.js `>=22`. `@chamvi/core`, `@chamvi/sandbox` and `ai` are peer de
 ```typescript
 import type { LanguageModel } from 'ai';
 import { codingTools } from '@chamvi/coding';
-import { defineAgent, http } from '@chamvi/core';
+import { ToolDeniedError, approve, defineAgent } from '@chamvi/core';
 import type { IWorkspaceManager } from '@chamvi/sandbox';
 
 export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceManager) {
@@ -51,17 +51,26 @@ export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceMa
         model,
         instructions: 'Check out the repository named in the payload, reproduce the reported bug ' +
             'with a failing test and answer with what you found and the diff.',
-        triggers: [http()],
         // create_workspace and dispose_workspace, then the seven coding tools
         tools: { ...workspaces.tools(), ...codingTools(workspaces) },
-        // every shell command waits for a human
-        approvals: { bash: 'user' },
+        hooks: {
+            // every shell command waits for a human
+            async beforeToolExecution({ toolName, input }, ctx) {
+                if (toolName !== 'bash') return input;
+                const { command } = input as { command: string };
+                const decision = await approve(ctx, { title: 'Run a shell command?', body: command });
+                if (!decision.approved) throw new ToolDeniedError(`Command refused: ${decision.reason ?? 'denied'}`);
+                return input;
+            },
+        },
         budget: { maxSteps: 40 },
     });
 }
 ```
 
-`workspaces` is a manager from `createWorkspaceManager({ provider })` (`@chamvi/sandbox`), attached to the engine with `workspaces.attach(engine)` so a run's workspaces go when it settles. The model calls `create_workspace` first, then works in it.
+`workspaces` is a manager from `createWorkspaceManager({ provider })` (`@chamvi/sandbox`), attached to the engine with `workspaces.attach(engine)` so a run's workspaces go when it settles. The model calls `create_workspace` first, then works in it. Subscribe the agent to a channel to start it (`channels: [http.on()]` with `@chamvi/http`).
+
+The tools are plain tools you did not write, so the gate lives in the agent's `beforeToolExecution` hook: it runs before every tool call, and `approve()` there pauses the run in `waiting` until someone answers (the UI inbox, `POST /runs/:id/approve`, or a channel's approval message with `ctx.channels.findOneOrFail(name).approve(...)`). The run keeps its workspace while it waits on this replica. Once answered, the hook runs again and `approve()` returns the decision; a thrown `ToolDeniedError` goes back to the model as a tool error and the run goes on.
 
 ## Tools
 
@@ -89,7 +98,7 @@ Every tool takes an optional `workspace` id (from `create_workspace`). Omitted, 
 
 ## Security
 
-`bash` runs whatever the model writes, and the model follows what it reads (an issue, a README, a test output): treat it as untrusted code. Use the Docker or Kubernetes provider, keep the workspace network firewalled, narrow `allowRepo` on the manager, and put `bash` behind an approval (`approvals: { bash: 'user' }`) where a human should see each command.
+`bash` runs whatever the model writes, and the model follows what it reads (an issue, a README, a test output): treat it as untrusted code. Use the Docker or Kubernetes provider, keep the workspace network firewalled, narrow `allowRepo` on the manager, and put `bash` behind an approval (a `beforeToolExecution` hook calling `approve()`, as in [Usage](#usage)) where a human should see each command.
 
 ## Coding backends
 

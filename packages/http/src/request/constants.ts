@@ -8,7 +8,7 @@
 import { TRIGGER_KEY_MAX_LENGTH } from '@chamvi/core';
 
 /**
- * Bounds of an `idempotencyKey`, a `thread`, an `Idempotency-Key` header and
+ * Bounds of an `idempotencyKey`, an `address`, an `Idempotency-Key` header and
  * a webhook's derived keys: core's TRIGGER_KEY_MAX_LENGTH.
  */
 export const KEY_MAX_LENGTH = TRIGGER_KEY_MAX_LENGTH;

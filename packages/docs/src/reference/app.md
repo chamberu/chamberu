@@ -29,9 +29,9 @@ Synchronous and side-effect free. `agents` may be omitted or empty when `CHAMVI_
 
 | Method | Builds | Rejects with |
 |---|---|---|
-| `start` | config, store (migrated unless `CHAMVI_MIGRATE=false`), engine, scheduler (unless `CHAMVI_SCHEDULER=false`), http; starts the engine and scheduler once every module built, resolves once listening | the setup error (a module graph error as `InvalidAgentDefinitionError`); `app_stopped` when `stop()` interrupted the setup (the setup's own error is logged); `app_in_use` for a second lifecycle or after `stop()` |
+| `start` | config, store (migrated unless `CHAMVI_MIGRATE=false`), engine with every contributed channel (the cron channel fires unless `CHAMVI_SCHEDULER=false`), http; starts the engine (and so its channels) once every module built, resolves once listening | the setup error (a module graph error as `InvalidAgentDefinitionError`); `app_stopped` when `stop()` interrupted the setup (the setup's own error is logged); `app_in_use` for a second lifecycle or after `stop()` |
 | `stop` | the shutdown sequence (see [Start and stop](/guide/app#start-and-stop)); memoized, waits for a setup in flight | `app_stop_failed` when a teardown failed (each failure is logged) |
-| `runJob` | config, store (migrated), engine (not started: `@chamvi/scheduler` `runJob` starts, ticks and drains it); no scheduler, no http | the job's error; `app_in_use` |
+| `runJob` | config, store (migrated), engine (not started: `@chamvi/channel-cron` `runJob` starts it without channels, ticks and drains it); no http | the job's error; `app_in_use` |
 | `migrate` | config, store (`migrateStore`), store teardown | `InvalidAgentDefinitionError` without `DATABASE_URL`; `app_in_use` |
 
 `runJob` resolves `exitCode: 0` for a `completed`, `waiting`, `skipped`, queued-behind-an-approval or signal-interrupted run, `1` for `failed` or `cancelled`.
@@ -57,14 +57,14 @@ Read by `readConfig(env, { mode, dev })` once per lifecycle; the optional module
 | `PORT` | http | int 1..65535 | `3000` | never |
 | `HOST` | http | string | `0.0.0.0` | never |
 | `CHAMVI_BASE_PATH` | http | empty or `^(?:\/[a-z0-9._~-]+)+$` | `''` (health at `/healthz`, UI at `/ui`) | never |
-| `CHAMVI_PUBLIC_URL` | http, ui, notifiers | absolute URL | unset | an approval link is wanted |
+| `CHAMVI_PUBLIC_URL` | http, ui, channels | absolute URL | unset | an approval link is wanted |
 | `CHAMVI_LOG_LEVEL` | config | `error`, `warn`, `info`, `debug` | `info` | never |
 | `DATABASE_URL` | store | `postgres://...` | unset: `MemoryStore` (warned outside dev) | `migrate`; any multi-replica or CronJob deployment |
 | `CHAMVI_MIGRATE` | store | bool | `true` | never |
 | `CHAMVI_PURGE_INTERVAL_MS` | store | int, `0` disables | `3600000` (only with `TypeormStore`, on `engine.clock`) | never |
 | `RESUME_SECRET` | engine | string, at least 32 characters | none (dev: random per process, warned) | `start`, `run-job` |
 | `CHAMVI_MAX_CONCURRENT_RUNS` | engine | int >= 1 | `4` | never |
-| `CHAMVI_SCHEDULER` | scheduler | bool | `true`; `false` runs no in-process cron (CronJob mode) | never |
+| `CHAMVI_SCHEDULER` | scheduler | bool | `true`; `false` starts no in-process cron (CronJob mode; `cron.on()` subscriptions still validate) | never |
 | `CHAMVI_AGENTS_DIR` | agents | path of a directory, relative to the working directory | unset: no [agent folders](/guide/agent-folders) | `createApp()` has no agents |
 | `CHAMVI_AGENTS_POLL_MS` | agents | int 1..`TIMER_MAX_MS` | `5000` (`DEFAULT_AGENTS_POLL_MS`) | never |
 | `CHAMVI_READINESS_DELAY_MS` | http shutdown | int | `0` | never |
@@ -112,12 +112,12 @@ function storeModule(options?: StoreModuleOptions): IModule;              // 'ch
 function staticTokensModule(options?: StaticTokensModuleOptions): IModule; // 'chamvi:static-tokens'
 function engineModule(options?: EngineModuleOptions): IModule;            // 'chamvi:engine'
 function agentsModule(): IModule;                                         // 'chamvi:agents'
-function schedulerModule(options?: SchedulerModuleOptions): IModule;      // 'chamvi:scheduler'
-function httpModule(options?: HttpModuleOptions): IModule;                // 'chamvi:http'
-function consoleNotifierModule(options?: ConsoleNotifierModuleOptions): IModule; // 'chamvi:notifier:<name>'
+function schedulerModule(options?: SchedulerModuleOptions): IModule;      // 'chamvi:scheduler', the cron channel
+function httpModule(options?: HttpModuleOptions): IModule;                // 'chamvi:http', the http, mcp and webhook channels
+function consoleChannelModule(options?: ConsoleChannelModuleOptions): IModule; // 'chamvi:console' ('chamvi:console:<name>' with a name)
 ```
 
-Listing one of them in `createApp({ modules })` replaces the default instance. `agentsModule()` (no options) reads `CHAMVI_AGENTS_DIR`: in `start` and `job` mode its `onReady` loads every folder into the engine before any start step (a dir that is no directory is `InvalidAgentDefinitionError`), and in `start` mode a lifecycle hook polls the dir from `started` until `stopping`; it registers `AppToken.AGENT_ISSUES`, which the http module passes on as `agentIssues`. A folder agent passes `AppToken.MODEL_CHECK` and every `AppToken.AGENT_CHECKS` contribution (the scheduler module's `assertSchedulable`, the http module's `assertMcpRunTool` unless `mcp: false`) and the engine's notifier check before it is registered; a refusal is a load issue, never a failed boot. Only `start` mode removes an agent whose marker has no folder; a job never does. Without a dir it only refuses an app without agents.
+Listing one of them in `createApp({ modules })` replaces the default instance. `agentsModule()` (no options) reads `CHAMVI_AGENTS_DIR`: in `start` and `job` mode its `onReady` loads every folder into the engine before any start step (a dir that is no directory is `InvalidAgentDefinitionError`), and in `start` mode a lifecycle hook polls the dir from `started` until `stopping`; it registers `AppToken.AGENT_ISSUES`, which the http module passes on as `agentIssues`. A folder agent passes `AppToken.MODEL_CHECK` and every `AppToken.AGENT_CHECKS` contribution (the scheduler module's `assertSchedulable`, the http module's `assertMcpRunTool` unless `mcp: false`) and the engine's channel check (every subscription names a registered channel) before it is registered; a refusal is a load issue, never a failed boot. Only `start` mode removes an agent whose marker has no folder; a job never does. Without a dir it only refuses an app without agents.
 
 <<< ../../../app/src/modules/config/types.ts{ts}
 
@@ -137,16 +137,13 @@ Listing one of them in `createApp({ modules })` replaces the default instance. `
 
 ```ts
 // @chamvi/github/module
-function githubModule(options?: GithubModuleOptions): GithubModule;        // .app: IGithubApp, 'chamvi:github'
-
-// @chamvi/notify-github/module
-function githubNotifierModule(options: GithubNotifierModuleOptions): IModule; // 'chamvi:notifier:<name>', default name 'github'
+function githubModule(options?: GithubModuleOptions): GithubModule;        // .app: IGithubApp and the github channel, 'chamvi:github'
 
 // @chamvi/sandbox/module
 function sandboxModule(options?: SandboxModuleOptions): SandboxModule;     // .manager: IWorkspaceManager, 'chamvi:sandbox'
 
-// @chamvi/notify-openclaw/module
-function openclawModule(options?: OpenclawModuleOptions): IModule;         // 'chamvi:notifier:<name>', default name 'openclaw'
+// @chamvi/channel-openclaw/module
+function openclawModule(options?: OpenclawModuleOptions): IModule;         // 'chamvi:channel:<name>', default name 'openclaw'
 
 // @chamvi/ui/module
 function uiModule(options?: UiModuleOptions): IModule;                     // 'chamvi:ui'
@@ -156,15 +153,13 @@ function authupModule(options?: AuthupModuleOptions): IModule;             // 'c
 function oidcModule(options: OidcOptions): IModule;                        // 'chamvi:oidc', no env form
 ```
 
-Each factory reads `options.env ?? process.env` when it is called and throws `InvalidAgentDefinitionError` naming a missing or malformed variable. Options win over env, except `CHAMVI_SANDBOX_PROVIDER`, `CHAMVI_SANDBOX_NAMESPACE` and `CHAMVI_SANDBOX_IMAGE`, which win over the sandbox options. The notifier modules default `approvalUrl` to the dashboard link built from `CHAMVI_PUBLIC_URL` and use the app's clock. Each module but `uiModule` and the authup ones provides its instance on the engine in its `engineCreated` hook; tools reach it through the package's context pair ([github](/reference/github#context), [notify-github](/reference/notify-github#context), [sandbox](/reference/sandbox#context), [notify-openclaw](/reference/notify-openclaw#context)).
+Each factory reads `options.env ?? process.env` when it is called and throws `InvalidAgentDefinitionError` naming a missing or malformed variable. Options win over env, except `CHAMVI_SANDBOX_PROVIDER`, `CHAMVI_SANDBOX_NAMESPACE` and `CHAMVI_SANDBOX_IMAGE`, which win over the sandbox options. The GitHub and OpenClaw modules contribute their channel to `AppToken.CHANNELS`, defaulting `approvalUrl` to the dashboard link built from `CHAMVI_PUBLIC_URL` and using the app's clock; tools reach a channel with `ctx.channels.findOne(name)`. `githubModule` and `sandboxModule` provide their instance on the engine in the `engineCreated` hook; tools reach it through the package's context pair ([github](/reference/github#context), [sandbox](/reference/sandbox#context)).
 
 <<< ../../../github/src/module/types.ts{ts}
 
-<<< ../../../notify-github/src/module/types.ts{ts}
-
 <<< ../../../sandbox/src/module/types.ts#public{ts}
 
-<<< ../../../notify-openclaw/src/module/types.ts{ts}
+<<< ../../../channel-openclaw/src/module/types.ts{ts}
 
 <<< ../../../ui/src/module/types.ts{ts}
 
@@ -230,6 +225,6 @@ const BUILTIN_PROVIDERS: readonly BuiltinProvider[]; // anthropic, openai, googl
 function createLogger(options?: LoggerOptions): ILogger;
 ```
 
-One JSON line per entry (`{ level, time, msg, ...fields, error? }`, the error as `{ name, code, message, stack }` only, never its `cause`) on stderr, or through `write`. The engine's, the scheduler's and the HTTP app's `onError` all go through it.
+One JSON line per entry (`{ level, time, msg, ...fields, error? }`, the error as `{ name, code, message, stack }` only, never its `cause`) on stderr, or through `write`. The engine's, the cron channel's and the HTTP app's `onError` all go through it.
 
 <<< ../../../app/src/logger/types.ts{ts}

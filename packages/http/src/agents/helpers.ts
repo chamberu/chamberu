@@ -6,18 +6,23 @@
  */
 
 import { DEFAULT_MAX_STEPS } from '@chamvi/core';
-import type { Agent, OverlapPolicy } from '@chamvi/core';
+import type { Agent } from '@chamvi/core';
 import { BadRequestError, NotFoundError } from '@ebec/http';
 import { defineSchema } from '@rapiq/core';
 import { CronExpressionParser } from 'cron-parser';
 import { isObject } from 'smob';
 import { Container } from 'validup';
 import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
-import { webhookUrl } from '../hooks/helpers.ts';
+import { webhookUrl } from '../channels/helpers.ts';
 import { decodeQuery } from '../request/helpers.ts';
 import { isDefined } from '../request/validators.ts';
 import type { HttpAgents } from '../app/types.ts';
-import type { AgentSummary, KvBody, ScheduleSummary } from './types.ts';
+import type {
+    AgentSummary,
+    KvBody,
+    ScheduleOverlap,
+    ScheduleSummary,
+} from './types.ts';
 
 /**
  * Any top-level filter key, no sort; values are coerced by rapiq (`2` ->
@@ -31,44 +36,60 @@ const KV_LIST_QUERY_SCHEMA = defineSchema({
     throwOnFailure: true,
 });
 
-export function summarizeAgent(agent: Agent, basePath: string): AgentSummary {
+/**
+ * An agent as `GET /agents` lists it; a subscription to one of `hookChannels`
+ * (the webhook channels the app mounts) carries its `hook` URL.
+ */
+export function summarizeAgent(agent: Agent, basePath: string, hookChannels: ReadonlySet<string> = new Set()): AgentSummary {
     const { definition } = agent;
-    const summary: AgentSummary = {
+    return {
         name: agent.name,
-        triggers: (definition.triggers ?? []).map((trigger) => (trigger.source === 'webhook' ?
+        channels: (definition.channels ?? []).map((subscription) => (hookChannels.has(subscription.channel) ?
             {
-                source: trigger.source,
-                id: trigger.id,
-                hook: webhookUrl(basePath, agent.name, String(trigger.options.path)),
+                channel: subscription.channel,
+                id: subscription.id,
+                hook: webhookUrl(basePath, subscription.channel, agent.name, String(subscription.options.path)),
             } :
-            { source: trigger.source, id: trigger.id })),
+            { channel: subscription.channel, id: subscription.id })),
         // defineAgent applied the defaults; the type keeps them optional
         budget: { maxSteps: DEFAULT_MAX_STEPS, ...definition.budget },
-        approvals: Object.keys(definition.approvals ?? {}),
         state: Object.keys(definition.state ?? {}),
     };
-    if (definition.notify !== undefined) summary.notify = definition.notify;
-    return summary;
 }
 
-/** Every `cron()` trigger of every agent, in definition order, with its next fire time after `now`. */
+/** The next fire time after `now`, or `undefined` for an expression or timezone cron-parser refuses. */
+function nextFire(expression: string, timezone: string | undefined, now: Date): string | undefined {
+    try {
+        return CronExpressionParser.parse(expression, {
+            currentDate: now,
+            ...(timezone ? { tz: timezone } : {}),
+        }).next().toDate().toISOString();
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * Every cron subscription (one whose options carry a string `expression`,
+ * as `@chamvi/channel-cron` builds them) of every agent, in definition
+ * order, with its next fire time after `now`.
+ */
 export function listSchedules(agents: Iterable<Agent>, now: Date): ScheduleSummary[] {
     const schedules: ScheduleSummary[] = [];
     for (const agent of agents) {
-        for (const trigger of agent.definition.triggers ?? []) {
-            if (trigger.source !== 'cron') continue;
-            const expression = String(trigger.options.expression);
-            const timezone = trigger.options.timezone as string | undefined;
-            const nextAt = CronExpressionParser.parse(expression, {
-                currentDate: now,
-                ...(timezone ? { tz: timezone } : {}),
-            }).next().toDate().toISOString();
+        for (const subscription of agent.definition.channels ?? []) {
+            const { expression } = subscription.options;
+            if (typeof expression !== 'string') continue;
+            const timezone = typeof subscription.options.timezone === 'string' ? subscription.options.timezone : undefined;
+            const nextAt = nextFire(expression, timezone, now);
+            if (nextAt === undefined) continue;
             schedules.push({
                 agent: agent.name,
-                trigger: trigger.id,
+                channel: subscription.channel,
+                trigger: subscription.id,
                 expression,
                 ...(timezone ? { timezone } : {}),
-                overlap: (trigger.options.overlap as OverlapPolicy | undefined) ?? 'skip',
+                overlap: (subscription.options.overlap as ScheduleOverlap | undefined) ?? 'skip',
                 nextAt,
             });
         }

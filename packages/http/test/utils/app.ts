@@ -5,27 +5,36 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { tool } from 'ai';
 import { z } from 'zod';
 import {
     Engine,
     MemoryStore,
-    cron,
+    approve,
+    createResumeToken,
     defineAgent,
-    http,
-    webhook,
+    defineTool,
 } from '@chamvi/core';
 import type {
     Agent,
-    INotifier,
+    ChannelSubscription,
+    IChannel,
     IStore,
-    Notification,
 } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
-import { createHttpApp, staticTokens } from '@chamvi/http';
+import {
+    createHttpApp,
+    http,
+    httpChannel,
+    mcpChannel,
+    staticTokens,
+    webhook,
+    webhookChannel,
+} from '@chamvi/http';
 import type { HttpAppOptions, Principal } from '@chamvi/http';
 import type { App } from 'routup';
 import { approvalModel, textModel } from './model.ts';
+
+export const RESUME_SECRET = 'test-secret';
 
 export const ADMIN_TOKEN = 'admin-token-0123456789';
 export const READER_TOKEN = 'reader-token-0123456789';
@@ -51,7 +60,8 @@ export type TestAppOverrides = Partial<Omit<HttpAppOptions, 'agents'>> & {
     agents?: Agent[];
     store?: IStore;
     clock?: ControllableClock;
-    notifiers?: Record<string, INotifier>;
+    /** Channels the engine holds besides `http`, `mcp`, `webhook` and the `cron` stub. */
+    engineChannels?: IChannel<any, any>[];
 };
 
 export function createTestApp(overrides: TestAppOverrides = {}) {
@@ -59,7 +69,7 @@ export function createTestApp(overrides: TestAppOverrides = {}) {
         agents: agentsOverride,
         store: storeOverride,
         clock: clockOverride,
-        notifiers,
+        engineChannels = [],
         engine: engineOverride,
         ...options
     } = overrides;
@@ -67,6 +77,8 @@ export function createTestApp(overrides: TestAppOverrides = {}) {
     const clock = (engineOverride?.clock as ControllableClock | undefined) ??
         clockOverride ??
         new ControllableClock(new Date(1_000_000));
+    const channels = testChannels();
+    const hooks = channels.find((channel) => channel.name === 'webhook')!;
     const engine = engineOverride ?? new Engine({
         store: storeOverride ?? new MemoryStore({ clock }),
         agents: agentsOverride ?? [
@@ -74,18 +86,20 @@ export function createTestApp(overrides: TestAppOverrides = {}) {
                 name: 'echo',
                 model: textModel(),
                 instructions: 'Echo.',
-                triggers: [http()],
+                channels: [http.on()],
             }),
         ],
-        resumeSecret: 'test-secret',
+        resumeSecret: RESUME_SECRET,
         clock,
-        notifiers,
+        channels: [...channels, ...engineChannels],
         onError: () => {},
     });
     const app = createHttpApp({
         auth: [testAuth, permissionsAuth],
         metrics: false,
         rateLimit: false,
+        // a given engine brings its own channels
+        ...(engineOverride ? {} : { channels: [hooks] }),
         ...options,
         engine,
     });
@@ -121,28 +135,58 @@ export function call(app: App, method: string, path: string, options: CallOption
     }));
 }
 
-/** Records every notification it is asked to send. */
-export class CapturingNotifier implements INotifier {
-    readonly name = 'capture';
+/** `http`, `mcp`, `webhook` (over the test authenticators) and the `cron` stub, fresh per call. */
+export function testChannels(): IChannel<any, any>[] {
+    return [httpChannel(), mcpChannel(), webhookChannel({ auth: [testAuth, permissionsAuth] }), cronStub()];
+}
 
-    readonly sent: Notification[] = [];
+/** A channel named `cron` without behaviour, so agents can carry cron subscriptions. */
+export function cronStub(): IChannel {
+    return { name: 'cron' };
+}
 
-    async notify(n: Notification): Promise<void> {
-        this.sent.push(n);
-    }
+/** A cron subscription as `@chamvi/channel-cron`'s `cron.on()` builds it. */
+export function cronOn(
+    expression: string,
+    options: { timezone?: string; overlap?: 'skip' | 'queue-one' | 'allow' } = {},
+): ChannelSubscription {
+    return {
+        channel: 'cron',
+        id: `cron:${expression}`,
+        options: {
+            expression,
+            timezone: options.timezone,
+            overlap: options.overlap ?? 'skip',
+        },
+    };
+}
 
-    /** The resume token of the latest approval notification. */
-    get lastToken(): string {
-        const token = this.sent.findLast((n) => n.kind === 'approval')?.resumeToken;
-        if (!token) throw new Error('no approval notification captured');
-        return token;
-    }
+/** A `deploy` tool that asks for an approval (no channel) before it deploys. */
+export function deployTool() {
+    return defineTool({
+        inputSchema: z.object({}),
+        execute: async (_input, { context }) => {
+            const decision = await approve(context, { title: 'Deploy?', body: 'release 1.2' });
+            return decision.approved ? 'deployed' : 'denied';
+        },
+    });
+}
+
+/** The resume token of the run's current wait point (no channel message carries it). */
+export async function resumeTokenOf(store: IStore, runId: string): Promise<string> {
+    const waiting = (await store.getRun(runId))?.waiting;
+    if (!waiting) throw new Error(`run ${runId} is not waiting`);
+    return createResumeToken(RESUME_SECRET, {
+        runId,
+        approvalId: waiting.approvalId,
+        tokenId: waiting.tokenId,
+        expiresAt: waiting.expiresAt,
+    });
 }
 
 /**
- * `echo` (http, text), `gate` (http, approval on `deploy`, notifies
- * `capture`), `sweep` (cron only) and `hooked` (webhook only); fresh models
- * per call.
+ * `echo` (http, text), `gate` (http, `deploy` asks for an approval),
+ * `sweep` (cron only) and `hooked` (webhook only); fresh models per call.
  */
 export function createRunAgents(): Agent[] {
     return [
@@ -150,41 +194,37 @@ export function createRunAgents(): Agent[] {
             name: 'echo',
             model: textModel(),
             instructions: 'Echo.',
-            triggers: [http()],
+            channels: [http.on()],
         }),
         defineAgent({
             name: 'gate',
             model: approvalModel('deploy'),
             instructions: 'Deploy.',
-            triggers: [http()],
-            tools: () => ({ deploy: tool({ inputSchema: z.object({}), execute: async () => 'deployed' }) }),
-            approvals: { deploy: 'user' },
-            notify: 'capture',
+            channels: [http.on()],
+            tools: () => ({ deploy: deployTool() }),
         }),
         defineAgent({
             name: 'sweep',
             model: textModel(),
             instructions: 'Sweep.',
-            triggers: [cron('0 * * * *')],
+            channels: [cronOn('0 * * * *')],
         }),
         defineAgent({
             name: 'hooked',
             model: textModel(),
             instructions: 'Hooked.',
-            triggers: [webhook({ path: '/x' })],
+            channels: [webhook.on('/x')],
         }),
     ];
 }
 
-/** `createTestApp` over `createRunAgents()` with a capturing notifier. */
+/** `createTestApp` over `createRunAgents()`, with `tokenOf(runId)` for paused runs. */
 export function createRunTestApp(overrides: TestAppOverrides = {}) {
-    const notifier = new CapturingNotifier();
     const setup = createTestApp({
         agents: createRunAgents(),
-        notifiers: { capture: notifier },
         ...overrides,
     });
-    return { ...setup, notifier };
+    return { ...setup, tokenOf: (runId: string) => resumeTokenOf(setup.store, runId) };
 }
 
 /** An authenticator that maps `Bearer p:<a>,<b>` to a principal with those permissions. */

@@ -1,15 +1,18 @@
 import type { ITokenVerifier } from '@authup/server-adapter-kit';
 import type { Agent, IStore } from '@chamvi/core';
+import { cronChannel } from '@chamvi/channel-cron';
 import { Engine } from '@chamvi/core';
 import {
     authup,
     createHttpApp,
     createShutdown,
+    httpChannel,
+    mcpChannel,
     oidc,
     staticTokens,
+    webhookChannel,
 } from '@chamvi/http';
 import type { Authenticator } from '@chamvi/http';
-import { createScheduler } from '@chamvi/scheduler';
 import { serve } from 'routup';
 
 /** `verifier`: an authup `TokenVerifier` in remote mode (with a `creator`), so tokens carry their grants. */
@@ -51,18 +54,20 @@ export function authenticators(verifier: ITokenVerifier): Authenticator[] {
 
 export async function start(store: IStore, agents: Agent[], resumeSecret: string, verifier: ITokenVerifier) {
     // #region app
+    const auth = authenticators(verifier);
+    // POST /channels/webhook/<agent><path>, authenticated with the same chain
+    const webhooks = webhookChannel({ auth });
     const engine = new Engine({
         store,
         agents,
         resumeSecret,
+        // the channels read the store, agents and clock from the engine
+        channels: [httpChannel(), mcpChannel(), webhooks, cronChannel()],
     });
-    // the scheduler and the app read the store, agents and clock from the engine
-    const scheduler = createScheduler({ engine });
 
     let server: ReturnType<typeof serve> | undefined;
     const shutdown = createShutdown({
         engine,
-        scheduler,
         // the server is created after the app; the helper only calls close() at shutdown
         server: { close: async (force) => { await server?.close(force); } },
         readinessDelayMs: 5_000,
@@ -70,7 +75,9 @@ export async function start(store: IStore, agents: Agent[], resumeSecret: string
 
     const app = createHttpApp({
         engine,
-        auth: authenticators(verifier),
+        auth,
+        // the channels served at /channels/<name>
+        channels: [webhooks],
         shutdown,
         basePath: '/api',
         // behind one reverse proxy: trust its X-Forwarded-For
@@ -78,14 +85,14 @@ export async function start(store: IStore, agents: Agent[], resumeSecret: string
         cors: { origin: 'https://chamvi.example.com' },
     });
 
+    // recovers runs, then starts every channel (the cron schedule among them)
     await engine.start();
-    await scheduler.start();
     // srvx must not install its own signal handler
     server = serve(app, { port: 3000, gracefulShutdown: false });
     // #endregion app
 
     // #region shutdown
-    // fail readiness, stop the scheduler, end streams, stop intake, drain
+    // fail readiness, end streams, stop the channels, drain
     process.once('SIGTERM', () => {
         void shutdown.shutdown().then(() => process.exit(0));
     });

@@ -12,6 +12,7 @@ import { systemClock } from '../../clock/index.ts';
 import type { IClock } from '../../clock/index.ts';
 import { InvalidRunStateError, RunNotFoundError } from '../../errors/index.ts';
 import type { Checkpoint, Run, Step } from '../../run/types.ts';
+import { normalizeEnvelope } from '../../trigger/helpers.ts';
 import type { IStore } from '../types.ts';
 import { compareCodePoints, copy } from './helpers.ts';
 import type { Expiring } from './types.ts';
@@ -20,6 +21,13 @@ import type { Expiring } from './types.ts';
  * In-memory Store. Methods are single-threaded and never await between a
  * check and the matching write, which makes the atomic operations atomic.
  */
+/** A copy of a stored run; an envelope of the pre-channel shape (`source`, `thread`) reads as the current one. */
+function readRun(run: Run): Run {
+    const out = copy(run);
+    out.trigger = normalizeEnvelope(out.trigger as unknown as Record<string, unknown>);
+    return out;
+}
+
 export class MemoryStore implements IStore {
     protected clock: IClock;
 
@@ -61,7 +69,7 @@ export class MemoryStore implements IStore {
 
     async getRun(id: string): Promise<Run | undefined> {
         const run = this.runs.get(id);
-        return run ? copy(run) : undefined;
+        return run ? readRun(run) : undefined;
     }
 
     async updateRun(
@@ -88,7 +96,7 @@ export class MemoryStore implements IStore {
             updatedAt: patch.updatedAt ? copy(patch.updatedAt) : this.clock.now(),
         };
         this.runs.set(id, next);
-        return copy(next);
+        return readRun(next);
     }
 
     async listRuns(q: {
@@ -107,7 +115,7 @@ export class MemoryStore implements IStore {
             .sort((a, b) => direction * (a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id, 'en')));
         const offset = q.offset ?? 0;
         const end = q.limit === undefined ? undefined : offset + q.limit;
-        return { data: matched.slice(offset, end).map((r) => copy(r)), total: matched.length };
+        return { data: matched.slice(offset, end).map((r) => readRun(r)), total: matched.length };
     }
 
     async claimRun(id: string, owner: string, ttlMs: number): Promise<boolean> {

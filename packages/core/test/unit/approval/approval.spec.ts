@@ -5,8 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { tool } from 'ai';
-import type { LanguageModel, ModelMessage } from 'ai';
+import type { LanguageModel } from 'ai';
 import {
     afterEach,
     describe,
@@ -18,25 +17,24 @@ import { z } from 'zod';
 import {
     Engine,
     FatalToolError,
-    InvalidAgentDefinitionError,
     InvalidResumeTokenError,
     InvalidRunStateError,
     RunNotFoundError,
     ValidationError,
+    approve,
     createResumeToken,
     defineAgent,
+    defineTool,
 } from '@chamvi/core';
 import type {
     AgentDefinition,
     EngineOptions,
-    INotifier,
-    Notification,
-    NotifyOptions,
 } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { MemoryStore } from '../../../src/store/index.ts';
+import { recordApprovals } from '../../utils/approvals.ts';
 import { mockModel } from '../../utils/mock-model.ts';
-import type { MockPart, MockResponse } from '../../utils/mock-model.ts';
+import type { MockResponse } from '../../utils/mock-model.ts';
 
 const engines: Engine[] = [];
 
@@ -57,31 +55,12 @@ const deployTurn = (env = 'prod', toolCallId?: string): MockResponse => ({
     }],
 });
 
-const call = (env: string, toolCallId: string): MockPart => ({
-    type: 'tool-call',
-    toolName: 'deploy',
-    input: { env },
-    toolCallId,
-});
-
 const text = (t: string): MockResponse => ({ parts: [{ type: 'text', text: t }] });
-
-class RecordingNotifier implements INotifier {
-    readonly name = 'owner';
-
-    calls: Array<{ n: Notification; opts: NotifyOptions }> = [];
-
-    fail = false;
-
-    async notify(n: Notification, opts: NotifyOptions): Promise<void> {
-        this.calls.push({ n, opts });
-        if (this.fail) throw new Error('notifier down');
-    }
-}
 
 type Setup = {
     model: LanguageModel;
-    approvals?: AgentDefinition['approvals'];
+    /** Whether the deploy of `env` asks for an approval; default always. */
+    gated?: (env: string) => boolean;
     budget?: AgentDefinition['budget'];
     /** Replaces the deploy tool's body (after recording the call). */
     deploy?: (input: { env: string }) => Promise<string>;
@@ -91,11 +70,14 @@ type Setup = {
 function setup(s: Setup) {
     const clock = new ControllableClock(new Date(1_000_000));
     const store = new MemoryStore({ clock });
-    const notifier = new RecordingNotifier();
     const executed: unknown[] = [];
-    const deploy = tool({
+    const deploy = defineTool({
         inputSchema: z.object({ env: z.string() }),
-        execute: async (input) => {
+        execute: async (input, { context }) => {
+            if (s.gated?.(input.env) ?? true) {
+                const decision = await approve(context, { title: `Deploy ${input.env}?`, timeoutMs: TIMEOUT });
+                if (!decision.approved) return `not deployed: ${decision.reason ?? 'denied'}`;
+            }
             executed.push(input);
             if (s.deploy) return s.deploy(input);
             return `deployed ${input.env}`;
@@ -106,16 +88,12 @@ function setup(s: Setup) {
         instructions: 'You release.',
         model: s.model,
         tools: () => ({ deploy }),
-        approvals: s.approvals ?? { deploy: 'user' },
-        approvalTimeoutMs: TIMEOUT,
-        notify: 'owner',
         budget: s.budget,
     });
     const errors: unknown[] = [];
     const engine = new Engine({
         store,
         agents: [agent],
-        notifiers: { owner: notifier },
         resumeSecret: SECRET,
         clock,
         claimTtlMs: 30,
@@ -125,6 +103,7 @@ function setup(s: Setup) {
         ...s.engine,
     });
     engines.push(engine);
+    const notifier = recordApprovals(engine, SECRET);
     return {
         clock,
         store,
@@ -140,7 +119,7 @@ type Ctx = ReturnType<typeof setup>;
 const env = (concurrencyKey?: string) => ({
     agent: 'release',
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: {},
     concurrencyKey,
 });
@@ -159,12 +138,12 @@ async function poll(ctx: Ctx, ms = 10) {
     await ctx.engine.idle();
 }
 
-const tokenOf = (ctx: Ctx, i = 0) => ctx.notifier.calls[i]!.n.resumeToken!;
+const tokenOf = (ctx: Ctx, i = 0) => ctx.notifier.calls[i]!.resumeToken;
 
 const promptOf = (model: ReturnType<typeof mockModel>, i: number) => JSON.stringify(model.doStreamCalls[i]?.prompt);
 
 describe('approvals', () => {
-    it('tool requiring approval puts run in waiting and notifies once', async () => {
+    it('tool requiring approval puts run in waiting once', async () => {
         const model = mockModel([deployTurn(), text('done')]);
         const ctx = setup({ model });
         const { runId, run } = await dispatchToWaiting(ctx);
@@ -175,7 +154,7 @@ describe('approvals', () => {
         expect(run?.waiting).toMatchObject({
             kind: 'approval',
             toolName: 'deploy',
-            input: { env: 'prod' },
+            title: 'Deploy prod?',
             expiresAt: new Date(1_000_000 + TIMEOUT),
         });
         expect(ctx.executed).toEqual([]);
@@ -184,28 +163,9 @@ describe('approvals', () => {
         expect(tokenId).toMatch(/^[0-9a-f-]{36}$/);
 
         expect(ctx.notifier.calls).toHaveLength(1);
-        const [{ n, opts }] = ctx.notifier.calls as [RecordingNotifier['calls'][number]];
-        expect(opts).toEqual({
-            idempotencyKey: `${runId}:${approvalId}`,
-            trigger: expect.objectContaining({
-                agent: 'release',
-                source: 'http',
-                id: run!.trigger.id,
-            }),
-        });
-        expect(n).toMatchObject({
-            kind: 'approval',
-            agent: 'release',
-            runId,
-            approvalId,
-            expiresAt: new Date(1_000_000 + TIMEOUT),
-        });
-        expect(n.title).toContain('deploy');
-        expect(n.body).toContain('prod');
-        expect(typeof n.resumeToken).toBe('string');
 
-        // re-process the waiting run twice (as a crash recovery would): it pauses on
-        // the same approval from its checkpoint, without another model call or notification
+        // re-process the waiting run twice (as a crash recovery would): the pending call
+        // suspends on the same approval again, without another model call or wait point
         for (let i = 0; i < 2; i++) {
             await ctx.store.updateRun(runId, { status: 'queued' }, { expectStatus: ['waiting'] });
             await poll(ctx);
@@ -238,15 +198,6 @@ describe('approvals', () => {
         expect(promptOf(model, 1)).toContain('deployed prod');
 
         const { messages } = (await ctx.store.latestCheckpoint(runId))!;
-        expect(messages).toContainEqual({
-            role: 'tool',
-            content: [{
-                type: 'tool-approval-response',
-                approvalId: run!.waiting!.approvalId,
-                approved: true,
-                reason: 'go',
-            }],
-        });
         // the tool result of the approved call is part of the checkpoint
         expect(JSON.stringify(messages)).toContain('deployed prod');
 
@@ -254,7 +205,7 @@ describe('approvals', () => {
         expect(steps.map((s) => s.kind)).toEqual(['llm', 'wait', 'tool', 'llm']);
         expect(steps[1]).toMatchObject({
             name: 'deploy',
-            input: { env: 'prod' },
+            input: { title: 'Deploy prod?' },
             output: {
                 approvalId: run!.waiting!.approvalId,
                 approved: true,
@@ -264,7 +215,7 @@ describe('approvals', () => {
         expect(steps.map((s) => s.index)).toEqual([0, 1, 2, 3]);
     });
 
-    it('denied resume completes without executing the tool', async () => {
+    it('denied resume completes without deploying', async () => {
         const model = mockModel([deployTurn(), text('ok, not deploying')]);
         const ctx = setup({ model });
         const { runId } = await dispatchToWaiting(ctx);
@@ -293,11 +244,11 @@ describe('approvals', () => {
         expect((await ctx.store.getRun(runId))?.status).toBe('completed');
     });
 
-    it('racing resumes: exactly one wins and only it writes the checkpoint', async () => {
+    it('racing resumes: exactly one wins and only it records the decision', async () => {
         const model = mockModel([deployTurn(), text('done')]);
         const ctx = setup({ model });
         const { runId } = await dispatchToWaiting(ctx);
-        const save = vi.spyOn(ctx.store, 'saveCheckpoint');
+        const put = vi.spyOn(ctx.store, 'putEffect');
         const token = tokenOf(ctx);
 
         const results = await Promise.allSettled([
@@ -307,24 +258,24 @@ describe('approvals', () => {
         expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
         const rejected = results.find((r) => r.status === 'rejected');
         expect(rejected?.reason).toBeInstanceOf(InvalidRunStateError);
-        // only the winner's approval checkpoint (before the run executes again)
-        expect(save).toHaveBeenCalledTimes(1);
+        // only the winner's decision
+        expect(put.mock.calls.filter(([key]) => key.startsWith('approval:'))).toHaveLength(1);
         await ctx.engine.idle();
         expect((await ctx.store.getRun(runId))?.status).toBe('completed');
         expect(ctx.executed).toEqual([{ env: 'prod' }]);
     });
 
-    it('a resumed run is not picked up before its approval is checkpointed', async () => {
+    it('a resumed run is not picked up before its decision is recorded', async () => {
         const model = mockModel([deployTurn(), text('done')]);
         const ctx = setup({ model });
         const { runId } = await dispatchToWaiting(ctx);
-        const latest = ctx.store.latestCheckpoint.bind(ctx.store);
-        // a poll pass runs while resume reads the checkpoint
-        vi.spyOn(ctx.store, 'latestCheckpoint').mockImplementationOnce(async (id) => {
+        const put = ctx.store.putEffect.bind(ctx.store);
+        // a poll pass runs while resume records the decision
+        vi.spyOn(ctx.store, 'putEffect').mockImplementationOnce(async (key, result) => {
             ctx.clock.advance(10);
             await ctx.engine.idle();
-            expect((await ctx.store.getRun(id))?.status).toBe('queued');
-            return latest(id);
+            expect((await ctx.store.getRun(runId))?.status).toBe('queued');
+            return put(key, result);
         });
 
         await ctx.engine.resume(tokenOf(ctx), { approved: true });
@@ -334,14 +285,14 @@ describe('approvals', () => {
         expect(model.doStreamCalls).toHaveLength(2);
     });
 
-    it('a crash between the queued transition and the approval checkpoint keeps the original token valid', async () => {
+    it('a crash between the queued transition and the recorded decision keeps the original token valid', async () => {
         const model = mockModel([deployTurn(), text('done')]);
         const ctx = setup({ model });
         const { runId, run } = await dispatchToWaiting(ctx);
         const token = tokenOf(ctx);
 
         // the resuming process dies right after answer()'s waiting -> queued write
-        vi.spyOn(ctx.store, 'latestCheckpoint').mockImplementationOnce(() => new Promise(() => {}));
+        vi.spyOn(ctx.store, 'putEffect').mockImplementationOnce(() => new Promise(() => {}));
         void ctx.engine.resume(token, { approved: false });
         await vi.waitFor(async () => {
             expect((await ctx.store.getRun(runId))?.status).toBe('queued');
@@ -423,7 +374,7 @@ describe('approvals', () => {
         const ctx = setup({
             model,
             budget: { maxSteps: 1 },
-            approvals: { deploy: (input) => ((input as { env: string }).env === 'dev' ? 'allow' : 'user') },
+            gated: (target) => target !== 'dev',
         });
         const { runId } = await dispatchToWaiting(ctx);
 
@@ -589,141 +540,6 @@ describe('approvals', () => {
         expect((await ctx.store.getRun(runId))?.status).toBe('completed');
     });
 
-    it('a failing notifier is reported, the run still waits and the next poll notifies again', async () => {
-        const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
-        ctx.notifier.fail = true;
-        const { runId, run } = await dispatchToWaiting(ctx);
-        expect(run?.status).toBe('waiting');
-        expect(run?.waiting?.notifiedAt).toBeUndefined();
-        expect(ctx.notifier.calls).toHaveLength(1);
-        expect(ctx.errors).toHaveLength(1);
-        expect(String(ctx.errors[0])).toContain('notifier down');
-
-        // the failed send did not use up the approval's notification: tick() retries it
-        ctx.notifier.fail = false;
-        await poll(ctx);
-        expect(ctx.notifier.calls).toHaveLength(2);
-        expect(ctx.notifier.calls[1]!.opts).toEqual(ctx.notifier.calls[0]!.opts);
-        expect(ctx.notifier.calls[1]!.opts.trigger.id).toBe(run!.trigger.id);
-        expect(ctx.notifier.calls[1]!.n.resumeToken).toBe(tokenOf(ctx));
-        expect((await ctx.store.getRun(runId))?.waiting?.notifiedAt).toBeInstanceOf(Date);
-
-        // delivered: neither later polls nor a re-pause send it again
-        await poll(ctx);
-        await ctx.store.updateRun(runId, { status: 'queued' }, { expectStatus: ['waiting'] });
-        await poll(ctx);
-        expect((await ctx.store.getRun(runId))?.status).toBe('waiting');
-        expect(ctx.notifier.calls).toHaveLength(2);
-        expect(ctx.errors).toHaveLength(1);
-
-        await ctx.engine.resume(tokenOf(ctx, 1), { approved: true });
-        await ctx.engine.idle();
-        expect((await ctx.store.getRun(runId))?.status).toBe('completed');
-    });
-
-    it('a send cut off by a crash is retried once its attempt lock expires', async () => {
-        const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
-        ctx.notifier.fail = true;
-        // the crashed process never released its attempt lock
-        vi.spyOn(ctx.store, 'release').mockResolvedValueOnce(undefined);
-        const { runId } = await dispatchToWaiting(ctx);
-        expect(ctx.notifier.calls).toHaveLength(1);
-        ctx.notifier.fail = false;
-
-        // the lock lives for one attempt (claimTtlMs = 30), not for the idempotency TTL
-        await poll(ctx, 10);
-        expect(ctx.notifier.calls).toHaveLength(1);
-        await poll(ctx, 30);
-        expect(ctx.notifier.calls).toHaveLength(2);
-        expect((await ctx.store.getRun(runId))?.waiting?.notifiedAt).toBeInstanceOf(Date);
-
-        await ctx.engine.resume(tokenOf(ctx, 1), { approved: true });
-        await ctx.engine.idle();
-        expect((await ctx.store.getRun(runId))?.status).toBe('completed');
-    });
-
-    it('an agent naming an unknown notifier is rejected', () => {
-        const agent = defineAgent({
-            name: 'release',
-            instructions: '',
-            model: mockModel([]),
-            notify: 'nobody',
-        });
-        expect(() => new Engine({
-            store: new MemoryStore(),
-            agents: [agent],
-            resumeSecret: SECRET,
-        })).toThrow(InvalidAgentDefinitionError);
-    });
-
-    it('approval policies map allow, deny and user', async () => {
-        const seen: unknown[] = [];
-        const model = mockModel([
-            {
-                parts: [
-                    call('dev', 'c1'),
-                    call('stage', 'c2'),
-                    call('prod', 'c3'),
-                ],
-            },
-            text('done'),
-        ]);
-        const ctx = setup({
-            model,
-            approvals: {
-                deploy: (input, { runtimeContext }) => {
-                    seen.push(runtimeContext.runId);
-                    const { env: target } = input as { env: string };
-                    if (target === 'dev') return 'allow';
-                    if (target === 'stage') return 'deny';
-                    return 'user';
-                },
-            },
-        });
-        const { runId, run } = await dispatchToWaiting(ctx);
-        expect(seen).toEqual([runId, runId, runId]);
-        expect(ctx.executed).toEqual([{ env: 'dev' }]);
-        expect(run?.waiting).toMatchObject({ toolName: 'deploy', input: { env: 'prod' } });
-
-        await ctx.engine.resume(tokenOf(ctx), { approved: true });
-        await ctx.engine.idle();
-        expect(ctx.executed).toEqual([{ env: 'dev' }, { env: 'prod' }]);
-        expect((await ctx.store.getRun(runId))?.status).toBe('completed');
-    });
-
-    it('several approval requests in one step pause on the first; the model re-requests the rest', async () => {
-        const model = mockModel([
-            {
-                parts: [
-                    call('prod', 'c1'),
-                    call('eu', 'unanswered-call'),
-                ],
-            },
-            deployTurn('eu', 'c3'),
-            text('both done'),
-        ]);
-        const ctx = setup({ model });
-        const { runId, run } = await dispatchToWaiting(ctx);
-        expect(run?.waiting).toMatchObject({ input: { env: 'prod' } });
-
-        // the unanswered call is not part of the history
-        const { messages }: { messages: ModelMessage[] } = (await ctx.store.latestCheckpoint(runId))!;
-        expect(JSON.stringify(messages)).not.toContain('unanswered-call');
-
-        await ctx.engine.resume(tokenOf(ctx), { approved: true });
-        await ctx.engine.idle();
-        expect(promptOf(model, 1)).not.toContain('unanswered-call');
-        const second = await ctx.store.getRun(runId);
-        expect(second?.status).toBe('waiting');
-        expect(second?.waiting).toMatchObject({ input: { env: 'eu' } });
-        expect(ctx.notifier.calls).toHaveLength(2);
-
-        await ctx.engine.resume(tokenOf(ctx, 1), { approved: true });
-        await ctx.engine.idle();
-        expect(ctx.executed).toEqual([{ env: 'prod' }, { env: 'eu' }]);
-        expect((await ctx.store.getRun(runId))?.output).toBe('both done');
-    });
-
     it('a waiting run can be cancelled, which unblocks its key and voids the token', async () => {
         const model = mockModel([deployTurn(), text('b done')]);
         const ctx = setup({ model });
@@ -740,7 +556,7 @@ describe('approvals', () => {
         expect(ctx.executed).toEqual([]);
     });
 
-    it('a cancel racing the pause settles the run cancelled without notifying', async () => {
+    it('a cancel racing the pause settles the run cancelled', async () => {
         const ctx = setup({ model: mockModel([deployTurn()]) });
         const { promise: gate, resolve: open } = Promise.withResolvers<void>();
         let holding = false;
@@ -763,7 +579,6 @@ describe('approvals', () => {
         await ctx.engine.idle();
 
         expect(await ctx.store.getRun(runId)).toMatchObject({ status: 'cancelled', waiting: undefined });
-        expect(ctx.notifier.calls).toHaveLength(0);
         expect(ctx.errors).toEqual([]);
     });
 
@@ -858,12 +673,12 @@ describe('Engine.approve', () => {
     it('approve rejects a stale approvalId and leaves the run waiting', async () => {
         const ctx = setup({ model: mockModel([deployTurn(), text('done')]) });
         const { runId } = await dispatchToWaiting(ctx);
-        const save = vi.spyOn(ctx.store, 'saveCheckpoint');
+        const put = vi.spyOn(ctx.store, 'putEffect');
 
         await expect(ctx.engine.approve(runId, { approvalId: 'other', approved: true }))
             .rejects.toThrow(InvalidRunStateError);
         expect((await ctx.store.getRun(runId))?.status).toBe('waiting');
-        expect(save).not.toHaveBeenCalled();
+        expect(put).not.toHaveBeenCalled();
     });
 
     it('approve rejects an expired wait point', async () => {

@@ -7,7 +7,7 @@
 <p align="center">
     <b>REST, SSE, webhooks and MCP for chamvi agents, on routup.</b><br>
     One routup App per chamvi app: humans start and follow runs over REST and SSE,<br>
-    machines post webhooks with bearer tokens, and agents call runs as MCP tools.
+    channels take deliveries at <code>/channels/&lt;name&gt;</code>, and agents call runs as MCP tools.
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
 - [Endpoints](#endpoints)
 - [Permissions](#permissions)
 - [Authenticators](#authenticators)
-- [Triggers](#triggers)
+- [Channels](#channels)
 - [MCP tools](#mcp-tools)
 - [Operations](#operations)
 - [Shutdown](#shutdown)
@@ -46,27 +46,31 @@ ESM only, Node.js `>=22`. `@chamvi/core` is a peer dependency; [routup](https://
 
 ```typescript
 import type { LanguageModel } from 'ai';
+import { Engine, MemoryStore, defineAgent } from '@chamvi/core';
 import {
-    Engine,
-    MemoryStore,
-    defineAgent,
+    createHttpApp,
+    createShutdown,
     http,
-} from '@chamvi/core';
-import { createHttpApp, createShutdown, staticTokens } from '@chamvi/http';
+    httpChannel,
+    mcpChannel,
+    staticTokens,
+} from '@chamvi/http';
 
 export async function createAgentServer(model: LanguageModel) {
     const echo = defineAgent({
         name: 'echo',
         model,
         instructions: 'Answer with a short summary of the payload.',
-        // http() lets REST (POST /agents/echo/runs) and MCP (run_echo) start runs
-        triggers: [http()],
+        // http.on() lets REST (POST /agents/echo/runs) and MCP (run_echo) start runs
+        channels: [http.on()],
     });
 
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [echo],
         resumeSecret: 'change-me',
+        // REST runs carry channel http, MCP runs channel mcp
+        channels: [httpChannel(), mcpChannel()],
     });
 
     const token = process.env.CHAMVI_TOKEN;
@@ -99,7 +103,7 @@ export async function createAgentServer(model: LanguageModel) {
 }
 ```
 
-Every route answers JSON. Errors are always `{ status, code, message, issues? }` (for unmatched routes too); a 5xx body says `Internal Server Error` and the cause goes to `onError`. An issue keeps its `received` value only when that is at most 256 characters as JSON, so a 400 never echoes a large body (an oversized `attachments` list, a long `thread` or media type) back. Every 401 carries `WWW-Authenticate: Bearer`.
+Every route answers JSON. Errors are always `{ status, code, message, issues? }` (for unmatched routes too); a 5xx body says `Internal Server Error` and the cause goes to `onError`. An issue keeps its `received` value only when that is at most 256 characters as JSON, so a 400 never echoes a large body (an oversized `attachments` list, a long `address` or media type) back. Every 401 carries `WWW-Authenticate: Bearer`.
 
 ## Endpoints
 
@@ -107,7 +111,7 @@ Paths are relative to `basePath` (default none).
 
 | Method and path | Permission | Answer |
 |---|---|---|
-| `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, thread?, attachments? }`, the key also as an `Idempotency-Key` header; the agent must declare `http()` |
+| `POST /agents/:name/runs` | `agent:<name>:run` | `202 { runId, deduplicated }`; body `{ payload?, idempotencyKey?, address?, attachments? }`, the key also as an `Idempotency-Key` header; the agent needs an `http.on()` subscription; runs carry channel `http` |
 | `GET /runs` | `run:read`, or `agent:<agent>:run` with `filter[agent]=<agent>` | `200 { data, meta: { total, limit, offset } }` |
 | `GET /runs/:id` | `run:read` or `agent:<run.agent>:run` | `200` the run plus its `steps` |
 | `GET /runs/:id/stream` | as `GET /runs/:id` | SSE: `run.updated`, `step.appended` (`id` = step index), `delta` (live model output, no `id`), `ping`; ends once the run settled. `Last-Event-ID` or `?after=<step index>` resumes; `503` with `Retry-After` over `stream.maxOpen` |
@@ -116,9 +120,9 @@ Paths are relative to `basePath` (default none).
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /runs/:id/approve` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ approvalId, approved, reason? }`; answers the run's current wait point without a token (409 for another `approvalId`, an expired wait point or a run not waiting) |
 | `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
-| `POST /hooks/:agent<path>` | `agent:<agent>:run` | `202 { runId, deduplicated }`; the whole body is the payload |
-| `GET /agents` | `run:read` | `200 { data: AgentSummary[] }`: triggers (with each webhook's `hook` path), budget, approvals, state collections |
-| `GET /schedules` | `run:read` | `200 { data: ScheduleSummary[] }`: every `cron()` trigger with its next fire time (from the definitions, not from a running scheduler) |
+| `POST /channels/<name>[/...]` | the channel's own | Whatever the channel's `in` answers; only for the channels in the `channels` option (see [Channels](#channels)) |
+| `GET /agents` | `run:read` | `200 { data: AgentSummary[], issues }`: subscriptions `{ channel, id, hook? }` (`hook`: the path of a subscription to a webhook channel this app mounts), budget, state collections; `issues` lists agents that failed to load |
+| `GET /schedules` | `run:read` | `200 { data: ScheduleSummary[] }`: every cron subscription (`@chamvi/channel-cron`'s `cron.on()`) with its channel and next fire time (from the definitions, not from a running scheduler) |
 | `GET /agents/:name/state/kv` | `state:read` | `200 { data: Array<{ key, value }> }` in key code-point order; `page[limit]` (default 50, at most 100), `page[offset]` |
 | `GET /agents/:name/state/kv/:key` | `state:read` | `200 { key, value }` (`null` when unset) |
 | `PATCH /agents/:name/state/kv/:key` | `state:write` | `200 { key, value }`; body `{ value }` |
@@ -131,7 +135,7 @@ Paths are relative to `basePath` (default none).
 
 `GET /runs` takes the [rapiq](https://www.npmjs.com/package/@rapiq/codec-url) URL syntax: `filter[agent]=triage`, `filter[status]=queued,running`, `page[limit]=20` (default 50, at most 100), `page[offset]=40` and `sort=createdAt` (oldest first, the default) or `sort=-createdAt` (newest first). The expression dialect works too (`filter=eq(agent,'triage')`); only filters joined with `and` are supported. Unknown keys, operators and sorts answer 400.
 
-Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413 above, 415 for another media type). A refused body is drained (at most `bodyLimit` more bytes) so a keep-alive connection serves the next request; a longer one closes the connection. A protected route checks the bearer token before it reads the body, so an unauthenticated client cannot make the server buffer it. Unknown body keys are dropped without an error. A NUL character (U+0000, which Postgres text columns refuse) in the URL, in an `idempotencyKey`, `thread` or other string field, or in a key a webhook derives from its payload answers 400.
+Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413 above, 415 for another media type). A refused body is drained (at most `bodyLimit` more bytes) so a keep-alive connection serves the next request; a longer one closes the connection. A protected route checks the bearer token before it reads the body, so an unauthenticated client cannot make the server buffer it. Unknown body keys are dropped without an error. A NUL character (U+0000, which Postgres text columns refuse) in the URL, in an `idempotencyKey`, `address` or other string field, or in a key a webhook derives from its payload answers 400.
 
 `attachments` takes at most 16 files `{ mediaType, filename?, data }`: `mediaType` is `type/subtype` without parameters, `filename` 1 to 255 characters, `data` strict base64 (padded, standard alphabet, no whitespace); anything else is 400 `validation_error` with the field's path, and nothing is dispatched. The files are stored as artifacts of the run (see `@chamvi/core`) and handed to the model as file parts. Base64 rides in the JSON body, so `bodyLimit` bounds the files as well.
 
@@ -149,7 +153,7 @@ Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`
 
 | Permission | Grants |
 |---|---|
-| `agent:<name>:run` | Start runs of the agent (REST, webhooks, MCP `run_<name>`) and read them |
+| `agent:<name>:run` | Start runs of the agent (REST, `webhookChannel()` deliveries, MCP `run_<name>`) and read them |
 | `agent:<name>:approve` | Answer the agent's approvals (`POST /runs/:id/approve`, `POST /resume`, MCP `resume_run`) |
 | `run:read` | Read and list every run, the agents and the schedules |
 | `run:cancel` | Cancel runs |
@@ -187,10 +191,14 @@ auth: [
 - **`authup({ verifier })`**: verifies through `@authup/server-adapter-web`. A token grants its permissions only when its `scope` contains `global`; other tokens keep their identity but grant nothing (so they answer 403). Local verification always yields no permissions: grants need remote mode (`creator`, introspection). Permission `policies`, `realm_id` and `client_id` are not evaluated. Caching: a cached result is served until the token's `exp`, so in local mode it outlives a disabled signing key and in remote mode a revoked token (`maxRemoteCacheTTL` bounds remote caching); without `cache`, nothing is cached.
 - **`oidc({ issuers, principal })`**: any OIDC issuer through vouchly, e.g. GitHub Actions tokens. Every issuer needs an `audience` (vouchly skips the `aud` check without one, so a public issuer's tokens for any audience would pass; `oidc()` throws otherwise). `principal` is **required** and maps the verified claims to a principal (or `undefined` to refuse it): a public issuer lets anyone mint a token for your audience, so the deployment decides which `sub` or `repository` gets which grants. A token from an issuer that is not configured passes to the next authenticator; an unreachable issuer answers 503.
 
-## Triggers
+## Channels
 
-- **`http({ schema? })`** is the control-plane trigger (id `http`, at most one per agent). REST `POST /agents/:name/runs` starts runs through it (envelope source `http`), and so does MCP `run_<name>` (source `mcp`). An agent without `http()` answers 404 on REST and gets no MCP tool. `schema` (any Standard Schema) validates the payload; failures answer 400 with `issues`.
-- **`webhook({ path, schema?, idempotencyKey?, concurrencyKey? })`** (id `webhook:<path>`, many per agent) is served on its own path under the agent: `webhook({ path: '/issues' })` on agent `intake` is `POST /hooks/intake/issues`, a path of `/` is `/hooks/intake` (`GET /agents` lists each `hook` URL; the id stays internal). The match is exact, a trailing slash included. The body may be any JSON value. The idempotency key comes from the `Idempotency-Key` header, else from `idempotencyKey(payload)`; retried deliveries with one key create one run. The hook answers 202 right away and never runs the agent synchronously. Signature-verified webhooks (GitHub) are a separate package.
+Agents subscribe to channels (`defineAgent({ channels: [...] })`, see `@chamvi/core`); the engine holds the channel instances (`new Engine({ channels })`). This package ships three:
+
+- **`httpChannel()`** (name `http`) and **`mcpChannel()`** (name `mcp`): no `in`, no `out`. **`http.on({ schema? })`** is the control-plane subscription (id `http`, at most one per agent): REST `POST /agents/:name/runs` starts runs through it as channel `http`, and MCP `run_<name>` as channel `mcp`, so the two keep separate idempotency scopes. An agent without it answers 404 on REST and gets no MCP tool. `schema` (any Standard Schema) validates the payload; failures answer 400 with `issues`. The engine refuses an `http.on()` subscription unless it holds `httpChannel()`.
+- **`webhookChannel({ auth, name?, bodyLimit? })`** (name `webhook` by default): **`webhook.on(path, { schema?, idempotencyKey?, concurrencyKey? })`** (id `webhook:<path>`, many per agent) is served on its own path under the agent: `webhook.on('/issues')` on agent `intake` is `POST /channels/webhook/intake/issues`, a path of `/` is `/channels/webhook/intake` (`GET /agents` lists each `hook` URL). The match is exact, a trailing slash included. A delivery needs a principal of `auth` (one authenticator or a chain, as the app's `auth`; required, since the app never authenticates channel routes) holding `agent:<agent>:run`, checked before the body is read. The body is any JSON value of at most `bodyLimit` bytes (default 1 MiB; 413 above, 415 for another media type) and is the payload. The idempotency key comes from the `Idempotency-Key` header, else from `idempotencyKey(payload)`; retried deliveries with one key create one run. It answers 202 right away and never runs the agent synchronously; runs carry no invoker. A second instance (`webhookChannel({ name: 'hooks', auth })`) makes its subscriptions with its own `on()`. Signature-verified webhooks (GitHub) are `@chamvi/github`'s channel.
+
+`createHttpApp({ channels })` mounts `POST /channels/<name>` and `POST /channels/<name>/...` for exactly the listed channels (each needs an `in` and must be the object the engine holds under its name; else `InvalidAgentDefinitionError`). These routes are rate-limited but never authenticated by the app: each channel checks its own credentials. `in({ request, subpath }, ctx)` gets the raw request (body unread; read it with this package's `readRequestBody(request, { limit })`, which answers 413 above the limit and closes the connection) and the raw subpath (`''` for the bare path, else starting with `/`, still percent-encoded), and `ctx.dispatch` dispatches as the channel. Its `Response` is sent as is; a thrown error renders like any route's error. Any other `/channels/...` path is 404.
 
 ## MCP tools
 
@@ -198,25 +206,25 @@ auth: [
 
 | Tool | Input | Answer |
 |---|---|---|
-| `run_<agent>` | `{ payload?, idempotencyKey?, thread?, waitSeconds? }` | `{ runId, status, deduplicated, output?, error?, waiting? }` |
+| `run_<agent>` | `{ payload?, idempotencyKey?, address?, waitSeconds? }` | `{ runId, status, deduplicated, output?, error?, waiting? }` |
 | `get_run` | `{ runId }` | The run (as `GET /runs/:id`, without steps) |
 | `list_runs` | `{ agent?, status?, limit?, offset? }` | `{ data: RunSummary[], total }` |
 | `resume_run` | `{ token, approved, reason? }` | `{ runId, status: 'queued' }` |
 
-- `run_<agent>` is listed for each agent with an `http()` trigger the principal may run; its `payload` carries the trigger schema's JSON Schema (local `$ref`s re-rooted under `payload`). Tool definitions are built once in `createHttpApp`, which throws `InvalidAgentDefinitionError` for a payload schema the MCP validator cannot compile or a tool name above the 64 characters MCP allows (an agent name above 60; set `mcp: false` to keep it). `waitSeconds` (default 0) waits for `completed`, `failed`, `cancelled` or `waiting`, at most `mcp.maxWaitSeconds` (default 60; larger values are clamped). A wait holds one of the app's `stream.maxOpen` slots; with all taken the call answers at once with `{ runId, status, deduplicated }`, like `waitSeconds: 0`, and the run proceeds. The wait polls the store every second, so it sees a run executing on another replica, and stops when the client goes away. A `waiting` answer names the tool and input, never the resume token.
-- Idempotency keys are scoped per agent, source and principal: an MCP start dedupes under `<agent>:mcp:<kind>:<id>`, a REST start under `<agent>:http:<kind>:<id>` (the principal's `kind` and `id`, URI-encoded), so one key used over both transports, or by two principals, creates two runs. Webhook starts carry no invoker and dedupe under `<agent>:webhook`.
+- `run_<agent>` is listed for each agent with an `http.on()` subscription the principal may run (runs carry channel `mcp`); its `payload` carries the subscription schema's JSON Schema (local `$ref`s re-rooted under `payload`). Tool definitions are built once in `createHttpApp`, which throws `InvalidAgentDefinitionError` for a payload schema the MCP validator cannot compile or a tool name above the 64 characters MCP allows (an agent name above 60; set `mcp: false` to keep it). `waitSeconds` (default 0) waits for `completed`, `failed`, `cancelled` or `waiting`, at most `mcp.maxWaitSeconds` (default 60; larger values are clamped). A wait holds one of the app's `stream.maxOpen` slots; with all taken the call answers at once with `{ runId, status, deduplicated }`, like `waitSeconds: 0`, and the run proceeds. The wait polls the store every second, so it sees a run executing on another replica, and stops when the client goes away. A `waiting` answer names the tool and the approval's `title` and `body`, never the resume token.
+- Idempotency keys are scoped per agent, channel and principal: an MCP start dedupes under `<agent>:mcp:<kind>:<id>`, a REST start under `<agent>:http:<kind>:<id>` (the principal's `kind` and `id`, URI-encoded), so one key used over both transports, or by two principals, creates two runs. Webhook starts carry no invoker and dedupe under `<agent>:webhook`.
 - `get_run` and `list_runs` follow the REST read rule; denied permissions and unknown runs come back as tool errors (`isError`).
 
 ## Operations
 
-- **`/metrics`** is unauthenticated (scrapers rarely send bearer tokens): keep it off the public ingress (a NetworkPolicy, or a separate internal listener), or disable it with `metrics: false`. Each app gets its own `prom-client` `Registry`; the `path` label is the route template (`/runs/:id`, `/hooks/:agent/*`; an unknown path is `/_unmatched`), so ids and probes do not mint series. SSE streams and rate-limited requests are not timed. `metrics.normalizePath` overrides the label.
+- **`/metrics`** is unauthenticated (scrapers rarely send bearer tokens): keep it off the public ingress (a NetworkPolicy, or a separate internal listener), or disable it with `metrics: false`. Each app gets its own `prom-client` `Registry`; the `path` label is the route template (`/runs/:id`, `/channels/:name/*`; an unknown path is `/_unmatched`), so ids and probes do not mint series. SSE streams and rate-limited requests are not timed. `metrics.normalizePath` overrides the label.
 - **Rate limit**: 300 requests per minute per client address by default, `/healthz`, `/readyz`, `/metrics` and CORS preflights excluded. The key is the socket address unless `trustProxy` is set: behind a reverse proxy, set it (e.g. `'loopback'` or a hop count) or every client shares the proxy's bucket; `X-Forwarded-For` is never trusted otherwise. Without a socket address (in-process `app.fetch`, unix sockets) all clients share one bucket.
 - **CORS** is off unless `cors` is given (`@routup/cors` options).
 - **Readiness** fails while shutting down, while the engine drains, or when the store does not answer within `readyTimeoutMs`.
 
 ## Shutdown
 
-`createShutdown()` runs the shutdown in order: fail readiness, wait `readinessDelayMs`, stop the scheduler, end open SSE streams and MCP `run_<agent>` waits (a wait answers with the run as stored), close MCP (the app registers that; new streams and MCP requests then answer 503), stop accepting connections, `engine.drain()`, then wait at most `closeTimeoutMs` for open connections before closing them. Pass `gracefulShutdown: false` to `serve()` so srvx does not install its own signal handler:
+`createShutdown()` runs the shutdown in order: fail readiness, wait `readinessDelayMs`, run the `onShutdown` callbacks in the order added (the http app's own one ends open SSE streams and MCP `run_<agent>` waits (a wait answers with the run as stored), closes MCP; new streams and MCP requests then answer 503), stop accepting connections, `engine.drain()` (which stops every channel first, the cron schedule among them), then wait at most `closeTimeoutMs` for open connections before closing them. Pass `gracefulShutdown: false` to `serve()` so srvx does not install its own signal handler:
 
 ```ts
 import { serve } from 'routup';
@@ -224,7 +232,6 @@ import { serve } from 'routup';
 let server: ReturnType<typeof serve> | undefined;
 const shutdown = createShutdown({
     engine,
-    scheduler,
     // the server is created after the app; the helper only calls close() at shutdown
     server: { close: async (force) => { await server?.close(force); } },
 });
@@ -236,7 +243,7 @@ process.once('SIGTERM', () => {
 });
 ```
 
-`shutdown.onShutdown(fn)` adds your own cleanup; it runs after the scheduler stopped and before the server closes.
+`shutdown.onShutdown(fn)` adds your own cleanup; it runs after readiness failed and before the server closes.
 
 ## Options
 
@@ -245,7 +252,7 @@ process.once('SIGTERM', () => {
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `engine` | `Engine` | required | Dispatches, cancels and resumes runs; its `store`, agents and `clock` serve every route (runs, steps and state are read from `engine.store`, polls, waits and timeouts run on `engine.clock`) |
-| `agents` | `string[]` | every agent | Names of the engine's agents this app serves (routes, MCP tools, hooks, extra routes); the others are unknown to it. A name the engine lacks or given twice throws `InvalidAgentDefinitionError` |
+| `agents` | `string[]` | every agent | Names of the engine's agents this app serves (routes, MCP tools, extra routes); the others are unknown to it. A mounted channel serves every agent subscribing to it. A name the engine lacks or given twice throws `InvalidAgentDefinitionError` |
 | `auth` | `Authenticator \| Authenticator[]` | required | The authenticator chain |
 | `basePath` | `string` | none | Prefix of every route, e.g. `/api` |
 | `trustProxy` | routup trust-proxy input | none | Which proxies the client address (and the rate-limit key) trusts |
@@ -259,14 +266,14 @@ process.once('SIGTERM', () => {
 | `metrics` | `false \| Partial<PrometheusOptions>` | `/metrics` | `@routup/prometheus` options |
 | `readyTimeoutMs` | `number` | `2_000` | How long `/readyz` waits for the store |
 | `onError` | `(error) => void` | `console.error` | 5xx causes and background failures |
-| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamvi/github`'s webhook), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter; `prefix: true` also serves every path below `path/` (the rest as `request.subpath`, raw and case kept; metrics label `<path>/*`; no other route of that method at or under it, never at or above the metrics path); a result may carry `headers` and a `Uint8Array` body (sent as is, `application/octet-stream` by default); the route context has `basePath` |
+| `channels` | `IChannel[]` | none | Channels served at `POST /channels/<name>` and below (see [Channels](#channels)); each needs an `in` and must be the object the engine holds under its name |
+| `routes` | `HttpRoute[]` | none | Extra routes other packages contribute (e.g. `@chamvi/ui`'s dashboard), served under `basePath` without `auth`; static paths, never under a built-in route's first segment or the metrics path (case-insensitive), `rateLimit: false` skips the limiter; `prefix: true` also serves every path below `path/` (the rest as `request.subpath`, raw and case kept; metrics label `<path>/*`; no other route of that method at or under it, never at or above the metrics path); a result may carry `headers` and a `Uint8Array` body (sent as is, `application/octet-stream` by default); the route context has `basePath` |
 
 `createShutdown(options)`:
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `engine` | `Engine` | required | Drained during the shutdown; its `clock` drives the delays |
-| `scheduler` | `{ stop(): Promise<void> }` | none | Stopped first, e.g. `createScheduler()` from `@chamvi/scheduler` |
 | `server` | `{ close(force?): Promise<void> }` | none | The srvx server |
 | `readinessDelayMs` | `number` | `0` | Time for load balancers to see the failing readiness |
 | `drainTimeoutMs` | `number` | `30_000` | Passed to `engine.drain()` |
@@ -280,11 +287,14 @@ process.once('SIGTERM', () => {
 | `createHttpApp` | function | Builds the routup App |
 | `createShutdown` | function | The graceful shutdown helper |
 | `staticTokens`, `authup`, `oidc` | function | Authenticators |
+| `httpChannel`, `mcpChannel`, `webhookChannel` | function | The channels REST, MCP and generic webhooks dispatch as |
+| `http`, `webhook` | constant | Subscription builders: `http.on({ schema? })`, `webhook.on(path, options?)` |
+| `HTTP_CHANNEL_NAME`, `MCP_CHANNEL_NAME`, `WEBHOOK_CHANNEL_NAME` | constant | `http`, `mcp`, `webhook` |
 | `agentPermission` | function | `agent:<agent>:<action>` (matching is core's `hasPermission`) |
 | `Permission` | constant | `ALL`, `RUN_READ`, `RUN_CANCEL`, `STATE_READ`, `STATE_WRITE` |
 | `DEFAULT_SHUTDOWN_DRAIN_TIMEOUT_MS`, `DEFAULT_SHUTDOWN_CLOSE_TIMEOUT_MS` | constant | `30_000`, `5_000` |
 
-Types: `HttpAppOptions`, `McpOptions`, `CorsOptions`, `RateLimitOptions`, `PrometheusOptions`, `TrustProxyInput`, `Principal`, `Authenticator`, `PermissionName`, `AgentAction`, `StaticToken`, `StaticTokensOptions`, `AuthupOptions`, `OidcOptions`, `IShutdown`, `ShutdownOptions`, `RunView`, `InvokerView`, `RunListQuery`, `RunSummary`, `RunToolResult`, `AgentSummary`, `ScheduleSummary`.
+Types: `HttpAppOptions`, `McpOptions`, `CorsOptions`, `RateLimitOptions`, `PrometheusOptions`, `TrustProxyInput`, `Principal`, `Authenticator`, `PermissionName`, `AgentAction`, `StaticToken`, `StaticTokensOptions`, `AuthupOptions`, `OidcOptions`, `IShutdown`, `ShutdownOptions`, `RunView`, `InvokerView`, `RunListQuery`, `RunSummary`, `RunToolResult`, `AgentSummary`, `ScheduleSummary`, `ScheduleOverlap`, `WebhookChannel`, `WebhookChannelOptions`, `HttpSubscriber`, `HttpSubscriptionOptions`, `WebhookSubscriber`, `WebhookSubscriptionOptions`.
 
 ## License
 

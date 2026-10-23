@@ -6,10 +6,8 @@
  */
 
 export type SchedulerModuleOptions = {
-    /** Names of the agents to schedule; default every agent. */
-    agents?: string[];
-    /** Lock owner; default the scheduler's `${hostname}-${pid}`. */
+    /** Lock owner; default the cron channel's `${hostname}-${pid}`. */
     owner?: string;
-    /** Default the scheduler's SCHEDULE_LOCK_TTL_MS. */
+    /** Default the cron channel's SCHEDULE_LOCK_TTL_MS. */
     lockTtlMs?: number;
 };

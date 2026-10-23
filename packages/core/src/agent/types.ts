@@ -6,15 +6,13 @@
  */
 
 import type { LanguageModel, OutputInterface, ToolSet } from 'ai';
+import type { ChannelSubscription } from '../channel/types.ts';
 import type { Budget, RunContext } from '../run/types.ts';
 import type { StateSchema } from '../state/types.ts';
 import type { ToolContext } from '../tool/types.ts';
-import type { TriggerDefinition } from '../trigger/types.ts';
 
 /** The factory's argument: the same ToolContext the run's chamvi tools get. */
 export type ToolFactoryContext<S extends StateSchema = StateSchema> = ToolContext<S>;
-
-export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: RunContext }) => 'user' | 'allow' | 'deny');
 
 /**
  * Decides per tool name whether a run may use a tool. A refused tool is not
@@ -24,19 +22,53 @@ export type ApprovalPolicy = 'user' | ((input: unknown, ctx: { runtimeContext: R
  * - the model calls it anyway: the AI SDK answers the model with its
  *   unavailable-tool error (NoSuchToolError), the engine records the step
  *   as ToolNotAllowedError;
- * - an approved call from an older history (the policy changed before the
- *   resume) reaches the engine's per-call re-check, which answers the model
- *   with ToolNotAllowedError.
+ * - a call pending on an approval (the policy changed before the resume)
+ *   reaches the engine's per-call re-check, which answers the model with
+ *   ToolNotAllowedError.
  * Should depend only on the run snapshot (e.g. `run.trigger.invoker`), so
  * the tool set is stable across executions.
  */
 export type ToolPolicy = (toolName: string, ctx: { run: RunContext }) => boolean;
 
+/** A tool call as the agent hooks see it. */
+export type ToolCallInfo = {
+    toolName: string;
+    toolCallId: string;
+    input: unknown;
+};
+
+/**
+ * Gates and rewrites for every tool call of the agent's merged set (user,
+ * chamvi, state and third-party tools alike), run inside the tool-call frame
+ * with the execution's ToolContext (`inject` works there).
+ */
+export type AgentHooks = {
+    /**
+     * Runs before the effect lookup and returns the input to execute with
+     * (`undefined` keeps it). A changed input is re-validated against the
+     * tool's input schema (a failure is a ValidationError tool error) and is
+     * what the effect key is computed from. A throw is a tool error
+     * (ToolDeniedError for a refusal); a FatalToolError fails the run.
+     */
+    beforeToolExecution?(call: ToolCallInfo, ctx: ToolContext): unknown | Promise<unknown>;
+    /**
+     * Runs on a fresh result and on a recorded effect result alike and returns
+     * the output the model sees (`undefined` keeps it). A streaming tool's
+     * hook gets its final value. Not called for a tool error.
+     */
+    afterToolExecution?(call: ToolCallInfo & { output: unknown }, ctx: ToolContext): unknown | Promise<unknown>;
+};
+
 export type AgentDefinition<S extends StateSchema = StateSchema> = {
     name: string;
     model: LanguageModel;
     instructions: string;
-    triggers?: TriggerDefinition[];
+    /**
+     * The channels that start the agent's runs (e.g. `cron.on('0 8 * * 1-5')`);
+     * every subscription names a channel registered on the engine, ids are
+     * unique per agent.
+     */
+    channels?: ChannelSubscription[];
     /**
      * The agent's tools: a plain `ToolSet` (the default), or a factory for
      * dynamic sets, called once per execution with the same ToolContext the
@@ -52,22 +84,16 @@ export type AgentDefinition<S extends StateSchema = StateSchema> = {
      * defineAgent for a plain set, a failed run for a factory).
      */
     toolsContext?: Record<string, unknown>;
+    /**
+     * Tool hooks (see AgentHooks). AI SDK tools declaring their own
+     * `needsApproval` are refused (nothing answers that request).
+     */
+    hooks?: AgentHooks;
     /** Filters the merged tool set (state tools included) per run, e.g. requireToolPermission(). */
     toolPolicy?: ToolPolicy;
     /** Record<collection, StandardSchemaV1>. */
     state?: S;
     budget?: Partial<Budget>;
-    /**
-     * Tool name to policy (maps to AI SDK toolApproval). A call needing approval
-     * pauses the run in `waiting`; one approval per pause: when a step asks for
-     * several, the run waits on the first and the other calls are dropped from
-     * the history, so the model requests them again after the resume.
-     */
-    approvals?: Record<string, ApprovalPolicy>;
-    /** Default 24h; on timeout the call is denied. */
-    approvalTimeoutMs?: number;
-    /** Notifier name registered on the engine. */
-    notify?: string;
     /**
      * Structured output (AI SDK `Output`, e.g. `Output.object({ schema })`):
      * a completed run's `output` is the parsed value instead of the text; a

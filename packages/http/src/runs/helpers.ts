@@ -16,11 +16,11 @@ import type {
     Agent,
     Artifact,
     ArtifactInput,
+    ChannelSubscription,
     Invoker,
     Run,
     RunStatusLiteral,
     Step,
-    TriggerDefinition,
 } from '@chamvi/core';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@ebec/http';
 import { defineSchema } from '@rapiq/core';
@@ -32,6 +32,7 @@ import { agentPermission } from '../auth/module.ts';
 import { Permission } from '../auth/constants.ts';
 import type { Principal } from '../auth/types.ts';
 import { DEFAULT_PAGE_LIMIT } from '../app/constants.ts';
+import { HTTP_CHANNEL_NAME } from '../channels/constants.ts';
 import type { HttpContext } from '../app/types.ts';
 import { decodeQuery } from '../request/helpers.ts';
 import {
@@ -111,18 +112,23 @@ export function assertCanListRuns(principal: Principal, agent: string | undefine
     throw new ForbiddenError({ message: `Missing permission "${Permission.RUN_READ}".` });
 }
 
-/** The agent's `http()` trigger, else 404. */
-export function requireHttpTrigger(agent: Agent): TriggerDefinition {
-    const trigger = agent.definition.triggers?.find((t) => t.source === 'http');
-    if (!trigger) throw new NotFoundError({ message: `Agent "${agent.name}" declares no http() trigger.` });
-    return trigger;
+/** The agent's `http.on()` subscription, else 404. */
+export function requireHttpSubscription(agent: Agent): ChannelSubscription {
+    const subscription = findHttpSubscription(agent);
+    if (!subscription) throw new NotFoundError({ message: `Agent "${agent.name}" has no http subscription.` });
+    return subscription;
+}
+
+/** The agent's subscription to the `http` channel (REST and MCP starts), if any. */
+export function findHttpSubscription(agent: Agent): ChannelSubscription | undefined {
+    return agent.definition.channels?.find((subscription) => subscription.channel === HTTP_CHANNEL_NAME);
 }
 
 export function createStartRunContainer(): Container<StartRunBody> {
     const container = new Container<StartRunBody>();
     container.mount('payload', { optional: true }, isDefined());
     container.mount('idempotencyKey', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
-    container.mount('thread', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
+    container.mount('address', { optional: true }, isString({ min: 1, max: KEY_MAX_LENGTH }));
     container.mount('attachments', { optional: true }, isArrayOf(createAttachmentContainer(), { max: MAX_ATTACHMENTS }));
     return container;
 }

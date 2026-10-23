@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { normalizeEnvelope } from '@chamvi/core';
 import type {
     AgentRevision,
     Artifact,
@@ -34,7 +35,7 @@ const RUN_PROPERTIES: ReadonlySet<string> = new Set([
     'status',
     'trigger',
     'concurrencyKey',
-    'thread',
+    'address',
     'output',
     'error',
     'usage',
@@ -124,11 +125,12 @@ export function toEntity<T extends ObjectLiteral>(
     return entity;
 }
 
+/** Revive a stored envelope's dates; a pre-channel envelope (`source`, `thread`) reads as the current shape. */
 function reviveTrigger(trigger: Record<string, unknown>): TriggerEnvelope {
-    const output = {
+    const output = normalizeEnvelope({
         ...trigger,
         receivedAt: new Date(trigger.receivedAt as string),
-    } as TriggerEnvelope;
+    });
     if (Array.isArray(trigger.attachments)) {
         output.attachments = (trigger.attachments as Record<string, unknown>[]).map((attachment) => ({
             ...attachment,
@@ -164,7 +166,7 @@ export function toRun(entity: RunEntity): Run {
     };
 
     if (entity.concurrencyKey !== null) run.concurrencyKey = entity.concurrencyKey;
-    if (entity.thread !== null) run.thread = entity.thread;
+    if (entity.address !== null) run.address = entity.address;
     if (entity.output !== null) run.output = entity.output;
     if (entity.error !== null) run.error = entity.error;
     if (entity.waiting !== null) run.waiting = reviveWaiting(entity.waiting);

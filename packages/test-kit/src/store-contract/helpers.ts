@@ -18,7 +18,7 @@ export function makeRun(id: string, overrides: Partial<Run> = {}): Run {
             id: `t-${id}`,
             agent: 'a',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
             receivedAt: createdAt,
         },

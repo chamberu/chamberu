@@ -6,7 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { defineAgent, http } from '@chamvi/core';
+import { defineAgent } from '@chamvi/core';
+import { http } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
     READER_TOKEN,
@@ -24,7 +25,7 @@ function setup() {
             name: 'loose',
             model: textModel(),
             instructions: 'Loose.',
-            triggers: [http()],
+            channels: [http.on()],
         }),
     ];
     return createTestApp({ agents });

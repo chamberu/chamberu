@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { Engine, defineAgent, http } from '@chamvi/core';
+import { Engine, defineAgent } from '@chamvi/core';
 import type { EngineOptions } from '@chamvi/core';
 import { ControllableClock } from '../../utils/clock.ts';
 import { mockModel } from '../../utils/mock-model.ts';
@@ -17,7 +17,6 @@ const agent = (text: string) => defineAgent({
     name: 'triage',
     model: mockModel(answers(text)),
     instructions: 'x',
-    triggers: [http()],
 });
 
 /** Holds the next marker write or delete at a gate until released. */
@@ -71,7 +70,7 @@ function createEngine(store: MemoryStore, clock: ControllableClock, extra: Parti
 const dispatch = (engine: Engine) => engine.dispatch({
     agent: 'triage',
     trigger: 'http',
-    source: 'http',
+    channel: 'http',
     payload: {},
 });
 

@@ -1,6 +1,6 @@
 # Apps & Modules
 
-An agent repository is one entry file: `export default createApp({ agents, modules })`. [`@chamvi/app`](/reference/app) boots config, store, engine, scheduler and HTTP from environment variables and shuts them down in order; [`@chamvi/cli`](/reference/cli) turns that into a process with `chamvi dev | build | start | run-job | migrate`, signals and exit codes.
+An agent repository is one entry file: `export default createApp({ agents, modules })`. [`@chamvi/app`](/reference/app) boots config, store, engine, channels and HTTP from environment variables and shuts them down in order; [`@chamvi/cli`](/reference/cli) turns that into a process with `chamvi dev | build | start | run-job | migrate`, signals and exit codes.
 
 ```bash
 npm install @chamvi/app @chamvi/cli ai @ai-sdk/anthropic typeorm pg
@@ -50,37 +50,36 @@ Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](h
 | `configModule()` | Reads every variable once ([environment](/reference/app#environment)) and registers the config, the clock and the JSON line logger |
 | `storeModule()` | A `TypeormStore` over `DATABASE_URL`, migrated unless `CHAMVI_MIGRATE=false`, plus the hourly `purgeExpired()`; without `DATABASE_URL` a `MemoryStore` (warned outside dev) |
 | `staticTokensModule()` | The `staticTokens()` authenticator from `CHAMVI_TOKENS` |
-| `engineModule()` | Checks the model strings, builds the `Engine` with every contributed notifier and starts it |
+| `engineModule()` | Checks the model strings, builds the `Engine` with every contributed channel (`AppToken.CHANNELS`) and starts it, which starts the channels |
 | `agentsModule()` | Without `CHAMVI_AGENTS_DIR`, refuses an app without agents; with it, loads the [agent folders](/guide/agent-folders) before the engine starts and watches them |
-| `schedulerModule()` | The in-process cron scheduler; `CHAMVI_SCHEDULER=false` leaves cron to Kubernetes CronJobs and `chamvi run-job` |
-| `httpModule()` | `createHttpApp()` with every contributed route and authenticator, the graceful shutdown, `serve()` on `HOST`:`PORT` |
+| `schedulerModule()` | The `cron` channel (`cronChannel()` from `@chamvi/channel-cron`); `CHAMVI_SCHEDULER=false` leaves firing to Kubernetes CronJobs and `chamvi run-job` (`cron.on()` subscriptions still validate) |
+| `httpModule()` | The `http`, `mcp` and `webhook` channels, `createHttpApp()` with every contributed route and authenticator, mounting every contributed channel with an `in` at `/channels/<name>`, the graceful shutdown, `serve()` on `HOST`:`PORT` |
 
-The optional modules ship with the package they configure, on its `/module` subpath (`@chamvi/app` is an optional peer there, and the package's main entry never imports it), so install the feature package of each one you use. Each factory reads its variables **when it is called**, that is when the entry is imported, and exposes its instance at once (`.app`, `.manager`). Each module also **provides its instance on the engine** before it starts, so a tools factory injects it per execution with the package's `inject*Context(ctx)` (see [Context](/guide/tools#context-shared-instances-for-tools)):
+The optional modules ship with the package they configure, on its `/module` subpath (`@chamvi/app` is an optional peer there, and the package's main entry never imports it), so install the feature package of each one you use. Each factory reads its variables **when it is called**, that is when the entry is imported, and exposes its instance at once (`.app`, `.manager`). Each module also **provides its instance on the engine** before it starts, so a tools factory injects it per execution with the package's `inject*Context(ctx)` (see [Context](/guide/tools#context-shared-instances-for-tools)); a channel a module contributes is reached with `ctx.channels.findOne(name)`:
 
 <<< @/snippets/app-modules.ts#modules
 
 | Factory | Entry | Contributes | Context |
 |---|---|---|---|
-| `githubModule()` | `@chamvi/github/module` | `.app` (`IGithubApp`), the signed webhook route `/webhooks/github` | `injectGithubContext(ctx)` |
-| `githubNotifierModule({ app })` | `@chamvi/notify-github/module` | the `githubNotifier()` named `github` | `injectGithubNotifierContext(ctx, name?)` |
+| `githubModule()` | `@chamvi/github/module` | `.app` (`IGithubApp`), the `github` channel: signed deliveries at `/channels/github`, comments out | `injectGithubContext(ctx)`, `ctx.channels.findOne('github')` |
 | `sandboxModule()` | `@chamvi/sandbox/module` | `.manager` (`IWorkspaceManager`), attached on start, closed after the engine drained | `injectSandboxContext(ctx)` |
-| `openclawModule()` | `@chamvi/notify-openclaw/module` | the `openclaw()` notifier named `openclaw` | `injectOpenclawContext(ctx, name?)` |
+| `openclawModule()` | `@chamvi/channel-openclaw/module` | the `openclawChannel()` named `openclaw` (out only) | `ctx.channels.findOne('openclaw')` |
 | `uiModule()` | `@chamvi/ui/module` | the [dashboard](/guide/ui) at `<basePath>/ui` | |
 | `authupModule()`, `oidcModule(options)` | `@chamvi/app/authup` | the `authup()` and `oidc()` authenticators, after the static tokens | |
-| `consoleNotifierModule()` | `@chamvi/app` | the `consoleNotifier()` named `console` | |
+| `consoleChannelModule({ name?, write? })` | `@chamvi/app` | the `consoleChannel()` named `console` (out only) | `ctx.channels.findOne('console')` |
 
-The notifier contexts are keyed per notifier name, so `openclawModule()` beside `openclawModule({ name: 'ops' })` provides both (`injectOpenclawContext(ctx, 'ops')`). `@chamvi/app/authup` stays in the app package, since `@chamvi/http` cannot depend on `@chamvi/app`.
+Channel names are unique per app, so `openclawModule()` beside `openclawModule({ name: 'ops' })` contributes two channels (`ctx.channels.findOne('ops')`); two channels of one name fail the setup with `InvalidAgentDefinitionError`. `@chamvi/app/authup` stays in the app package, since `@chamvi/http` cannot depend on `@chamvi/app`.
 
-With `CHAMVI_PUBLIC_URL` set, the notifier modules link approvals to the dashboard: `<CHAMVI_PUBLIC_URL><basePath>/ui/approvals?run=<runId>&approval=<approvalId>`, without a token. A factory missing a required variable throws `InvalidAgentDefinitionError` naming it; no message ever echoes a value.
+With `CHAMVI_PUBLIC_URL` set, the GitHub and OpenClaw modules link approvals to the dashboard: `<CHAMVI_PUBLIC_URL><basePath>/ui/approvals?run=<runId>&approval=<approvalId>`, without a token. A factory missing a required variable throws `InvalidAgentDefinitionError` naming it; no message ever echoes a value.
 
 ## Setup contributes, onReady consumes
 
 orkos sets every module up in dependency order, then calls every `onReady`. chamvi splits the work along that line:
 
-- In **`setup`**, a module registers what it contributes on the container's collection tokens: `AppToken.HTTP_ROUTES`, `NOTIFIERS`, `AUTHENTICATORS` (with an `order`, lowest first), `LIFECYCLE_HOOKS` and `AGENT_CHECKS` (an `(agent) => void` that throws `InvalidAgentDefinitionError` for a folder agent the module could not serve, run before the agent is registered).
-- In **`onReady`**, the consumers build: the engine module collects the notifiers, the http module the routes and authenticators.
+- In **`setup`**, a module registers what it contributes on the container's collection tokens: `AppToken.HTTP_ROUTES`, `CHANNELS`, `AUTHENTICATORS` (with an `order`, lowest first), `LIFECYCLE_HOOKS` and `AGENT_CHECKS` (an `(agent) => void` that throws `InvalidAgentDefinitionError` for a folder agent the module could not serve, run before the agent is registered).
+- In **`onReady`**, the consumers build: the engine module collects the channels, the http module the routes, the authenticators and the channels it mounts.
 
-So a contribution never depends on module order. A module that resolves `ENGINE`, `SCHEDULER` or `SERVER` in its own `onReady` lists that module in `dependencies`. Nothing starts in `onReady`: the engine, the scheduler and the http module register start steps, which the app runs (engine, scheduler, then the `started` hooks and listening) only once every module's `onReady` ran, user modules included. So a configuration error any of them finds starts nothing: no queued run of the shared store executes on a replica that then exits 2.
+So a contribution never depends on module order. A module that resolves `ENGINE` or `SERVER` in its own `onReady` lists that module in `dependencies`. Nothing starts in `onReady`: the engine and the http module register start steps, which the app runs (the engine with its channels, then the `started` hooks and listening) only once every module's `onReady` ran, user modules included. So a configuration error any of them finds starts nothing: no queued run of the shared store executes on a replica that then exits 2.
 
 ## Start and stop
 
@@ -88,26 +87,25 @@ So a contribution never depends on module order. A module that resolves `ENGINE`
 
 1. config
 2. store (and the migrations, advisory-locked, so every replica may run them)
-3. every `onReady`: the engine is built, the [agent folders](/guide/agent-folders) are loaded into it, the scheduler and the HTTP app are built, nothing runs yet
-4. `engine.start()`
-5. `scheduler.start()`
-6. the purge timer and the agents dir watcher
-7. `serve()` on `HOST`:`PORT`, listening last
+3. every `onReady`: the engine is built with every contributed channel, the [agent folders](/guide/agent-folders) are loaded into it, the HTTP app is built, nothing runs yet
+4. `engine.start()`: recovery, then every channel's `start()` (the cron schedule among them)
+5. the purge timer and the agents dir watcher
+6. `serve()` on `HOST`:`PORT`, listening last
 
 `app.stop()` is memoized and also stops a start still setting up (which then never listens):
 
 1. `/readyz` answers 503, then `CHAMVI_READINESS_DELAY_MS` (0)
-2. `scheduler.stop()`, the purge timer and the agents dir watcher stop
+2. the `stopping` hooks: the purge timer and the agents dir watcher stop
 3. the app's closers (SSE streams, MCP waits)
 4. `server.close()`
-5. `engine.drain()` for up to `CHAMVI_DRAIN_TIMEOUT_MS` (30 s)
+5. `engine.drain()`: every channel's `stop()` first, then up to `CHAMVI_DRAIN_TIMEOUT_MS` (30 s) for the runs
 6. up to `CHAMVI_CLOSE_TIMEOUT_MS` (5 s) for the close, then `server.close(true)`
 7. the workspace manager closes (with `sandboxModule`, up to 30 s)
 8. the store's data source is destroyed
 
 orkos swallows teardown errors; chamvi does not: every teardown error is logged, and `stop()` then rejects with `app_stop_failed` (the CLI exits 1). An app runs one lifecycle: a second `start()`, `runJob()` or `migrate()` rejects with `app_in_use`.
 
-`runJob({ agent, trigger? })` builds config, store and engine (with the folder agents, loaded once), no scheduler and no HTTP, fires the cron trigger once through [`runJob()`](/guide/scheduler) and tears down. `migrate()` only migrates the store; it fails without `DATABASE_URL`.
+`runJob({ agent, subscription? })` builds config, store and engine (with the folder agents, loaded once), starts no channel and no HTTP, fires the cron subscription once through [`runJob()`](/guide/scheduler) and tears down. `migrate()` only migrates the store; it fails without `DATABASE_URL`.
 
 ## Writing a module
 
@@ -115,7 +113,7 @@ The module contract comes from the main entry of `@chamvi/app`: `AppToken`, `Mod
 
 <<< @/snippets/app-module.ts#module
 
-- **Hooks** (`LIFECYCLE_HOOKS`): `engineCreated(engine)` before `engine.start()` (the place for `engine.provide()`; a throwing hook, such as a second value for one key, is logged through `context.report()` and the app still starts), `started()` before the server listens, `stopping()` after the scheduler stopped, `drained()` after the engine drained and before the store closes.
+- **Hooks** (`LIFECYCLE_HOOKS`): `engineCreated(engine)` before `engine.start()` (the place for `engine.provide()`; a throwing hook, such as a second value for one key, is logged through `context.report()` and the app still starts), `started()` after `engine.start()` (channels started), before the server listens, `stopping()` first in the shutdown, before the drain stops the channels, `drained()` after the engine drained and before the store closes.
 - **Failures:** orkos never tears down a module whose `setup` threw, so such a `setup` closes what it opened before rethrowing. A module whose `onReady` threw is torn down, so `teardown` tolerates state that `onReady` never built.
 - **Stopping:** `AppToken.CONTEXT` holds the lifecycle's `signal`, aborted once `stop()` is called; `throwIfStopped(context)` before a long step keeps a stopped start from going on. `context.report(error)` logs an error and, during `stop()`, makes it reject.
 - **Modes:** `AppToken.CONTEXT` holds the `mode`: `start` builds everything, `job` (`runJob`) config, store and engine, `migrate` only config and store. A module that resolves `ENGINE` in `onReady` returns early in `migrate` mode, as the sample does, or `chamvi migrate` fails.

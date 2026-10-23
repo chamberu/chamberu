@@ -5,13 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import {
-    MemoryStore,
-    defineAgent,
-    http,
-} from '@chamvi/core';
+import { MemoryStore, defineAgent } from '@chamvi/core';
+import { http } from '@chamvi/http';
 import type { Engine } from '@chamvi/core';
-import type { IScheduler } from '@chamvi/scheduler';
 import { ControllableClock } from '@chamvi/test-kit';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
@@ -44,7 +40,7 @@ const agent = defineAgent({
     name: 'triage',
     model: textModel(),
     instructions: 'x',
-    triggers: [http()],
+    channels: [http.on()],
 });
 
 let apps: IApp[] = [];
@@ -215,22 +211,17 @@ describe('App.stop', () => {
         };
         const { env, url } = await envFor();
 
+        // the cron channel's stand-in: the drain stops channels first
         const scheduler: IModule = {
             name: ModuleName.SCHEDULER,
-            dependencies: [ModuleName.ENGINE],
-            setup: async () => undefined,
-            async onReady(container) {
-                const fake: IScheduler = {
-                    start: async () => {},
-                    stop: async () => {
-                        if (events.length === 0) {
-                            const response = await fetch(url('/readyz'));
-                            if (response.status === 503) events.push('readyz 503');
-                        }
-                        once('scheduler stop');
+            async setup(container) {
+                container.registerMany(AppToken.CHANNELS, {
+                    useValue: {
+                        name: 'cron',
+                        start: async () => {},
+                        stop: async () => once('channel stop'),
                     },
-                };
-                container.register(AppToken.SCHEDULER, { useValue: fake });
+                });
             },
         };
         const store: IModule = {
@@ -238,7 +229,18 @@ describe('App.stop', () => {
             dependencies: [ModuleName.CONFIG],
             async setup(container) {
                 container.register(AppToken.STORE, { useValue: new MemoryStore() });
-                container.registerMany(AppToken.LIFECYCLE_HOOKS, { useValue: { name: 'purge', stopping: () => once('purge stop hook') } });
+                container.registerMany(AppToken.LIFECYCLE_HOOKS, {
+                    useValue: {
+                        name: 'purge',
+                        stopping: async () => {
+                            if (events.length === 0) {
+                                const response = await fetch(url('/readyz'));
+                                if (response.status === 503) events.push('readyz 503');
+                            }
+                            once('purge stop hook');
+                        },
+                    },
+                });
             },
             async teardown() {
                 events.push('data source destroy');
@@ -267,9 +269,9 @@ describe('App.stop', () => {
 
         expect(events).toEqual([
             'readyz 503',
-            'scheduler stop',
             'purge stop hook',
             'server closed',
+            'channel stop',
             'engine drained',
             'drained hook',
             'data source destroy',

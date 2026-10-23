@@ -12,7 +12,6 @@ import {
     InvalidAgentDefinitionError,
     defineAgent,
     defineTool,
-    http,
 } from '@chamvi/core';
 import type { Agent, Engine } from '@chamvi/core';
 import { injectSandboxContext, provideSandboxContext } from '@chamvi/sandbox';
@@ -84,7 +83,6 @@ function agent(extra: Partial<Parameters<typeof defineAgent>[0]> = {}): Agent {
         name: 'coder',
         model: textModel(),
         instructions: 'code',
-        triggers: [http()],
         ...extra,
     });
 }
@@ -268,7 +266,7 @@ describe('sandboxModule', () => {
         const { runId } = await engine.dispatch({
             agent: 'coder',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         await engine.idle();
@@ -314,7 +312,7 @@ describe('sandboxModule', () => {
         const { runId } = await engine.dispatch({
             agent: 'coder',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         await engine.idle();

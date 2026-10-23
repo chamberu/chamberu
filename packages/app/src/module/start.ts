@@ -18,14 +18,14 @@ type StartStep = {
 };
 
 /**
- * The start steps (internal, not exported): what the engine and scheduler
+ * The start steps (internal, not exported): what the engine and http
  * modules start once every module checked its configuration in `onReady`.
  */
 const START_STEPS = new TypedToken<StartStep>('chamvi.start-steps');
 
 /**
  * Registers a start step: `run` is called at most once, by the app once every
- * `onReady` ran (in registration order: engine, scheduler, the http module's
+ * `onReady` ran (in registration order: the engine with its channels, the http module's
  * serve), so a configuration error any module finds starts nothing.
  */
 export function registerStartStep(container: IContainer, name: string, run: () => Promise<void>): void {

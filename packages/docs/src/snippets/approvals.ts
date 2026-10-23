@@ -5,58 +5,100 @@ import {
     Engine,
     MemoryStore,
     RunStatus,
+    ToolDeniedError,
+    approve,
+    consoleChannel,
     defineAgent,
+    defineTool,
 } from '@chamvi/core';
-import type { INotifier, Notification, NotifyOptions } from '@chamvi/core';
 
 declare function deployVersion(version: string, env: string): Promise<string>;
+declare function runShell(command: string): Promise<string>;
 
-// #region notifier
-class InboxNotifier implements INotifier {
-    readonly name = 'owner';
-
-    readonly tokens = new Map<string, string>();
-
-    async notify(n: Notification, opts: NotifyOptions): Promise<void> {
-        // a real notifier sends a message; it must throw when the send fails
-        if (n.kind === 'approval' && n.resumeToken) {
-            this.tokens.set(opts.idempotencyKey, n.resumeToken);
+// #region tool
+const deploy = defineTool({
+    description: 'Deploys a version to an environment.',
+    inputSchema: z.object({ version: z.string(), env: z.enum(['staging', 'prod']) }),
+    execute: async ({ version, env }, { context }) => {
+        if (env === 'prod') {
+            // pauses the run in `waiting`; once answered, the call runs again and gets the decision
+            const decision = await approve(context, {
+                title: `Deploy ${version} to prod?`,
+                body: 'Staging has been green for a day.',
+                timeoutMs: 60 * 60 * 1000,
+            });
+            if (!decision.approved) return `Not deployed: ${decision.reason ?? 'denied'}.`;
         }
-    }
+        // staging deploys run right away
+        return deployVersion(version, env);
+    },
+});
+// #endregion tool
+
+// #region channel
+const restart = defineTool({
+    description: 'Restarts the service.',
+    inputSchema: z.object({ service: z.string() }),
+    execute: async ({ service }, { context }) => {
+        // the request also goes out through the channel (kind 'approval', no resume token)
+        const { approved } = await context.channels.findOneOrFail('console').approve({
+            title: `Restart ${service}?`,
+            address: 'ops',
+        });
+        return approved ? `restarted ${service}` : 'left running';
+    },
+});
+// #endregion channel
+
+// #region hook
+// a tool from another library: you cannot put approve() into its execute
+const shell = tool({
+    description: 'Runs a shell command.',
+    inputSchema: z.object({ command: z.string() }),
+    execute: async ({ command }) => runShell(command),
+});
+
+export function createOperator(model: LanguageModel) {
+    return defineAgent({
+        name: 'operator',
+        model,
+        instructions: 'Keep the service healthy.',
+        tools: { shell, restart },
+        hooks: {
+            // runs before every tool call, inside the call: approve() works here and replays on resume
+            async beforeToolExecution({ toolName, input }, ctx) {
+                if (toolName !== 'shell') return input;
+                const { command } = input as { command: string };
+                const decision = await approve(ctx, { title: 'Run a shell command?', body: command });
+                // a tool error the model sees; the run goes on
+                if (!decision.approved) throw new ToolDeniedError(`Refused: ${decision.reason ?? 'denied'}`);
+                return input;
+            },
+            // runs on a fresh and on a recorded result alike: redact before the model sees it
+            afterToolExecution({ output }) {
+                return typeof output === 'string' ? output.replaceAll(/ghp_\w+/g, '[token]') : output;
+            },
+        },
+    });
 }
-// #endregion notifier
+// #endregion hook
 
 export async function approvalFlow(model: LanguageModel) {
-    // #region agent
-    const deployer = defineAgent({
-        name: 'deployer',
-        model,
-        instructions: 'Deploy the requested version.',
-        tools: {
-            deploy: tool({
-                description: 'Deploys a version to an environment.',
-                inputSchema: z.object({ version: z.string(), env: z.enum(['staging', 'prod']) }),
-                execute: async ({ version, env }) => deployVersion(version, env),
-            }),
-        },
-        approvals: {
-            // staging deploys run right away, prod deploys wait for the owner
-            deploy: (input) => ((input as { env: string }).env === 'prod' ? 'user' : 'allow'),
-        },
-        approvalTimeoutMs: 60 * 60 * 1000,
-        notify: 'owner',
-    });
-    // #endregion agent
-
     // #region engine
     const resumeSecret = process.env.RESUME_SECRET;
     if (!resumeSecret) throw new Error('RESUME_SECRET is not set');
 
-    const inbox = new InboxNotifier();
+    const deployer = defineAgent({
+        name: 'deployer',
+        model,
+        instructions: 'Deploy the requested version.',
+        tools: { deploy, restart },
+    });
+
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [deployer],
-        notifiers: { owner: inbox },
+        channels: [consoleChannel()],
         resumeSecret,
     });
     // #endregion engine
@@ -64,23 +106,25 @@ export async function approvalFlow(model: LanguageModel) {
     await engine.start();
     const { runId } = await engine.dispatch({
         agent: 'deployer',
-        trigger: 'http',
-        source: 'http',
+        trigger: 'manual',
+        channel: 'console',
         payload: { version: '1.4.0', env: 'prod' },
     });
     await engine.idle();
 
-    // #region resume
+    // #region answer
     const run = await engine.getRun(runId);
     if (run?.status === RunStatus.WAITING && run.waiting) {
-        const token = inbox.tokens.get(`${run.id}:${run.waiting.approvalId}`);
-        if (token) {
-            await engine.resume(token, { approved: false, reason: 'Not on a Friday.' });
-        }
+        // run.waiting: { approvalId, toolName, toolCallId, title, body?, channel?, address?, expiresAt, ... }
+        await engine.approve(run.id, {
+            approvalId: run.waiting.approvalId,
+            approved: false,
+            reason: 'Not on a Friday.',
+        });
     }
-    // #endregion resume
+    // #endregion answer
 
     await engine.idle();
-    engine.stop();
+    await engine.stop();
     return engine.getRun(runId);
 }

@@ -10,7 +10,10 @@ import type { Engine } from '@chamvi/core';
 export interface IShutdown {
     /** True from the first `shutdown()` call on; `/readyz` then fails. */
     readonly shuttingDown: boolean;
-    /** Runs `fn` during the shutdown, after the scheduler stopped; returns an unsubscribe. */
+    /**
+     * Runs `fn` during the shutdown, in the order added, after readiness
+     * failed and before the server closes; returns an unsubscribe.
+     */
     onShutdown(fn: () => void | Promise<void>): () => void;
     /** Idempotent: every call returns the same promise. */
     shutdown(): Promise<void>;
@@ -19,7 +22,6 @@ export interface IShutdown {
 export type ShutdownOptions = {
     /** Drained on shutdown; its `clock` times the delays. */
     engine: Engine;
-    scheduler?: { stop(): Promise<void> };
     /** srvx `Server` (pass `gracefulShutdown: false` to `serve`). */
     server?: { close(closeActiveConnections?: boolean): Promise<void> };
     /** Time for load balancers to see the failing readiness. Default 0. */

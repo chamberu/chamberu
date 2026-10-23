@@ -11,11 +11,15 @@ import {
     InvalidAgentDefinitionError,
     MemoryStore,
     defineAgent,
-    http,
-    webhook,
 } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
-import { createHttpApp } from '@chamvi/http';
+import {
+    createHttpApp,
+    http,
+    httpChannel,
+    webhook,
+    webhookChannel,
+} from '@chamvi/http';
 import { textModel } from '../../utils/model.ts';
 import {
     ADMIN_TOKEN,
@@ -32,20 +36,22 @@ function setup() {
             name: 'echo',
             model: textModel(),
             instructions: 'Echo.',
-            triggers: [http()],
+            channels: [http.on()],
         }),
         defineAgent({
             name: 'other',
             model: textModel(),
             instructions: 'Other.',
-            triggers: [http()],
+            channels: [http.on()],
         }),
     ];
+    const hooks = webhookChannel({ auth: testAuth });
     const options = {
         store,
         agents,
         resumeSecret: 'test-secret',
         clock,
+        channels: [httpChannel(), hooks],
         onError: () => {},
     };
     const engine = new Engine(options);
@@ -55,6 +61,7 @@ function setup() {
         auth: testAuth,
         metrics: false,
         rateLimit: false,
+        channels: [hooks],
     });
     return {
         app,
@@ -80,7 +87,7 @@ describe('createHttpApp over the engine', () => {
         const { runId } = await engine.dispatch({
             agent: 'echo',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         const response = await call(app, 'GET', `/runs/${runId}`, { token: ADMIN_TOKEN });
@@ -148,7 +155,7 @@ describe('createHttpApp over the engine', () => {
             name: 'late',
             model: textModel(),
             instructions: 'Late.',
-            triggers: [http()],
+            channels: [http.on()],
         }));
         const { data } = await (await call(app, 'GET', '/agents', { token: ADMIN_TOKEN })).json() as { data: { name: string }[] };
         expect(data.map((agent) => agent.name)).toEqual(['echo', 'other', 'late']);
@@ -163,14 +170,14 @@ describe('createHttpApp over the engine', () => {
             name: 'hooked',
             model: textModel(),
             instructions: 'Hooked.',
-            triggers: [webhook({ path: '/x' })],
+            channels: [webhook.on('/x')],
         }));
-        expect((await call(app, 'POST', '/hooks/hooked/x', { token: ADMIN_TOKEN, body: {} })).status).toBe(202);
+        expect((await call(app, 'POST', '/channels/webhook/hooked/x', { token: ADMIN_TOKEN, body: {} })).status).toBe(202);
 
         await engine.removeAgent('other');
         await engine.removeAgent('hooked');
         expect((await call(app, 'POST', '/agents/other/runs', { token: ADMIN_TOKEN })).status).toBe(404);
-        expect((await call(app, 'POST', '/hooks/hooked/x', { token: ADMIN_TOKEN, body: {} })).status).toBe(404);
+        expect((await call(app, 'POST', '/channels/webhook/hooked/x', { token: ADMIN_TOKEN, body: {} })).status).toBe(404);
         expect((await call(app, 'GET', '/agents/other/state/kv/k', { token: ADMIN_TOKEN })).status).toBe(404);
         const { data } = await (await call(app, 'GET', '/agents', { token: ADMIN_TOKEN })).json() as { data: { name: string }[] };
         expect(data.map((agent) => agent.name)).toEqual(['echo']);
@@ -203,7 +210,7 @@ describe('createHttpApp over the engine', () => {
             name: 'late',
             model: textModel(),
             instructions: 'Late.',
-            triggers: [http()],
+            channels: [http.on()],
         }));
         await engine.removeAgent('other');
         const { data } = await (await call(app, 'GET', '/agents', { token: ADMIN_TOKEN })).json() as { data: { name: string }[] };

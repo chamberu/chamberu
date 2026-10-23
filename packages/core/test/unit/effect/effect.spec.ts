@@ -36,13 +36,14 @@ import { mockModel } from '../../utils/mock-model.ts';
 function toolContext(runId: string): ToolContext {
     const store = new MemoryStore();
     return {
+        channels: {} as ToolContext['channels'],
         run: {
             runId,
             agent: 'triage',
             trigger: {
                 agent: 'triage',
                 trigger: 'http',
-                source: 'http',
+                channel: 'http',
                 payload: {},
             } as RunContext['trigger'],
             signal: new AbortController().signal,
@@ -116,7 +117,7 @@ describe('effect tools', () => {
 
     it('keeps contextSchema and forwards options.context through the wrapper', async () => {
         const plain = defineTool({ inputSchema: schema, execute: async (_i, { context }) => context });
-        const wrapped = wrapToolsForRun({ plain }, ctx, new MemoryStore(), () => true);
+        const wrapped = wrapToolsForRun({ plain }, ctx, new MemoryStore(), { allow: () => true });
         expect(wrapped.plain!.contextSchema).toBe(toolContextSchema);
         expect(await call(wrapped, 'plain', { body: 'x' })).toBe(ctx);
     });
@@ -191,7 +192,7 @@ describe('effect tools', () => {
         const { runId } = await first.dispatch({
             agent: 'triage',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         await first.idle();
@@ -260,7 +261,8 @@ describe('effect tools', () => {
         let runs = 0;
         const plain = tool({ inputSchema: schema, execute: async () => ++runs });
         const tools = wrapToolsForRun({ plain }, ctx, new MemoryStore());
-        expect(tools.plain).toBe(plain);
+        // wrapped only to run inside its tool-call frame
+        expect(tools.plain).toMatchObject({ inputSchema: plain.inputSchema });
         await call(tools, 'plain', { body: 'hi' });
         await call(tools, 'plain', { body: 'hi' });
         expect(runs).toBe(2);
@@ -346,12 +348,12 @@ describe('tool allow check', () => {
         const plain = tool({ inputSchema: schema, execute: async () => ++runs });
         const post = defineEffectTool({ inputSchema: schema, execute: async () => ++runs });
         const store = new MemoryStore();
-        const tools = wrapToolsForRun({ plain, post }, ctx, store, (name) => name === 'none');
+        const tools = wrapToolsForRun({ plain, post }, ctx, store, { allow: (name) => name === 'none' });
         await expect(call(tools, 'plain', { body: 'hi' })).rejects.toBeInstanceOf(ToolNotAllowedError);
         await expect(call(tools, 'post', { body: 'hi' })).rejects.toMatchObject({ code: 'tool_not_allowed' });
         expect(runs).toBe(0);
 
-        const allowed = wrapToolsForRun({ plain }, ctx, store, (name) => name === 'plain');
+        const allowed = wrapToolsForRun({ plain }, ctx, store, { allow: (name) => name === 'plain' });
         expect(await call(allowed, 'plain', { body: 'hi' })).toBe(1);
     });
 });

@@ -12,7 +12,7 @@ const triage = defineAgent({
     name: 'triage',
     model: 'anthropic:claude-sonnet-5-5',
     instructions: 'Triage the issue.',
-    triggers: [http()],
+    channels: [http.on()],
 });
 
 export default createApp({ agents: [triage] });

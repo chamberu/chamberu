@@ -17,5 +17,6 @@ export type {
     ResumeDecision,
     RunDelta,
     EngineOptions,
+    EngineStartOptions,
     RunEvent,
 } from './types.ts';

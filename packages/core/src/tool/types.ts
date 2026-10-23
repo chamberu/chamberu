@@ -6,6 +6,7 @@
  */
 
 import type { IRunArtifacts } from '../artifact/types.ts';
+import type { ToolChannels } from '../channel/types.ts';
 import type { RunContext } from '../run/types.ts';
 import type { IAgentState, StateSchema } from '../state/types.ts';
 
@@ -16,6 +17,11 @@ import type { IAgentState, StateSchema } from '../state/types.ts';
  * engine (`engine.provide`) are reached with `inject(ctx, key)`, never as a field.
  */
 export type ToolContext<S extends StateSchema = StateSchema> = {
+    /**
+     * Run-bound handles on the engine's channels with `out`: `findOne(name?)`
+     * (no name: the channel the run came from), `findOneOrFail(name?)`, `find()`.
+     */
+    channels: ToolChannels;
     run: RunContext;
     state: IAgentState<S>;
     /**

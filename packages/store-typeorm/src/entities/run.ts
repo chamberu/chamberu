@@ -61,7 +61,8 @@ export class RunEntity {
         length: 255,
         nullable: true,
     })
-    thread!: string | null;
+    /** The column keeps its name from before channels (no migration). */
+    address!: string | null;
 
     @Column({
         name: 'output', 

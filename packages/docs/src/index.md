@@ -2,7 +2,7 @@
 layout: page
 pageClass: ch-home
 title: chamvi
-titleTemplate: Self-hosted, trigger-driven AI agents
+titleTemplate: Self-hosted, channel-driven AI agents
 
 hero:
     eyebrow: Self-hosted agents
@@ -10,7 +10,7 @@ hero:
     highlight: keep the keys
     lead: You write the agent with the AI SDK. chamvi queues its runs, checkpoints every step, pauses for approvals and resumes interrupted runs, in your own Node process and database.
     file: agents/triage.ts
-    approval: close(#412) waits for the owner, resume token signed
+    approval: close(#412) waits for the owner, across restarts
     actions:
         -   text: Get started
             link: /getting-started/
@@ -22,15 +22,15 @@ features:
     eyebrow: What the AI SDK leaves out
     title: The layer between a model call and an agent you can trust.
     items:
-        -   title: One intake for every trigger
-            body: A webhook, a cron tick or a manual call becomes the same envelope and the same queued run. Idempotency keys turn redeliveries into the existing run; concurrency keys keep two runs for one issue apart.
+        -   title: One contract for every channel
+            body: A webhook, a cron tick, a GitHub delivery or a manual call becomes the same envelope and the same queued run, and tools answer through the same channels. Idempotency keys turn redeliveries into the existing run; concurrency keys keep two runs for one issue apart.
             detail: dispatch({ idempotencyKey })
         -   title: Runs survive restarts
             body: A checkpoint after every step. drain() hands unfinished runs back, and recover() continues them from the latest checkpoint on any replica, without applying a recorded effect twice.
             detail: drain() → recover()
         -   title: Ask before acting
-            body: A tool call that needs a human pauses the run in waiting, with a signed resume token. Approve or deny it an hour or a day later, from any replica.
-            detail: resume(token, { approved })
+            body: A tool that needs a human awaits approve() and the run pauses in waiting. Approve or deny it an hour or a day later, from any replica; the call then runs again with the decision.
+            detail: await approve(ctx, { title })
 
 flow:
     eyebrow: How a run flows
@@ -45,22 +45,22 @@ flow:
 packages:
     eyebrow: Packages
     title: Small today, planned in the open.
-    lead: The engine, the cron scheduler, the HTTP and MCP API, the dashboard, the TypeORM store, the GitHub connector, sandboxes, notifiers, the app and CLI and the test helpers ship now. The rest is designed milestone by milestone.
+    lead: The engine, the cron, HTTP, GitHub and OpenClaw channels, the MCP API, the dashboard, the TypeORM store, sandboxes, the app and CLI and the test helpers ship now. The rest is designed milestone by milestone.
     shipped:
         -   name: '@chamvi/core'
-            body: Agents, triggers, the run engine, checkpoints, budgets, effect tools, approvals, agent state and the in-memory store.
+            body: Agents, the channel contract, the run engine, checkpoints, budgets, effect tools, durable approvals, agent hooks, agent state and the in-memory store.
             link: /reference/
         -   name: '@chamvi/test-kit'
             body: ControllableClock and the store contract suite every IStore implementation must pass.
             link: /reference/test-kit
-        -   name: '@chamvi/scheduler'
-            body: Fires cron() triggers once per tick across replicas, with overlap policies, timezones and one-shot jobs.
-            link: /reference/scheduler
+        -   name: '@chamvi/channel-cron'
+            body: The cron channel. Fires cron.on() subscriptions once per tick across replicas, with overlap policies, timezones and one-shot jobs.
+            link: /reference/channel-cron
         -   name: '@chamvi/store-typeorm'
             body: TypeORM store (PostgreSQL) for durable runs across replicas, passing the store contract suite.
             link: /stores/typeorm
         -   name: '@chamvi/http'
-            body: REST, server-sent events, webhooks and an MCP endpoint, with bearer, authup and OIDC authentication.
+            body: REST, server-sent events, an MCP endpoint, the webhook channel and the /channels mount, with bearer, authup and OIDC authentication.
             link: /guide/http
         -   name: '@chamvi/app + @chamvi/cli'
             body: One createApp() default export booted from env, and the chamvi bin with dev, build, start, run-job and migrate.
@@ -69,14 +69,14 @@ packages:
             body: A dashboard with an agents overview, runs started from the agent page, live steps, an approvals inbox, agent state and schedules, served by uiRoutes().
             link: /guide/ui
         -   name: '@chamvi/github'
-            body: GitHub App auth, webhook triggers and issue tools with reconciliation.
+            body: GitHub App auth, the GitHub channel (deliveries in, issue comments out) and issue tools with reconciliation.
             link: /reference/github
         -   name: '@chamvi/sandbox-*'
             body: Disposable workspaces, local for development, a container or a pod per workspace in production, plus coding tools.
             link: /guide/workspaces
-        -   name: '@chamvi/notify-*'
-            body: Approval requests into an OpenClaw chat or as one comment on the run's GitHub issue, once per approval.
-            link: /guide/notifiers
+        -   name: '@chamvi/channel-openclaw'
+            body: The OpenClaw channel. Messages and approval requests into an OpenClaw chat, once per key.
+            link: /reference/channel-openclaw
     planned:
         -   name: 'deploy kit'
             milestone: M1

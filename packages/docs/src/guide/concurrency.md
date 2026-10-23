@@ -33,7 +33,7 @@ A run is executed by the engine that holds its claim. `claimRun(id, owner, claim
 
 Every `claimTtlMs / 3` each started engine:
 
-1. runs `tick()`: denies expired approvals and re-sends undelivered approval notifications,
+1. runs `tick()`: denies expired approvals and re-sends approval messages a channel has not delivered yet,
 2. runs `recover()`: requeues `running` or `interrupted` runs whose claim expired or was released, and aborts local runs another replica asked to cancel,
 3. runs a scheduling pass.
 
@@ -45,4 +45,4 @@ A shorter lease recovers crashed runs sooner and polls more often. A longer leas
 
 ## Cron across replicas
 
-Firing a cron trigger once across replicas needs a per-tick lock. [`@chamvi/scheduler`](/guide/scheduler) takes the store lock `cron:<agent>:<triggerId>:<scheduledAt>` per tick (never released, held for 10 minutes by default) and dispatches with the idempotency key `<triggerId>@<scheduledAt>`, so a second firing is harmless even if the lock failed. See [Cron Scheduling](/guide/scheduler) and [Multiple Replicas](/deployment/replicas).
+Firing a cron subscription once across replicas needs a per-tick lock. The cron channel ([`@chamvi/channel-cron`](/guide/scheduler)) takes the store lock `cron:<agent>:<subscriptionId>:<scheduledAt>` per tick (never released, held for 10 minutes by default) and dispatches with the idempotency key `<subscriptionId>@<scheduledAt>`, so a second firing is harmless even if the lock failed. See [Cron Scheduling](/guide/scheduler) and [Multiple Replicas](/deployment/replicas).

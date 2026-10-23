@@ -5,10 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { cron } from '@chamvi/channel-cron';
 import {
     InvalidAgentDefinitionError,
     MemoryStore,
-    cron,
     defineAgent,
 } from '@chamvi/core';
 import type { Agent } from '@chamvi/core';
@@ -45,12 +45,12 @@ afterEach(async () => {
     globalThis.AI_SDK_DEFAULT_PROVIDER = undefined;
 });
 
-function sweep(model: Agent['definition']['model'], triggers = [cron('*/5 * * * *')]): Agent {
+function sweep(model: Agent['definition']['model'], channels = [cron.on('*/5 * * * *')]): Agent {
     return defineAgent({
         name: 'sweep',
         model,
         instructions: 'x',
-        triggers,
+        channels,
     });
 }
 
@@ -127,7 +127,7 @@ describe('App.runJob', () => {
             name: 'digest',
             model: textModel(),
             instructions: 'x',
-            triggers: [cron('0 * * * *')],
+            channels: [cron.on('0 * * * *')],
         });
         const { app, env } = build([sweep(textModel()), other]);
 
@@ -137,10 +137,19 @@ describe('App.runJob', () => {
         expect(error.message).toBe('No agent "nope"; the app has: sweep, digest.');
     });
 
-    it('throws for an ambiguous trigger', async () => {
-        const { app, env } = build([sweep(textModel(), [cron('*/5 * * * *'), cron('0 * * * *')])]);
+    it('throws for an ambiguous subscription, and fires the one named', async () => {
+        const { app, env } = build([sweep(textModel(), [cron.on('*/5 * * * *'), cron.on('0 * * * *')])]);
 
         expect(await rejectionOf(app.runJob({ env, agent: 'sweep' }))).toBeInstanceOf(InvalidAgentDefinitionError);
+
+        const named = build([sweep(textModel(), [cron.on('*/5 * * * *'), cron.on('0 * * * *')])]);
+        const result = await named.app.runJob({
+            env: named.env, 
+            agent: 'sweep', 
+            subscription: 'cron:0 * * * *', 
+        });
+        expect(result).toMatchObject({ status: 'completed', exitCode: 0 });
+        expect((await named.store.getRun(result.runId as string))?.trigger).toMatchObject({ channel: 'cron', trigger: 'cron:0 * * * *' });
     });
 
     it('serves no http during a job', async () => {

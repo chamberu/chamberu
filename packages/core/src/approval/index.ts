@@ -5,5 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+export { APPROVAL_TIMEOUT_MAX_MS, DEFAULT_APPROVAL_TIMEOUT_MS } from './constants.ts';
 export * from './module.ts';
-export type { ResumeTokenClaims } from './types.ts';
+export { approve } from './request.ts';
+export type { ApprovalDecision, ApprovalRequestInput, ResumeTokenClaims } from './types.ts';

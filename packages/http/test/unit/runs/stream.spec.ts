@@ -17,12 +17,12 @@ import { ControllableClock } from '@chamvi/test-kit';
 import { createShutdown } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
-    CapturingNotifier,
     READER_TOKEN,
     call,
     createRunAgents,
     createRunTestApp,
     flush,
+    testChannels,
     tokenFor,
 } from '../../utils/app.ts';
 import { SseReader, readEvents } from '../../utils/sse.ts';
@@ -235,7 +235,7 @@ describe('GET /runs/:id/stream', () => {
             agents,
             resumeSecret: 'test-secret',
             clock,
-            notifiers: { capture: new CapturingNotifier() },
+            channels: testChannels(),
             owner: 'replica-b',
             onError: () => {},
         });
@@ -399,7 +399,7 @@ describe('GET /runs/:id/stream', () => {
             agents,
             resumeSecret: 'test-secret',
             clock,
-            notifiers: { capture: new CapturingNotifier() },
+            channels: testChannels(),
             onError: () => {},
         });
         const shutdown = createShutdown({ engine });

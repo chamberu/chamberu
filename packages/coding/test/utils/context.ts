@@ -18,6 +18,8 @@ const NO_ARTIFACTS: IRunArtifacts = {
 /** A ToolContext of run `runId`, started over http; `signal` defaults to one that never aborts. */
 export function toolContext(runId: string, signal: AbortSignal = new AbortController().signal): ToolContext {
     return {
+        // these tools reach no channel
+        channels: {} as ToolContext['channels'],
         run: {
             runId,
             agent: 'coder',
@@ -25,7 +27,7 @@ export function toolContext(runId: string, signal: AbortSignal = new AbortContro
                 id: `env-${runId}`,
                 agent: 'coder',
                 trigger: 'http',
-                source: 'http',
+                channel: 'http',
                 payload: {},
                 receivedAt: new Date(0),
             },

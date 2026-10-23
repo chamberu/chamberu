@@ -16,21 +16,20 @@ import * as core from '@chamvi/core';
 describe('public api', () => {
     it.each([
         'defineAgent',
-        'cron',
-        'http',
-        'webhook',
         'Engine',
         'MemoryStore',
         'defineEffectTool',
         'defineTool',
         'effectMarker',
         'createResumeToken',
+        'approve',
         'verifyResumeToken',
         'ChamviError',
         'InvalidResumeTokenError',
         'BudgetExceededError',
         'ArtifactNotFoundError',
         'ToolNotAllowedError',
+        'ToolDeniedError',
         'IncompleteResponseError',
         'SandboxError',
         'hasPermission',
@@ -39,7 +38,9 @@ describe('public api', () => {
         'requireToolPermission',
         'isArtifactMediaType',
         'assertTriggerKey',
-        'consoleNotifier',
+        'normalizeEnvelope',
+        'consoleChannel',
+        'ChannelNotFoundError',
         'defineContextKey',
         'inject',
         'tryInject',
@@ -60,6 +61,56 @@ describe('public api', () => {
 
     it('exports the trigger key bound', () => {
         expect(core.TRIGGER_KEY_MAX_LENGTH).toBe(255);
+    });
+
+    it('removes the trigger factories', () => {
+        expect(core).not.toHaveProperty('cron');
+        expect(core).not.toHaveProperty('http');
+        expect(core).not.toHaveProperty('webhook');
+    });
+
+    it('keeps the channel context factory internal', () => {
+        expect(core).not.toHaveProperty('createChannelContext');
+        expect(core).not.toHaveProperty('assertChannelName');
+        expect(core).not.toHaveProperty('createChannelHandle');
+        expect(core).not.toHaveProperty('runToolCall');
+        expect(core).not.toHaveProperty('currentToolCall');
+    });
+
+    it('exports the approval timeout bounds', () => {
+        expect(core.DEFAULT_APPROVAL_TIMEOUT_MS).toBe(24 * 60 * 60 * 1000);
+        expect(core.APPROVAL_TIMEOUT_MAX_MS).toBe(2 ** 31 - 1);
+    });
+
+    it('keeps the approval internals internal', () => {
+        expect(core).not.toHaveProperty('SuspendSignal');
+        expect(core).not.toHaveProperty('requestApproval');
+        expect(core).not.toHaveProperty('SUSPENDED_RESULT');
+    });
+
+    it('removes the notifiers', () => {
+        expect(core).not.toHaveProperty('consoleNotifier');
+    });
+
+    it('exports the channel types', () => {
+        expectTypeOf<core.ChannelRequest>().toEqualTypeOf<{ request: Request; subpath: string }>();
+        expectTypeOf<core.ChannelDispatchEnvelope>().toEqualTypeOf<Omit<core.DispatchEnvelope, 'channel'>>();
+        expectTypeOf<core.ChannelContext['dispatch']>().returns.toEqualTypeOf<Promise<core.DispatchResult>>();
+        expectTypeOf<core.ChannelSendOptions>().toEqualTypeOf<{ signal: AbortSignal; trigger: core.TriggerEnvelope }>();
+        expectTypeOf<core.ChannelMessage['kind']>().toEqualTypeOf<'message' | 'approval'>();
+        expectTypeOf<core.ChannelSubscription>().toHaveProperty('channel').toEqualTypeOf<string>();
+        expectTypeOf<core.IChannel>().toHaveProperty('name').toEqualTypeOf<string>();
+        expectTypeOf<core.TriggerEnvelope>().toHaveProperty('channel').toEqualTypeOf<string>();
+        expectTypeOf<core.Run>().toHaveProperty('address').toEqualTypeOf<string | undefined>();
+        expectTypeOf<core.EngineStartOptions>().toEqualTypeOf<{ channels?: boolean }>();
+        expectTypeOf<core.EmitMessage>().toEqualTypeOf<{
+            title?: string; 
+            body: string; 
+            key?: string 
+        }>();
+        expectTypeOf<core.ChannelHandle['emit']>().returns.toEqualTypeOf<Promise<void>>();
+        expectTypeOf<core.ChannelHandle['approve']>().returns.toEqualTypeOf<Promise<core.ApprovalDecision>>();
+        expectTypeOf<core.ConsoleChannelOptions>().toHaveProperty('name').toEqualTypeOf<string | undefined>();
     });
 
     it('exports the sandbox error code', () => {

@@ -13,7 +13,7 @@ import {
     NAME_MAX_LENGTH,
     NAME_PATTERN,
 } from './constants.ts';
-import { assertToolsContext } from './helpers.ts';
+import { assertNoNeedsApproval, assertToolsContext } from './helpers.ts';
 import type { Agent, AgentDefinition } from './types.ts';
 
 export function defineAgent<S extends StateSchema = StateSchema>(def: AgentDefinition<S>): Agent<S> {
@@ -28,18 +28,19 @@ export function defineAgent<S extends StateSchema = StateSchema>(def: AgentDefin
     }
 
     const seen = new Set<string>();
-    for (const trigger of def.triggers ?? []) {
-        if (seen.has(trigger.id)) {
+    for (const subscription of def.channels ?? []) {
+        if (seen.has(subscription.id)) {
             throw new InvalidAgentDefinitionError(
-                `Agent "${def.name}" has duplicate trigger id "${trigger.id}".`,
+                `Agent "${def.name}" has duplicate subscription id "${subscription.id}".`,
             );
         }
-        seen.add(trigger.id);
+        seen.add(subscription.id);
     }
 
     // a factory's set is only known per execution, the engine checks it there
-    if (typeof def.tools !== 'function' && def.toolsContext) {
-        assertToolsContext(def.name, def.tools ?? {}, def.toolsContext);
+    if (typeof def.tools !== 'function') {
+        assertNoNeedsApproval(def.name, def.tools ?? {});
+        if (def.toolsContext) assertToolsContext(def.name, def.tools ?? {}, def.toolsContext);
     }
 
     return {

@@ -10,8 +10,7 @@ export default defineAgent({
     // read on every load, so an edit of prompt.md reloads the agent like any other file
     instructions: readFileSync(new URL('./prompt.md', import.meta.url), 'utf8'),
     tools: { lookup_issue: lookupIssue },
-    triggers: [http()],
+    channels: [http.on()],
     budget: { maxSteps: 10 },
-    notify: 'console',
 });
 // #endregion agent

@@ -24,7 +24,7 @@
 
 <<< @/snippets/shutdown.ts#cancel
 
-If the local execution loses its lease while being cancelled, `cancel()` throws `InvalidRunStateError`: the run was not cancelled and may now execute on another replica. A cancel that races a pause cancels the run the pause left waiting, without sending the approval notification.
+If the local execution loses its lease while being cancelled, `cancel()` throws `InvalidRunStateError`: the run was not cancelled and may now execute on another replica. A cancel that races a pause cancels the run the pause left waiting, without sending the approval message.
 
 ## Drain
 

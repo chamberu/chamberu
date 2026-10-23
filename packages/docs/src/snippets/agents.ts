@@ -1,13 +1,9 @@
 import { Output } from 'ai';
 import type { LanguageModel } from 'ai';
 import { z } from 'zod';
-import {
-    cron,
-    defineAgent,
-    defineEffectTool,
-    defineTool,
-    http,
-} from '@chamvi/core';
+import { cron } from '@chamvi/channel-cron';
+import { defineAgent, defineEffectTool, defineTool } from '@chamvi/core';
+import { http } from '@chamvi/http';
 
 declare const model: LanguageModel;
 declare function renderChart(points: number[]): Promise<Uint8Array>;
@@ -33,9 +29,9 @@ export const reporter = defineAgent({
     name: 'weekly-report',
     model,
     instructions: 'Summarize the open work items in the trigger payload.',
-    triggers: [
-        http(),
-        cron('0 8 * * 1', { timezone: 'Europe/Berlin' }),
+    channels: [
+        http.on(),
+        cron.on('0 8 * * 1', { timezone: 'Europe/Berlin' }),
     ],
     budget: {
         maxSteps: 10,
@@ -67,7 +63,7 @@ export function createLabeler() {
         name: 'labeler',
         model,
         instructions: 'Label the issue in the trigger payload.',
-        triggers: [http()],
+        channels: [http.on()],
         // run.output is { label, reason } instead of the final text
         output: Output.object({
             schema: z.object({
@@ -100,7 +96,7 @@ export const charter = defineAgent({
     name: 'charter',
     model,
     instructions: 'Chart the numbers in the attached CSV.',
-    triggers: [http()],
+    channels: [http.on()],
     tools: { saveChart },
 });
 // #endregion artifacts

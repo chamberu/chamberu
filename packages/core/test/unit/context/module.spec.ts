@@ -17,6 +17,7 @@ import type { MemoryStore, ToolContext } from '@chamvi/core';
 
 function handBuilt(): ToolContext {
     return {
+        channels: {} as ToolContext['channels'],
         run: {} as ToolContext['run'],
         state: {} as ToolContext['state'],
         artifacts: {} as ToolContext['artifacts'],

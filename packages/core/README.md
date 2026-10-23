@@ -5,7 +5,7 @@
 <h1 align="center">@chamvi/core</h1>
 
 <p align="center">
-    <b>Core engine for self-hosted, trigger-driven AI agents: agents, triggers and durable runs.</b><br>
+    <b>Core engine for self-hosted, channel-driven AI agents: agents, channels and durable runs.</b><br>
     You write the agent with the AI SDK. The engine queues its runs, checkpoints every step,<br>
     pauses for approvals and picks interrupted runs up again, in a plain Node process.
 </p>
@@ -42,20 +42,20 @@ The AI SDK runs the model and its tool loop, and stops there. An agent that reac
 | **Concurrency** | Two webhooks for the same issue race each other | One run at a time per `concurrencyKey`, enforced through the store across replicas |
 | **Durability** | A crash loses the conversation | A checkpoint after every step; a recovered run continues from the latest one |
 | **Side effects** | A retried tool call posts again | `defineEffectTool()` records each result per effect key and can check the remote system before acting |
-| **Approvals** | You build the pause, the storage and the callback | The run waits in `waiting` with a signed resume token; `resume(token, decision)` continues it |
+| **Approvals** | You build the pause, the storage and the callback | `await approve(ctx, { title })` in a tool pauses the run in `waiting`, across restarts; `engine.approve()` or `resume(token, decision)` answers and the call replays with the decision |
 | **Limits** | `stopWhen` per call | `maxSteps`, `maxTokens` and `timeoutMs` per run, settled as `completed` or `failed` |
 | **Shutdown** | Runs die with the process | `drain()` waits for in-flight runs, then marks the rest `interrupted` for another replica |
 
 Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageModel` and a plain `ToolSet` (tools built with `tool()`, or `defineTool()` for tools that read the run context), and nothing is wrapped in a chamvi type.
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
+    <img src="https://raw.githubusercontent.com/chamvi/chamvi/master/.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool that awaits approve() pauses the run in waiting; approving or denying it requeues the run, and the call runs again with the decision. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
 </p>
 
 **Table of Contents**
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Agents and triggers](#agents-and-triggers)
+  - [Agents and channels](#agents-and-channels)
   - [Effect tools](#effect-tools)
   - [Approvals](#approvals)
   - [Agent state](#agent-state)
@@ -75,7 +75,7 @@ ESM only, Node.js `>=22`. `ai@^7` (the Vercel AI SDK) is a peer dependency; add 
 
 ## Usage
 
-One agent, an in-memory store and one manually dispatched run:
+One agent, an in-memory store, the development console channel and one manually dispatched run that answers where it came from:
 
 ```typescript
 import type { LanguageModel } from 'ai';
@@ -83,27 +83,29 @@ import { z } from 'zod';
 import {
     Engine,
     MemoryStore,
+    consoleChannel,
     defineAgent,
     defineEffectTool,
-    http,
 } from '@chamvi/core';
 
 export async function triageIssue(model: LanguageModel) {
     const labels: string[] = [];
+    const lines: string[] = [];
 
     const triage = defineAgent({
         name: 'triage',
         model,
         instructions: 'Label the issue in the trigger payload as bug, feature or question.',
-        triggers: [http()],
         budget: { maxSteps: 5 },
         tools: {
             // the result is recorded per (run, tool, input): a resumed run reuses it
             addLabel: defineEffectTool({
                 description: 'Adds a label to the issue.',
                 inputSchema: z.object({ label: z.enum(['bug', 'feature', 'question']) }),
-                execute: async ({ label }) => {
+                execute: async ({ label }, { context }) => {
                     labels.push(label);
+                    // answers where the run came from, at most once per message
+                    await context.channels.findOne()?.emit({ body: `Labelled as ${label}.` });
                     return { added: label };
                 },
             }),
@@ -113,29 +115,39 @@ export async function triageIssue(model: LanguageModel) {
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage],
+        channels: [consoleChannel({
+            write: (line) => {
+                lines.push(line);
+            },
+        })],
         resumeSecret: 'change-me',
     });
     await engine.start();
 
     const { runId } = await engine.dispatch({
         agent: 'triage',
-        trigger: 'http',
-        source: 'http',
+        trigger: 'manual',
+        channel: 'console',
+        address: 'issue-1',
         payload: { title: 'App crashes on start' },
     });
 
     await engine.idle();
-    engine.stop();
+    await engine.stop();
 
-    return { run: await engine.getRun(runId), labels };
+    return {
+        run: await engine.getRun(runId), 
+        labels, 
+        lines, 
+    };
 }
 ```
 
-The run settles `completed`, and its `output` is the text of the model's last answer (with structured `output`, the parsed value). This is the code of [`test/fixtures/readme-example.ts`](./test/fixtures/readme-example.ts), which the test suite runs against a scripted model.
+The run settles `completed`, and its `output` is the text of the model's last answer (with structured `output`, the parsed value); the console channel wrote `Labelled as bug.` once. This is the code of [`test/fixtures/readme-example.ts`](./test/fixtures/readme-example.ts), which the test suite runs against a scripted model.
 
-### Agents and triggers
+### Agents and channels
 
-- `defineAgent()` checks the name (`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 characters) and that trigger ids are unique, and fills in the default budget (`maxSteps: 20`, `timeoutMs: 900_000`).
+- `defineAgent()` checks the name (`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64 characters) and that subscription ids are unique, and fills in the default budget (`maxSteps: 20`, `timeoutMs: 900_000`).
 - `tools` is a plain AI SDK `ToolSet`, defined once at module scope, or a factory `(ctx) => ToolSet` for dynamic sets (called once per execution). Tools built with `defineTool()` (or `defineEffectTool()`) read the run context as `context` in `execute`: `run` (`runId`, `agent`, `trigger`, `signal`), the agent's `state` and the run's `artifacts`. One context per execution, shared by every call and by the factory; treat it as immutable.
 
 ```typescript
@@ -152,8 +164,10 @@ tools: { search: searchTool },
 toolsContext: { search: { apiKey: process.env.SEARCH_KEY } },
 ```
 
-- `cron()`, `http()` and `webhook()` describe triggers. `cron()` validates the expression and defaults its overlap policy to `skip`. `http()` is the control-plane trigger (id `http`, at most one per agent) that REST, the UI and MCP start runs through; `webhook({ path })` is a generic webhook (id `webhook:<path>`, many per agent). In this package only `engine.dispatch()` starts runs: firing cron, HTTP and webhook triggers belongs to the scheduler and HTTP packages.
-- The trigger envelope (source, trigger id, payload) becomes the run's first user message, as a JSON block.
+- A channel (`IChannel`: `name`, optional `defaultAddress`, `start`, `stop`, `in`, `out`) is anything a run comes from or talks to; `new Engine({ channels })` registers them (names follow the agent-name rule, unique per engine). `start()` starts every channel after the first recovery (`start({ channels: false })` starts none), `drain()` and `stop()` stop them first. An agent subscribes through `channels: ChannelSubscription[]`, each naming a registered channel (an unknown one is refused). A channel dispatches through its `ChannelContext`, which sets `channel` to its own name.
+- Outbound is tool-driven: the engine never sends a message of its own. Inside a tool, `ctx.channels.findOne(name)` returns a handle on a registered channel with `out`, or `undefined`; without a name it is the run's source channel, bound to its source address. `ctx.channels.findOneOrFail(name?)` throws `ChannelNotFoundError` (`channel_not_found`) instead of `undefined`, and `ctx.channels.find()` returns every channel with `out`. `handle.emit({ title?, body, key? }, address?)` sends through the channel's `out`; the address defaults to the source address on the source channel, else to the channel's `defaultAddress` (`consoleChannel()` has its name, the OpenClaw channel its `deliver.to`); without either it is a `validation_error` tool error. An emit is an effect: its key (`<runId>:emit:<channel>:<sha256 of address and message>`, or your `key`) is recorded in the effect store, so identical emits of one step and a step redone after a crash send once, and `out` gets it as `message.key` to dedupe on; a throwing `out` records nothing and is a tool error. `emit` outside a tool call (in the tools factory) throws `InvalidRunStateError`.
+- `consoleChannel({ name?, write? })` is the development channel (out only, default name `console`, default `write` `console.log`): one header line per message, the body lines and, for an approval, until when it waits; it never throws.
+- The trigger envelope (channel, subscription id, payload; `address` is where the run came from on the channel) becomes the run's first user message, as a JSON block.
 - `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments` (ids `<runId>.0000`, `<runId>.0001`, ..., so a listing keeps the input order), and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
 - The tool context (also the factory's argument) carries `artifacts`, scoped to the run: `put({ mediaType, filename?, data })`, `get(id)` and `list()`. `put()` is no effect by itself; call it inside a `defineEffectTool` to store a file exactly once.
 - `output` takes an AI SDK `Output` (e.g. `Output.object({ schema })`): a completed run's `output` is then the parsed value instead of the text, and a final answer that does not parse fails the run with `validation_error` (the quoted cause cut to 500 characters; the whole answer stays in the `llm` step). An answer cut off at the output token limit, or a loop that ended on a tool call nothing executed, fails it with `incomplete_response`.
@@ -189,14 +203,22 @@ const agent = defineAgent({
 ### Approvals
 
 ```typescript
+const deploy = defineTool({
+    description: 'Deploy a version.',
+    inputSchema: z.object({ version: z.string() }),
+    execute: async ({ version }, { context }) => {
+        // pauses the run until the owner answers; the call then runs again and gets the decision
+        const decision = await approve(context, { title: `Deploy ${version}?`, timeoutMs: 60 * 60 * 1000 });
+        if (!decision.approved) return `Not deployed: ${decision.reason ?? 'denied'}`;
+        return deployVersion(version);
+    },
+});
+
 const deployer = defineAgent({
     name: 'deployer',
     model,
     instructions: 'Deploy the requested version.',
     tools: { deploy },
-    approvals: { deploy: 'user' },
-    approvalTimeoutMs: 60 * 60 * 1000,
-    notify: 'owner',
 });
 
 // fail fast: the engine rejects an empty secret, which would let anyone mint tokens
@@ -206,20 +228,19 @@ if (!resumeSecret) throw new Error('RESUME_SECRET is not set');
 const engine = new Engine({
     store,
     agents: [deployer],
-    notifiers: { owner: notifier },
     resumeSecret,
 });
 
-// later, with the token the notifier delivered
-await engine.resume(token, { approved: true });
+// later, from the owner's answer to run.waiting
+await engine.approve(runId, { approvalId, approved: true });
 ```
 
-- A call that needs approval puts the run in `waiting` and frees its slot. The notifier receives the request once, with a resume token signed with `resumeSecret` and the run's trigger envelope (`NotifyOptions.trigger`); a failed send is retried on every poll until it is delivered.
-- For development, `notifiers: { owner: consoleNotifier() }` logs every notification and its resume token (development only: keep it out of logs others read); `@chamvi/notify-openclaw` and `@chamvi/notify-github` deliver to an OpenClaw chat or the run's issue.
-- A policy can also be a function that returns `'user'`, `'allow'` or `'deny'` per call.
-- A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
-- `engine.approve(runId, { approvalId, approved, reason? })` answers the current wait point without a token, for a caller that authorized the approver itself; it spends the notified token like `resume()`.
-- An approval not answered within `approvalTimeoutMs` (default 24 hours) is denied, and the model sees the denial.
+- `approve(ctx, { title, body?, timeoutMs? })` runs inside a tool call (its `execute` or the agent's `hooks`). It puts the run in `waiting` (`run.waiting` names the approval, `<stepIndex>:<toolCallId>:<n>`) and frees its slot; the approval survives restarts. Once answered, the call runs again from the start and `approve()` returns `{ approved, reason?, approver? }`, so code before it must be idempotent. Other calls of the same step that finished keep their results.
+- `ctx.channels.findOneOrFail(name).approve({ title, address? })` is the same, with the request delivered through that channel.
+- To gate a tool you did not write, call `approve()` in the agent's `beforeToolExecution` hook and throw `ToolDeniedError` for a denial.
+- `engine.resume(token, decision)` answers with a resume token signed with `resumeSecret` (`createResumeToken`). A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
+- `engine.approve(runId, { approvalId, approved, reason? })` answers the current wait point without a token, for a caller that authorized the approver itself; it spends a token handed out earlier like `resume()`.
+- An approval not answered within its `timeoutMs` (default 24 hours) is denied with the reason `approval timed out`.
 
 ### Invokers and tool access
 
@@ -233,11 +254,14 @@ const ops = defineAgent({
     tools: { deploy, rollback },
     // offers a tool only when the invoker holds tool:ops:<tool>; cron and webhook runs get none
     toolPolicy: requireToolPermission(),
-    approvals: {
+    hooks: {
         // release managers deploy without asking
-        deploy: (_input, { runtimeContext }) => {
-            const invoker = runtimeContext.trigger.invoker;
-            return invoker && hasPermission(invoker.permissions, 'release:manage') ? 'allow' : 'user';
+        async beforeToolExecution({ toolName, input }, ctx) {
+            const { invoker } = ctx.run.trigger;
+            if (toolName !== 'deploy' || (invoker && hasPermission(invoker.permissions, 'release:manage'))) return input;
+            const decision = await approve(ctx, { title: 'Deploy?' });
+            if (!decision.approved) throw new ToolDeniedError('Deploy denied.');
+            return input;
         },
     },
 });
@@ -245,7 +269,7 @@ const ops = defineAgent({
 await engine.dispatch({
     agent: 'ops',
     trigger: 'http',
-    source: 'http',
+    channel: 'http',
     payload: {},
     invoker: { id: 'u-42', kind: 'user', permissions: ['tool:ops:deploy'] },
 });
@@ -255,8 +279,8 @@ await engine.resume(token, { approved: true, approver: { id: 'u-7', kind: 'user'
 ```
 
 - The invoker (`{ id, kind, name?, permissions }`) is a snapshot taken at dispatch. A run keeps it across approvals and restarts; revoking a grant later does not reach a run that already holds it.
-- With an invoker, the `idempotencyKey` is scoped to it (`<agent>:<source>:<kind>:<id>`): only the same invoker's retry is deduplicated, another invoker with the same key gets its own run.
-- Tool code sees it as `context.run.trigger.invoker` in tools and the factory and `ctx.run.trigger.invoker` in effect hooks; approval policies see it as `runtimeContext.trigger.invoker`.
+- With an invoker, the `idempotencyKey` is scoped to it (`<agent>:<channel>:<kind>:<id>`): only the same invoker's retry is deduplicated, another invoker with the same key gets its own run.
+- Tool code sees it as `context.run.trigger.invoker` in tools and the factory and `ctx.run.trigger.invoker` in effect hooks and the agent hooks.
 - The policy covers state tools too. A call to a refused tool that still arrives fails as a tool error and the run goes on: the step records it as `tool_not_allowed` (`ToolNotAllowedError`), whether the model called it anyway (the model sees the AI SDK's unavailable-tool error) or an approved call from an older history reached the engine's re-check.
 - Permissions are `:`-separated: `*` alone grants everything, a `*` segment matches one segment, and segment counts must match. `requireToolPermission({ withoutInvoker: 'allow' })` lets runs without an invoker use every tool.
 
@@ -294,7 +318,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 
 ### Context
 
-A tool reaches a shared instance (an API client, the GitHub App, a workspace manager) through a typed key instead of a closure. The engine keeps the value by reference; `inject(ctx, key)` reads it in a tool's `execute`, in the tools factory and in the effect hooks, and nothing provided is ever stored or serialized (`ToolContext` stays `{ run, state, artifacts }`).
+A tool reaches a shared instance (an API client, the GitHub App, a workspace manager) through a typed key instead of a closure. The engine keeps the value by reference; `inject(ctx, key)` reads it in a tool's `execute`, in the tools factory and in the effect hooks, and nothing provided is ever stored or serialized (`ToolContext` is `{ run, state, artifacts, channels }` and gains no field for a provided value).
 
 ```ts
 import { defineContextKey, defineTool, inject } from '@chamvi/core';
@@ -320,8 +344,8 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 |---|---|---|---|
 | `store` | `IStore` | required | Where runs, steps, checkpoints and state live |
 | `agents` | `Agent[]` | required | The agents this engine runs |
-| `resumeSecret` | `string` | required | HMAC secret for resume tokens and AI SDK approval signatures; must not be empty |
-| `notifiers` | `Record<string, INotifier>` | `{}` | Notifiers by name, referenced by an agent's `notify` |
+| `resumeSecret` | `string` | required | HMAC secret for resume tokens; must not be empty |
+| `channels` | `IChannel[]` | `[]` | Channels by unique name, started by `start()` and stopped first by `drain()`/`stop()`; tools reach them through `ctx.channels` |
 | `maxConcurrentRuns` | `number` | `4` | Runs executing at once in this process |
 | `claimTtlMs` | `number` | `60_000` | Lease on a running run, renewed every `claimTtlMs / 3`; the poll for new work, expired approvals and abandoned runs uses the same interval |
 | `owner` | `string` | `` `${hostname}-${pid}` `` | Identity of this replica in claims |
@@ -335,15 +359,13 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `name` | `string` | required | Unique per app, lowercase words joined by `-` |
 | `model` | `LanguageModel` | required | Any AI SDK model |
 | `instructions` | `string` | required | System instructions |
-| `triggers` | `TriggerDefinition[]` | none | From `cron()`, `http()` and `webhook()` |
+| `channels` | `ChannelSubscription[]` | none | Subscriptions to channels registered on the engine |
 | `tools` | `ToolSet \| (ctx) => ToolSet` | none | A plain tool set, or a factory called for each execution |
 | `toolsContext` | `Record<string, unknown>` | none | Per tool name, the context of a tool that is not chamvi's, passed through by reference |
 | `state` | `Record<string, StandardSchemaV1>` | none | Typed state collections |
 | `toolPolicy` | `(toolName, { run }) => boolean` | none | Tools the run may use, e.g. `requireToolPermission()` |
 | `budget` | `{ maxSteps, maxTokens?, timeoutMs? }` | `{ maxSteps: 20, timeoutMs: 900_000 }` | Per run; the timeout applies to each execution |
-| `approvals` | `Record<string, ApprovalPolicy>` | none | Tools that need approval: `'user'` or a function |
-| `approvalTimeoutMs` | `number` | `86_400_000` | After this, the approval is denied |
-| `notify` | `string` | none | Name of a notifier registered on the engine |
+| `hooks` | `AgentHooks` | none | `beforeToolExecution` / `afterToolExecution` around every tool call: rewrite input or output, gate a tool with `approve()` |
 | `output` | `Output` | none | AI SDK structured output; a completed run's `output` is the parsed value |
 
 ## API
@@ -352,31 +374,35 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 |---|---|---|
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
-| `cron`, `http`, `webhook` | function | Trigger definitions |
-| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `provide`, `start`, `dispatch`, `getRun`, `on`, `resume`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
+| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `putAgent`, `removeAgent`, `getChannel`, `listChannels`, `provide`, `start`, `dispatch`, `getRun`, `on`, `resume`, `approve`, `inspectResumeToken`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineTool` | function | An AI SDK `tool()` whose `execute` gets the run's `ToolContext` as `context` |
 | `defineContextKey`, `inject`, `tryInject` | function | Typed context keys, and reading a value provided on the engine from a `ToolContext` |
 | `toolContextSchema` | object | The `contextSchema` that marks a chamvi tool |
 | `defineEffectTool`, `effectMarker` | function | Recorded side-effecting tools and their hidden marker |
 | `EFFECT` | symbol | Marks a tool created by `defineEffectTool()` |
-| `wrapToolsForRun` | function | `wrapToolsForRun(tools, ctx, store, allow?)`: applies effect recording to a `ToolSet` outside the engine, with a `ToolContext`; an optional `allow(toolName)` re-checks each call (a refused call throws `ToolNotAllowedError`) |
+| `wrapToolsForRun` | function | `wrapToolsForRun(tools, ctx, store, { allow?, hooks? })`: applies effect recording and the agent hooks to a `ToolSet` outside the engine, with a `ToolContext`; an optional `allow(toolName)` re-checks each call (a refused call throws `ToolNotAllowedError`) |
+| `approve` | function | `approve(ctx, { title, body?, timeoutMs? })`: a durable approval from inside a tool call |
+| `DEFAULT_APPROVAL_TIMEOUT_MS`, `APPROVAL_TIMEOUT_MAX_MS` | constant | `86_400_000` (24 h), `2_147_483_647` |
 | `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API over a store, and `createStateTools(schema)`, the generated state tools (they read `context.state`) |
 | `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
 | `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
-| `consoleNotifier` | function | `consoleNotifier({ name?, write? })`: a development `INotifier` that logs each notification (default name `console`, default `write` `console.log`) |
+| `consoleChannel` | function | `consoleChannel({ name?, write? })`: a development channel, out only, logging each message (default name `console`, default `write` `console.log`) |
+| `assertTriggerKey`, `normalizeEnvelope` | function | The 255-character, no-NUL rule for envelope keys and addresses; the read-back of envelopes stored before channels (`source`, `thread`) for store implementations |
 | `isArtifactMediaType` | function | The media type rule for attachments and artifacts (`type/subtype`, no parameters) |
 | `ChamviError` | class | Base class of every error below |
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `IncompleteResponseError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
 | `ContextNotProvidedError` | class | `inject()` found no value for the key (`context_not_provided`) |
+| `ChannelNotFoundError` | class | `ctx.channels.findOneOrFail()` named a channel the engine does not have or one without `out` (`channel_not_found`) |
 | `ToolNotAllowedError` | class | The tool error recorded for a call to a tool the `toolPolicy` refuses |
+| `ToolDeniedError` | class | A gate (e.g. a `beforeToolExecution` hook) refused a tool call (`tool_denied`); a tool error, never fatal |
 | `SandboxError` | class | A sandbox workspace or provider failed (`@chamvi/sandbox` and its providers); a tool error, never a failed run |
 | `ErrorCode` | object | The `code` of every error above |
 | `systemClock` | object | The default `IClock` |
 
-Types: `Agent`, `AgentDefinition`, `ToolContext`, `ContextKey`, `IContextProvider`, `ToolPolicy`, `TriggerDefinition`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `INotifier`, `Notification`, `NotifyOptions`, `ConsoleNotifierOptions`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
+Types: `Agent`, `AgentDefinition`, `ToolContext`, `ContextKey`, `IContextProvider`, `ToolPolicy`, `AgentHooks`, `ToolCallInfo`, `TriggerEnvelope`, `Invoker`, `Run`, `RunStatus`, `Step`, `Checkpoint`, `WaitPoint`, `Budget`, `Usage`, `ApprovalRequestInput`, `ApprovalDecision`, `ApprovalAnswer`, `IStore` and its parts, `Artifact`, `ArtifactInput`, `IRunArtifacts`, `IChannel`, `ChannelSubscription`, `ChannelContext`, `ChannelMessage`, `ChannelSendOptions`, `ChannelHandle`, `EmitMessage`, `ConsoleChannelOptions`, `IAgentState`, `RunEvent`, `EngineOptions`, `IClock`.
 
 Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamvi/test-kit`](../test-kit).
 
@@ -385,9 +411,9 @@ Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamvi/te
 - **A tool error does not fail the run.** It goes back to the model as a tool error result. Throw `FatalToolError` to fail the run; the step budget caps retry loops.
 - **Budgets settle runs.** A run stopped by `maxSteps` or `maxTokens` while the model still wanted to call tools fails with code `BudgetExceeded`; a run that hits its timeout fails with code `Timeout`.
 - **Effects are recorded after they happen.** A crash between a tool's side effect and the store write repeats the effect on resume, unless `alreadyApplied` finds it.
-- **Several approvals in one step are handled one at a time.** The run waits on the first; the other calls are dropped from the history, and the model requests them again after the resume.
+- **Several approvals in one step are handled one at a time.** The run waits on the first in call order; the other suspended calls stay pending and ask again after the resume, before any further model call.
 - **`MemoryStore` is not durable.** Everything is gone with the process; use a persistent store to survive restarts or to run replicas.
-- **`stop()` only stops polling.** Runs in progress continue; use `drain()` to shut down.
+- **`stop()` stops polling and the channels.** It resolves once every channel stopped; runs in progress continue, so use `drain()` to shut down.
 
 ## License
 

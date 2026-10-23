@@ -8,6 +8,7 @@
 import type {
     Agent,
     Engine,
+    IChannel,
     IClock,
     IStore,
 } from '@chamvi/core';
@@ -39,7 +40,7 @@ export type HttpAppOptions = {
     /** Its `store`, agents and `clock` serve every route. */
     engine: Engine;
     /**
-     * Names of the engine's agents to serve (routes, MCP tools, hooks, extra
+     * Names of the engine's agents to serve (routes, MCP tools, extra
      * routes), checked at construction; the others, also agents registered
      * later, are unknown to this app. A named agent removed from the engine
      * answers 404. Default: every agent the engine holds, at request time.
@@ -79,8 +80,15 @@ export type HttpAppOptions = {
     readyTimeoutMs?: number;
     /** Receives 5xx causes and background failures. Default: `console.error`. */
     onError?: (error: unknown) => void;
-    /** Extra routes other packages contribute (e.g. a GitHub webhook), served under `basePath`. */
+    /** Extra routes other packages contribute (e.g. the dashboard), served under `basePath`. */
     routes?: HttpRoute[];
+    /**
+     * Channels to serve at `POST /channels/<name>` and below (e.g. the
+     * webhook and GitHub channels), unauthenticated: each checks its own
+     * credentials. Each needs an `in` and must be the object the engine holds
+     * under its name, else InvalidAgentDefinitionError. Default: none.
+     */
+    channels?: IChannel[];
 };
 
 // #endregion options
@@ -130,7 +138,7 @@ export type HttpRouteContext = {
 
 export type HttpRoute = {
     method: HttpRouteMethod;
-    /** Static path under basePath (no ':' '*' '{'), e.g. '/webhooks/github'; also its metrics label. */
+    /** Static path under basePath (no ':' '*' '{'), e.g. '/ui'; also its metrics label. */
     path: string;
     /** false: skipped by the app's rate limiter (callers that never retry, e.g. webhook senders). Default: limited. */
     rateLimit?: false;
@@ -180,5 +188,7 @@ export type HttpContext = {
     closed: boolean;
     /** Extra routes, validated in `buildContext`. */
     routes: HttpRoute[];
+    /** Mounted channels, validated in `buildContext`. */
+    channels: IChannel[];
     onError: (error: unknown) => void;
 };

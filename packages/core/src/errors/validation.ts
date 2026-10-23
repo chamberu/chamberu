@@ -16,9 +16,9 @@ import { ErrorCode } from './constants.ts';
 export class ValidationError extends ChamviError {
     constructor(message: string, issues: readonly Issue[] = []) {
         super({
-            message, 
-            code: ErrorCode.VALIDATION, 
-            issues, 
+            message,
+            code: ErrorCode.VALIDATION,
+            issues,
         });
     }
 }

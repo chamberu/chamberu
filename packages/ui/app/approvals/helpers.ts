@@ -8,7 +8,7 @@
 import { isObject } from 'smob';
 import type { LocationQueryRaw } from 'vue-router';
 import type { ApiError } from '../api/error.ts';
-import type { AgentWire, RunWire } from '../api/types.ts';
+import type { RunWire } from '../api/types.ts';
 import { hasPermission } from '../auth/helpers.ts';
 import { shortId } from '../runs/helpers.ts';
 import { RESUME_STORAGE_KEY } from './constants.ts';
@@ -56,7 +56,7 @@ function firstToken(value: unknown): string | undefined {
 
 /**
  * A global `beforeEach` (registered before the auth guard): a `token` in
- * the fragment (`#token=...`, the form notifiers should use, since a
+ * the fragment (`#token=...`, the form a channel's link should use, since a
  * browser never sends the fragment to a server or proxy) or in the query
  * (`?token=...`, also repeated) moves into `sessionStorage`, and the
  * navigation is redirected to the same location without it (`replace`),
@@ -116,13 +116,16 @@ export function pendingApprovals(
 }
 
 /**
- * The callout's "notified" line: the notifier's name once the approval was sent,
- * `nobody` for an agent without a notifier, else "not sent (retrying)" (the
- * engine re-sends on every poll). `agent` is `undefined` while unknown (no `run:read`).
+ * The callout's "notified" line: the channel (and address) the approval went
+ * out through once sent, `inbox only` for a request that names no channel,
+ * else "not sent (retrying)" (the engine re-sends on every poll).
  */
-export function notifiedLine(run: RunWire, agent: AgentWire | undefined): NotifiedLine {
-    if (run.waiting?.notifiedAt) return { text: agent?.notify ?? 'sent', warn: false };
-    if (agent && !agent.notify) return { text: 'nobody', warn: false };
+export function notifiedLine(run: RunWire): NotifiedLine {
+    const { waiting } = run;
+    if (!waiting?.channel) return { text: 'inbox only', warn: false };
+    if (waiting.notifiedAt) {
+        return { text: waiting.address ? `${waiting.channel} · ${waiting.address}` : waiting.channel, warn: false };
+    }
     return { text: 'not sent (retrying)', warn: true };
 }
 

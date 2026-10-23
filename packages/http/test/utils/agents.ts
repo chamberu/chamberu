@@ -5,28 +5,28 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { tool } from 'ai';
 import { z } from 'zod';
-import { defineAgent, http, webhook } from '@chamvi/core';
+import { defineAgent } from '@chamvi/core';
 import type { Agent } from '@chamvi/core';
+import { http, webhook } from '@chamvi/http';
+import { deployTool } from './app.ts';
 import { textModel } from './model.ts';
 
-/** `echo` (http only) and `intake` (a webhook, an approval, an `issues` collection). */
+/** `echo` (http only) and `intake` (a webhook, a tool asking for approvals, an `issues` collection). */
 export function inventoryAgents(): Agent[] {
     return [
         defineAgent({
             name: 'echo',
             model: textModel(),
             instructions: 'Echo.',
-            triggers: [http()],
+            channels: [http.on()],
         }),
         defineAgent({
             name: 'intake',
             model: textModel(),
             instructions: 'Intake.',
-            triggers: [webhook({ path: '/issues' })],
-            tools: () => ({ deploy: tool({ inputSchema: z.object({}), execute: async () => 'ok' }) }),
-            approvals: { deploy: 'user' },
+            channels: [webhook.on('/issues')],
+            tools: () => ({ deploy: deployTool() }),
             state: { issues: z.object({ title: z.string(), status: z.string() }) },
         }),
     ];

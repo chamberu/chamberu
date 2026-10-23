@@ -17,13 +17,13 @@ import { ControllableClock } from '@chamvi/test-kit';
 import { createShutdown } from '@chamvi/http';
 import {
     ADMIN_TOKEN,
-    CapturingNotifier,
     READER_TOKEN,
     call,
     createRunAgents,
     createRunTestApp,
     createTestApp,
     flush,
+    testChannels,
 } from '../../utils/app.ts';
 import { callTool, connectMcp } from '../../utils/mcp.ts';
 import { SseReader } from '../../utils/sse.ts';
@@ -179,7 +179,7 @@ describe('stream.maxOpen', () => {
             agents,
             resumeSecret: 'test-secret',
             clock,
-            notifiers: { capture: new CapturingNotifier() },
+            channels: testChannels(),
             onError: () => {},
         });
         const shutdown = createShutdown({ engine });

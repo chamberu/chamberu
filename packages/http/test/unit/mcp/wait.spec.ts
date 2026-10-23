@@ -18,11 +18,11 @@ import { buildContext } from '../../../src/app/helpers.ts';
 import { waitForRun } from '../../../src/mcp/helpers.ts';
 import {
     ADMIN_TOKEN,
-    CapturingNotifier,
     createRunAgents,
     createRunTestApp,
     flush,
     testAuth,
+    testChannels,
 } from '../../utils/app.ts';
 import { callTool, connectMcp } from '../../utils/mcp.ts';
 import type { ToolResult } from '../../utils/mcp.ts';
@@ -74,12 +74,17 @@ describe('mcp run_<agent> with waitSeconds', () => {
         const result = await callTool(client, 'run_gate', { waitSeconds: 5 });
         expect(result.structuredContent).toMatchObject({
             status: 'waiting',
-            waiting: { toolName: 'deploy', input: {} },
+            waiting: {
+                toolName: 'deploy', 
+                title: 'Deploy?', 
+                body: 'release 1.2', 
+            },
         });
+        const { runId } = result.structuredContent as { runId: string };
         const json = JSON.stringify(result);
         expect(json).not.toContain('resumeToken');
         expect(json).not.toContain('tokenId');
-        expect(json).not.toContain(setup.notifier.lastToken);
+        expect(json).not.toContain(await setup.tokenOf(runId));
         await client.close();
         await setup.engine.drain();
     });
@@ -128,7 +133,7 @@ describe('mcp run_<agent> with waitSeconds', () => {
             agents,
             resumeSecret: 'test-secret',
             clock,
-            notifiers: { capture: new CapturingNotifier() },
+            channels: testChannels(),
             owner: 'replica-b',
             onError: () => {},
         });
@@ -178,7 +183,7 @@ describe('waitForRun', () => {
             agents,
             resumeSecret: 's',
             clock,
-            notifiers: { capture: new CapturingNotifier() },
+            channels: testChannels(),
             onError: () => {},
         });
         const ctx = buildContext({ engine, auth: testAuth });
@@ -200,7 +205,7 @@ describe('waitForRun', () => {
         const { runId } = await engine.dispatch({
             agent: 'echo',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         const subscriptions = spyOnSubscriptions(engine);
@@ -228,7 +233,7 @@ describe('waitForRun', () => {
         const { runId } = await engine.dispatch({
             agent: 'echo',
             trigger: 'http',
-            source: 'http',
+            channel: 'http',
             payload: {},
         });
         const pending = waitForRun(ctx, runId, { timeoutMs: 10_000, pollMs: 1_000 });

@@ -98,7 +98,7 @@ function make(opts: Partial<EngineOptions> & { store?: CountingStore; clock?: Co
 const env = (agent = 'triage') => ({
     agent,
     trigger: 'http',
-    source: 'http' as const,
+    channel: 'http' as const,
     payload: {},
 });
 
@@ -118,7 +118,8 @@ async function parkWaiting(store: MemoryStore, clock: ControllableClock, id: str
             kind: 'approval',
             approvalId: 'a1',
             toolName: 'tool',
-            input: {},
+            toolCallId: 'c1',
+            title: 'Run tool?',
             expiresAt: new Date(now.getTime() + 60_000),
             tokenId: 'tok',
         },
@@ -174,16 +175,20 @@ describe('Engine agent registry', () => {
         expect(await statusOf(engine, after)).toBe('queued');
     });
 
-    it('putAgent refuses an unknown notifier', async () => {
+    it('putAgent refuses an unknown channel', async () => {
         const { engine, changes } = make();
         const broken = defineAgent({
             name: 'digest',
             model,
             instructions: 'y',
-            notify: 'nope',
+            channels: [{
+                channel: 'nope', 
+                id: 'nope', 
+                options: {}, 
+            }],
         });
         await expect(engine.putAgent(broken)).rejects.toThrow(InvalidAgentDefinitionError);
-        await expect(engine.putAgent(broken)).rejects.toThrow('Agent "digest" uses unknown notifier "nope".');
+        await expect(engine.putAgent(broken)).rejects.toThrow('Agent "digest" subscribes to unknown channel "nope".');
         expect(engine.listAgents()).toEqual([triage]);
         expect(changes).toEqual([]);
     });

@@ -2,7 +2,7 @@
 
 # chamvi: Agent Guide
 
-chamvi is a TypeScript framework for building self-hosted, trigger-driven AI agents. Agents are declared with `defineAgent()`, started by triggers (cron, http, webhook, github, mcp), and executed as durable runs whose steps are checkpointed in a pluggable store, so runs survive restarts and approval pauses. LLM access goes through the Vercel AI SDK; its types (`ToolSet`, `LanguageModel`, `ModelMessage`) pass through unchanged and are never re-wrapped.
+chamvi is a TypeScript framework for building self-hosted, channel-driven AI agents. Agents are declared with `defineAgent()`, subscribe to channels (cron, http, mcp, webhook, github; OpenClaw and the console are out-only channels) that start their runs, and execute as durable runs whose steps are checkpointed in a pluggable store, so runs survive restarts and approval pauses. Outbound is tool-driven (`injectChannel`, `replyChannel`), and a tool asks for a human with a durable `approve()`. LLM access goes through the Vercel AI SDK; its types (`ToolSet`, `LanguageModel`, `ModelMessage`) pass through unchanged and are never re-wrapped.
 
 ## Quick Reference
 
@@ -21,12 +21,12 @@ npm run lint
 - **Package manager**: npm (workspaces)
 - **Build orchestration**: nx (`nx run-many`), packages built with tsdown (ESM only)
 
-Packages live in `packages/*`. `@chamvi/app`, `@chamvi/cli`, `@chamvi/coding`, `@chamvi/core`, `@chamvi/github`, `@chamvi/http`, `@chamvi/notify-github`, `@chamvi/notify-openclaw`, `@chamvi/sandbox`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s`, `@chamvi/sandbox-local`, `@chamvi/scheduler`, `@chamvi/store-typeorm`, `@chamvi/test-kit` and `@chamvi/ui` exist today (container images in `images/*`); the others are planned (see [Project Structure](.agents/structure.md)).
+Packages live in `packages/*`. `@chamvi/app`, `@chamvi/channel-cron`, `@chamvi/channel-openclaw`, `@chamvi/cli`, `@chamvi/coding`, `@chamvi/core`, `@chamvi/github`, `@chamvi/http`, `@chamvi/sandbox`, `@chamvi/sandbox-docker`, `@chamvi/sandbox-k8s`, `@chamvi/sandbox-local`, `@chamvi/store-typeorm`, `@chamvi/test-kit` and `@chamvi/ui` exist today (container images in `images/*`); the others are planned (see [Project Structure](.agents/structure.md)).
 
 ## Detailed Guides
 
 - **[Project Structure](.agents/structure.md)**: Workspace layout, existing and planned packages, core module map
-- **[Architecture](.agents/architecture.md)**: Run lifecycle and statuses, trigger envelope, store contract, idempotency and effects
+- **[Architecture](.agents/architecture.md)**: Run lifecycle and statuses, channels and the envelope, durable approvals and hooks, store contract, idempotency and effects
 - **[Testing](.agents/testing.md)**: Vitest setup, source aliasing, in-memory store, store contract suite
 - **[Conventions](.agents/conventions.md)**: Tooling, naming rules, commits, release flow, external references (`.agents/references/`)
 - **[Design](.agents/design.md)**: Brand direction, colour tokens, type, logo and docs landing page rules

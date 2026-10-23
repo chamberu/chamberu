@@ -55,7 +55,7 @@ export default defineComponent({
                     <span class="ch-display text-xl text-night-fg">chamvi</span>
                 </p>
                 <p class="m-0 mt-4 max-w-[38ch] text-sm leading-relaxed">
-                    Self-hosted, trigger-driven AI agents with durable runs, built on the Vercel AI SDK.
+                    Self-hosted, channel-driven AI agents with durable runs, built on the Vercel AI SDK.
                 </p>
             </div>
             <nav
