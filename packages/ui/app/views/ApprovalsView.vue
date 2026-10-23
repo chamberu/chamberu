@@ -339,7 +339,7 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
             <EmptyState
                 icon="check"
                 title="Nothing waiting for you"
-                text="Every paused tool call has an answer. New ones appear here and in your notifier."
+                text="Every paused tool call has an answer. New ones appear here and in the channel that asked."
             />
         </div>
     </div>

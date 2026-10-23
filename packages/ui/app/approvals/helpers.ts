@@ -56,7 +56,7 @@ function firstToken(value: unknown): string | undefined {
 
 /**
  * A global `beforeEach` (registered before the auth guard): a `token` in
- * the fragment (`#token=...`, the form notifiers should use, since a
+ * the fragment (`#token=...`, the form a channel's link should use, since a
  * browser never sends the fragment to a server or proxy) or in the query
  * (`?token=...`, also repeated) moves into `sessionStorage`, and the
  * navigation is redirected to the same location without it (`replace`),

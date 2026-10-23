@@ -157,8 +157,9 @@ describe('public api', () => {
         'createAgentsWatcher',
         'createLazyProvider',
         'githubModule',
-        'githubNotifierModule',
+        'githubChannel',
         'openclawModule',
+        'openclawChannel',
         'sandboxModule',
         'uiModule',
         'buildModuleHarness',
@@ -190,7 +191,7 @@ describe('package.json', () => {
     });
 
     it('names no feature package in the dependency fields', () => {
-        const feature = /^@chamvi\/(github|notify-github|notify-openclaw|sandbox(-.+)?|ui)$/;
+        const feature = /^@chamvi\/(github|channel-openclaw|sandbox(-.+)?|ui)$/;
         const names = [
             ...Object.keys(pkg.dependencies ?? {}),
             ...Object.keys(pkg.devDependencies ?? {}),
