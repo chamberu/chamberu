@@ -404,6 +404,31 @@ export function describeStoreContract(
             expect(listed.data[0]?.trigger.channel).toBe('github');
         });
 
+        it('an envelope stored before channels (source, thread) reads back as channel and address', async () => {
+            const { store } = await setup();
+            const run = makeRun('r1');
+            run.trigger = {
+                id: run.trigger.id,
+                agent: run.trigger.agent,
+                trigger: run.trigger.trigger,
+                payload: run.trigger.payload,
+                receivedAt: run.trigger.receivedAt,
+                source: 'github',
+                thread: 'owner/repo#7',
+            } as unknown as typeof run.trigger;
+            await store.createRun(run);
+            for (const stored of [
+                await store.getRun('r1'),
+                (await store.listRuns({})).data[0],
+                await store.updateRun('r1', { status: RunStatus.RUNNING }),
+            ]) {
+                expect(stored?.trigger.channel).toBe('github');
+                expect(stored?.trigger.address).toBe('owner/repo#7');
+                expect(stored?.trigger).not.toHaveProperty('source');
+                expect(stored?.trigger).not.toHaveProperty('thread');
+            }
+        });
+
         it('listRuns breaks createdAt ties by id ascending', async () => {
             const { store } = await setup();
             for (const id of ['b', 'c', 'a']) {
