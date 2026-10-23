@@ -28,7 +28,7 @@ import { isObject } from 'smob';
 import type { Container } from 'validup';
 import { MAX_PAGE_LIMIT } from '../app/constants.ts';
 import { KEY_MAX_LENGTH, RECEIVED_MAX_LENGTH } from './constants.ts';
-import type { DecodedQuery } from './types.ts';
+import type { DecodedQuery, ReadRequestBodyOptions } from './types.ts';
 
 /** `application/json` or a `+json` media type (parameters ignored). */
 export function isJsonMediaType(contentType: string | null): boolean {
@@ -123,6 +123,10 @@ export async function readBodyBytes(event: IAppEvent, limit: number, json: boole
         }
         chunks.push(value);
     }
+    return concatChunks(chunks, size);
+}
+
+function concatChunks(chunks: readonly Uint8Array[], size: number): Uint8Array<ArrayBuffer> {
     const bytes = new Uint8Array(size);
     let offset = 0;
     for (const chunk of chunks) {
@@ -130,6 +134,39 @@ export async function readBodyBytes(event: IAppEvent, limit: number, json: boole
         offset += chunk.byteLength;
     }
     return bytes;
+}
+
+/**
+ * Reads a channel request's body of at most `limit` bytes: a
+ * `content-length` above it is refused unread, a body without one is read
+ * until it passes the limit. A refusal is a RequestEntityTooLargeError (413);
+ * the channel mount then closes the connection. Media-type checks stay with
+ * the caller.
+ */
+export async function readRequestBody(request: Request, options: ReadRequestBodyOptions): Promise<Uint8Array<ArrayBuffer>> {
+    const { limit } = options;
+    const length = request.headers.get('content-length');
+    if (length !== null && /^\d+$/.test(length) && Number(length) > limit) throw tooLarge(limit);
+    if (!request.body) return new Uint8Array(0);
+
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            if (size > limit) throw tooLarge(limit);
+            chunks.push(value);
+        }
+    } catch (error) {
+        await reader.cancel().catch(() => {});
+        throw error;
+    } finally {
+        reader.releaseLock();
+    }
+    return concatChunks(chunks, size);
 }
 
 /**

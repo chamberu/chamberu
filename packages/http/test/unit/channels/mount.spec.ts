@@ -16,11 +16,15 @@ import {
     MemoryStore,
     ValidationError,
     defineAgent,
-    readRequestBody,
 } from '@chamvi/core';
 import type { ChannelContext, ChannelRequest, IChannel } from '@chamvi/core';
 import { ControllableClock } from '@chamvi/test-kit';
-import { createHttpApp, http, httpChannel } from '@chamvi/http';
+import {
+    createHttpApp,
+    http,
+    httpChannel,
+    readRequestBody,
+} from '@chamvi/http';
 import type { App } from 'routup';
 import { testAuth } from '../../utils/app.ts';
 import { textModel } from '../../utils/model.ts';
@@ -186,7 +190,7 @@ describe('/channels/<name> mount', () => {
         expect(seen).toHaveLength(1);
     });
 
-    it('payload_too_large from readRequestBody answers 413', async () => {
+    it('a body readRequestBody refuses answers 413 and closes the connection', async () => {
         const limited: IChannel = {
             name: 'limited',
             async in({ request }) {
@@ -197,7 +201,8 @@ describe('/channels/<name> mount', () => {
         const { app, errors } = setup([limited]);
         const response = await post(app, '/channels/limited', 'too large');
         expect(response.status).toBe(413);
-        expect(await response.json()).toMatchObject({ status: 413, code: 'payload_too_large' });
+        expect(response.headers.get('connection')).toBe('close');
+        expect(await response.json()).toMatchObject({ status: 413, code: 'request_entity_too_large' });
         expect(errors).toEqual([]);
         expect((await post(app, '/channels/limited', 'ok')).status).toBe(204);
     });

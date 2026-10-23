@@ -16,7 +16,6 @@ import * as core from '@chamvi/core';
 describe('public api', () => {
     it.each([
         'defineAgent',
-        'readRequestBody',
         'Engine',
         'MemoryStore',
         'defineEffectTool',
@@ -93,10 +92,6 @@ describe('public api', () => {
 
     it('removes the notifiers', () => {
         expect(core).not.toHaveProperty('consoleNotifier');
-    });
-
-    it('exports the payload too large error code', () => {
-        expect(core.ErrorCode.PAYLOAD_TOO_LARGE).toBe('payload_too_large');
     });
 
     it('exports the channel types', () => {

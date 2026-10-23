@@ -19,7 +19,7 @@ Every error chamvi throws extends `ChamviError`, which extends ebec's `BaseError
 | `ChannelNotFoundError` | `CHANNEL_NOT_FOUND` | `channel_not_found` | `injectChannel()` named a channel the engine does not hold, or one without `out` |
 | `LeaseLostError` | `LEASE_LOST` | `lease_lost` | Reported to `onError` when an engine stops executing a run whose claim it lost; carries `runId` |
 | `SandboxError` | `SANDBOX` | `sandbox_error` | A [workspace](/guide/workspaces) or its provider failed: a create, start or checkout (with git's stderr), a missing or oversized file, an unknown, expired or disposed workspace, a Docker or Kubernetes API error, a reached per-run workspace cap; a tool error, the run goes on |
-| `ValidationError` | `VALIDATION` (`PAYLOAD_TOO_LARGE`) | `validation_error` (`payload_too_large`) | A state document fails its schema (carries `issues`); an invalid attachment at `dispatch()` or `artifacts.put()`; a final answer that does not parse as the agent's [structured `output`](/guide/agents#structured-output) (the run fails); a workspace path, repository or ref the sandbox rules refuse (a tool error); an `emit()` without an address off the source channel (a tool error); with code `payload_too_large`, a body `readRequestBody()` refuses (`@chamvi/http` answers 413) |
+| `ValidationError` | `VALIDATION` | `validation_error` | A state document fails its schema (carries `issues`); an invalid attachment at `dispatch()` or `artifacts.put()`; a final answer that does not parse as the agent's [structured `output`](/guide/agents#structured-output) (the run fails); a workspace path, repository or ref the sandbox rules refuse (a tool error); an `emit()` without an address off the source channel (a tool error) |
 
 ## Run errors
 

@@ -88,11 +88,6 @@ export type ChannelSubscription<P = unknown> = {
     idempotencyKey?(payload: P): string | undefined;
 };
 
-export type ReadRequestBodyOptions = {
-    /** Most bytes accepted; more is a ValidationError with code `payload_too_large`. */
-    limit: number;
-};
-
 /** A message a tool emits; `key` overrides the content-addressed dedupe key. */
 export type EmitMessage = {
     title?: string;

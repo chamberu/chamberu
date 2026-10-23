@@ -15,3 +15,8 @@ export type DecodedQuery = {
     offset?: number;
     sorts: ISort[];
 };
+
+export type ReadRequestBodyOptions = {
+    /** Most bytes accepted; more is a RequestEntityTooLargeError (413). */
+    limit: number;
+};

@@ -10,7 +10,6 @@ import {
     defineAgent,
     defineTool,
     injectChannel,
-    readRequestBody,
     replyChannel,
 } from '@chamvi/core';
 import type {
@@ -23,6 +22,7 @@ import type {
 import {
     http,
     httpChannel,
+    readRequestBody,
     webhook,
     webhookChannel,
 } from '@chamvi/http';
@@ -143,7 +143,7 @@ export function chatChannel(options: { secret: string; apiUrl: string }): IChann
             if (request.headers.get('authorization') !== `Bearer ${options.secret}`) {
                 return new Response(null, { status: 401 });
             }
-            // payload_too_large above the limit, which the http app answers with 413
+            // 413 above the limit
             const bytes = await readRequestBody(request, { limit: 64 * 1024 });
             const post = JSON.parse(new TextDecoder().decode(bytes)) as ChatPost;
             if (typeof post.text !== 'string') throw new ValidationError('text is required.');

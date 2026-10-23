@@ -50,7 +50,6 @@ const CORE_STATUS: Record<string, number> = {
     [ErrorCode.RUN_NOT_FOUND]: 404,
     [ErrorCode.ARTIFACT_NOT_FOUND]: 404,
     [ErrorCode.INVALID_RUN_STATE]: 409,
-    [ErrorCode.PAYLOAD_TOO_LARGE]: 413,
 };
 
 const APP_ERROR_CODE = 'APP_ERROR';
@@ -203,8 +202,6 @@ function renderError(event: IAppEvent, body: ErrorBody): Response {
     const headers = new Headers(event.response.headers);
     headers.set('content-type', 'application/json; charset=utf-8');
     if (body.status === 401) headers.set('www-authenticate', 'Bearer');
-    // a body refused part-way (readRequestBody) leaves bytes unread that would stall a keep-alive socket
-    if (body.code === ErrorCode.PAYLOAD_TOO_LARGE) headers.set('connection', 'close');
     return new Response(JSON.stringify(body), { status: body.status, headers });
 }
 

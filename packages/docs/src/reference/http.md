@@ -28,6 +28,7 @@ The store, the agents and the clock come from `engine` (`engine.store`, `engine.
 function httpChannel(): IChannel;                                // name 'http': REST runs; no in, no out
 function mcpChannel(): IChannel;                                 // name 'mcp': MCP run_<agent> runs; no in, no out
 function webhookChannel(options: WebhookChannelOptions): WebhookChannel; // in at /channels/<name>/<agent><path>; on() bound to its name
+function readRequestBody(request: Request, options: ReadRequestBodyOptions): Promise<Uint8Array>; // for a channel's in: 413 above options.limit
 
 const http: HttpSubscriber;       // http.on({ schema? }): id 'http', at most one per agent
 const webhook: WebhookSubscriber; // webhook.on(path, options?): id 'webhook:<path>'

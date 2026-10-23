@@ -42,12 +42,11 @@ function requireToolPermission(opts?: RequireToolPermissionOptions): ToolPolicy;
 function injectChannel(ctx: ToolContext, name: string): ChannelHandle;        // else ChannelNotFoundError ('channel_not_found')
 function replyChannel(ctx: ToolContext): ChannelHandle | undefined;          // the run's source channel at its source address
 function consoleChannel(options?: ConsoleChannelOptions): IChannel;           // out only, name 'console'
-function readRequestBody(request: Request, options: { limit: number }): Promise<Uint8Array>; // ValidationError 'payload_too_large' above the limit
 function normalizeEnvelope(raw: Record<string, unknown>): TriggerEnvelope;    // for stores: legacy source/thread read back as channel/address
 function assertTriggerKey(name: string, value: string | undefined): void;     // 255 characters, no NUL
 ```
 
-`IChannel`, `ChannelRequest`, `ChannelContext`, `ChannelDispatchEnvelope`, `DispatchResult`, `ChannelMessage`, `ChannelSendOptions`, `ChannelSubscription`, `ReadRequestBodyOptions`, `EmitMessage`, `ChannelHandle` and `ConsoleChannelOptions`:
+`IChannel`, `ChannelRequest`, `ChannelContext`, `ChannelDispatchEnvelope`, `DispatchResult`, `ChannelMessage`, `ChannelSendOptions`, `ChannelSubscription`, `EmitMessage`, `ChannelHandle` and `ConsoleChannelOptions`:
 
 <<< ../../../core/src/channel/types.ts{ts}
 

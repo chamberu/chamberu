@@ -5,8 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { readRequestBody } from '@chamvi/core';
 import type { ChannelContext, ChannelDispatchEnvelope, ChannelRequest } from '@chamvi/core';
+import { readRequestBody } from '@chamvi/http';
 import { NotFoundError, UnauthorizedError, UnsupportedMediaTypeError } from '@ebec/http';
 import { isSameLogin } from '../app/helpers.ts';
 import type { IGithubApp } from '../app/types.ts';

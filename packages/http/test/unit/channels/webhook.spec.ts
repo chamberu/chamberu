@@ -239,7 +239,7 @@ describe('webhookChannel()', () => {
         const { app, store } = limitedApp(16);
         const response = await call(app, 'POST', '/channels/hooks/raw/raw', { token: ADMIN_TOKEN, body: { blob: 'x'.repeat(64) } });
         expect(response.status).toBe(413);
-        expect((await response.json()).code).toBe('payload_too_large');
+        expect((await response.json()).code).toBe('request_entity_too_large');
         expect((await store.listRuns({})).total).toBe(0);
     });
 

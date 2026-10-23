@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { InvalidAgentDefinitionError, hasPermission, readRequestBody } from '@chamvi/core';
+import { InvalidAgentDefinitionError, hasPermission } from '@chamvi/core';
 import type { ChannelContext, ChannelRequest } from '@chamvi/core';
 import {
     BadRequestError,
@@ -21,6 +21,7 @@ import {
     assertDerivedKey,
     isJsonMediaType,
     readIdempotencyHeader,
+    readRequestBody,
     validatePayload,
 } from '../request/helpers.ts';
 import { createWebhookSubscription } from '../subscriptions/webhook.ts';
