@@ -19,7 +19,8 @@ import type { GithubModuleChannelOptions, GithubModuleOptions } from './types.ts
  * contributes its channel (`githubChannel()`, deliveries in at
  * `/channels/<name>`, comments out) to `AppToken.CHANNELS`, with the UI
  * approval link from `CHAMVI_PUBLIC_URL` unless `channel.approvalUrl` is
- * given and the app's clock, and provides the app on the engine
+ * given, the app's clock and, unless `channel.onError` is given, the app's
+ * logger for the failures of a delivery, and provides the app on the engine
  * (`injectGithubContext(ctx)`).
  */
 export class GithubModule implements IModule {
@@ -45,11 +46,14 @@ export class GithubModule implements IModule {
     async setup(container: IContainer): Promise<void> {
         const config = container.resolve(AppToken.CONFIG);
         const approvalUrl = this.channelOptions.approvalUrl ?? approvalUrlOf(config);
+        const logger = container.resolve(AppToken.LOGGER);
         const channel = githubChannel({
             ...this.channelOptions,
             app: this.app,
             ...(approvalUrl && { approvalUrl }),
             clock: container.resolve(AppToken.CLOCK),
+            // a failed agent of a delivery (filter, key, dispatch) belongs in the app's log
+            onError: this.channelOptions.onError ?? ((error) => logger.error('github channel error', error)),
         });
         container.registerMany(AppToken.CHANNELS, { useValue: channel });
         container.registerMany(AppToken.LIFECYCLE_HOOKS, {

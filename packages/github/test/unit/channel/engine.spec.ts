@@ -152,7 +152,7 @@ describe('github channel with the engine', () => {
         const comments = () => setup.fake.comments.get('octo/demo#5') ?? [];
         expect(comments()).toHaveLength(1);
         const body = String(comments()[0]!.body);
-        expect(body).toContain('### Close octo/demo#5?');
+        expect(body).toContain('### Close octo/demo#\u200D5?');
         expect(body).toContain('It duplicates #3.');
         expect(body).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${waiting.waiting!.approvalId}&agent=triage`);
         const token = createResumeToken('test-secret', {

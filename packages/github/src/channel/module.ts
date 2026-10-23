@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { registerChannelName } from '../app/helpers.ts';
 import { createGithubSubscription, githubAddress } from '../subscription/module.ts';
 import { receiveDelivery } from '../webhook/module.ts';
 import { resolveOptions } from './helpers.ts';
@@ -25,6 +26,8 @@ import type { GithubChannel, GithubChannelOptions } from './types.ts';
 export function githubChannel(options: GithubChannelOptions): GithubChannel {
     const resolved = resolveOptions(options);
     const { name } = resolved;
+    // the app's tools then act as the delivery's installation for runs of this channel
+    registerChannelName(resolved.app, name);
     return {
         name,
         in: (input, ctx) => receiveDelivery(input, ctx, resolved),

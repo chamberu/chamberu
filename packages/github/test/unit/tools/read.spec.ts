@@ -236,6 +236,38 @@ describe('read tools', () => {
         expect(fake.tokenInstallations).toEqual([7]);
     });
 
+    it('uses the delivery installation for a run of a renamed github channel of the app', async () => {
+        const fixture = createGithubFixture({ installationId: 7 });
+        githubChannel({ app: fixture.gh, name: 'github-ent' });
+        const event = {
+            name: 'issues',
+            action: 'opened',
+            delivery: 'd-1',
+            installationId: 42,
+            payload: {},
+        };
+        const ctx = toolContext({ channel: 'github-ent', payload: event });
+        const tools: ToolSet = wrapToolsForRun(fixture.gh.readTools(), ctx, new MemoryStore());
+        fixture.fake.issues.set('octo/demo#5', { ...ISSUE });
+        await callTool(tools, 'github_get_issue', { repo: 'octo/demo', number: 5 }, ctx);
+        expect(fixture.fake.tokenInstallations).toEqual([42]);
+    });
+
+    it('never takes the installation from the payload of another channel', async () => {
+        const { fake, call } = setup({ installationId: 7 }, {
+            channel: 'http',
+            payload: {
+                name: 'issues',
+                delivery: 'd-1',
+                installationId: 42,
+                payload: {},
+            },
+        });
+        fake.issues.set('octo/demo#5', { ...ISSUE });
+        await call('github_get_issue', { repo: 'octo/demo', number: 5 });
+        expect(fake.tokenInstallations).toEqual([7]);
+    });
+
     it('fails the run without an installation', async () => {
         const { call } = setup({}, { channel: 'http' });
         await expect(call('github_get_issue', { repo: 'octo/demo', number: 5 })).rejects.toBeInstanceOf(FatalToolError);

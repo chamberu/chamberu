@@ -129,9 +129,24 @@ function breakBacktickRuns(text: string): string {
 }
 
 /**
- * The comment: mentions, the title (when given), the body (when not empty)
- * in a fence no backtick run in it can close (so a `@login` or `#123` inside
- * notifies nobody), the approval line (a link with run and approval id,
+ * A title as one line that notifies nobody and links nothing: whitespace
+ * runs collapsed, and a zero-width joiner after every `@` and `#` and inside
+ * `GH-<n>`, so a `@login`, `@org/team`, `#123`, `owner/repo#1` or `GH-1`
+ * in it (titles come from tool code, often from model or issue text) is
+ * plain text.
+ */
+export function neutralizeTitle(title: string): string {
+    return title
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/[@#]/g, (char) => `${char}\u200D`)
+        .replace(/\b(GH)-(?=\d)/gi, '$1\u200D-');
+}
+
+/**
+ * The comment: mentions, the title (when given, neutralized), the body
+ * (when not empty) in a fence no backtick run in it can close (so a
+ * `@login` or `#123` inside notifies nobody), the approval line (a link with run and approval id,
  * never a token), the run and the marker.
  */
 export function renderComment(
@@ -144,7 +159,7 @@ export function renderComment(
 ): string {
     const sections: string[] = [];
     if (input.mentions.length > 0) sections.push(input.mentions.map((login) => `@${login}`).join(' '));
-    if (message.title !== undefined) sections.push(`### ${message.title.replace(/\s+/g, ' ').trim()}`);
+    if (message.title !== undefined) sections.push(`### ${neutralizeTitle(message.title)}`);
     if (message.body.length > 0) {
         const body = breakBacktickRuns(cutText(message.body, COMMENT_BODY_MAX_LENGTH));
         const fence = fenceFor(body);

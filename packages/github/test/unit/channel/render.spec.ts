@@ -56,6 +56,15 @@ describe('renderComment', () => {
         expect(comment.split('\n')[0]).toBe('### Approval required: deploy');
     });
 
+    it('keeps mentions and references in the title from notifying or linking', () => {
+        const comment = renderComment({ ...approval, title: 'Reply to @org/security-team about #1, octo/demo#2 and GH-3' }, { mentions: [], marker: '<!-- m -->' });
+        const heading = comment.split('\n')[0]!;
+        expect(heading).toBe('### Reply to @\u200Dorg/security-team about #\u200D1, octo/demo#\u200D2 and GH\u200D-3');
+        expect(heading).not.toMatch(/@[A-Za-z0-9]/);
+        expect(heading).not.toMatch(/#\d/);
+        expect(heading).not.toMatch(/GH-\d/);
+    });
+
     it('without a link, names the UI and the approve route', () => {
         const comment = renderComment(approval, { mentions: [], marker: '<!-- chamvi:effect=r1:a1 -->' });
         expect(comment).toContain('Answer it in the chamvi UI or through POST /runs/:id/approve.');

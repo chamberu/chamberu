@@ -261,6 +261,55 @@ describe('githubModule', () => {
         expect(answer.runs[0]!.agent).toBe('triage');
     });
 
+    it('logs the failed agents of a delivery through the app logger', async () => {
+        const port = await freePort();
+        const logger = createRecordingLogger();
+        const agent = defineAgent({
+            name: 'triage',
+            model: textModel(),
+            instructions: 'triage',
+            channels: [github.on('issues.opened', {
+                filter: () => {
+                    throw new Error('filter broke');
+                },
+            })],
+        });
+        const harness = await createModuleHarness({
+            env: {
+                RESUME_SECRET: SECRET,
+                CHAMVI_TOKENS: TOKENS,
+                HOST: '127.0.0.1',
+                PORT: String(port),
+            },
+            agents: [agent],
+            modules: [
+                configModule({ logger }),
+                storeModule(),
+                staticTokensModule(),
+                engineModule(),
+                httpModule({ metrics: false, rateLimit: false }),
+                githubModule({ env: githubEnv({ GITHUB_APP_SLUG: 'chamvi-test' }) }),
+            ],
+        });
+        harnesses.push(harness);
+
+        const body = readFileSync(new URL('../../fixtures/deliveries/issues-opened.json', import.meta.url), 'utf8');
+        const response = await fetch(`http://127.0.0.1:${port}/channels/github`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-github-event': 'issues',
+                'x-github-delivery': 'd-2',
+                'x-hub-signature-256': sign(body, 'a'),
+            },
+            body,
+        });
+        expect(response.status).toBe(500);
+        const entry = logger.entries.find((e) => e.msg === 'github channel error');
+        expect(entry?.level).toBe('error');
+        expect(JSON.stringify(entry)).toContain('filter broke');
+    });
+
     it('provides the app as context', async () => {
         const module = githubModule({ env: githubEnv() });
         const seen: boolean[] = [];

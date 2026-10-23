@@ -70,8 +70,8 @@ function requireReason(value: unknown): CloseInput['reason'] {
 /**
  * The GitHub write tools, each an effect tool applied at most once:
  * labels (set semantics), comments (found again by their hidden marker
- * after a lost effect record) and closing an issue (meant to sit behind
- * `approvals: { github_close_issue: 'user' }`).
+ * after a lost effect record) and closing an issue (meant to be gated by
+ * a `beforeToolExecution` hook that calls approve() for it).
  */
 export function createWriteTools(app: IGithubApp): ToolSet {
     return {

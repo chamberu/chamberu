@@ -77,3 +77,21 @@ export function normalizeBaseUrl(input: string | undefined): string {
     }
     return input.replace(/\/+$/, '');
 }
+
+/** The names of the GitHub channels made for each app (githubChannel() registers its own). */
+const CHANNEL_NAMES = new WeakMap<object, Set<string>>();
+
+/** Records that the channel `name` takes the deliveries of `app` (githubChannel() calls it). */
+export function registerChannelName(app: object, name: string): void {
+    let names = CHANNEL_NAMES.get(app);
+    if (!names) {
+        names = new Set();
+        CHANNEL_NAMES.set(app, names);
+    }
+    names.add(name);
+}
+
+/** Whether a githubChannel() of `app` is named `name`. */
+export function isChannelOf(app: object, name: unknown): boolean {
+    return typeof name === 'string' && (CHANNEL_NAMES.get(app)?.has(name) ?? false);
+}
