@@ -185,7 +185,7 @@ function inject<T>(ctx: ToolContext, key: ContextKey<T>): T;                    
 function tryInject<T>(ctx: ToolContext, key: ContextKey<T>): T | undefined;
 ```
 
-`engine.provide(key, value)` (`Engine` implements `IContextProvider`) keeps the value by reference and refuses a foreign key, `undefined` and a second value for one key (`InvalidAgentDefinitionError` naming the key). `inject` reads the engine's values for the `ToolContext` the engine built for the execution (tool `execute`, the tools factory, `alreadyApplied`, `effectKey`); `ToolContext` itself gains no field, and nothing provided is stored or serialized. A missing value is a tool error in `execute` and the effect hooks and fails the run in the factory. See [Context](/guide/tools#context-shared-instances-for-tools).
+`engine.provide(key, value)` (`Engine` implements `IContextProvider`) keeps the value by reference and refuses a foreign key, `undefined` and a second value for one key (`InvalidAgentDefinitionError` naming the key). `inject` reads the engine's values for the `ToolContext` the engine built for the execution (tool `execute`, the tools factory, `alreadyApplied`, `effectKey`); `ToolContext` (`{ engine, run, state, artifacts }`) gains no field for a provided value, and nothing provided is stored or serialized. A missing value is a tool error in `execute` and the effect hooks and fails the run in the factory. See [Context](/guide/tools#context-shared-instances-for-tools).
 
 <<< ../../../core/src/context/types.ts{ts}
 

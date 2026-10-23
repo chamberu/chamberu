@@ -48,7 +48,7 @@ The budget you pass is merged over the defaults, so `budget: { maxSteps: 5 }` ke
 | `run.signal` | `AbortSignal` | Aborts on cancel, drain, a lost lease or the run timeout, and once the execution has ended |
 | `artifacts` | `IRunArtifacts` | The run's files: `put()`, `get(id)`, `list()`. See [Files](#files) |
 
-The engine builds one `ToolContext` per execution and hands it, through the AI SDK's `toolsContext`, to every tool whose `contextSchema` is chamvi's `toolContextSchema`, which is what `defineTool()` sets. Other tools (a plain `tool()`, a third-party tool) get no chamvi context. Every call of an execution gets the same object: treat it as immutable. Pass `context.run.signal` on to `fetch` and other cancellable work.
+The engine builds one `ToolContext` per execution and hands it, through the AI SDK's `toolsContext`, to every tool whose `contextSchema` is chamvi's `toolContextSchema`, which is what `defineTool()` sets. Other tools (a plain `tool()`, a third-party tool) get no chamvi context. Every call of an execution gets the same object: treat it as immutable. It holds `run`, `state`, `artifacts` and `engine`, the engine executing the run, which `injectChannel()` and `replyChannel()` use to reach its channels. Pass `context.run.signal` on to `fetch` and other cancellable work.
 
 For typed state, name the schema: `defineTool<Input, Output, typeof schema>({ ... })` types `context.state` by the agent's collections. The agent does not check that schema against its own `state`: a tool typed for other collections still compiles, and at run time reads of an undeclared collection are empty and writes fail as tool errors.
 

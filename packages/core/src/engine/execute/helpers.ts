@@ -21,7 +21,7 @@ import { isObject } from 'smob';
 import { assertNoNeedsApproval, assertToolsContext } from '../../agent/helpers.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
-import { bindChannels, bindProvided } from '../../context/helpers.ts';
+import { bindProvided } from '../../context/helpers.ts';
 import { validateToolInput } from '../../effect/helpers.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
 import {
@@ -153,13 +153,13 @@ export function assembleTools(
         return { tools: {}, toolsContext: {} };
     }
     const toolContext: ToolContext = {
+        engine: ctx.engine,
         run: runContext,
         state: createAgentState(ctx.agent.name, schema, ctx.store),
         artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
     };
-    // before the factory, so inject() and injectChannel() work there, in execute and in the effect hooks
+    // before the factory, so inject() works there, in execute and in the effect hooks
     if (ctx.provided) bindProvided(toolContext, ctx.provided);
-    if (ctx.channels) bindChannels(toolContext, ctx.channels, ctx.store);
     const tools: ToolSet = {
         ...(schema ? createStateTools(schema) : {}),
         ...(typeof userTools === 'function' ? userTools(toolContext) : userTools),

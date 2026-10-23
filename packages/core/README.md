@@ -319,7 +319,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 
 ### Context
 
-A tool reaches a shared instance (an API client, the GitHub App, a workspace manager) through a typed key instead of a closure. The engine keeps the value by reference; `inject(ctx, key)` reads it in a tool's `execute`, in the tools factory and in the effect hooks, and nothing provided is ever stored or serialized (`ToolContext` stays `{ run, state, artifacts }`).
+A tool reaches a shared instance (an API client, the GitHub App, a workspace manager) through a typed key instead of a closure. The engine keeps the value by reference; `inject(ctx, key)` reads it in a tool's `execute`, in the tools factory and in the effect hooks, and nothing provided is ever stored or serialized (`ToolContext` is `{ engine, run, state, artifacts }` and gains no field for a provided value).
 
 ```ts
 import { defineContextKey, defineTool, inject } from '@chamvi/core';

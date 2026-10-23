@@ -6,14 +6,16 @@
  */
 
 import type { Agent } from '../../agent/types.ts';
-import type { IChannel } from '../../channel/types.ts';
 import type { IClock } from '../../clock/index.ts';
 import type { ContextKey } from '../../context/types.ts';
 import type { Run, Step, Usage } from '../../run/types.ts';
 import type { IStore } from '../../store/types.ts';
+import type { Engine } from '../module.ts';
 import type { RunDelta } from '../types.ts';
 
 export type ExecuteContext = {
+    /** The executing engine, handed to the execution's ToolContext as `engine`. */
+    engine: Engine;
     run: Run;
     agent: Agent;
     store: IStore;
@@ -45,11 +47,6 @@ export type ExecuteContext = {
      * ToolContext for inject() before the tools factory runs.
      */
     provided?: ReadonlyMap<ContextKey<unknown>, unknown>;
-    /**
-     * The engine's registered channels by name (by reference), bound to the
-     * execution's ToolContext for injectChannel() and replyChannel().
-     */
-    channels?: ReadonlyMap<string, IChannel<any, any>>;
 };
 
 /** What a suspended approve() asks for: the run pauses on it (`Run.waiting`). */

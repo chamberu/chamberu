@@ -890,6 +890,7 @@ export class Engine implements IContextProvider {
             return;
         }
         await executeRun({
+            engine: this,
             run,
             agent,
             store: this.store,
@@ -907,7 +908,6 @@ export class Engine implements IContextProvider {
             pause: (request, usage) => this.pause(run, request, usage),
             ownsRun: () => this.ownsRun(run.id),
             provided: this.provided,
-            channels: this.channels,
         });
     }
 

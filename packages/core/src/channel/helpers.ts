@@ -8,7 +8,6 @@
 import { isObject } from 'smob';
 import { requestApproval } from '../approval/request.ts';
 import type { ApprovalDecision, ApprovalRequestInput } from '../approval/types.ts';
-import type { channelsOf } from '../context/helpers.ts';
 import { currentToolCall } from '../effect/frame.ts';
 import { stableHash } from '../effect/helpers.ts';
 import type { Engine } from '../engine/module.ts';
@@ -22,7 +21,17 @@ import type {
     IChannel,
 } from './types.ts';
 
-type Binding = NonNullable<ReturnType<typeof channelsOf>>;
+/** Emits in flight per execution (its ToolContext) by effect key: parallel identical emits share one send. */
+const inflights = new WeakMap<object, Map<string, Promise<void>>>();
+
+function inflightOf(ctx: ToolContext): Map<string, Promise<void>> {
+    let inflight = inflights.get(ctx);
+    if (!inflight) {
+        inflight = new Map();
+        inflights.set(ctx, inflight);
+    }
+    return inflight;
+}
 
 /** The context a channel's `start` and `in` get: its dispatch always carries the channel's own name. */
 export function createChannelContext(engine: Engine, channel: Pick<IChannel, 'name'>): ChannelContext {
@@ -71,17 +80,18 @@ function assertEmitMessage(message: unknown): asserts message is EmitMessage {
  */
 export function createChannelHandle(
     ctx: ToolContext,
-    binding: Binding,
     channel: IChannel<any, any>,
     address?: string,
 ): ChannelHandle {
     const { name } = channel;
+    const effects = ctx.engine.store;
+    const inflight = inflightOf(ctx);
     const fallback = address ?? channel.defaultAddress;
     const missing = () => new ValidationError(
         `Channel "${name}" needs an address: only the run's source channel and a channel with a defaultAddress have a default one.`,
     );
     const send = async (effectKey: string, key: string, message: EmitMessage, target: string) => {
-        const stored = await binding.effects.getEffect(effectKey);
+        const stored = await effects.getEffect(effectKey);
         if (stored) return;
         await channel.out!({
             kind: 'message',
@@ -93,7 +103,7 @@ export function createChannelHandle(
         }, target, { signal: ctx.run.signal, trigger: ctx.run.trigger });
         // The message went out: a failing write must not fail the call (as for effect tools).
         try {
-            await binding.effects.putEffect(effectKey, {
+            await effects.putEffect(effectKey, {
                 channel: name, 
                 address: target, 
                 key, 
@@ -123,10 +133,10 @@ export function createChannelHandle(
                 body: message.body, 
             })}`;
         const key = message.key ?? effectKey;
-        let pending = binding.inflight.get(effectKey);
+        let pending = inflight.get(effectKey);
         if (!pending) {
-            pending = send(effectKey, key, message, target).finally(() => binding.inflight.delete(effectKey));
-            binding.inflight.set(effectKey, pending);
+            pending = send(effectKey, key, message, target).finally(() => inflight.delete(effectKey));
+            inflight.set(effectKey, pending);
         }
         return pending;
     };

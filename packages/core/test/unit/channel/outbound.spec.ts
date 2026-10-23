@@ -373,7 +373,7 @@ describe('channel outbound', () => {
         expect((thrown[0] as Error).message).toContain('"nope"');
     });
 
-    it('injectChannel without an engine binding throws ChannelNotFoundError', () => {
+    it('injectChannel without an engine throws ChannelNotFoundError', () => {
         const toolContext = { run: { runId: 'r', agent: 'ops' } } as unknown as ToolContext;
         expect(() => injectChannel(toolContext, 'slack')).toThrow(ChannelNotFoundError);
         expect(replyChannel(toolContext)).toBeUndefined();
