@@ -21,6 +21,7 @@ import { isObject } from 'smob';
 import { assertNoNeedsApproval, assertToolsContext } from '../../agent/helpers.ts';
 import { toFilePart } from '../../artifact/helpers.ts';
 import { createRunArtifacts } from '../../artifact/module.ts';
+import { createToolChannels } from '../../channel/helpers.ts';
 import { bindProvided } from '../../context/helpers.ts';
 import { validateToolInput } from '../../effect/helpers.ts';
 import { wrapToolsForRun } from '../../effect/wrap.ts';
@@ -153,10 +154,10 @@ export function assembleTools(
         return { tools: {}, toolsContext: {} };
     }
     const toolContext: ToolContext = {
-        engine: ctx.engine,
         run: runContext,
         state: createAgentState(ctx.agent.name, schema, ctx.store),
         artifacts: createRunArtifacts(ctx.store, { id: ctx.run.id, agent: ctx.run.agent }, ctx.clock),
+        channels: createToolChannels(runContext, ctx.store, ctx.engine),
     };
     // before the factory, so inject() works there, in execute and in the effect hooks
     if (ctx.provided) bindProvided(toolContext, ctx.provided);

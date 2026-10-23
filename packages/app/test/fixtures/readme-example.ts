@@ -22,6 +22,6 @@ const triage = defineAgent({
 // chamvi start | run-job | migrate load this default export
 export default createApp({
     agents: [triage],
-    // tools write to it with injectChannel(ctx, 'console').emit(...)
+    // tools write to it with ctx.channels.findOneOrFail('console').emit(...)
     modules: [consoleChannelModule()],
 });

@@ -70,7 +70,7 @@ export function createCodingAgent(model: LanguageModel, workspaces: IWorkspaceMa
 
 `workspaces` is a manager from `createWorkspaceManager({ provider })` (`@chamvi/sandbox`), attached to the engine with `workspaces.attach(engine)` so a run's workspaces go when it settles. The model calls `create_workspace` first, then works in it. Subscribe the agent to a channel to start it (`channels: [http.on()]` with `@chamvi/http`).
 
-The tools are plain tools you did not write, so the gate lives in the agent's `beforeToolExecution` hook: it runs before every tool call, and `approve()` there pauses the run in `waiting` until someone answers (the UI inbox, `POST /runs/:id/approve`, or a channel's approval message with `injectChannel(ctx, name).approve(...)`). The run keeps its workspace while it waits on this replica. Once answered, the hook runs again and `approve()` returns the decision; a thrown `ToolDeniedError` goes back to the model as a tool error and the run goes on.
+The tools are plain tools you did not write, so the gate lives in the agent's `beforeToolExecution` hook: it runs before every tool call, and `approve()` there pauses the run in `waiting` until someone answers (the UI inbox, `POST /runs/:id/approve`, or a channel's approval message with `ctx.channels.findOneOrFail(name).approve(...)`). The run keeps its workspace while it waits on this replica. Once answered, the hook runs again and `approve()` returns the decision; a thrown `ToolDeniedError` goes back to the model as a tool error and the run goes on.
 
 ## Tools
 

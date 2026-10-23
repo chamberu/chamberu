@@ -45,7 +45,7 @@ The coding tools, the GitHub tools and any third-party tool have an `execute` yo
 
 - `beforeToolExecution({ toolName, toolCallId, input }, ctx)` returns the input to use (a rewritten one is validated against the tool's input schema again; a failure is a `validation_error` tool error). It runs before the effect lookup, so an effect tool's key comes from the final input. Throw `ToolDeniedError` (`tool_denied`) to refuse: a tool error the model sees, the run goes on. `FatalToolError` still fails the run.
 - `afterToolExecution({ toolName, toolCallId, input, output }, ctx)` returns the output the model sees. It runs on a fresh result and on a recorded effect result alike (redaction stays consistent), on a streaming tool's final value, and never for a tool error.
-- `ctx` is the execution's `ToolContext`, so `inject()`, `injectChannel()` and `ctx.run.trigger.invoker` work in both. A hook can let some invokers through without asking (see [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker)).
+- `ctx` is the execution's `ToolContext`, so `inject()`, `ctx.channels` and `ctx.run.trigger.invoker` work in both. A hook can let some invokers through without asking (see [Restricting tools per invoker](/guide/tools#restricting-tools-per-invoker)).
 
 ## Answering
 

@@ -9,8 +9,6 @@ import {
     consoleChannel,
     defineAgent,
     defineTool,
-    injectChannel,
-    replyChannel,
 } from '@chamvi/core';
 import type {
     ChannelContext,
@@ -56,7 +54,7 @@ export async function dispatchExamples(model: LanguageModel, auth: Authenticator
         trigger: 'webhook:/issues',
         channel: 'webhook',
         payload: { repo: 'acme/app', issue: 42 },
-        // where the run came from on its channel; replyChannel() answers there
+        // where the run came from on its channel; ctx.channels.findOne() answers there
         address: 'acme/app#42',
         // a redelivery with the same key returns the same run
         idempotencyKey: 'delivery-7f3a',
@@ -103,9 +101,9 @@ export const resolve = defineTool({
     inputSchema: z.object({ summary: z.string() }),
     async execute({ summary }, { context }) {
         // the run's source channel at its source address; undefined when that channel has no out
-        await replyChannel(context)?.emit({ body: summary });
+        await context.channels.findOne()?.emit({ body: summary });
         // any registered channel with out; the address is required off the source channel
-        await injectChannel(context, 'console').emit({ title: 'Resolved', body: summary }, 'on-call');
+        await context.channels.findOneOrFail('console').emit({ title: 'Resolved', body: summary }, 'on-call');
         return 'reported';
     },
 });

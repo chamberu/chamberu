@@ -4,7 +4,6 @@ import {
     MemoryStore,
     ToolDeniedError,
     defineAgent,
-    injectChannel,
 } from '@chamvi/core';
 import { createGithubApp, github, githubChannel } from '@chamvi/github';
 import type { GithubAppOptions } from '@chamvi/github';
@@ -45,7 +44,7 @@ export async function createTriageServer(
             // closing waits for the owner, asked in a comment on the issue
             async beforeToolExecution({ toolName, input }, ctx) {
                 if (toolName !== 'github_close_issue') return undefined;
-                const { approved } = await injectChannel(ctx, 'github').approve({
+                const { approved } = await ctx.channels.findOneOrFail('github').approve({
                     title: 'Close this issue?',
                     body: JSON.stringify(input),
                 });

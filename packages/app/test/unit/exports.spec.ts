@@ -44,8 +44,6 @@ describe('public api', () => {
         'httpModule',
         // the common surface of @chamvi/core and @chamvi/http
         'defineAgent',
-        'injectChannel',
-        'replyChannel',
         'approve',
         'defineTool',
         'defineEffectTool',

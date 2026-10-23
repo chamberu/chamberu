@@ -18,8 +18,6 @@ import {
     createResumeToken,
     defineAgent,
     defineTool,
-    injectChannel,
-    replyChannel,
 } from '@chamvi/core';
 import type { ChamviError, Engine } from '@chamvi/core';
 import { github } from '@chamvi/github';
@@ -44,7 +42,7 @@ const reply = defineTool({
     description: 'Answers on the issue the run came from.',
     inputSchema: z.object({ body: z.string() }),
     execute: async ({ body }, { context }) => {
-        await replyChannel(context)!.emit({ body });
+        await context.channels.findOneOrFail().emit({ body });
         return 'sent';
     },
 });
@@ -79,7 +77,7 @@ function closeAgent(gh: IGithubApp) {
         hooks: {
             async beforeToolExecution(call, ctx) {
                 if (call.toolName !== 'github_close_issue') return undefined;
-                const decision = await injectChannel(ctx, 'github').approve({
+                const decision = await ctx.channels.findOneOrFail('github').approve({
                     title: 'Close octo/demo#5?',
                     body: 'It duplicates #3.',
                 });
@@ -107,7 +105,7 @@ async function start(setup: GithubTestApp): Promise<string> {
 }
 
 describe('github channel with the engine', () => {
-    it('replyChannel(ctx) in a github run comments on the source issue', async () => {
+    it('ctx.channels.findOne() in a github run comments on the source issue', async () => {
         const setup = createGithubTestApp({
             agents: replyAgent([
                 {

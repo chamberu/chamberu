@@ -60,7 +60,7 @@ Each of these is a better fit in some setups: if you already run Inngest or Trig
 - the [`Engine`](/reference/#runengine): dispatch, scheduling, execution, checkpoints, budgets, durable [approvals](/guide/approvals), cancel, drain and recovery
 - [effect tools](/guide/effect-tools) and [agent state](/guide/state)
 - the [store contract](/stores/) and [`MemoryStore`](/stores/memory)
-- the [`IChannel`](/guide/channels) contract, `injectChannel()`, `replyChannel()` and `consoleChannel()`
+- the [`IChannel`](/guide/channels) contract, `ToolContext.channels` and `consoleChannel()`
 
 `@chamvi/test-kit` adds the store contract suite and a controllable clock for tests.
 

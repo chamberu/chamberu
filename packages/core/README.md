@@ -86,7 +86,6 @@ import {
     consoleChannel,
     defineAgent,
     defineEffectTool,
-    replyChannel,
 } from '@chamvi/core';
 
 export async function triageIssue(model: LanguageModel) {
@@ -106,7 +105,7 @@ export async function triageIssue(model: LanguageModel) {
                 execute: async ({ label }, { context }) => {
                     labels.push(label);
                     // answers where the run came from, at most once per message
-                    await replyChannel(context)?.emit({ body: `Labelled as ${label}.` });
+                    await context.channels.findOne()?.emit({ body: `Labelled as ${label}.` });
                     return { added: label };
                 },
             }),
@@ -166,7 +165,7 @@ toolsContext: { search: { apiKey: process.env.SEARCH_KEY } },
 ```
 
 - A channel (`IChannel`: `name`, optional `defaultAddress`, `start`, `stop`, `in`, `out`) is anything a run comes from or talks to; `new Engine({ channels })` registers them (names follow the agent-name rule, unique per engine). `start()` starts every channel after the first recovery (`start({ channels: false })` starts none), `drain()` and `stop()` stop them first. An agent subscribes through `channels: ChannelSubscription[]`, each naming a registered channel (an unknown one is refused). A channel dispatches through its `ChannelContext`, which sets `channel` to its own name.
-- Outbound is tool-driven: the engine never sends a message of its own. Inside a tool, `injectChannel(ctx, name)` returns a handle on a registered channel with `out` (else `ChannelNotFoundError`, `channel_not_found`), and `replyChannel(ctx)` the run's source channel bound to its source address (`undefined` when that channel has no `out` or the run no address). `handle.emit({ title?, body, key? }, address?)` sends through the channel's `out`; the address defaults to the source address on the source channel, else to the channel's `defaultAddress` (`consoleChannel()` has its name, the OpenClaw channel its `deliver.to`); without either it is a `validation_error` tool error. An emit is an effect: its key (`<runId>:emit:<channel>:<sha256 of address and message>`, or your `key`) is recorded in the effect store, so identical emits of one step and a step redone after a crash send once, and `out` gets it as `message.key` to dedupe on; a throwing `out` records nothing and is a tool error. `emit` outside a tool call (in the tools factory) throws `InvalidRunStateError`.
+- Outbound is tool-driven: the engine never sends a message of its own. Inside a tool, `ctx.channels.findOne(name)` returns a handle on a registered channel with `out`, or `undefined`; without a name it is the run's source channel, bound to its source address. `ctx.channels.findOneOrFail(name?)` throws `ChannelNotFoundError` (`channel_not_found`) instead of `undefined`, and `ctx.channels.find()` returns every channel with `out`. `handle.emit({ title?, body, key? }, address?)` sends through the channel's `out`; the address defaults to the source address on the source channel, else to the channel's `defaultAddress` (`consoleChannel()` has its name, the OpenClaw channel its `deliver.to`); without either it is a `validation_error` tool error. An emit is an effect: its key (`<runId>:emit:<channel>:<sha256 of address and message>`, or your `key`) is recorded in the effect store, so identical emits of one step and a step redone after a crash send once, and `out` gets it as `message.key` to dedupe on; a throwing `out` records nothing and is a tool error. `emit` outside a tool call (in the tools factory) throws `InvalidRunStateError`.
 - `consoleChannel({ name?, write? })` is the development channel (out only, default name `console`, default `write` `console.log`): one header line per message, the body lines and, for an approval, until when it waits; it never throws.
 - The trigger envelope (channel, subscription id, payload; `address` is where the run came from on the channel) becomes the run's first user message, as a JSON block.
 - `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments` (ids `<runId>.0000`, `<runId>.0001`, ..., so a listing keeps the input order), and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
@@ -237,7 +236,7 @@ await engine.approve(runId, { approvalId, approved: true });
 ```
 
 - `approve(ctx, { title, body?, timeoutMs? })` runs inside a tool call (its `execute` or the agent's `hooks`). It puts the run in `waiting` (`run.waiting` names the approval, `<stepIndex>:<toolCallId>:<n>`) and frees its slot; the approval survives restarts. Once answered, the call runs again from the start and `approve()` returns `{ approved, reason?, approver? }`, so code before it must be idempotent. Other calls of the same step that finished keep their results.
-- `injectChannel(ctx, name).approve({ title, address? })` is the same, with the request delivered through that channel.
+- `ctx.channels.findOneOrFail(name).approve({ title, address? })` is the same, with the request delivered through that channel.
 - To gate a tool you did not write, call `approve()` in the agent's `beforeToolExecution` hook and throw `ToolDeniedError` for a denial.
 - `engine.resume(token, decision)` answers with a resume token signed with `resumeSecret` (`createResumeToken`). A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
 - `engine.approve(runId, { approvalId, approved, reason? })` answers the current wait point without a token, for a caller that authorized the approver itself; it spends a token handed out earlier like `resume()`.
@@ -319,7 +318,7 @@ The factory receives a `ControllableClock` and must use it for every expiry deci
 
 ### Context
 
-A tool reaches a shared instance (an API client, the GitHub App, a workspace manager) through a typed key instead of a closure. The engine keeps the value by reference; `inject(ctx, key)` reads it in a tool's `execute`, in the tools factory and in the effect hooks, and nothing provided is ever stored or serialized (`ToolContext` is `{ engine, run, state, artifacts }` and gains no field for a provided value).
+A tool reaches a shared instance (an API client, the GitHub App, a workspace manager) through a typed key instead of a closure. The engine keeps the value by reference; `inject(ctx, key)` reads it in a tool's `execute`, in the tools factory and in the effect hooks, and nothing provided is ever stored or serialized (`ToolContext` is `{ run, state, artifacts, channels }` and gains no field for a provided value).
 
 ```ts
 import { defineContextKey, defineTool, inject } from '@chamvi/core';
@@ -346,7 +345,7 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `store` | `IStore` | required | Where runs, steps, checkpoints and state live |
 | `agents` | `Agent[]` | required | The agents this engine runs |
 | `resumeSecret` | `string` | required | HMAC secret for resume tokens; must not be empty |
-| `channels` | `IChannel[]` | `[]` | Channels by unique name, started by `start()` and stopped first by `drain()`/`stop()`; tools reach them through `injectChannel()` |
+| `channels` | `IChannel[]` | `[]` | Channels by unique name, started by `start()` and stopped first by `drain()`/`stop()`; tools reach them through `ctx.channels` |
 | `maxConcurrentRuns` | `number` | `4` | Runs executing at once in this process |
 | `claimTtlMs` | `number` | `60_000` | Lease on a running run, renewed every `claimTtlMs / 3`; the poll for new work, expired approvals and abandoned runs uses the same interval |
 | `owner` | `string` | `` `${hostname}-${pid}` `` | Identity of this replica in claims |
@@ -389,7 +388,6 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `createAgentState`, `createStateTools` | function | State API over a store, and `createStateTools(schema)`, the generated state tools (they read `context.state`) |
 | `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
 | `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
-| `injectChannel`, `replyChannel` | function | A run-bound `ChannelHandle` on a registered channel, or on the run's source channel and address, for a tool to `emit()` through |
 | `consoleChannel` | function | `consoleChannel({ name?, write? })`: a development channel, out only, logging each message (default name `console`, default `write` `console.log`) |
 | `assertTriggerKey`, `normalizeEnvelope` | function | The 255-character, no-NUL rule for envelope keys and addresses; the read-back of envelopes stored before channels (`source`, `thread`) for store implementations |
 | `isArtifactMediaType` | function | The media type rule for attachments and artifacts (`type/subtype`, no parameters) |
@@ -397,7 +395,7 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `IncompleteResponseError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
 | `ContextNotProvidedError` | class | `inject()` found no value for the key (`context_not_provided`) |
-| `ChannelNotFoundError` | class | `injectChannel()` named a channel the engine does not have or one without `out` (`channel_not_found`) |
+| `ChannelNotFoundError` | class | `ctx.channels.findOneOrFail()` named a channel the engine does not have or one without `out` (`channel_not_found`) |
 | `ToolNotAllowedError` | class | The tool error recorded for a call to a tool the `toolPolicy` refuses |
 | `ToolDeniedError` | class | A gate (e.g. a `beforeToolExecution` hook) refused a tool call (`tool_denied`); a tool error, never fatal |
 | `SandboxError` | class | A sandbox workspace or provider failed (`@chamvi/sandbox` and its providers); a tool error, never a failed run |

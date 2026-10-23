@@ -12,7 +12,6 @@ import {
     createResumeToken,
     defineAgent,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import type { ChannelMessage, IChannel } from '@chamvi/core';
 import { cron, cronChannel } from '@chamvi/channel-cron';
@@ -54,7 +53,7 @@ const engine = new Engine({
                     description: 'Deploy an environment.',
                     inputSchema: z.object({ env: z.string() }),
                     execute: async ({ env }, { context }) => {
-                        const decision = await injectChannel(context, 'capture').approve({
+                        const decision = await context.channels.findOneOrFail('capture').approve({
                             title: `Deploy ${env}?`,
                             body: `Rolls the demo release out to ${env}.`,
                             address: 'ops',

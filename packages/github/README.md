@@ -62,7 +62,6 @@ import {
     MemoryStore,
     ToolDeniedError,
     defineAgent,
-    injectChannel,
 } from '@chamvi/core';
 import { createGithubApp, github, githubChannel } from '@chamvi/github';
 import type { GithubAppOptions } from '@chamvi/github';
@@ -103,7 +102,7 @@ export async function createTriageServer(
             // closing waits for the owner, asked in a comment on the issue
             async beforeToolExecution({ toolName, input }, ctx) {
                 if (toolName !== 'github_close_issue') return undefined;
-                const { approved } = await injectChannel(ctx, 'github').approve({
+                const { approved } = await ctx.channels.findOneOrFail('github').approve({
                     title: 'Close this issue?',
                     body: JSON.stringify(input),
                 });
@@ -158,7 +157,7 @@ export async function createTriageServer(
 | `sha256=` HMAC of the raw body bytes under none of the webhook secrets | `401` |
 | Body not a JSON object | `400` |
 
-A verified delivery is dispatched to every agent with a matching `github.on()` subscription of this channel, **at most one run per agent** (its first matching subscription), with `channel: 'github'`, the `GithubEvent` as payload and, for an event with an issue or pull request, the address `<owner>/<repo>#<number>` (`run.address`, where `replyChannel(ctx)` answers). The answer is `202 { delivery, runs: [{ agent, runId, deduplicated }] }`, also for `ping`, for events no subscription matches and for events the App sent itself (`runs: []`).
+A verified delivery is dispatched to every agent with a matching `github.on()` subscription of this channel, **at most one run per agent** (its first matching subscription), with `channel: 'github'`, the `GithubEvent` as payload and, for an event with an issue or pull request, the address `<owner>/<repo>#<number>` (`run.address`, where `ctx.channels.findOne()` answers). The answer is `202 { delivery, runs: [{ agent, runId, deduplicated }] }`, also for `ping`, for events no subscription matches and for events the App sent itself (`runs: []`).
 
 - **Dedupe**: the idempotency key is the delivery id (or the subscription's `idempotencyKey(event)`), so a redelivery returns the existing runs with `deduplicated: true`. The signature covers the body only, neither the `X-GitHub-Delivery` nor the `X-GitHub-Event` header (`e.delivery`, `e.name`): whoever holds one signed delivery (a proxy log, a support dump) can replay it under new delivery ids, or under another event name an agent listens on, and start a new run each time. On an exposed endpoint, derive the key from body fields only, e.g. `` idempotencyKey: (e) => `${e.action}:${e.payload.repository?.full_name}#${e.payload.issue?.number}@${e.payload.issue?.updated_at}` ``, and let a `filter` check that the body carries what the event name implies (`issue` without `comment` for `issues`, `comment` for `issue_comment`, `pull_request` for `pull_request`).
 - **Failures**: agents are matched and dispatched in order and a failing one (a throwing `filter` or key function, a key `dispatch` refuses, a failed dispatch) does not stop the others; each failure goes to the channel's `onError`, and the answer is then `500`. **GitHub does not redeliver failed deliveries automatically**: redeliver a `4xx`/`5xx` delivery by hand (the App's *Advanced* tab) or through the redelivery API. A redelivery keeps the delivery id, so the agents that already got their run are deduplicated.
@@ -186,18 +185,18 @@ github.on(['issues.opened', 'issue_comment.created'], {   // 'issues' matches ev
 
 ## Outbound: comments
 
-The channel's `out` comments on an issue or pull request. Tools reach it through core: `replyChannel(ctx)` answers on the issue of a run the channel started, `injectChannel(ctx, 'github')` emits to any issue (`github.to({ repo, number })` builds the address `<owner>/<repo>#<number>`):
+The channel's `out` comments on an issue or pull request. Tools reach it through core: `ctx.channels.findOne()` answers on the issue of a run the channel started, `ctx.channels.findOne('github')` emits to any issue (`github.to({ repo, number })` builds the address `<owner>/<repo>#<number>`):
 
 ```ts
-import { defineTool, injectChannel, replyChannel } from '@chamvi/core';
+import { defineTool } from '@chamvi/core';
 import { github } from '@chamvi/github';
 
 const answer = defineTool({
     description: 'Answer on the issue.',
     inputSchema: z.object({ body: z.string() }),
     async execute({ body }, { context }) {
-        await replyChannel(context)?.emit({ body });
-        await injectChannel(context, 'github').emit({ title: 'Triage log', body }, github.to({ repo: 'octo/ops', number: 1 }));
+        await context.channels.findOne()?.emit({ body });
+        await context.channels.findOneOrFail('github').emit({ title: 'Triage log', body }, github.to({ repo: 'octo/ops', number: 1 }));
         return 'sent';
     },
 });
@@ -228,7 +227,7 @@ The message key (an `emit`'s content-addressed key, an approval's `<runId>:<appr
 
 ## Approvals
 
-Gate a tool in the agent's `hooks.beforeToolExecution` with a durable `approve()`, as the usage example does for `github_close_issue`: `injectChannel(ctx, 'github').approve({ title, body })` pauses the run, and the engine delivers the request as one comment on the run's issue (key `<runId>:<approvalId>`, re-sent by `tick()` until it went out, never twice). The owner answers in the chamvi UI (`approvalUrl` links there) or through `POST /runs/:id/approve`; the call then runs again from the start and `approve()` returns the decision. `approve(ctx, { title })` from core asks without a comment (inbox and API only).
+Gate a tool in the agent's `hooks.beforeToolExecution` with a durable `approve()`, as the usage example does for `github_close_issue`: `ctx.channels.findOneOrFail('github').approve({ title, body })` pauses the run, and the engine delivers the request as one comment on the run's issue (key `<runId>:<approvalId>`, re-sent by `tick()` until it went out, never twice). The owner answers in the chamvi UI (`approvalUrl` links there) or through `POST /runs/:id/approve`; the call then runs again from the start and `approve()` returns the decision. `approve(ctx, { title })` from core asks without a comment (inbox and API only).
 
 ## Tools
 

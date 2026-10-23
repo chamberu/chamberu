@@ -11,27 +11,25 @@ import type { ApprovalDecision, ApprovalRequestInput } from '../approval/types.t
 import { currentToolCall } from '../effect/frame.ts';
 import { stableHash } from '../effect/helpers.ts';
 import type { Engine } from '../engine/module.ts';
-import { InvalidAgentDefinitionError, InvalidRunStateError, ValidationError } from '../errors/index.ts';
+import {
+    ChannelNotFoundError,
+    InvalidAgentDefinitionError,
+    InvalidRunStateError,
+    ValidationError,
+} from '../errors/index.ts';
 import { NAME_MAX_LENGTH, NAME_PATTERN } from '../agent/constants.ts';
-import type { ToolContext } from '../tool/types.ts';
+import type { RunContext } from '../run/types.ts';
+import type { IEffectStore } from '../store/types.ts';
 import type {
     ChannelContext,
     ChannelHandle,
     EmitMessage,
     IChannel,
+    ToolChannels,
 } from './types.ts';
 
-/** Emits in flight per execution (its ToolContext) by effect key: parallel identical emits share one send. */
-const inflights = new WeakMap<object, Map<string, Promise<void>>>();
-
-function inflightOf(ctx: ToolContext): Map<string, Promise<void>> {
-    let inflight = inflights.get(ctx);
-    if (!inflight) {
-        inflight = new Map();
-        inflights.set(ctx, inflight);
-    }
-    return inflight;
-}
+/** Emits in flight in one execution by effect key: parallel identical emits share one send. */
+type Inflight = Map<string, Promise<void>>;
 
 /** The context a channel's `start` and `in` get: its dispatch always carries the channel's own name. */
 export function createChannelContext(engine: Engine, channel: Pick<IChannel, 'name'>): ChannelContext {
@@ -71,21 +69,21 @@ function assertEmitMessage(message: unknown): asserts message is EmitMessage {
 }
 
 /**
- * A handle on `channel` (which has `out`) for the execution `ctx` belongs
- * to. `emit` is an effect: recorded under its key in the effect store, so a
+ * A handle on `channel` (which has `out`) for the execution of `run`.
+ * `emit` is an effect: recorded under its key in the effect store, so a
  * redone step (or a parallel identical call) sends once; a throwing `out`
  * records nothing. `approve` is approve() with the request delivered
  * through this channel to `address` (default: the bound address, else the
  * channel's `defaultAddress`).
  */
-export function createChannelHandle(
-    ctx: ToolContext,
+function createChannelHandle(
+    run: RunContext,
+    effects: IEffectStore,
+    inflight: Inflight,
     channel: IChannel<any, any>,
     address?: string,
 ): ChannelHandle {
     const { name } = channel;
-    const effects = ctx.engine.store;
-    const inflight = inflightOf(ctx);
     const fallback = address ?? channel.defaultAddress;
     const missing = () => new ValidationError(
         `Channel "${name}" needs an address: only the run's source channel and a channel with a defaultAddress have a default one.`,
@@ -96,11 +94,11 @@ export function createChannelHandle(
         await channel.out!({
             kind: 'message',
             key,
-            runId: ctx.run.runId,
-            agent: ctx.run.agent,
+            runId: run.runId,
+            agent: run.agent,
             ...(message.title !== undefined ? { title: message.title } : {}),
             body: message.body,
-        }, target, { signal: ctx.run.signal, trigger: ctx.run.trigger });
+        }, target, { signal: run.signal, trigger: run.trigger });
         // The message went out: a failing write must not fail the call (as for effect tools).
         try {
             await effects.putEffect(effectKey, {
@@ -124,7 +122,7 @@ export function createChannelHandle(
         if (typeof target !== 'string' || target.length === 0) {
             throw new ValidationError('The address must be a non-empty string.');
         }
-        const prefix = `${ctx.run.runId}:emit:${name}:`;
+        const prefix = `${run.runId}:emit:${name}:`;
         const effectKey = message.key !== undefined ?
             `${prefix}key:${message.key}` :
             `${prefix}${stableHash({
@@ -156,5 +154,43 @@ export function createChannelHandle(
         ...(fallback !== undefined ? { address: fallback } : {}),
         emit,
         approve,
+    };
+}
+
+/**
+ * The execution's `ToolContext.channels` over `engine`'s channels with
+ * `out`: `findOne(name?)` (default: the run's source channel) or undefined,
+ * `findOneOrFail(name?)` or ChannelNotFoundError, `find()` all of them. On
+ * the source channel a handle defaults to the source address. Emits in
+ * flight are shared by every handle of the execution.
+ */
+export function createToolChannels(
+    run: RunContext,
+    effects: IEffectStore,
+    engine: Pick<Engine, 'getChannel' | 'listChannels'>,
+): ToolChannels {
+    const inflight: Inflight = new Map();
+    const canSend = (channel: IChannel<any, any> | undefined): channel is IChannel<any, any> => (
+        typeof channel?.out === 'function'
+    );
+    const handle = (channel: IChannel<any, any>) => createChannelHandle(
+        run,
+        effects,
+        inflight,
+        channel,
+        run.trigger.channel === channel.name ? run.trigger.address : undefined,
+    );
+    const findOne = (name?: string) => {
+        const channel = engine.getChannel(name ?? run.trigger.channel);
+        return canSend(channel) ? handle(channel) : undefined;
+    };
+    return {
+        findOne,
+        findOneOrFail(name) {
+            const found = findOne(name);
+            if (!found) throw new ChannelNotFoundError(name ?? run.trigger.channel);
+            return found;
+        },
+        find: () => engine.listChannels().filter(canSend).map(handle),
     };
 }

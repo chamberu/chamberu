@@ -53,8 +53,8 @@ export function toolContext(input: ToolContextInput = {}): ToolContext {
         receivedAt: input.receivedAt ?? START,
     };
     return {
-        // no engine: these tools reach no channel
-        engine: {} as ToolContext['engine'],
+        // these tools reach no channel
+        channels: {} as ToolContext['channels'],
         run: {
             runId,
             agent: 'triage',

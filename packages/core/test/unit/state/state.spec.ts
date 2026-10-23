@@ -47,7 +47,7 @@ function toolContext(store: MemoryStore): ToolContext {
         signal: new AbortController().signal,
     };
     return {
-        engine: {} as ToolContext['engine'],
+        channels: {} as ToolContext['channels'],
         run,
         state: createAgentState('alpha', schema, store),
         artifacts: createRunArtifacts(store, { id: 'r1', agent: 'alpha' }, systemClock),

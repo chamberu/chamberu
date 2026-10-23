@@ -24,7 +24,7 @@ const digest = defineAgent({
 // synchronous and side-effect free: chamvi start | run-job | migrate load this default export
 export default createApp({
     agents: [digest],
-    // tools write to it with injectChannel(ctx, 'console').emit(...)
+    // tools write to it with ctx.channels.findOneOrFail('console').emit(...)
     modules: [consoleChannelModule()],
 });
 // #endregion entry

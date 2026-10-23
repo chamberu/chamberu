@@ -21,7 +21,6 @@ import {
     approve,
     defineAgent,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import type {
     AgentDefinition,
@@ -555,7 +554,7 @@ describe('durable approve()', () => {
         const ask = defineTool({
             inputSchema: z.object({}),
             execute: async (_input, { context }) => {
-                const handle = injectChannel(context, 'slack');
+                const handle = context.channels.findOneOrFail('slack');
                 const missing = await handle.approve({ title: 'no address' }).catch((error: { code?: string }) => error.code);
                 const decision = await handle.approve({ title: 'Close #12?', address: 'C0OPS' });
                 return [missing, decision.approved];

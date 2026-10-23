@@ -22,7 +22,7 @@ export function createEngine(model: LanguageModel) {
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [triage, digest],
-        // tools reach it with injectChannel(ctx, 'console')
+        // tools reach it with ctx.channels.findOneOrFail('console')
         channels: [consoleChannel()],
         resumeSecret: 'change-me',
         maxConcurrentRuns: 8,

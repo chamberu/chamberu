@@ -6,7 +6,7 @@ chamvi is built milestone by milestone, each defined by one real agent that has 
 
 | Package | Contents |
 |---|---|
-| `@chamvi/core` | `defineAgent()` with channel subscriptions and tool hooks, the `IChannel` contract (`injectChannel`, `replyChannel`, `consoleChannel()`), `Engine` (dispatch, scheduling, checkpoints, budgets, durable `approve()`, cancel, drain, recovery), effect tools, agent state, the `IStore` contract, `MemoryStore` |
+| `@chamvi/core` | `defineAgent()` with channel subscriptions and tool hooks, the `IChannel` contract (`ToolContext.channels`, `consoleChannel()`), `Engine` (dispatch, scheduling, checkpoints, budgets, durable `approve()`, cancel, drain, recovery), effect tools, agent state, the `IStore` contract, `MemoryStore` |
 | `@chamvi/test-kit` | `describeStoreContract`, `describeWorkspaceContract`, `ControllableClock`, `createGitFixture`, `createFakeGithub` |
 | `@chamvi/channel-cron` | The cron channel `cronChannel()` and `cron.on()` (one locked hubwire component per subscription, overlap policies, timezones), `runJob()` for one-shot jobs |
 | `@chamvi/store-typeorm` | `TypeormStore` on Postgres, `migrateStore`, `purgeExpired`. See [TypeORM store](/stores/typeorm) |

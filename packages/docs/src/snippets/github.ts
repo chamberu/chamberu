@@ -7,8 +7,6 @@ import {
     ToolDeniedError,
     defineAgent,
     defineTool,
-    injectChannel,
-    replyChannel,
     requireToolPermission,
 } from '@chamvi/core';
 import { createGithubApp, github, githubChannel } from '@chamvi/github';
@@ -58,7 +56,7 @@ export function createTriage(model: LanguageModel, store: IStore) {
             // closing waits for the owner, asked in a comment on the run's issue
             async beforeToolExecution({ toolName, input }, ctx) {
                 if (toolName !== 'github_close_issue') return input;
-                const { approved } = await injectChannel(ctx, 'github').approve({
+                const { approved } = await ctx.channels.findOneOrFail('github').approve({
                     title: 'Close this issue?',
                     body: JSON.stringify(input),
                 });
@@ -105,9 +103,9 @@ export const answer = defineTool({
     inputSchema: z.object({ body: z.string() }),
     async execute({ body }, { context }) {
         // a github run: a comment on the issue it came from
-        await replyChannel(context)?.emit({ body });
+        await context.channels.findOne()?.emit({ body });
         // any issue: the address is <owner>/<repo>#<number>
-        await injectChannel(context, 'github').emit({ title: 'Triage log', body }, github.to({ repo: 'octo/ops', number: 1 }));
+        await context.channels.findOneOrFail('github').emit({ title: 'Triage log', body }, github.to({ repo: 'octo/ops', number: 1 }));
         return 'sent';
     },
 });

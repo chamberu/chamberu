@@ -10,7 +10,6 @@ import {
     consoleChannel,
     defineAgent,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 
 declare function deployVersion(version: string, env: string): Promise<string>;
@@ -42,7 +41,7 @@ const restart = defineTool({
     inputSchema: z.object({ service: z.string() }),
     execute: async ({ service }, { context }) => {
         // the request also goes out through the channel (kind 'approval', no resume token)
-        const { approved } = await injectChannel(context, 'console').approve({
+        const { approved } = await context.channels.findOneOrFail('console').approve({
             title: `Restart ${service}?`,
             address: 'ops',
         });

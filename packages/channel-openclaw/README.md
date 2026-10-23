@@ -50,7 +50,7 @@ In the OpenClaw gateway configuration:
 
 ## Usage
 
-`openclawChannel()` is an `IChannel`; register it on the engine (`channels`) and send through it from a tool with `injectChannel(ctx, 'openclaw')`: `emit()` for a message, `approve()` to pause the tool call until the owner answers:
+`openclawChannel()` is an `IChannel`; register it on the engine (`channels`) and send through it from a tool with `ctx.channels.findOne('openclaw')`: `emit()` for a message, `approve()` to pause the tool call until the owner answers:
 
 ```typescript
 import type { LanguageModel } from 'ai';
@@ -60,7 +60,6 @@ import {
     MemoryStore,
     defineAgent,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import { openclawChannel } from '@chamvi/channel-openclaw';
 import type { OpenclawChannelOptions } from '@chamvi/channel-openclaw';
@@ -96,7 +95,7 @@ export function createApprovalEngine(
         inputSchema: z.object({ env: z.enum(['staging', 'prod']) }),
         execute: async ({ env }, { context }) => {
             // every deploy waits for the owner, who is asked in their chat
-            const { approved } = await injectChannel(context, 'openclaw').approve({
+            const { approved } = await context.channels.findOneOrFail('openclaw').approve({
                 title: `Deploy to ${env}?`,
                 body: 'The current release goes out now.',
                 address: OPENCLAW_TO,
@@ -145,7 +144,7 @@ The message carries no resume token and no `resume_run` call:
 
 ## With @chamvi/app
 
-`openclawModule()` from `@chamvi/channel-openclaw/module` reads `OPENCLAW_BASE_URL`, `OPENCLAW_HOOKS_TOKEN`, `OPENCLAW_CHANNEL`, `OPENCLAW_TO`, `OPENCLAW_HOOKS_PATH`, `OPENCLAW_AGENT_ID` and `OPENCLAW_ACCOUNT_ID` when it is called, links approvals to the dashboard from `CHAMVI_PUBLIC_URL` and contributes the channel (module `chamvi:channel:<name>`); tools reach it with `injectChannel(ctx, name)`. `@chamvi/app` is an optional peer; the main entry never imports it.
+`openclawModule()` from `@chamvi/channel-openclaw/module` reads `OPENCLAW_BASE_URL`, `OPENCLAW_HOOKS_TOKEN`, `OPENCLAW_CHANNEL`, `OPENCLAW_TO`, `OPENCLAW_HOOKS_PATH`, `OPENCLAW_AGENT_ID` and `OPENCLAW_ACCOUNT_ID` when it is called, links approvals to the dashboard from `CHAMVI_PUBLIC_URL` and contributes the channel (module `chamvi:channel:<name>`); tools reach it with `ctx.channels.findOne(name)`. `@chamvi/app` is an optional peer; the main entry never imports it.
 
 ```ts
 import { createApp } from '@chamvi/app';
@@ -161,7 +160,7 @@ export default createApp({ agents, modules: [openclawModule(), openclawModule({ 
 | `baseUrl` | `string` | required | The gateway, e.g. `http://openclaw:18789`; an absolute `http:`/`https:` URL without credentials, query or hash. A base path is kept |
 | `hooksToken` | `string` | required | OpenClaw's `hooks.token`; a valid header value (no control characters, nothing above U+00FF, no surrounding whitespace) |
 | `deliver` | `{ channel, to, accountId? }` | required | Where OpenClaw delivers the answer; `channel` and `to` must be concrete (`last` is refused); also the channel's `defaultAddress`, so a tool may leave the address out; an address the tool passes replaces `to` |
-| `name` | `string` | `'openclaw'` | The channel name `injectChannel(ctx, name)` takes; a second instance needs its own |
+| `name` | `string` | `'openclaw'` | The channel name `ctx.channels.findOne(name)` takes; a second instance needs its own |
 | `hooksPath` | `string` | `'/hooks'` | OpenClaw's `hooks.path`; starts with `/`, not `/` itself; trailing slashes are dropped |
 | `agentId` | `string` | none | The OpenClaw agent that phrases the message |
 | `approvalUrl` | `({ runId, approvalId, agent }) => string` | none | A link to the approval in the chamvi UI, added to approval messages; it carries no token (see [Answering approvals](#answering-approvals)) |

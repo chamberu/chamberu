@@ -26,7 +26,7 @@ type EnvOption = keyof typeof VARIABLES;
 /**
  * Contributes `openclawChannel()` to `AppToken.CHANNELS`, options resolved
  * and checked when the factory is called; tools reach it with
- * `injectChannel(ctx, name)`.
+ * `ctx.channels.findOne(name)`.
  */
 export class OpenclawModule implements IModule {
     readonly name: string;

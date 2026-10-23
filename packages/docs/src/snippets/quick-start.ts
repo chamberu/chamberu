@@ -6,7 +6,6 @@ import {
     consoleChannel,
     defineAgent,
     defineEffectTool,
-    replyChannel,
 } from '@chamvi/core';
 
 export async function triageIssue(model: LanguageModel) {
@@ -25,7 +24,7 @@ export async function triageIssue(model: LanguageModel) {
                 execute: async ({ label }, { context }) => {
                     labels.push(label);
                     // answers where the run came from (here: the console), once per message
-                    await replyChannel(context)?.emit({ body: `Labelled as ${label}.` });
+                    await context.channels.findOne()?.emit({ body: `Labelled as ${label}.` });
                     return { added: label };
                 },
             }),
@@ -45,7 +44,7 @@ export async function triageIssue(model: LanguageModel) {
         agent: 'triage',
         trigger: 'manual',
         channel: 'console',
-        // where the run came from on that channel; replyChannel() answers there
+        // where the run came from on that channel; ctx.channels.findOne() answers there
         address: 'issue-1',
         payload: { title: 'App crashes on start' },
     });

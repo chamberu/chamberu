@@ -40,8 +40,6 @@ describe('public api', () => {
         'assertTriggerKey',
         'normalizeEnvelope',
         'consoleChannel',
-        'injectChannel',
-        'replyChannel',
         'ChannelNotFoundError',
         'defineContextKey',
         'inject',

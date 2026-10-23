@@ -340,8 +340,7 @@ describe('engine.provide', () => {
         expect((await toolStep(store, runId, 'use'))?.output).toBe('ok');
 
         const ctx = contexts[0]!;
-        expect(Reflect.ownKeys(ctx).map(String).sort()).toEqual(['artifacts', 'engine', 'run', 'state']);
-        expect(ctx.engine).toBe(engine);
+        expect(Reflect.ownKeys(ctx).map(String).sort()).toEqual(['artifacts', 'channels', 'run', 'state']);
         const secret = 'sekr3t-ctx-value';
         expect(JSON.stringify(ctx.run)).not.toContain(secret);
         expect(JSON.stringify(await store.listSteps(runId))).not.toContain(secret);

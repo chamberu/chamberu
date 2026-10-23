@@ -4,7 +4,6 @@ import {
     ToolDeniedError,
     createApp,
     defineAgent,
-    injectChannel,
 } from '@chamvi/app';
 import { githubModule } from '@chamvi/github/module';
 import { openclawModule } from '@chamvi/channel-openclaw/module';
@@ -41,7 +40,7 @@ const repro = defineAgent({
         // every shell command waits for the owner, asked in their OpenClaw chat
         async beforeToolExecution({ toolName, input }, ctx) {
             if (toolName !== 'bash') return input;
-            const { approved } = await injectChannel(ctx, 'openclaw').approve({
+            const { approved } = await ctx.channels.findOneOrFail('openclaw').approve({
                 title: 'Run a shell command?',
                 body: (input as { command: string }).command,
             });

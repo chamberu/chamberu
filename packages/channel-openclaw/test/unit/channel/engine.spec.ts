@@ -20,7 +20,6 @@ import {
     createResumeToken,
     defineAgent,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import { openclawChannel } from '@chamvi/channel-openclaw';
 import type { OpenclawChannelOptions } from '@chamvi/channel-openclaw';
@@ -47,7 +46,7 @@ function setup(
     const deploy = defineTool({
         inputSchema: z.object({ env: z.string() }),
         execute: async (input, { context }) => {
-            const { approved } = await injectChannel(context, 'openclaw').approve({
+            const { approved } = await context.channels.findOneOrFail('openclaw').approve({
                 title: `Deploy to ${input.env}?`,
                 body: 'Release v1.2.0.',
                 // the owner's chat; overrides deliver.to
@@ -61,7 +60,7 @@ function setup(
     const announce = defineTool({
         inputSchema: z.object({ text: z.string(), to: z.string() }),
         execute: async ({ text, to }, { context }) => {
-            await injectChannel(context, 'openclaw').emit({ title: 'Release', body: text }, to);
+            await context.channels.findOneOrFail('openclaw').emit({ title: 'Release', body: text }, to);
             return 'sent';
         },
     });

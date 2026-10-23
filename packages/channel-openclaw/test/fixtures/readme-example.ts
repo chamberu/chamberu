@@ -5,7 +5,6 @@ import {
     MemoryStore,
     defineAgent,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import { openclawChannel } from '@chamvi/channel-openclaw';
 import type { OpenclawChannelOptions } from '@chamvi/channel-openclaw';
@@ -41,7 +40,7 @@ export function createApprovalEngine(
         inputSchema: z.object({ env: z.enum(['staging', 'prod']) }),
         execute: async ({ env }, { context }) => {
             // every deploy waits for the owner, who is asked in their chat
-            const { approved } = await injectChannel(context, 'openclaw').approve({
+            const { approved } = await context.channels.findOneOrFail('openclaw').approve({
                 title: `Deploy to ${env}?`,
                 body: 'The current release goes out now.',
                 address: OPENCLAW_TO,

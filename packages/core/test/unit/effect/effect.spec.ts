@@ -36,7 +36,7 @@ import { mockModel } from '../../utils/mock-model.ts';
 function toolContext(runId: string): ToolContext {
     const store = new MemoryStore();
     return {
-        engine: {} as ToolContext['engine'],
+        channels: {} as ToolContext['channels'],
         run: {
             runId,
             agent: 'triage',

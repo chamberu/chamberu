@@ -20,7 +20,6 @@ import {
     defineAgent,
     defineEffectTool,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import type { IChannel } from '@chamvi/core';
 import { MemoryStore } from '../../../src/store/index.ts';
@@ -230,7 +229,7 @@ describe('approval replay', () => {
         const deploy = defineTool({
             inputSchema: z.object({}),
             execute: async (_input, { context }) => {
-                await injectChannel(context, 'slack').approve({ title: 'go?', address: 'C1' });
+                await context.channels.findOneOrFail('slack').approve({ title: 'go?', address: 'C1' });
                 resumed++;
                 await new Promise((_resolve, reject) => {
                     context.run.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });

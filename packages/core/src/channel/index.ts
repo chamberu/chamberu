@@ -6,5 +6,4 @@
  */
 
 export * from './console.ts';
-export * from './module.ts';
 export type * from './types.ts';

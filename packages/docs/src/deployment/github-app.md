@@ -49,13 +49,13 @@ Large `push` or `pull_request` deliveries can exceed the default `bodyLimit` of 
 
 ## Comments out and approvals
 
-The channel's `out` comments on an issue or pull request. `replyChannel(ctx)` answers on the issue a run came from, `injectChannel(ctx, 'github')` emits to any issue (`github.to({ repo, number })` builds the address `<owner>/<repo>#<number>`):
+The channel's `out` comments on an issue or pull request. `ctx.channels.findOne()` answers on the issue a run came from, `ctx.channels.findOne('github')` emits to any issue (`github.to({ repo, number })` builds the address `<owner>/<repo>#<number>`):
 
 <<< @/snippets/github.ts#outbound
 
 Before posting, the channel lists the issue's comments updated since the run's `receivedAt` minus one hour and returns when one by the App bot holds the marker `effectMarker(message.key)`, so a lost response never posts twice. The comment carries the `mention` logins, `### <title>`, the body in a fence one backtick longer than any run in it (so a `@login` or `#123` inside notifies nobody), for an approval the approval line, the run line and the marker. The installation is the event's for a run this channel started, else `installationId` from `createGithubApp()`.
 
-An approval asked through the channel (`injectChannel(ctx, 'github').approve(...)`, as the agent above does for `github_close_issue` in its `beforeToolExecution` hook) becomes one comment on the run's issue. It never carries the resume token: with `approvalUrl` it links to the approval in the chamvi UI (run and approval id only), else it says to answer in the UI or through `POST /runs/:id/approve`. The comment is public to everyone who can read the issue.
+An approval asked through the channel (`ctx.channels.findOneOrFail('github').approve(...)`, as the agent above does for `github_close_issue` in its `beforeToolExecution` hook) becomes one comment on the run's issue. It never carries the resume token: with `approvalUrl` it links to the approval in the chamvi UI (run and approval id only), else it says to answer in the UI or through `POST /runs/:id/approve`. The comment is public to everyone who can read the issue.
 
 ## Tools
 

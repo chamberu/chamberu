@@ -9,8 +9,9 @@ import { ChamviError } from './base.ts';
 import { ErrorCode } from './constants.ts';
 
 /**
- * injectChannel() named a channel the engine does not have, or one that
- * cannot send (it has no `out`). The message names the channel only.
+ * ctx.channels.findOneOrFail() named a channel the engine does not have, or
+ * one that cannot send (it has no `out`); also an approval delivery through
+ * a channel the engine no longer has. The message names the channel only.
  */
 export class ChannelNotFoundError extends ChamviError {
     constructor(name: string) {

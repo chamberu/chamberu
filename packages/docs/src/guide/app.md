@@ -55,20 +55,20 @@ Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](h
 | `schedulerModule()` | The `cron` channel (`cronChannel()` from `@chamvi/channel-cron`); `CHAMVI_SCHEDULER=false` leaves firing to Kubernetes CronJobs and `chamvi run-job` (`cron.on()` subscriptions still validate) |
 | `httpModule()` | The `http`, `mcp` and `webhook` channels, `createHttpApp()` with every contributed route and authenticator, mounting every contributed channel with an `in` at `/channels/<name>`, the graceful shutdown, `serve()` on `HOST`:`PORT` |
 
-The optional modules ship with the package they configure, on its `/module` subpath (`@chamvi/app` is an optional peer there, and the package's main entry never imports it), so install the feature package of each one you use. Each factory reads its variables **when it is called**, that is when the entry is imported, and exposes its instance at once (`.app`, `.manager`). Each module also **provides its instance on the engine** before it starts, so a tools factory injects it per execution with the package's `inject*Context(ctx)` (see [Context](/guide/tools#context-shared-instances-for-tools)); a channel a module contributes is reached with `injectChannel(ctx, name)`:
+The optional modules ship with the package they configure, on its `/module` subpath (`@chamvi/app` is an optional peer there, and the package's main entry never imports it), so install the feature package of each one you use. Each factory reads its variables **when it is called**, that is when the entry is imported, and exposes its instance at once (`.app`, `.manager`). Each module also **provides its instance on the engine** before it starts, so a tools factory injects it per execution with the package's `inject*Context(ctx)` (see [Context](/guide/tools#context-shared-instances-for-tools)); a channel a module contributes is reached with `ctx.channels.findOne(name)`:
 
 <<< @/snippets/app-modules.ts#modules
 
 | Factory | Entry | Contributes | Context |
 |---|---|---|---|
-| `githubModule()` | `@chamvi/github/module` | `.app` (`IGithubApp`), the `github` channel: signed deliveries at `/channels/github`, comments out | `injectGithubContext(ctx)`, `injectChannel(ctx, 'github')` |
+| `githubModule()` | `@chamvi/github/module` | `.app` (`IGithubApp`), the `github` channel: signed deliveries at `/channels/github`, comments out | `injectGithubContext(ctx)`, `ctx.channels.findOne('github')` |
 | `sandboxModule()` | `@chamvi/sandbox/module` | `.manager` (`IWorkspaceManager`), attached on start, closed after the engine drained | `injectSandboxContext(ctx)` |
-| `openclawModule()` | `@chamvi/channel-openclaw/module` | the `openclawChannel()` named `openclaw` (out only) | `injectChannel(ctx, 'openclaw')` |
+| `openclawModule()` | `@chamvi/channel-openclaw/module` | the `openclawChannel()` named `openclaw` (out only) | `ctx.channels.findOne('openclaw')` |
 | `uiModule()` | `@chamvi/ui/module` | the [dashboard](/guide/ui) at `<basePath>/ui` | |
 | `authupModule()`, `oidcModule(options)` | `@chamvi/app/authup` | the `authup()` and `oidc()` authenticators, after the static tokens | |
-| `consoleChannelModule({ name?, write? })` | `@chamvi/app` | the `consoleChannel()` named `console` (out only) | `injectChannel(ctx, 'console')` |
+| `consoleChannelModule({ name?, write? })` | `@chamvi/app` | the `consoleChannel()` named `console` (out only) | `ctx.channels.findOne('console')` |
 
-Channel names are unique per app, so `openclawModule()` beside `openclawModule({ name: 'ops' })` contributes two channels (`injectChannel(ctx, 'ops')`); two channels of one name fail the setup with `InvalidAgentDefinitionError`. `@chamvi/app/authup` stays in the app package, since `@chamvi/http` cannot depend on `@chamvi/app`.
+Channel names are unique per app, so `openclawModule()` beside `openclawModule({ name: 'ops' })` contributes two channels (`ctx.channels.findOne('ops')`); two channels of one name fail the setup with `InvalidAgentDefinitionError`. `@chamvi/app/authup` stays in the app package, since `@chamvi/http` cannot depend on `@chamvi/app`.
 
 With `CHAMVI_PUBLIC_URL` set, the GitHub and OpenClaw modules link approvals to the dashboard: `<CHAMVI_PUBLIC_URL><basePath>/ui/approvals?run=<runId>&approval=<approvalId>`, without a token. A factory missing a required variable throws `InvalidAgentDefinitionError` naming it; no message ever echoes a value.
 

@@ -61,7 +61,7 @@ A subscription may carry `concurrencyKey(payload)` and `idempotencyKey(payload)`
 
 <<< ../../../core/src/trigger/types.ts{ts}
 
-`dispatch()` takes the envelope without `id` and `receivedAt`; it fills in a random UUID and the current time. `trigger` is the subscription id (`'http'`, `'webhook:/issues'`, ...), `channel` the name of the channel the run came from (`'mcp'` for a run started through `http.on()` over MCP). `address` is where the run came from on that channel, as the channel defines it (the issue for GitHub, a chat recipient); it is stored on the run as `run.address` and is where [`replyChannel()`](#outbound-from-tools) answers. An `idempotencyKey`, `concurrencyKey` or `address` above 255 characters or with a NUL is refused (`ValidationError`) before anything is written.
+`dispatch()` takes the envelope without `id` and `receivedAt`; it fills in a random UUID and the current time. `trigger` is the subscription id (`'http'`, `'webhook:/issues'`, ...), `channel` the name of the channel the run came from (`'mcp'` for a run started through `http.on()` over MCP). `address` is where the run came from on that channel, as the channel defines it (the issue for GitHub, a chat recipient); it is stored on the run as `run.address` and is where [`ctx.channels.findOne()`](#outbound-from-tools) answers. An `idempotencyKey`, `concurrencyKey` or `address` above 255 characters or with a NUL is refused (`ValidationError`) before anything is written.
 
 The engine renders the channel, subscription id and payload as a JSON block and makes it the run's first user message. The model sees exactly that; put what it needs into the payload.
 
@@ -75,8 +75,9 @@ The engine never sends a message of its own. A tool sends through a channel:
 
 <<< @/snippets/channels.ts#outbound
 
-- `injectChannel(ctx, name)` returns a handle on a registered channel with `out`; an unknown name, or a channel without `out`, throws `ChannelNotFoundError` (`channel_not_found`).
-- `replyChannel(ctx)` returns the run's source channel bound to its source address, or `undefined` when that channel has no `out` or the run has no address.
+- `ctx.channels.findOne(name)` returns a handle on a registered channel with `out`, or `undefined` for an unknown name or a channel without `out`. Without a name it is the run's source channel, bound to its source address, so a tool answers where the run came from without knowing the channel (and gets `undefined` for a run from `http`, `mcp` or `cron`).
+- `ctx.channels.findOneOrFail(name?)` is the same, but throws `ChannelNotFoundError` (`channel_not_found`) instead of returning `undefined`: use it for a channel the agent cannot work without.
+- `ctx.channels.find()` returns a handle on every channel with `out`, in registration order.
 - `handle.emit({ title?, body, key? }, address?)` sends through `out`. The address defaults to the source address on the source channel, else to the channel's `defaultAddress`; without either a missing address is a `validation_error` tool error.
 - An emit is an [effect](/guide/effect-tools): its key is `<runId>:emit:<channel>:<sha256 of address and message>` (or your `key`), recorded in the effect store, so identical emits of one step and a step redone after a crash send once. `out` gets the key as `message.key`, to dedupe on in the transport. A throwing `out` records nothing and is a tool error, so the next identical emit sends again.
 - `emit` outside a tool call (in the tools factory) throws `InvalidRunStateError`: the tool call is the unit of retry.

@@ -4,7 +4,6 @@ import {
     Engine,
     MemoryStore,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import type { Agent } from '@chamvi/core';
 
@@ -24,7 +23,7 @@ export function createEngine(agents: Agent[]) {
     const engine = new Engine({
         store: new MemoryStore(),
         agents,
-        // tools reach it with injectChannel(ctx, 'openclaw')
+        // tools reach it with ctx.channels.findOneOrFail('openclaw')
         channels: [openclaw],
         resumeSecret: process.env.RESUME_SECRET ?? '',
     });
@@ -37,7 +36,7 @@ export const deploy = defineTool({
     description: 'Deploy the current release.',
     inputSchema: z.object({ env: z.enum(['staging', 'prod']) }),
     execute: async ({ env }, { context }) => {
-        const openclaw = injectChannel(context, 'openclaw');
+        const openclaw = context.channels.findOneOrFail('openclaw');
         // without an address both go to deliver.to (the channel's defaultAddress)
         const { approved } = await openclaw.approve({ title: `Deploy to ${env}?` });
         if (!approved) return 'the owner said no';

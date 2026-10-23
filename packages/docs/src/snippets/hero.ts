@@ -6,7 +6,6 @@ import {
     defineAgent,
     defineEffectTool,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import { webhook } from '@chamvi/http';
 
@@ -38,7 +37,7 @@ export const triage = defineAgent({
             inputSchema: z.object({ issue: z.number() }),
             execute: async ({ issue }, { context }) => {
                 // waits in `waiting` until the owner signs off, across restarts
-                const { approved } = await injectChannel(context, 'owner')
+                const { approved } = await context.channels.findOneOrFail('owner')
                     .approve({ title: `Close #${issue}?`, address: 'ops' });
                 if (!approved) throw new ToolDeniedError('The owner keeps it open.');
                 return closeIssue(issue);

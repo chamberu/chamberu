@@ -67,7 +67,7 @@ const triage = defineAgent({
 // chamvi start | run-job | migrate load this default export
 export default createApp({
     agents: [triage],
-    // tools write to it with injectChannel(ctx, 'console').emit(...)
+    // tools write to it with ctx.channels.findOneOrFail('console').emit(...)
     modules: [consoleChannelModule()],
 });
 ```
@@ -134,9 +134,9 @@ Modules are orkos `IModule`s on an eldin container. The built-in ones are always
 | `schedulerModule({ owner?, lockTtlMs? })` | `chamvi:scheduler` | `@chamvi/app` | the `cron` channel (`cronChannel()` of `@chamvi/channel-cron`; in start mode it fires only with `CHAMVI_SCHEDULER`) |
 | `httpModule()` | `chamvi:http` | `@chamvi/app` | the `http`, `mcp` and `webhook` channels (webhooks authenticate with the app's authenticators), `createHttpApp()` mounting every contributed channel with an `in` at `/channels/<name>`, the graceful shutdown, listens last |
 | `consoleChannelModule({ name?, write? })` | `chamvi:console` (`chamvi:console:<name>` with a name) | `@chamvi/app` | `consoleChannel()` (name `console`, out only) |
-| `githubModule()` | `chamvi:github` | `@chamvi/github/module` | the GitHub App and its channel (`github`: signed deliveries at `/channels/github`, comments out); `injectGithubContext(ctx)` and `injectChannel(ctx, 'github')` for tools |
+| `githubModule()` | `chamvi:github` | `@chamvi/github/module` | the GitHub App and its channel (`github`: signed deliveries at `/channels/github`, comments out); `injectGithubContext(ctx)` and `ctx.channels.findOne('github')` for tools |
 | `sandboxModule({ provider?, ... })` | `chamvi:sandbox` | `@chamvi/sandbox/module` | the run-scoped workspace manager (`.manager`, `injectSandboxContext(ctx)`), closed after the engine drained |
-| `openclawModule()` | `chamvi:channel:<name>` | `@chamvi/channel-openclaw/module` | `openclawChannel()` (name `openclaw`, out only), `injectChannel(ctx, 'openclaw')` |
+| `openclawModule()` | `chamvi:channel:<name>` | `@chamvi/channel-openclaw/module` | `openclawChannel()` (name `openclaw`, out only), `ctx.channels.findOne('openclaw')` |
 | `uiModule()` | `chamvi:ui` | `@chamvi/ui/module` | the dashboard at `<basePath>/ui` |
 | `authupModule()` | `chamvi:authup` | `@chamvi/app/authup` | the authup authenticator, after static tokens |
 | `oidcModule(options)` | `chamvi:oidc` | `@chamvi/app/authup` | the `oidc()` authenticator, after authup (no env form) |

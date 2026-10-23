@@ -21,7 +21,6 @@ import {
     createResumeToken,
     defineAgent,
     defineTool,
-    injectChannel,
 } from '@chamvi/core';
 import type { ChannelMessage, ChannelSendOptions, IChannel } from '@chamvi/core';
 import { MemoryStore } from '../../../src/store/index.ts';
@@ -69,7 +68,7 @@ const askTool = (channel: string | null) => defineTool({
     execute: async (_input, { context }) => {
         const request = { title: 'Close #12?', body: 'stale for 90 days' };
         const decision = channel ?
-            await injectChannel(context, channel).approve({ ...request, address: 'C0OPS' }) :
+            await context.channels.findOneOrFail(channel).approve({ ...request, address: 'C0OPS' }) :
             await approve(context, request);
         return decision.approved;
     },

@@ -13,7 +13,7 @@ import type { ConsoleChannelModuleOptions } from './types.ts';
 
 /**
  * Contributes `consoleChannel(options)` to `AppToken.CHANNELS` (out only):
- * tools reach it through `injectChannel(ctx, 'console')`, and approvals a
+ * tools reach it through `ctx.channels.findOne('console')`, and approvals a
  * tool requests on it are written to the console. Named `chamvi:console`,
  * or `chamvi:console:<name>` for a channel of another name.
  */

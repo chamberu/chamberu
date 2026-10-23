@@ -96,7 +96,7 @@ export type EmitMessage = {
 };
 
 /**
- * A channel bound to the run (`injectChannel`, `replyChannel`). `address` is
+ * A channel bound to the run (`ToolContext.channels`). `address` is
  * the run's source address when this is the run's source channel, else the
  * channel's `defaultAddress`.
  */
@@ -110,6 +110,22 @@ export type ChannelHandle = {
     emit(message: EmitMessage, address?: string): Promise<void>;
     /** Asks the owner to approve, durably (suspends the tool call until answered). */
     approve(request: ApprovalRequestInput & { address?: string }): Promise<ApprovalDecision>;
+};
+
+/**
+ * `ToolContext.channels`: run-bound handles on the engine's channels with
+ * `out`. On the run's source channel a handle defaults to the source address.
+ */
+export type ToolChannels = {
+    /**
+     * The channel `name` (default: the run's source channel); undefined when
+     * the engine has no such channel or it has no `out`.
+     */
+    findOne(name?: string): ChannelHandle | undefined;
+    /** As findOne(), but ChannelNotFoundError instead of undefined. */
+    findOneOrFail(name?: string): ChannelHandle;
+    /** Every engine channel with `out`, in registration order. */
+    find(): ChannelHandle[];
 };
 
 export type ConsoleChannelOptions = {
