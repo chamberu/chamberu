@@ -21,7 +21,8 @@ import type { OpenclawChannelOptions, OpenclawHookBody } from './types.ts';
  * The OpenClaw channel, out only: `out` posts to OpenClaw's
  * `POST <hooksPath>/agent`, and OpenClaw runs an agent turn on the message
  * and delivers the answer to `deliver.channel`, to the address when it is
- * not empty, else to `deliver.to`. The `Idempotency-Key` (the message key)
+ * not empty, else to `deliver.to` (also the channel's `defaultAddress`, so a
+ * tool may leave the address out). The `Idempotency-Key` (the message key)
  * and a deterministic message let OpenClaw replay a resend after a lost
  * response. Every failure throws a `openclaw_request` ChamviError (a
  * stalled gateway after `timeoutMs`), an aborted `opts.signal` its reason.
@@ -82,5 +83,9 @@ export function openclawChannel(options: OpenclawChannelOptions): IChannel {
         }
     };
 
-    return { name: resolved.name, out };
+    return {
+        name: resolved.name,
+        defaultAddress: resolved.deliver.to,
+        out,
+    };
 }
