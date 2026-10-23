@@ -44,7 +44,6 @@ export async function dispatchExamples(model: LanguageModel, auth: Authenticator
         agents: [triage],
         // every subscribed channel must be registered (InvalidAgentDefinitionError otherwise)
         channels: [httpChannel(), webhookChannel({ auth }), cronChannel()],
-        resumeSecret: 'change-me',
     });
     // #endregion subscriptions
 
@@ -118,7 +117,6 @@ export function createEngine(model: LanguageModel) {
             tools: { resolve },
         })],
         channels: [consoleChannel()],
-        resumeSecret: 'change-me',
     });
 }
 // #endregion outbound
@@ -164,7 +162,7 @@ export function chatChannel(options: { secret: string; apiUrl: string }): IChann
                 body: JSON.stringify({
                     channel: address,
                     text: [message.title, message.body].filter(Boolean).join('\n'),
-                    // an approval carries its id and expiry, never a resume token: link to the UI
+                    // an approval carries its id and expiry: link to the UI
                     link: message.approvalId ?
                         `https://chamvi.example/ui/approvals?run=${message.runId}&approval=${message.approvalId}` :
                         undefined,

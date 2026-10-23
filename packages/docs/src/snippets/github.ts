@@ -74,7 +74,6 @@ export function createTriage(model: LanguageModel, store: IStore) {
         store,
         agents: [triage],
         channels: [channel, cronChannel()],
-        resumeSecret: process.env.RESUME_SECRET ?? '',
     });
     const app = createHttpApp({
         engine,

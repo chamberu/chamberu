@@ -119,14 +119,11 @@ describe('createSession', () => {
         await session.restore();
         storage.setItem(TOKEN_STORAGE_KEY, 'x');
         storage.setItem(RETURN_STORAGE_KEY, '/runs');
-        storage.setItem('chamvi.resume', 'resume-token');
         storage.setItem('chamvi.authup.access_token', '"at"');
         storage.setItem('other', 'kept');
         await session.signOut();
-        expect(storage.length).toBe(2);
+        expect(storage.length).toBe(1);
         expect(storage.getItem('other')).toBe('kept');
-        // a pending deep link stays for the next principal of this tab
-        expect(storage.getItem('chamvi.resume')).toBe('resume-token');
         expect(session.principal.value).toBeUndefined();
         expect(session.method).toBeUndefined();
         expect(adapter.calls).toContain('signOut');

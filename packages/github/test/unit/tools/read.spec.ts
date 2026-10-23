@@ -341,7 +341,6 @@ describe('read tools', () => {
             store,
             agents: [agent],
             channels: [githubChannel({ app: gh, clock })],
-            resumeSecret: 'test-secret',
             clock,
             onError: () => {},
         });

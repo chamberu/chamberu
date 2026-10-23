@@ -5,7 +5,6 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { randomBytes } from 'node:crypto';
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import type { Env } from '../env/index.ts';
 import {
@@ -30,7 +29,6 @@ import {
     DEV_DRAIN_TIMEOUT_MS,
     LOG_LEVELS,
     PUBLIC_URL_PROTOCOLS,
-    RESUME_SECRET_MIN_LENGTH,
 } from './constants.ts';
 import { readTokens } from './helpers.ts';
 import type { AppConfig, ReadConfigOptions } from './types.ts';
@@ -44,23 +42,6 @@ function readBasePath(env: Env): string {
     }
 
     return value;
-}
-
-function readResumeSecret(env: Env, options: ReadConfigOptions): Pick<AppConfig['engine'], 'resumeSecret' | 'resumeSecretGenerated'> {
-    const dev = options.dev ?? false;
-    const resumeSecret = envString(env, 'RESUME_SECRET', {
-        minLength: RESUME_SECRET_MIN_LENGTH,
-        required: options.mode !== 'migrate' && !dev,
-    });
-    if (typeof resumeSecret === 'string') {
-        return { resumeSecret, resumeSecretGenerated: false };
-    }
-
-    if (dev) {
-        return { resumeSecret: randomBytes(32).toString('base64url'), resumeSecretGenerated: true };
-    }
-
-    return { resumeSecret: '', resumeSecretGenerated: false };
 }
 
 /**
@@ -99,7 +80,6 @@ export function readConfig(env: Env, options: ReadConfigOptions): AppConfig {
             purgeIntervalMs: envInteger(env, 'CHAMVI_PURGE_INTERVAL_MS', { default: DEFAULT_PURGE_INTERVAL_MS, max: TIMER_MAX_MS }),
         },
         engine: {
-            ...readResumeSecret(env, options),
             maxConcurrentRuns: envInteger(env, 'CHAMVI_MAX_CONCURRENT_RUNS', {
                 default: DEFAULT_MAX_CONCURRENT_RUNS,
                 min: 1,

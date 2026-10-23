@@ -93,7 +93,6 @@ describePostgres('two engines on one TypeORM store', () => {
         const engine = new Engine({
             store,
             agents: [agent],
-            resumeSecret: 's',
             // Real time: renewal runs every claimTtlMs / 3, so the lease must
             // survive a delayed renewal on a loaded machine.
             claimTtlMs: 3_000,

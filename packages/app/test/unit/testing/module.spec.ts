@@ -24,7 +24,7 @@ import {
 import type { AppMode, IContainer, IModule } from '@chamvi/app';
 import { buildModuleHarness, createModuleHarness } from '@chamvi/app/testing';
 import type { ModuleHarness } from '@chamvi/app/testing';
-import { SECRET, recording, rejectionOf } from '../../utils/app.ts';
+import { recording, rejectionOf } from '../../utils/app.ts';
 import { createRecordingLogger } from '../../utils/logger.ts';
 import { textModel } from '../../utils/model.ts';
 
@@ -56,7 +56,7 @@ function modules(extra: IModule[] = []): IModule[] {
 async function start(mode?: AppMode) {
     const harness = await createModuleHarness({
         mode,
-        env: { RESUME_SECRET: SECRET },
+        env: {},
         agents: [triage()],
         modules: modules(),
     });
@@ -97,7 +97,7 @@ describe('module harness', () => {
         const clock = new ControllableClock(new Date('2026-10-22T00:00:00Z'));
         const failure = new Error('boom');
         const harness = buildModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             modules: [
                 recording(configModule({ clock, logger: createRecordingLogger(clock) }), events, 'config'),
                 {
@@ -122,7 +122,7 @@ describe('module harness', () => {
         const events: string[] = [];
         const clock = new ControllableClock(new Date('2026-10-22T00:00:00Z'));
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             modules: [recording(configModule({ clock, logger: createRecordingLogger(clock) }), events, 'config')],
         });
 

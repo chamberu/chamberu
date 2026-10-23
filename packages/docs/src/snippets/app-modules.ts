@@ -23,7 +23,7 @@ const sandbox = sandboxModule({
 
 const repro = defineAgent({
     name: 'repro',
-    model: 'anthropic:claude-sonnet-5-5',
+    model: 'anthropic/claude-sonnet-5-5',
     instructions: 'Reproduce the reported bug with a failing test and comment the result.',
     channels: [github.on('issues.labeled')],
     // each module provides its instance on the engine; a factory injects it per execution

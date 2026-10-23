@@ -94,7 +94,7 @@ Rules for a channel:
 1. **`in` checks its own credentials.** `createHttpApp({ channels })` mounts `POST /channels/<name>` and everything below it for the listed channels, rate-limited but never authenticated by the app's authenticators. Read the body with `readRequestBody(request, { limit })` from `@chamvi/http` (413 above the limit); any thrown error renders through the app's JSON error handler.
 2. **`out` throws on failure.** A failed emit records nothing; a failed approval message leaves `waiting.notifiedAt` unset and `tick()` re-sends it on every poll.
 3. **`out` is idempotent on `message.key`.** A crash after a successful send but before the record re-sends with the same key; pass it to the transport (an `Idempotency-Key` header, a hidden marker) so the owner gets one message.
-4. **Never send a resume token.** A message carries the approval id; link to the approval in the [dashboard](/guide/ui#approval-links), where the owner answers signed in.
+4. **Link to the approval.** A message carries the approval id; link to the approval in the [dashboard](/guide/ui#approval-links), where the owner answers signed in.
 
 `ChannelSendOptions` carries the call's `signal` and `trigger`, the run's stored envelope (e.g. to find the run's issue); read it, never write it.
 

@@ -58,7 +58,6 @@ function createEngine(
         store,
         clock,
         claimTtlMs: 30,
-        resumeSecret: 'secret',
         channels,
         agents: [defineAgent({
             name: 'release',

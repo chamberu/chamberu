@@ -180,7 +180,6 @@ describe('effect tools', () => {
                     model,
                     tools: () => ({ post }),
                 })],
-                resumeSecret: 's',
                 onError: () => {},
             });
             engines.push(engine);

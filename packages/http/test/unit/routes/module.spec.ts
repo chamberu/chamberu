@@ -242,7 +242,7 @@ describe('extra routes', () => {
         ['a path with a wildcard', [route({ path: '/extra/*' })]],
         ['a path with a brace', [route({ path: '/extra{/x}' })]],
         ['a duplicate method and path', [route(), route()]],
-        ...['agents', 'channels', 'runs', 'resume', 'mcp', 'healthz', 'me', 'readyz', 'schedules']
+        ...['agents', 'channels', 'runs', 'mcp', 'healthz', 'me', 'readyz', 'schedules']
             .map((segment): [string, HttpRoute[]] => [`the reserved segment ${segment}`, [route({ path: `/${segment}/x` })]]),
         ['the metrics path', [route({ method: 'GET', path: '/metrics' })]],
         ['a reserved segment in another case', [route({ path: '/AGENTS/x' })]],

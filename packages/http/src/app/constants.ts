@@ -43,7 +43,6 @@ export const RESERVED_ROUTE_SEGMENTS: readonly string[] = [
     'mcp',
     'me',
     'readyz',
-    'resume',
     'runs',
     'schedules',
 ];

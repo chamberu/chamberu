@@ -18,7 +18,7 @@ import { AppToken, ModuleName, configModule } from '@chamvi/app';
 import { createModuleHarness } from '@chamvi/app/testing';
 import type { ModuleHarness } from '@chamvi/app/testing';
 import { openclawModule } from '@chamvi/channel-openclaw/module';
-import { SECRET, createRecordingLogger } from '../../utils/module.ts';
+import { createRecordingLogger } from '../../utils/module.ts';
 import { createFakeOpenclaw } from '../../utils/openclaw.ts';
 
 const HOOKS_TOKEN = 'hooks-token-value';
@@ -107,7 +107,7 @@ describe('openclawModule', () => {
 
     it('contributes the channel, out only', async () => {
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             modules: [configModule({ logger: createRecordingLogger() }), openclawModule({ env: openclawEnv() })],
         });
         harnesses.push(harness);
@@ -126,7 +126,7 @@ describe('openclawModule', () => {
             clock,
         });
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET, CHAMVI_PUBLIC_URL: 'https://chamvi.example' },
+            env: { CHAMVI_PUBLIC_URL: 'https://chamvi.example' },
             modules: [
                 configModule({ clock, logger: createRecordingLogger(clock) }),
                 openclawModule({
@@ -166,7 +166,7 @@ describe('openclawModule', () => {
         expect(b.name).toBe('chamvi:channel:ops');
 
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             modules: [configModule({ logger: createRecordingLogger() }), a, b],
         });
         harnesses.push(harness);

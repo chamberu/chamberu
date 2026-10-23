@@ -14,7 +14,6 @@ export async function watchRuns(model: LanguageModel) {
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [agent],
-        resumeSecret: 'change-me',
     });
 
     // #region events

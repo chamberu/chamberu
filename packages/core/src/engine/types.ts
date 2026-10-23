@@ -52,8 +52,6 @@ export type EngineOptions = {
     maxConcurrentRuns?: number;
     /** Default 60_000, renewed every ttl/3 while running. */
     claimTtlMs?: number;
-    /** HMAC secret for resume tokens; must not be empty. */
-    resumeSecret: string;
     clock?: IClock;
     /** Receives errors that have no caller to throw to. Default console.error. */
     onError?: (error: unknown, run?: Run) => void;
@@ -65,17 +63,14 @@ export type DispatchEnvelope = Omit<TriggerEnvelope, 'id' | 'receivedAt' | 'atta
         attachments?: ArtifactInput[];
     };
 
-export type ResumeDecision = {
+/** An answer to the run's current wait point (`Engine.approve()`). */
+export type ApprovalAnswer = {
+    /** Must equal `run.waiting.approvalId`, else InvalidRunStateError. */
+    approvalId: string;
     approved: boolean;
     reason?: string;
     /** Who answered; recorded on the wait step (\`output.approver\`). */
     approver?: Invoker;
-};
-
-/** A token-less answer to the run's current wait point (`Engine.approve()`). */
-export type ApprovalAnswer = ResumeDecision & {
-    /** Must equal `run.waiting.approvalId`, else InvalidRunStateError. */
-    approvalId: string;
 };
 
 export type EngineStartOptions = {

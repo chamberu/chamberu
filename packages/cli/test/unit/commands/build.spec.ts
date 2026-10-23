@@ -7,10 +7,13 @@
 
 import {
     mkdir,
+    mkdtemp,
     readFile,
+    rm,
     stat,
     writeFile,
 } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
     afterEach,
@@ -125,6 +128,17 @@ describe('build', () => {
         await runCli(['build'], fake.context({ cwd: app.cwd }));
         expect(fake.exitCodes).toEqual([1]);
         expect(await exists(path.join(app.cwd, 'dist/index.mjs'))).toBe(false);
+    });
+
+    it('without any entry file exits 2: nothing to build', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'chamvi-cli-build-'));
+        try {
+            await runCli(['build'], fake.context({ cwd }));
+            expect(fake.exitCodes).toEqual([2]);
+            expect(fake.stderr.join('')).toContain('nothing to build');
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+        }
     });
 
     it('a missing entry exits 2', async () => {

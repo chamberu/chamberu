@@ -102,7 +102,6 @@ export function createApiClient(options: ApiClientOptions): IApiClient {
         getRun: (id) => request<RunDetail>(path('runs', id)),
         cancelRun: async (id) => { await request(`${path('runs', id)}/cancel`, { method: 'POST' }); },
         approve: async (id, body) => { await request(`${path('runs', id)}/approve`, { method: 'POST', body }); },
-        resume: (body) => request<{ runId: string }>('/resume', { method: 'POST', body }),
         listKv: async (agent, page) => dataOf<KvEntry>(await request(withQuery(`${path('agents', agent)}/state/kv`, pageQuery(new URLSearchParams(), page)))),
         listDocs: async (agent, collection, page) => dataOf<DocEntry>(await request(withQuery(
             `${path('agents', agent)}/state/collections${path(collection)}`,

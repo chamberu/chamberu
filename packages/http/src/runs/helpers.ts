@@ -7,7 +7,6 @@
 
 import {
     ArtifactNotFoundError,
-    InvalidResumeTokenError,
     RunNotFoundError,
     RunStatus,
     hasPermission,
@@ -46,15 +45,13 @@ import {
 import { KEY_MAX_LENGTH } from '../request/constants.ts';
 import {
     APPROVAL_ID_MAX_LENGTH,
+    APPROVAL_REASON_MAX_LENGTH,
     ATTACHMENT_FILENAME_MAX_LENGTH,
     MAX_ATTACHMENTS,
-    RESUME_REASON_MAX_LENGTH,
-    RESUME_TOKEN_MAX_LENGTH,
 } from './constants.ts';
 import type {
     ApproveBody,
     InvokerView,
-    ResumeBody,
     RunListQuery,
     RunView,
     StartRunBody,
@@ -240,19 +237,11 @@ export function parseRunListQuery(searchParams: URLSearchParams, agentNames: Ite
     return query;
 }
 
-export function createResumeContainer(): Container<ResumeBody> {
-    const container = new Container<ResumeBody>();
-    container.mount('token', isString({ min: 1, max: RESUME_TOKEN_MAX_LENGTH }));
-    container.mount('approved', isBoolean());
-    container.mount('reason', { optional: true }, isString({ max: RESUME_REASON_MAX_LENGTH }));
-    return container;
-}
-
 export function createApproveContainer(): Container<ApproveBody> {
     const container = new Container<ApproveBody>();
     container.mount('approvalId', isString({ min: 1, max: APPROVAL_ID_MAX_LENGTH }));
     container.mount('approved', isBoolean());
-    container.mount('reason', { optional: true }, isString({ max: RESUME_REASON_MAX_LENGTH }));
+    container.mount('reason', { optional: true }, isString({ max: APPROVAL_REASON_MAX_LENGTH }));
     return container;
 }
 
@@ -272,18 +261,4 @@ function assertCanApprove(principal: Principal, run: Run): void {
     if (!hasPermission(principal.permissions, permission)) {
         throw new ForbiddenError({ message: `Missing permission "${permission}".` });
     }
-}
-
-/**
- * The run a resume token answers, once the principal may approve for its
- * agent: the signature and expiry are checked before any store lookup
- * (400), a run that does not exist reads as an invalid token (400), a
- * missing `agent:<agent>:approve` is 403.
- */
-export async function resolveResumeTarget(ctx: HttpContext, principal: Principal, token: string): Promise<Run> {
-    const claims = ctx.engine.inspectResumeToken(token);
-    const run = await ctx.store.getRun(claims.runId);
-    if (!run) throw new InvalidResumeTokenError();
-    assertCanApprove(principal, run);
-    return run;
 }

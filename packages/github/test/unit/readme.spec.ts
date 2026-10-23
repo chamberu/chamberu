@@ -34,7 +34,6 @@ function stubEnv() {
     vi.stubEnv('GITHUB_PRIVATE_KEY', fake.privateKey.replaceAll('\n', '\\n'));
     vi.stubEnv('GITHUB_WEBHOOK_SECRET', SECRET);
     vi.stubEnv('CHAMVI_TOKEN', 'readme-token-0123456789');
-    vi.stubEnv('RESUME_SECRET', 'readme-resume-secret');
     return { clock, fake };
 }
 

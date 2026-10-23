@@ -21,7 +21,6 @@ export async function createAgentServer(model: LanguageModel) {
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [echo],
-        resumeSecret: 'change-me',
         // REST runs carry channel http, MCP runs channel mcp
         channels: [httpChannel(), mcpChannel()],
     });

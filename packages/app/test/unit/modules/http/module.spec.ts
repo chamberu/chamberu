@@ -46,7 +46,6 @@ import {
     listenOn,
 } from '../../../utils/port.ts';
 
-const SECRET = 'x'.repeat(32);
 const TOKEN = 'a-static-token-of-length';
 const TOKENS = JSON.stringify([{
     value: TOKEN,
@@ -111,7 +110,6 @@ async function build(options: {
     const logger = createRecordingLogger(clock);
     const harness = buildHarness({
         env: {
-            RESUME_SECRET: SECRET,
             HOST: '127.0.0.1',
             PORT: String(port),
             CHAMVI_TOKENS: TOKENS,

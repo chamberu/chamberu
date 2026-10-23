@@ -14,7 +14,6 @@ export type {
     ApprovalAnswer,
     DispatchEnvelope,
     EngineEvent,
-    ResumeDecision,
     RunDelta,
     EngineOptions,
     EngineStartOptions,

@@ -52,7 +52,6 @@ function setup(script: MockResponse[], tools: AgentDefinition['tools']) {
             model,
             tools,
         })],
-        resumeSecret: 'secret',
         clock,
         onError: (error) => { errors.push(error); },
     });

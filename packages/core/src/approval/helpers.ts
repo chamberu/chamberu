@@ -5,25 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { createHmac } from 'node:crypto';
 import { isObject } from 'smob';
 import type { Invoker } from '../trigger/types.ts';
-import type { ApprovalDecision, ResumeTokenPayload } from './types.ts';
-
-export function sign(secret: string, encodedPayload: string): Buffer {
-    return createHmac('sha256', secret)
-        .update(encodedPayload)
-        .digest();
-}
-
-export function isResumeTokenPayload(value: unknown): value is ResumeTokenPayload {
-    if (!isObject(value)) return false;
-    return typeof value.runId === 'string' &&
-        typeof value.approvalId === 'string' &&
-        typeof value.tokenId === 'string' &&
-        typeof value.exp === 'number' &&
-        Number.isFinite(value.exp);
-}
+import type { ApprovalDecision } from './types.ts';
 
 /** The effect store key the decision of `approvalId` is recorded under. */
 export function approvalDecisionKey(runId: string, approvalId: string): string {

@@ -77,13 +77,12 @@ function setup(s: Setup) {
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 'secret',
         clock,
         claimTtlMs: 30,
         onError: () => {},
     });
     engines.push(engine);
-    const notifier = recordApprovals(engine, 'secret');
+    const notifier = recordApprovals(engine);
     return {
         clock,
         store,
@@ -396,7 +395,11 @@ describe('tool policy', () => {
             kind: 'user', 
             permissions: ['agent:release:approve'], 
         };
-        await engine.resume(notifier.calls[0]!.resumeToken!, { approved: true, approver });
+        await engine.approve(notifier.calls[0]!.runId, {
+            approvalId: notifier.calls[0]!.approvalId, 
+            approved: true, 
+            approver, 
+        });
         await engine.idle();
 
         const run = await store.getRun(runId);
@@ -455,14 +458,13 @@ describe('tool policy', () => {
                 toolPolicy: (name) => name !== 'deploy',
                 hooks: gateTool('deploy'),
             })],
-            resumeSecret: 'secret',
             clock,
             claimTtlMs: 30,
             onError: () => {},
         });
         engines.push(tightened);
         await tightened.start();
-        await tightened.resume(notifier.calls[0]!.resumeToken!, { approved: true });
+        await tightened.approve(notifier.calls[0]!.runId, { approvalId: notifier.calls[0]!.approvalId, approved: true });
         await tightened.idle();
 
         const run = await store.getRun(runId);
@@ -490,8 +492,9 @@ describe('tool policy', () => {
         const { runId } = await engine.dispatch(env(alice));
         await engine.idle();
 
-        const token = notifier.calls[0]!.resumeToken!;
-        await expect(engine.resume(token, {
+        const { approvalId } = notifier.calls[0]!;
+        await expect(engine.approve(runId, {
+            approvalId,
             approved: true,
             approver: {
                 id: '', 
@@ -503,7 +506,7 @@ describe('tool policy', () => {
         expect((await store.listSteps(runId)).some((s) => s.kind === 'wait')).toBe(false);
 
         // without an approver the wait step has none
-        await engine.resume(token, { approved: true });
+        await engine.approve(runId, { approvalId, approved: true });
         await engine.idle();
         const wait = (await store.listSteps(runId)).find((s) => s.kind === 'wait');
         expect(wait?.output).not.toHaveProperty('approver');

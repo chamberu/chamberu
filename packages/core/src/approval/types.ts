@@ -7,17 +7,6 @@
 
 import type { Invoker } from '../trigger/types.ts';
 
-export type ResumeTokenClaims = {
-    runId: string;
-    approvalId: string;
-    tokenId: string;
-};
-
-export type ResumeTokenPayload = ResumeTokenClaims & {
-    /** expiresAt in epoch milliseconds. */
-    exp: number;
-};
-
 /** What a tool asks the owner to approve (`approve()`, `ChannelHandle.approve()`). */
 export type ApprovalRequestInput = {
     title: string;

@@ -8,16 +8,14 @@
 import { describe, expect, it } from 'vitest';
 import { approvalUrlOf, readConfig } from '@chamvi/app';
 
-const SECRET = 'x'.repeat(32);
 
 describe('approvalUrlOf', () => {
     it('is undefined without a public URL', () => {
-        expect(approvalUrlOf(readConfig({ RESUME_SECRET: SECRET }, { mode: 'start' }))).toBeUndefined();
+        expect(approvalUrlOf(readConfig({}, { mode: 'start' }))).toBeUndefined();
     });
 
     it('builds the UI approval link under the base path', () => {
         const config = readConfig({
-            RESUME_SECRET: SECRET,
             CHAMVI_PUBLIC_URL: 'https://a.example',
             CHAMVI_BASE_PATH: '/api',
         }, { mode: 'start' });

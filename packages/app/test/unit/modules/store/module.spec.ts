@@ -20,7 +20,6 @@ import type { AppMode } from '@chamvi/app';
 import { createHarness } from '../../../utils/harness.ts';
 import { createRecordingLogger } from '../../../utils/logger.ts';
 
-const SECRET = 'x'.repeat(32);
 
 function flush(): Promise<void> {
     return new Promise((resolve) => {
@@ -50,7 +49,7 @@ async function setup(options: {
     const harness = await createHarness({
         mode: options.mode,
         dev: options.dev,
-        env: { RESUME_SECRET: SECRET, ...options.env },
+        env: { ...options.env },
         modules: [
             configModule({ clock, logger }),
             storeModule(options.store ? { store: options.store } : {}),

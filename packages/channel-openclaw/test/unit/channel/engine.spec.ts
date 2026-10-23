@@ -17,7 +17,6 @@ import type { ChamviError } from '@chamvi/core';
 import {
     Engine,
     MemoryStore,
-    createResumeToken,
     defineAgent,
     defineTool,
 } from '@chamvi/core';
@@ -84,7 +83,6 @@ function setup(
                 ...patch,
             }),
         ],
-        resumeSecret: 'resume-secret',
         clock,
         claimTtlMs: 30,
         onError: (error) => {
@@ -172,25 +170,17 @@ describe('openclawChannel with the engine', () => {
         expect((await ctx.engine.getRun(runId))?.waiting?.notifiedAt).toBeInstanceOf(Date);
     });
 
-    it('the message never holds a resume token; the owner answers through the link', async () => {
+    it('the approval message links the approval, which the owner answers there', async () => {
         const ctx = setup(undefined, { approvalUrl: (ref) => `https://chamvi.example/ui/approvals?run=${ref.runId}&approval=${ref.approvalId}&agent=${ref.agent}` });
         const runId = await dispatchToWaiting(ctx);
         const waiting = (await ctx.engine.getRun(runId))!.waiting!;
         const [request] = ctx.fake.requests;
         expect((request!.body as { message: string }).message).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${waiting.approvalId}&agent=deployer`);
-        const token = createResumeToken('resume-secret', {
-            runId,
-            approvalId: waiting.approvalId,
-            tokenId: waiting.tokenId,
-            expiresAt: waiting.expiresAt,
-        });
         const sent = JSON.stringify({
             url: request!.url,
             headers: request!.headers,
             body: request!.body,
         });
-        expect(sent).not.toContain(token);
-        expect(sent).not.toContain(token.split('.')[1]);
         expect(sent).not.toContain('resume_run');
 
         await ctx.engine.approve(runId, { approvalId: waiting.approvalId, approved: true });

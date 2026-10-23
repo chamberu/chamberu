@@ -6,6 +6,7 @@
  */
 
 import {
+    mkdir,
     mkdtemp,
     rm,
     writeFile,
@@ -23,7 +24,7 @@ import {
     vi,
 } from 'vitest';
 import { runCli } from '../../../src/run/module.ts';
-import { RESUME_SECRET, TOKEN, startEnv } from '../../utils/env.ts';
+import { TOKEN, startEnv } from '../../utils/env.ts';
 import { closeServer, freePort, listenOn } from '../../utils/port.ts';
 import { createFakeProcess } from '../../utils/process.ts';
 import type { FakeProcess } from '../../utils/process.ts';
@@ -95,19 +96,23 @@ describe('start', () => {
         expect(fake.stderr.join('')).not.toContain('app_stopped');
     });
 
-    it('missing RESUME_SECRET exits 2', async () => {
-        const env = startEnv(port);
-        delete env.RESUME_SECRET;
-        await start(['--entry', fixture('app')], env);
-        expect(fake.exitCodes).toEqual([2]);
-        expect(fake.stderr.join('')).toContain('RESUME_SECRET');
-        expect(fake.signals.listenerCount('SIGTERM')).toBe(0);
-        expect(await isListening()).toBe(false);
-    });
-
-    it('missing dist/index.mjs exits 2 with the hint', async () => {
+    it('without any entry file runs the default app and says so', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'chamvi-cli-start-'));
         try {
+            await start([], startEnv(port), cwd);
+            expect(fake.exitCodes).toEqual([]);
+            expect(await isListening()).toBe(true);
+            expect(fake.stderr.join('')).toContain('no entry file: running the default app');
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+        }
+    });
+
+    it('missing dist/index.mjs beside src/index.ts exits 2 with the hint', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'chamvi-cli-start-'));
+        try {
+            await mkdir(path.join(cwd, 'src'));
+            await writeFile(path.join(cwd, 'src/index.ts'), 'export default {};\n');
             await start([], startEnv(port), cwd);
             expect(fake.exitCodes).toEqual([2]);
             expect(fake.stderr.join('')).toContain('run `chamvi build` or pass --entry src/index.ts');
@@ -156,7 +161,7 @@ describe('start', () => {
         it('loads .env without overriding', async () => {
             const devToken = 'a-dev-token-from-the-env-file';
             await writeFile(path.join(cwd, '.env'), [
-                `RESUME_SECRET=${RESUME_SECRET}`,
+                'CHAMVI_LOG_LEVEL=warn',
                 `CHAMVI_TOKENS='[{"value":"${devToken}","id":"dev","permissions":["*"]}]'`,
                 'PORT=1',
                 '',
@@ -165,7 +170,7 @@ describe('start', () => {
 
             await start(['--dev', '--entry', fixture('app')], env, cwd);
             expect(env.PORT).toBe(String(port));
-            expect(env.RESUME_SECRET).toBe(RESUME_SECRET);
+            expect(env.CHAMVI_LOG_LEVEL).toBe('warn');
 
             const response = await fetch(`http://127.0.0.1:${port}/agents`, { headers: { authorization: `Bearer ${devToken}` } });
             expect(response.status).toBe(200);
@@ -198,7 +203,7 @@ describe('start', () => {
             expect(fake.links).toBe(0);
         });
 
-        it('warns about the random secret and token', async () => {
+        it('warns about the random token', async () => {
             const lines: string[] = [];
             vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
                 lines.push(String(chunk));
@@ -207,7 +212,6 @@ describe('start', () => {
 
             await start(['--dev', '--entry', fixture('app')], { PORT: String(port), HOST: '127.0.0.1' }, cwd);
             const log = lines.join('');
-            expect(log).toContain('RESUME_SECRET unset');
             expect(log).toContain('CHAMVI_TOKENS unset');
         });
     });

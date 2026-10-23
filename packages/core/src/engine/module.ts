@@ -10,12 +10,10 @@ import { hostname } from 'node:os';
 import { pid } from 'node:process';
 import type { Agent } from '../agent/types.ts';
 import { approvalDecisionKey } from '../approval/helpers.ts';
-import { verifyResumeToken } from '../approval/module.ts';
 import { assertArtifactInput } from '../artifact/helpers.ts';
 import { attachmentIds, storeArtifact } from '../artifact/module.ts';
 import { assertChannelName, assertDefaultAddress, createChannelContext } from '../channel/helpers.ts';
 import type { IChannel } from '../channel/types.ts';
-import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
 import type { IClock } from '../clock/index.ts';
 import { contextKeyName, isContextKey } from '../context/helpers.ts';
@@ -26,7 +24,6 @@ import {
     ChannelNotFoundError,
     ErrorCode,
     InvalidAgentDefinitionError,
-    InvalidResumeTokenError,
     InvalidRunStateError,
     LeaseLostError,
     RunNotFoundError,
@@ -50,7 +47,6 @@ import {
 } from './constants.ts';
 import { toRunError } from './execute/helpers.ts';
 import { executeRun } from './execute/module.ts';
-import { staleToken } from './helpers.ts';
 import type { ApprovalRequest } from './execute/types.ts';
 import { RunQueue } from './queue/module.ts';
 import { cancelAgentRuns, dropRevision, syncRevision } from './registry/module.ts';
@@ -61,8 +57,10 @@ import type {
     EngineEvent,
     EngineOptions,
     EngineStartOptions,
-    ResumeDecision,
 } from './types.ts';
+
+/** What `answer()` records: an `ApprovalAnswer` without its approval id. */
+type ApprovalDecisionInput = Omit<ApprovalAnswer, 'approvalId'>;
 
 export class Engine implements IContextProvider {
     /** The store runs, steps and state live in; packages built on the engine read through it. */
@@ -93,7 +91,6 @@ export class Engine implements IContextProvider {
     /** Every time-based decision of the engine; packages built on it share it. */
     readonly clock: IClock;
 
-    protected readonly resumeSecret: string;
 
     protected readonly queue: RunQueue;
 
@@ -145,12 +142,7 @@ export class Engine implements IContextProvider {
         }
         this.owner = opts.owner ?? `${hostname()}-${pid}`;
         this.clock = opts.clock ?? systemClock;
-        this.resumeSecret = opts.resumeSecret;
         this.claimTtlMs = opts.claimTtlMs ?? 60_000;
-        if (!this.resumeSecret) {
-            // an empty HMAC key would let anyone mint valid resume tokens
-            throw new InvalidAgentDefinitionError('The engine needs a non-empty resumeSecret.');
-        }
         if (this.agents.size !== opts.agents.length) {
             const seen = new Set<string>();
             const duplicate = opts.agents.find((a) => seen.size === seen.add(a.name).size);
@@ -586,46 +578,14 @@ export class Engine implements IContextProvider {
     }
 
     /**
-     * Checks a resume token's signature (constant time) and expiry and returns
-     * its claims; touches no store. Lets an intake layer authorize against the
-     * run's agent before `resume()` without acting on an unsigned payload;
-     * `resume()` still checks the token against the current wait point.
-     * Throws InvalidResumeTokenError for a forged, malformed or expired token.
-     */
-    inspectResumeToken(token: string): ResumeTokenClaims {
-        return verifyResumeToken(this.resumeSecret, token, this.clock.now());
-    }
-
-    /**
-     * Answers the approval a `waiting` run waits on and requeues it. Single
-     * use: a second resume of the same wait point throws InvalidRunStateError.
-     * Throws InvalidResumeTokenError for a forged, expired or superseded token.
-     */
-    async resume(token: string, decision: ResumeDecision): Promise<void> {
-        if (decision.approver !== undefined) {
-            decision = { ...decision, approver: toInvoker(decision.approver, 'approver') };
-        }
-        const claims = verifyResumeToken(this.resumeSecret, token, this.clock.now());
-        const run = await this.store.getRun(claims.runId);
-        if (!run) throw new RunNotFoundError(claims.runId);
-        if (run.status !== RunStatus.WAITING || !run.waiting) {
-            throw new InvalidRunStateError(`Run "${run.id}" is ${run.status} and not waiting for an approval.`);
-        }
-        if (run.waiting.tokenId !== claims.tokenId || run.waiting.approvalId !== claims.approvalId) {
-            throw new InvalidResumeTokenError('The resume token does not belong to the current approval.');
-        }
-        await this.answer(run, run.waiting, decision, staleToken);
-    }
-
-    /**
-     * Answers the current wait point of a `waiting` run without a resume token
-     * (the caller authorized the approver) and requeues it, on the same path as
-     * `resume()`: the token notified earlier is spent by the same transition.
-     * Throws InvalidRunStateError when the run is not waiting, waits on another
-     * approval or its wait point expired (`tick()` denies that one).
+     * Answers the current wait point of a `waiting` run (the caller authorized
+     * the approver) and requeues it. Single use: a second answer of the same
+     * wait point throws InvalidRunStateError, as does a run that is not
+     * waiting, waits on another approval or whose wait point expired
+     * (`tick()` denies that one).
      */
     async approve(runId: string, answer: ApprovalAnswer): Promise<void> {
-        const decision: ResumeDecision = {
+        const decision: ApprovalDecisionInput = {
             approved: answer.approved,
             ...(answer.reason !== undefined ? { reason: answer.reason } : {}),
             ...(answer.approver !== undefined ? { approver: toInvoker(answer.approver, 'approver') } : {}),
@@ -668,10 +628,15 @@ export class Engine implements IContextProvider {
                 // the listing may be stale by now: the run could wait on a newer approval
                 const run = await this.store.getRun(listed.id);
                 if (run?.status !== RunStatus.WAITING || !run.waiting || run.waiting.expiresAt.getTime() > now) continue;
-                await this.answer(run, run.waiting, { approved: false, reason: APPROVAL_TIMED_OUT }, staleToken);
+                await this.answer(
+                    run,
+                    run.waiting,
+                    { approved: false, reason: APPROVAL_TIMED_OUT },
+                    () => new InvalidRunStateError(`Run "${run.id}" moved on to another approval.`),
+                );
             } catch (error) {
-                // answered meanwhile (resume, another replica)
-                if (!(error instanceof InvalidRunStateError) && !(error instanceof InvalidResumeTokenError)) {
+                // answered meanwhile (approve, another replica)
+                if (!(error instanceof InvalidRunStateError)) {
                     this.onError(error, listed);
                 }
             }
@@ -688,12 +653,12 @@ export class Engine implements IContextProvider {
      *
      * `waiting` survives the transition and is cleared only after the decision
      * landed: if we die in between, the run re-pauses on the same wait point, so
-     * the token the owner already holds stays valid.
+     * the approval the owner was asked stays answerable.
      */
     protected async answer(
         run: Run,
         waiting: WaitPoint,
-        decision: ResumeDecision,
+        decision: ApprovalDecisionInput,
         stale: () => Error,
     ): Promise<void> {
         const now = this.clock.now();
@@ -706,7 +671,7 @@ export class Engine implements IContextProvider {
         let queued: Run;
         try {
             // the run may have moved on to another approval since `waiting` was read
-            if (transitioned.waiting?.tokenId !== waiting.tokenId) {
+            if (transitioned.waiting?.approvalId !== waiting.approvalId) {
                 throw stale();
             }
             await this.store.putEffect(approvalDecisionKey(run.id, waiting.approvalId), {
@@ -741,7 +706,7 @@ export class Engine implements IContextProvider {
                 updatedAt: this.clock.now(),
             }, { expectStatus: [RunStatus.QUEUED] });
         } catch (error) {
-            // undo, so the wait point (still on the run) and its token stay answerable
+            // undo, so the wait point (still on the run) stays answerable
             await this.store.updateRun(run.id, {
                 status: RunStatus.WAITING,
                 claim: undefined,
@@ -767,7 +732,6 @@ export class Engine implements IContextProvider {
                 kind: 'approval',
                 ...asked,
                 expiresAt: new Date(now.getTime() + timeoutMs),
-                tokenId: randomUUID(),
             };
         const updated = await this.ownedUpdate(run.id, {
             status: RunStatus.WAITING,
@@ -798,10 +762,9 @@ export class Engine implements IContextProvider {
     /**
      * Sends the approval message of `waiting` through the channel it names
      * (none: inbox and API only, nothing to send) unless it was delivered
-     * already: a successful send records `waiting.notifiedAt`. The message
-     * never carries the resume token; its key `<runId>:<approvalId>` is fixed
-     * once the wait point is stored, so the channel dedupes a send whose
-     * record was lost. A store lock `notify:<runId>:<approvalId>` held for one
+     * already: a successful send records `waiting.notifiedAt`. Its key
+     * `<runId>:<approvalId>` is fixed once the wait point is stored, so the
+     * channel dedupes a send whose record was lost. A store lock `notify:<runId>:<approvalId>` held for one
      * attempt keeps replicas from sending concurrently; the attempt is aborted
      * after claimTtlMs (the lock's TTL). A failed attempt, or a channel the
      * engine does not have, goes to onError and is retried by tick() on the
@@ -819,7 +782,7 @@ export class Engine implements IContextProvider {
         const attempt = randomUUID();
         let acquired = false;
         const isCurrent = (current: Run | undefined) => current?.status === RunStatus.WAITING &&
-            current.waiting?.tokenId === waiting.tokenId;
+            current.waiting?.approvalId === waiting.approvalId;
         const controller = new AbortController();
         const timer = this.clock.setTimeout(() => controller.abort(new ChamviError({
             message: `Channel "${channel.name}" did not deliver approval "${waiting.approvalId}" within ${this.claimTtlMs}ms.`,

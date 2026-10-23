@@ -10,16 +10,21 @@ import { InvalidAgentDefinitionError } from '@chamvi/core';
 import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { AppToken, ModuleName } from '../../module/constants.ts';
-import { AGENTS_WATCHER_HOOK_NAME, NO_AGENTS_MESSAGE, NO_DIRECTORY_MESSAGE } from './constants.ts';
+import {
+    AGENTS_WATCHER_HOOK_NAME,
+    DEFAULT_AGENTS_DIR,
+    NO_AGENTS_MESSAGE,
+    NO_DIRECTORY_MESSAGE,
+} from './constants.ts';
 import { isDirectory } from './helpers.ts';
 import type { AgentCheck } from '../../module/types.ts';
 import type { IAgentsWatcher } from './types.ts';
 import { createAgentsWatcher } from './watcher.ts';
 
 /**
- * The agents dir (`CHAMVI_AGENTS_DIR`, start and job mode; nothing in
- * migrate mode). Without a dir it only refuses an app without code agents.
- * With one, `setup` registers `AGENT_ISSUES` and (start mode) the watcher's
+ * The agents dir (`CHAMVI_AGENTS_DIR`, else `./agents` when that is a
+ * directory; start and job mode, nothing in migrate mode). Without a dir an
+ * app without code agents starts empty (a warning). With one, `setup` registers `AGENT_ISSUES` and (start mode) the watcher's
  * lifecycle hook; `onReady` loads every folder into the engine before any
  * start step runs (a folder changed while the app was down cancels its old
  * runs once; in start mode a marker without a folder removes that agent, a
@@ -34,6 +39,9 @@ export class AgentsModule implements IModule {
 
     protected watcher: IAgentsWatcher | undefined;
 
+    /** The agents dir this lifecycle loads, absolute; set by `setup`. */
+    protected root: string | undefined;
+
     async setup(container: IContainer): Promise<void> {
         const context = container.resolve(AppToken.CONTEXT);
         if (context.mode === 'migrate') {
@@ -41,9 +49,16 @@ export class AgentsModule implements IModule {
         }
 
         const { dir } = container.resolve(AppToken.CONFIG).agents;
-        if (dir === undefined) {
+        if (dir !== undefined) {
+            // checked in onReady: a dir named explicitly must exist
+            this.root = resolve(process.cwd(), dir);
+        } else {
+            const fallback = resolve(process.cwd(), DEFAULT_AGENTS_DIR);
+            this.root = await isDirectory(fallback) ? fallback : undefined;
+        }
+        if (this.root === undefined) {
             if (context.agents.length === 0) {
-                throw new InvalidAgentDefinitionError(NO_AGENTS_MESSAGE);
+                container.resolve(AppToken.LOGGER).warn(NO_AGENTS_MESSAGE);
             }
             return;
         }
@@ -63,12 +78,11 @@ export class AgentsModule implements IModule {
     async onReady(container: IContainer): Promise<void> {
         const context = container.resolve(AppToken.CONTEXT);
         const config = container.resolve(AppToken.CONFIG);
-        const { dir } = config.agents;
-        if (context.mode === 'migrate' || dir === undefined) {
+        const { root } = this;
+        if (context.mode === 'migrate' || root === undefined) {
             return;
         }
 
-        const root = resolve(process.cwd(), dir);
         if (!await isDirectory(root)) {
             throw new InvalidAgentDefinitionError(NO_DIRECTORY_MESSAGE);
         }

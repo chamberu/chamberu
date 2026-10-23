@@ -45,7 +45,6 @@ function make(opts: Partial<EngineOptions> & { store: MemoryStore; clock: Contro
     const errors: unknown[] = [];
     const engine = new HookedEngine({
         agents: [],
-        resumeSecret: 's',
         onError: (error) => {
             errors.push(error);
         },

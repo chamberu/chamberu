@@ -81,7 +81,6 @@ async function run(s: Setup) {
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 'secret',
         clock,
         onError: () => {},
     });

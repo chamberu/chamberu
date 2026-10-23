@@ -50,8 +50,8 @@ export function createDevCommand(context: CliContext): CommandDef<typeof DEV_ARG
                 context.cliPath,
                 'start',
                 '--dev',
-                '--entry',
-                entry,
+                // without an entry, start runs the default app too
+                ...(entry !== undefined ? ['--entry', entry] : []),
             ], {
                 cwd: context.cwd,
                 env: { ...context.env, [DEV_LINK_VARIABLE]: '1' },

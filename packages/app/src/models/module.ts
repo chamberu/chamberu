@@ -7,7 +7,6 @@
 
 import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { createProviderRegistry } from 'ai';
-import type { ProviderRegistryProvider } from 'ai';
 import { isObject } from 'smob';
 import { BUILTIN_PROVIDERS, MODEL_SEPARATOR } from './constants.ts';
 import { envString } from '../env/module.ts';
@@ -16,6 +15,7 @@ import type {
     BuiltinProvider,
     ModelCheck,
     ModelProviders,
+    ModelRegistry,
     ModelRegistryOptions,
     ResolvedModels,
 } from './types.ts';
@@ -72,7 +72,12 @@ function checkModel(
 ): void {
     const index = model.indexOf(MODEL_SEPARATOR);
     if (index <= 0 || index === model.length - 1) {
-        throw new InvalidAgentDefinitionError(`Agent "${agent}": model "${model}" must be "<provider>:<model>".`);
+        // the AI SDK registry's default separator; name the string to write instead
+        const colon = model.indexOf(':');
+        const hint = colon > 0 && colon < model.length - 1 ?
+            ` (${model.slice(0, colon)}${MODEL_SEPARATOR}${model.slice(colon + 1)})` :
+            '';
+        throw new InvalidAgentDefinitionError(`Agent "${agent}": model "${model}" must be "<provider>/<model>"${hint}.`);
     }
 
     const id = model.slice(0, index);
@@ -130,14 +135,14 @@ export async function resolveModels(options: ModelRegistryOptions): Promise<Reso
     };
     options.agents.forEach(check);
 
-    return { registry: createProviderRegistry(providers), check };
+    return { registry: createProviderRegistry(providers, { separator: MODEL_SEPARATOR }), check };
 }
 
 /**
  * Builds the provider registry model strings resolve through, after checking
  * every agent's string model against it (see \`resolveModels\`).
  */
-export async function createModelRegistry(options: ModelRegistryOptions): Promise<ProviderRegistryProvider> {
+export async function createModelRegistry(options: ModelRegistryOptions): Promise<ModelRegistry> {
     return (await resolveModels(options)).registry;
 }
 
@@ -146,7 +151,7 @@ export async function createModelRegistry(options: ModelRegistryOptions): Promis
  * set. The returned restore unsets it again, but only while it still is this
  * registry; with a provider set before, nothing changes and restore is a no-op.
  */
-export function installDefaultProvider(registry: ProviderRegistryProvider): () => void {
+export function installDefaultProvider(registry: ModelRegistry): () => void {
     if (globalThis.AI_SDK_DEFAULT_PROVIDER !== undefined) {
         return () => undefined;
     }

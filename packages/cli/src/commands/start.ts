@@ -10,7 +10,7 @@ import path from 'node:path';
 import { TIMER_MAX_MS, envInteger } from '@chamvi/app';
 import { defineCommand } from 'citty';
 import type { CommandDef } from 'citty';
-import { loadApp, resolveEntry } from '../entry/module.ts';
+import { loadEntryApp, resolveEntry } from '../entry/module.ts';
 import { assertKnownArgs } from '../run/helpers.ts';
 import type { CliContext } from '../run/types.ts';
 import { installSignalHandlers } from '../signals/module.ts';
@@ -66,7 +66,7 @@ export function createStartCommand(context: CliContext): CommandDef<typeof START
                 entry: args.entry,
                 kind: dev ? 'source' : 'built',
             });
-            const app = await loadApp(entry, context.importModule);
+            const app = await loadEntryApp(entry, context);
 
             const handlers = installSignalHandlers({
                 target: context.signals,

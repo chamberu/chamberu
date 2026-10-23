@@ -38,7 +38,6 @@ function setup(subscription: ChannelSubscription = cron.on('*/5 * * * *')) {
         store,
         agents: [agent],
         channels: [cronChannel(), cronChannel({ name: 'cron-eu' })],
-        resumeSecret: 's',
         clock,
     });
     const fire = (scheduledAt: Date = T, s: ChannelSubscription = subscription) => fireCronSubscription({

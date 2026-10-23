@@ -27,7 +27,6 @@ import {
 } from '@chamvi/app';
 import type { IApp, ILifecycleHook } from '@chamvi/app';
 import {
-    SECRET,
     TOKENS,
     deferred,
     rejectionOf,
@@ -57,7 +56,6 @@ async function envFor() {
         port,
         url: (path: string) => `http://127.0.0.1:${port}${path}`,
         env: {
-            RESUME_SECRET: SECRET,
             HOST: '127.0.0.1',
             PORT: String(port),
             CHAMVI_TOKENS: TOKENS,

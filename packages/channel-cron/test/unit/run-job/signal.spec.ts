@@ -49,7 +49,6 @@ function setup() {
         store,
         agents: [agent],
         channels: [cronChannel()],
-        resumeSecret: 's',
         clock,
     });
     return {

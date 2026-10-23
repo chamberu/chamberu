@@ -53,7 +53,6 @@ describe('createScheduler', () => {
             store,
             agents,
             channels: channels(),
-            resumeSecret: 's',
             owner: opts.owner,
         });
         const scheduler = createScheduler({
@@ -193,7 +192,6 @@ describe('createScheduler', () => {
             store,
             agents: [],
             channels: channels(),
-            resumeSecret: 's',
         });
         await engine.putAgent(agentWith([cron.on('0 0 * * 1/2')]), { revision: 'h1' });
 
@@ -238,7 +236,6 @@ describe('createScheduler', () => {
                 store,
                 agents,
                 channels: channels(),
-                resumeSecret: 's',
             });
             const scheduler = createScheduler({
                 engine,

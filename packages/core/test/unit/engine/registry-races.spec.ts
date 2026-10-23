@@ -61,7 +61,6 @@ function createEngine(store: MemoryStore, clock: ControllableClock, extra: Parti
         store,
         clock,
         agents: [],
-        resumeSecret: 's',
         onError: () => {},
         ...extra,
     });

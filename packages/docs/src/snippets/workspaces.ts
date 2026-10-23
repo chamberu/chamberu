@@ -44,7 +44,6 @@ export async function serve(store: IStore, model: LanguageModel, provider: ISand
         store,
         agents: [repro],
         channels: [httpChannel()],
-        resumeSecret: 'change-me',
     });
     // a run's workspaces go once it completed, failed or was cancelled
     workspaces.attach(engine);

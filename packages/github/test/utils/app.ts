@@ -95,7 +95,6 @@ export function createGithubTestApp(input: GithubTestAppInput): GithubTestApp {
         store,
         agents,
         channels: [channel as IChannel],
-        resumeSecret: 'test-secret',
         clock,
         onError,
     });

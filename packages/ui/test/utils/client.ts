@@ -19,7 +19,6 @@ export function fakeClient(overrides: Partial<IApiClient> = {}): IApiClient {
         getRun: missing('getRun'),
         cancelRun: missing('cancelRun'),
         approve: missing('approve'),
-        resume: missing('resume'),
         listKv: missing('listKv'),
         listDocs: missing('listDocs'),
         streamRun: missing('streamRun'),

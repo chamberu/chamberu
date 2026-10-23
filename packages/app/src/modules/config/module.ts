@@ -35,10 +35,6 @@ export class ConfigModule implements IModule {
         container.register(AppToken.CONFIG, { useValue: config });
         container.register(AppToken.CLOCK, { useValue: clock });
         container.register(AppToken.LOGGER, { useValue: logger });
-
-        if (config.engine.resumeSecretGenerated) {
-            logger.warn('RESUME_SECRET unset: generated one for this dev process, so resume tokens stop working after a restart.');
-        }
     }
 }
 

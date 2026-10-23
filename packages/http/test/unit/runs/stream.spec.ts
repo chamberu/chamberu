@@ -233,7 +233,6 @@ describe('GET /runs/:id/stream', () => {
         const other = new Engine({
             store,
             agents,
-            resumeSecret: 'test-secret',
             clock,
             channels: testChannels(),
             owner: 'replica-b',
@@ -397,7 +396,6 @@ describe('GET /runs/:id/stream', () => {
         const engine = new Engine({
             store,
             agents,
-            resumeSecret: 'test-secret',
             clock,
             channels: testChannels(),
             onError: () => {},

@@ -38,7 +38,7 @@ export const DEFAULT_MEDIA_TYPE = 'application/octet-stream';
 /** @internal On every answer of the dashboard, next to the CSP. */
 export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
     'x-content-type-options': 'nosniff',
-    // a deep link's resume token must never leave as a referrer
+    // an approval link's ids must never leave as a referrer
     'referrer-policy': 'no-referrer',
     'x-frame-options': 'DENY',
 };

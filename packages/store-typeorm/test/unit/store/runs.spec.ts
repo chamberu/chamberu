@@ -75,7 +75,6 @@ describePostgres('TypeormStore runs', () => {
                 channel: 'github',
                 address: 'o/r#1',
                 expiresAt: new Date('2026-03-08T07:15:00.456Z'),
-                tokenId: 'tok',
                 notifiedAt: new Date(2_000_001),
             },
             cancelRequested: true,
@@ -157,7 +156,6 @@ describePostgres('TypeormStore runs', () => {
                 toolCallId: 'call-1',
                 title: 'Approve tool',
                 expiresAt: new Date(50_000),
-                tokenId: 'tok',
             },
         }));
         await store.claimRun('r1', 'o1', 1_000);

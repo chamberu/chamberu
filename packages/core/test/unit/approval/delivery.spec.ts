@@ -18,7 +18,6 @@ import {
     ChannelNotFoundError,
     Engine,
     approve,
-    createResumeToken,
     defineAgent,
     defineTool,
 } from '@chamvi/core';
@@ -30,7 +29,6 @@ import type { MockResponse } from '../../utils/mock-model.ts';
 
 const START = 1_000_000;
 const CLAIM_TTL_MS = 30;
-const SECRET = 'secret';
 
 const engines: Engine[] = [];
 
@@ -96,7 +94,6 @@ function createEngine(store: MemoryStore, clock: ControllableClock, channels: IC
             model: askModel(),
             tools: { ask: askTool(channel) },
         })],
-        resumeSecret: SECRET,
         channels,
         clock,
         claimTtlMs: CLAIM_TTL_MS,
@@ -156,15 +153,7 @@ describe('approval delivery', () => {
         expect(opts.trigger).toEqual(run!.trigger);
         expect(opts.signal).toBeInstanceOf(AbortSignal);
 
-        const token = createResumeToken(SECRET, {
-            runId,
-            approvalId: waiting.approvalId,
-            tokenId: waiting.tokenId,
-            expiresAt: waiting.expiresAt,
-        });
         const json = JSON.stringify(message);
-        expect(json).not.toContain(token);
-        expect(json).not.toContain(waiting.tokenId);
         expect(json).not.toContain('resumeToken');
         expect(waiting.notifiedAt).toBeInstanceOf(Date);
 
@@ -225,7 +214,6 @@ describe('approval delivery', () => {
         expect(sent[0]?.message.key).toBe(`${runId}:${waiting!.approvalId}`);
         expect((await store.getRun(runId))?.waiting).toMatchObject({
             approvalId: waiting!.approvalId,
-            tokenId: waiting!.tokenId,
             notifiedAt: expect.any(Date),
         });
         expect(second.errors).toEqual([]);

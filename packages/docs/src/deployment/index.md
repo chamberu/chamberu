@@ -24,7 +24,7 @@ agent repo --push--> CI --image--> registry --Flux image automation--> HelmRelea
 
 ## Configuration
 
-Configuration comes from [environment variables](/reference/app#environment), typically from Kubernetes Secrets: the database URL, `RESUME_SECRET`, the HTTP port, provider API keys (direct providers through the AI SDK provider registry, no gateway by default), static API tokens for machine clients, and OpenClaw and GitHub settings. How the Secrets get into the cluster (plain Secrets, SOPS, External Secrets) is the cluster's choice.
+Configuration comes from [environment variables](/reference/app#environment), typically from Kubernetes Secrets: the database URL, the HTTP port, provider API keys (direct providers through the AI SDK provider registry, no gateway by default), static API tokens for machine clients, and OpenClaw and GitHub settings. How the Secrets get into the cluster (plain Secrets, SOPS, External Secrets) is the cluster's choice.
 
 ## Observability
 

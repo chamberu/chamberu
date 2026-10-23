@@ -90,7 +90,6 @@ function make(def: TestAgent, opts: Partial<EngineOptions> & { store?: MemorySto
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 's',
         onError: () => {},
         ...opts,
     });

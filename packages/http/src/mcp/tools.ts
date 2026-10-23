@@ -18,13 +18,13 @@ import { agentPermission } from '../auth/module.ts';
 import type { Principal } from '../auth/types.ts';
 import { KEY_MAX_LENGTH } from '../request/constants.ts';
 import { validatePayload } from '../request/helpers.ts';
-import { RESUME_REASON_MAX_LENGTH, RESUME_TOKEN_MAX_LENGTH } from '../runs/constants.ts';
+import { APPROVAL_ID_MAX_LENGTH, APPROVAL_REASON_MAX_LENGTH } from '../runs/constants.ts';
 import { MCP_CHANNEL_NAME } from '../channels/constants.ts';
 import {
     assertCanListRuns,
     findHttpSubscription,
+    loadApprovableRun,
     loadReadableRun,
-    resolveResumeTarget,
     serializeRun,
 } from '../runs/helpers.ts';
 import {
@@ -54,8 +54,9 @@ type GetRunArgs = { runId: string };
 /** No U+0000: Postgres text columns refuse it. */
 const NO_NUL = '^[^\\u0000]*$';
 
-type ResumeRunArgs = {
-    token: string;
+type ApproveRunArgs = {
+    runId: string;
+    approvalId: string;
     approved: boolean;
     reason?: string;
 };
@@ -102,18 +103,24 @@ const LIST_RUNS_INPUT = fromJsonSchema<ListRunsArgs>({
     additionalProperties: false,
 });
 
-const RESUME_RUN_INPUT = fromJsonSchema<ResumeRunArgs>({
+const APPROVE_RUN_INPUT = fromJsonSchema<ApproveRunArgs>({
     type: 'object',
     properties: {
-        token: {
+        runId: {
             type: 'string',
             minLength: 1,
-            maxLength: RESUME_TOKEN_MAX_LENGTH,
+            pattern: NO_NUL,
+        },
+        approvalId: {
+            type: 'string',
+            minLength: 1,
+            maxLength: APPROVAL_ID_MAX_LENGTH,
+            pattern: NO_NUL,
         },
         approved: { type: 'boolean' },
-        reason: { type: 'string', maxLength: RESUME_REASON_MAX_LENGTH },
+        reason: { type: 'string', maxLength: APPROVAL_REASON_MAX_LENGTH },
     },
-    required: ['token', 'approved'],
+    required: ['runId', 'approvalId', 'approved'],
     additionalProperties: false,
 });
 
@@ -320,14 +327,15 @@ function registerRunTool(
     }));
 }
 
-function registerResumeTool(server: McpServer, ctx: HttpContext, principal: Principal): void {
-    server.registerTool('resume_run', {
-        title: 'Resume run',
-        description: 'Answers a pending approval with its resume token. Needs agent:<agent>:approve for the run\'s agent.',
-        inputSchema: RESUME_RUN_INPUT,
+function registerApproveTool(server: McpServer, ctx: HttpContext, principal: Principal): void {
+    server.registerTool('approve_run', {
+        title: 'Approve run',
+        description: 'Answers the approval a waiting run waits on (its waiting.approvalId, from get_run). Needs agent:<agent>:approve for the run\'s agent.',
+        inputSchema: APPROVE_RUN_INPUT,
     }, (args) => runTool(ctx, async () => {
-        const run = await resolveResumeTarget(ctx, principal, args.token);
-        await ctx.engine.resume(args.token, {
+        const run = await loadApprovableRun(ctx, principal, args.runId);
+        await ctx.engine.approve(run.id, {
+            approvalId: args.approvalId,
             approved: args.approved,
             ...(args.reason !== undefined ? { reason: args.reason } : {}),
             approver: toInvoker(principal),
@@ -346,5 +354,5 @@ export function registerTools(
 ): void {
     for (const tool of runTools) registerRunTool(server, ctx, tool, extra, options);
     registerReadTools(server, ctx, extra.principal);
-    registerResumeTool(server, ctx, extra.principal);
+    registerApproveTool(server, ctx, extra.principal);
 }

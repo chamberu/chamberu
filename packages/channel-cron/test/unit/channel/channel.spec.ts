@@ -43,7 +43,6 @@ describe('cronChannel', () => {
             store,
             agents,
             channels,
-            resumeSecret: 's',
             onError: () => {},
         });
         engines.push(engine);

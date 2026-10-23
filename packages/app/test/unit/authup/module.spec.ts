@@ -27,7 +27,6 @@ import {
 import { authupModule, oidcModule } from '@chamvi/app/authup';
 import { resolveAuthenticators } from '../../../src/modules/http/helpers.ts';
 import {
-    SECRET,
     TOKEN,
     TOKENS,
 } from '../../utils/app.ts';
@@ -75,7 +74,6 @@ async function served(verifier: ITokenVerifier) {
     const port = await freePort();
     const harness = await createHarness({
         env: {
-            RESUME_SECRET: SECRET,
             CHAMVI_TOKENS: TOKENS,
             HOST: '127.0.0.1',
             PORT: String(port),
@@ -156,7 +154,7 @@ describe('oidcModule', () => {
 
     it('contributes after authup', async () => {
         const harness = await createHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             modules: [
                 configModule({ logger: createRecordingLogger() }),
                 oidcModule({ issuers: [ISSUER], principal: () => undefined }),

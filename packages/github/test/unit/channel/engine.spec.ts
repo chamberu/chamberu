@@ -15,7 +15,6 @@ import {
 import { z } from 'zod';
 import {
     ToolDeniedError,
-    createResumeToken,
     defineAgent,
     defineTool,
 } from '@chamvi/core';
@@ -153,15 +152,6 @@ describe('github channel with the engine', () => {
         expect(body).toContain('### Close octo/demo#\u200D5?');
         expect(body).toContain('It duplicates #3.');
         expect(body).toContain(`Approve or deny: https://chamvi.example/ui/approvals?run=${runId}&approval=${waiting.waiting!.approvalId}&agent=triage`);
-        const token = createResumeToken('test-secret', {
-            runId,
-            approvalId: waiting.waiting!.approvalId,
-            tokenId: waiting.waiting!.tokenId,
-            expiresAt: waiting.waiting!.expiresAt,
-        });
-        const posted = JSON.stringify(setup.fake.requests.filter((r) => r.method === 'POST'));
-        expect(posted).not.toContain(token);
-        expect(posted).not.toContain(token.split('.')[1]);
         expect(setup.fake.requests.filter((r) => r.method === 'PATCH')).toHaveLength(0);
 
         await setup.engine.tick();

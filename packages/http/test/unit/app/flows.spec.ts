@@ -134,11 +134,11 @@ describe('acceptance flows', () => {
         await engine.drain();
     });
 
-    it('approval, POST /resume by an authup principal, completed', async () => {
+    it('approval, POST /runs/:id/approve by an authup principal, completed', async () => {
         const {
             app,
             engine,
-            tokenOf,
+            approvalIdOf,
         } = setup();
         const started = await call(app, 'POST', '/agents/gate/runs', { token: ADMIN_TOKEN });
         const { runId } = await started.json() as { runId: string };
@@ -146,7 +146,10 @@ describe('acceptance flows', () => {
         await engine.idle();
         expect((await engine.getRun(runId))?.status).toBe('waiting');
 
-        const resumed = await call(app, 'POST', '/resume', { token: 'approver', body: { token: await tokenOf(runId), approved: true } });
+        const resumed = await call(app, 'POST', `/runs/${runId}/approve`, {
+            token: 'approver',
+            body: { approvalId: await approvalIdOf(runId), approved: true },
+        });
         expect(resumed.status).toBe(202);
         await engine.idle();
 

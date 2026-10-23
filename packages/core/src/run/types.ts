@@ -47,7 +47,6 @@ export type WaitPoint = {
     channel?: string;
     address?: string;
     expiresAt: Date;
-    tokenId: string;
     /** Set once the approval message went out through `channel`; tick() re-sends while it is missing. */
     notifiedAt?: Date;
 };

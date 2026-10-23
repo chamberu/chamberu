@@ -33,7 +33,6 @@ function setup(subscriptions: ChannelSubscription[]) {
         store,
         agents: [agent],
         channels: [cronChannel()],
-        resumeSecret: 's',
         clock,
     });
     const fire = (tick: number, subscription = subscriptions[0] as ChannelSubscription) => fireCronSubscription({

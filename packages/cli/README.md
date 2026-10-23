@@ -78,9 +78,9 @@ Relative imports carry `.ts` and there is no `enum`, so `chamvi dev` (Node's typ
 | `run-job` | `<agent>`, `[subscriptionId]`, `--entry` | Fires one cron subscription once and waits for its run (a Kubernetes CronJob; no channel is started); `subscriptionId` defaults to the agent's only cron subscription |
 | `migrate` | `--entry` | Migrates the Postgres store (`DATABASE_URL` required) |
 
-The entry is `--entry`, else for the source commands (`dev`, `build`) the `package.json` field `"chamvi": { "entry": "<path>" }`, else `src/index.ts`. The built commands (`start`, `run-job`, `migrate`) never read that field and default to `dist/index.mjs`, so an image built from a repository that sets it still starts; a `.ts` entry runs through type stripping too.
+The entry is `--entry`, else for the source commands (`dev`, `build`) the `package.json` field `"chamvi": { "entry": "<path>" }`, else `src/index.ts`. The built commands (`start`, `run-job`, `migrate`) never read that field and default to `dist/index.mjs`, so an image built from a repository that sets it still starts; a `.ts` entry runs through type stripping too. With none of them (no `--entry`, no `chamvi.entry`, no default file), `dev`, `start`, `run-job` and `migrate` run the default app, `createApp({})` configured by env alone, with its agents from `./agents` (or `CHAMVI_AGENTS_DIR`), and say so on stderr; `build` exits 2 (nothing to build). A missing `dist/index.mjs` beside a `src/index.ts` still exits 2 with the build hint.
 
-`chamvi dev` runs `start --dev`: the source entry, `.env` from the working directory (never overriding a set variable), a `MemoryStore` unless `DATABASE_URL` is set, a random `RESUME_SECRET` and, without another authenticator, one random `*` token, each logged with a warning, and shorter timeouts (`CHAMVI_DRAIN_TIMEOUT_MS` 5000, `CHAMVI_FORCE_EXIT_MS` 15000).
+`chamvi dev` runs `start --dev`: the source entry, `.env` from the working directory (never overriding a set variable), a `MemoryStore` unless `DATABASE_URL` is set and, without another authenticator, one random `*` token, logged with a warning, and shorter timeouts (`CHAMVI_DRAIN_TIMEOUT_MS` 5000, `CHAMVI_FORCE_EXIT_MS` 15000).
 
 ## Exit codes
 

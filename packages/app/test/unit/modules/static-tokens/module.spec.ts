@@ -18,7 +18,6 @@ import type { AuthenticatorEntry } from '@chamvi/app';
 import { createHarness } from '../../../utils/harness.ts';
 import { createRecordingLogger } from '../../../utils/logger.ts';
 
-const SECRET = 'x'.repeat(32);
 const ENV_TOKEN = 'env-token-0123456789';
 const OPTION_TOKEN = 'option-token-0123456789';
 
@@ -35,7 +34,7 @@ async function entriesOf(options: {
     const logger = createRecordingLogger();
     const harness = await createHarness({
         dev: options.dev,
-        env: { RESUME_SECRET: SECRET, ...options.env },
+        env: { ...options.env },
         // the static-tokens module first, so a contribution registered after its setup still counts
         modules: [configModule({ logger }), options.module ?? staticTokensModule(), ...(options.extra ?? [])],
     });

@@ -40,7 +40,7 @@ const restart = defineTool({
     description: 'Restarts the service.',
     inputSchema: z.object({ service: z.string() }),
     execute: async ({ service }, { context }) => {
-        // the request also goes out through the channel (kind 'approval', no resume token)
+        // the request also goes out through the channel (kind 'approval')
         const { approved } = await context.channels.findOneOrFail('console').approve({
             title: `Restart ${service}?`,
             address: 'ops',
@@ -85,9 +85,6 @@ export function createOperator(model: LanguageModel) {
 
 export async function approvalFlow(model: LanguageModel) {
     // #region engine
-    const resumeSecret = process.env.RESUME_SECRET;
-    if (!resumeSecret) throw new Error('RESUME_SECRET is not set');
-
     const deployer = defineAgent({
         name: 'deployer',
         model,
@@ -99,7 +96,6 @@ export async function approvalFlow(model: LanguageModel) {
         store: new MemoryStore(),
         agents: [deployer],
         channels: [consoleChannel()],
-        resumeSecret,
     });
     // #endregion engine
 

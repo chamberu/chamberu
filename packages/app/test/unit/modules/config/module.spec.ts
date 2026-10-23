@@ -12,7 +12,6 @@ import { AppToken, ModuleName, configModule } from '@chamvi/app';
 import { buildHarness, createHarness } from '../../../utils/harness.ts';
 import { createRecordingLogger } from '../../../utils/logger.ts';
 
-const SECRET = 'x'.repeat(32);
 
 describe('configModule', () => {
     it('registers config, clock and logger', async () => {
@@ -23,7 +22,7 @@ describe('configModule', () => {
         expect(module.dependencies ?? []).toEqual([]);
 
         const harness = await createHarness({
-            env: { RESUME_SECRET: SECRET, PORT: '4000' },
+            env: { PORT: '4000' },
             modules: [module],
         });
 
@@ -35,7 +34,7 @@ describe('configModule', () => {
 
     it('defaults to the system clock and a JSON line logger', async () => {
         const harness = await createHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             modules: [configModule()],
         });
 
@@ -47,34 +46,17 @@ describe('configModule', () => {
 
     it('an invalid env fails setup with InvalidAgentDefinitionError', async () => {
         const harness = buildHarness({
-            env: { RESUME_SECRET: SECRET, PORT: 'abc' },
+            env: { PORT: 'abc' },
             modules: [configModule({ logger: createRecordingLogger() })],
         });
 
         await expect(harness.setup()).rejects.toBeInstanceOf(InvalidAgentDefinitionError);
     });
 
-    it('warns about a generated resume secret', async () => {
+    it('logs nothing', async () => {
         const logger = createRecordingLogger();
         const harness = await createHarness({
-            dev: true,
             env: {},
-            modules: [configModule({ logger })],
-        });
-
-        const config = harness.container.resolve(AppToken.CONFIG);
-        expect(config.engine.resumeSecretGenerated).toBe(true);
-        const warnings = logger.entries.filter((entry) => entry.level === 'warn');
-        expect(warnings).toHaveLength(1);
-        expect(warnings[0]!.msg).toContain('RESUME_SECRET');
-        expect(logger.lines.join('\n')).not.toContain(config.engine.resumeSecret);
-        await harness.stop();
-    });
-
-    it('stays silent with a resume secret', async () => {
-        const logger = createRecordingLogger();
-        const harness = await createHarness({
-            env: { RESUME_SECRET: SECRET },
             modules: [configModule({ logger })],
         });
 

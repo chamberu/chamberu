@@ -82,19 +82,19 @@ describe('createModelRegistry', () => {
         expect(BUILTIN_PROVIDERS.map((p) => p.id)).toEqual(['anthropic', 'openai', 'google', 'mistral', 'xai']);
     });
 
-    it('resolves \'anthropic:m\' through the discovered provider', async () => {
+    it('resolves \'anthropic/m\' through the discovered provider', async () => {
         const {
             importer,
             options,
             model,
         } = fakeImporter();
         const registry = await createModelRegistry({
-            agents: [agentWith('anthropic:m')],
+            agents: [agentWith('anthropic/m')],
             env: { ANTHROPIC_API_KEY: 'sk-test', ANTHROPIC_BASE_URL: 'https://proxy.example/v1' },
             importer,
         });
 
-        expect(registry.languageModel('anthropic:m')).toBe(model);
+        expect(registry.languageModel('anthropic/m')).toBe(model);
         expect(options).toEqual([{ apiKey: 'sk-test', baseURL: 'https://proxy.example/v1' }]);
     });
 
@@ -113,18 +113,18 @@ describe('createModelRegistry', () => {
         const { importer } = fakeImporter();
         const other = textModel('from other');
         const registry = await createModelRegistry({
-            agents: [agentWith('anthropic:m')],
+            agents: [agentWith('anthropic/m')],
             env: { ANTHROPIC_API_KEY: 'sk-test' },
             models: { anthropic: customProvider({ languageModels: { m: other } }) },
             importer,
         });
 
-        expect(registry.languageModel('anthropic:m')).toBe(other);
+        expect(registry.languageModel('anthropic/m')).toBe(other);
     });
 
     it('a missing package names it', async () => {
         const error = await rejectionOf(createModelRegistry({
-            agents: [agentWith('anthropic:m')],
+            agents: [agentWith('anthropic/m')],
             env: { ANTHROPIC_API_KEY: 'sk-test' },
             importer: async (specifier) => {
                 throw notFound(specifier);
@@ -139,7 +139,7 @@ describe('createModelRegistry', () => {
     it('a broken transitive import rethrows', async () => {
         const broken = notFound('@ai-sdk/provider-utils');
         const error = await rejectionOf(createModelRegistry({
-            agents: [agentWith('anthropic:m')],
+            agents: [agentWith('anthropic/m')],
             env: { ANTHROPIC_API_KEY: 'sk-test' },
             importer: async (specifier) => {
                 if (specifier === '@ai-sdk/anthropic') throw broken;
@@ -167,7 +167,7 @@ describe('createModelRegistry', () => {
     it('a missing key names the variable', async () => {
         const { importer } = fakeImporter();
         const error = await rejectionOf(createModelRegistry({
-            agents: [agentWith('anthropic:m')],
+            agents: [agentWith('anthropic/m')],
             env: { ANTHROPIC_API_KEY: '' },
             importer,
         }));
@@ -179,7 +179,7 @@ describe('createModelRegistry', () => {
     it('a key is not needed for a provider in models', async () => {
         const model = textModel();
         const registry = await createModelRegistry({
-            agents: [agentWith('anthropic:m')],
+            agents: [agentWith('anthropic/m')],
             env: {},
             models: { anthropic: customProvider({ languageModels: { m: model } }) },
             importer: async (specifier) => {
@@ -187,10 +187,10 @@ describe('createModelRegistry', () => {
             },
         });
 
-        expect(registry.languageModel('anthropic:m')).toBe(model);
+        expect(registry.languageModel('anthropic/m')).toBe(model);
     });
 
-    it('a string without \':\' throws', async () => {
+    it('a string without \'/\' throws', async () => {
         const { importer } = fakeImporter();
         const error = await rejectionOf(createModelRegistry({
             agents: [agentWith('claude-sonnet')],
@@ -199,13 +199,38 @@ describe('createModelRegistry', () => {
         }));
 
         expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toBe('Agent "triage": model "claude-sonnet" must be "<provider>:<model>".');
+        expect(error.message).toBe('Agent "triage": model "claude-sonnet" must be "<provider>/<model>".');
+    });
+
+    it('a \'<provider>:<model>\' string throws, naming the string to write', async () => {
+        const { importer } = fakeImporter();
+        const error = await rejectionOf(createModelRegistry({
+            agents: [agentWith('anthropic:claude-sonnet')],
+            env: { ANTHROPIC_API_KEY: 'sk-test' },
+            importer,
+        }));
+
+        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
+        expect(error.message).toBe('Agent "triage": model "anthropic:claude-sonnet" must be "<provider>/<model>" (anthropic/claude-sonnet).');
+    });
+
+    it('splits at the first \'/\', so a model id may hold one', async () => {
+        const { importer } = fakeImporter();
+        const model = textModel();
+        const { registry } = await resolveModels({
+            agents: [agentWith('router/meta-llama/llama-3')],
+            env: {},
+            models: { router: customProvider({ languageModels: { 'meta-llama/llama-3': model } }) },
+            importer,
+        });
+
+        expect(registry.languageModel('router/meta-llama/llama-3')).toBe(model);
     });
 
     it('an unknown provider lists the available ones', async () => {
         const { importer } = fakeImporter();
         const error = await rejectionOf(createModelRegistry({
-            agents: [agentWith('acme:m')],
+            agents: [agentWith('acme/m')],
             env: { ANTHROPIC_API_KEY: 'sk-test' },
             models: { local: customProvider({ languageModels: { m: textModel() } }) },
             importer,
@@ -224,11 +249,11 @@ describe('createModelRegistry', () => {
             importer,
         });
 
-        expect(registry.languageModel('anthropic:m')).toBeDefined();
-        expect(() => check(agentWith('anthropic:m', 'later'))).not.toThrow();
+        expect(registry.languageModel('anthropic/m')).toBeDefined();
+        expect(() => check(agentWith('anthropic/m', 'later'))).not.toThrow();
         expect(() => check(agentWith(textModel(), 'later'))).not.toThrow();
-        expect(() => check(agentWith('acme:m', 'later'))).toThrow(
-            new InvalidAgentDefinitionError('Agent "later": model "acme:m" names the unknown provider "acme"; available: anthropic.'),
+        expect(() => check(agentWith('acme/m', 'later'))).toThrow(
+            new InvalidAgentDefinitionError('Agent "later": model "acme/m" names the unknown provider "acme"; available: anthropic.'),
         );
     });
 
@@ -246,11 +271,11 @@ describe('createModelRegistry', () => {
 
     it('real @ai-sdk/anthropic exports createAnthropic', async () => {
         const registry = await createModelRegistry({
-            agents: [agentWith('anthropic:claude-sonnet-5-5')],
+            agents: [agentWith('anthropic/claude-sonnet-5-5')],
             env: { ANTHROPIC_API_KEY: 'sk-test' },
         });
 
-        const model = registry.languageModel('anthropic:claude-sonnet-5-5');
+        const model = registry.languageModel('anthropic/claude-sonnet-5-5');
         expect(model.provider).toContain('anthropic');
         expect(model.modelId).toBe('claude-sonnet-5-5');
     });
@@ -258,7 +283,7 @@ describe('createModelRegistry', () => {
     it('the default importer reads an uninstalled provider as not installed', async () => {
         // @ai-sdk/openai is no devDependency of @chamvi/app
         const error = await rejectionOf(createModelRegistry({
-            agents: [agentWith('openai:gpt-5')],
+            agents: [agentWith('openai/gpt-5')],
             env: { OPENAI_API_KEY: 'sk-test' },
         }));
 
@@ -311,7 +336,7 @@ describe('installDefaultProvider', () => {
 
     it('never the Gateway', async () => {
         const { importer, model } = fakeImporter(textModel('triaged'));
-        const agent = agentWith('anthropic:m');
+        const agent = agentWith('anthropic/m');
         const registry = await createModelRegistry({
             agents: [agent],
             env: { ANTHROPIC_API_KEY: 'sk-test' },
@@ -323,7 +348,6 @@ describe('installDefaultProvider', () => {
         const engine = new Engine({
             store: new MemoryStore({ clock }),
             agents: [agent],
-            resumeSecret: 's',
             clock,
         });
         try {

@@ -55,7 +55,6 @@ function make(model: LanguageModel, opts: {
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 's',
         onError: () => {},
     });
     engines.push(engine);

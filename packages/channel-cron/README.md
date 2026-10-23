@@ -67,7 +67,6 @@ export async function startScheduling(model: LanguageModel) {
         agents: [sweep],
         // every replica registers the same channel; it reads agents and store from the engine
         channels: [cronChannel()],
-        resumeSecret: 'change-me',
     });
 
     // starts the cron channel after recovering runs

@@ -37,7 +37,7 @@ import type { ModuleHarness } from '@chamvi/app/testing';
 import { SandboxModule, sandboxModule } from '@chamvi/sandbox/module';
 import type { SandboxModuleOptions, SandboxProviderName } from '@chamvi/sandbox/module';
 import { mockModel, textModel } from '../../utils/model.ts';
-import { SECRET, createRecordingLogger, rejectionOf } from '../../utils/module.ts';
+import { createRecordingLogger, rejectionOf } from '../../utils/module.ts';
 
 /** Records which provider the module imports instead of importing it. */
 class RecordingSandboxModule extends SandboxModule {
@@ -108,7 +108,7 @@ async function harnessWith(module: IModule, options: {
 } = {}) {
     const harness = await createModuleHarness({
         mode: options.mode ?? 'start',
-        env: { RESUME_SECRET: SECRET },
+        env: {},
         agents: options.agents ?? [agent()],
         modules: [
             configModule({ logger: createRecordingLogger() }),
@@ -334,7 +334,7 @@ describe('sandboxModule', () => {
             },
         };
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             agents: [agent()],
             modules: [
                 configModule({ logger: createRecordingLogger() }),

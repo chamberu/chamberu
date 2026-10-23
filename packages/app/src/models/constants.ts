@@ -42,4 +42,5 @@ export const BUILTIN_PROVIDERS: readonly BuiltinProvider[] = [
     },
 ];
 
-export const MODEL_SEPARATOR = ':';
+/** Between provider and model id in a model string, as the AI SDK writes them (`openai/gpt-5`). */
+export const MODEL_SEPARATOR = '/';

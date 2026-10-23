@@ -49,7 +49,6 @@ function setup() {
     const options = {
         store,
         agents,
-        resumeSecret: 'test-secret',
         clock,
         channels: [httpChannel(), hooks],
         onError: () => {},

@@ -12,8 +12,8 @@ import type { ConsoleChannelOptions, IChannel } from './types.ts';
  * A channel for development, out only: writes each message as a few lines
  * to `write` (`console.log` by default), the header, the body lines and, for
  * an approval, until when it waits. Never throws, so an approval delivered
- * here counts as sent at once. It never sees a resume token. Its
- * `defaultAddress` is its name, so tools emit to it without an address.
+ * here counts as sent at once. Its `defaultAddress` is its name, so tools
+ * emit to it without an address.
  */
 export function consoleChannel(options: ConsoleChannelOptions = {}): IChannel {
     const name = options.name ?? 'console';

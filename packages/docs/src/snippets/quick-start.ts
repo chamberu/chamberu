@@ -36,7 +36,6 @@ export async function triageIssue(model: LanguageModel) {
         agents: [triage],
         // logs every message a tool sends through it
         channels: [consoleChannel()],
-        resumeSecret: 'change-me',
     });
     await engine.start();
 

@@ -22,7 +22,8 @@ import {
     expect,
     it,
 } from 'vitest';
-import { loadApp, resolveEntry } from '../../../src/entry/module.ts';
+import { DEFAULT_APP_NOTICE } from '../../../src/entry/constants.ts';
+import { loadApp, loadEntryApp, resolveEntry } from '../../../src/entry/module.ts';
 import { CLI_USAGE_ERROR_CODE, EXIT_CODE } from '../../../src/run/constants.ts';
 import { exitCodeOf } from '../../../src/run/helpers.ts';
 
@@ -97,7 +98,8 @@ describe('resolveEntry', () => {
         await expect(resolveEntry({ cwd, kind: 'source' })).resolves.toBe(path.join(cwd, 'src/index.ts'));
     });
 
-    it('refuses a missing built entry with the build hint', async () => {
+    it('refuses a missing built entry beside a source entry with the build hint', async () => {
+        await touch('src/index.ts');
         const error = await rejectionOf(resolveEntry({ cwd, kind: 'built' }));
         expect(error).toBeInstanceOf(ChamviError);
         expect((error as ChamviError).code).toBe(CLI_USAGE_ERROR_CODE);
@@ -116,10 +118,16 @@ describe('resolveEntry', () => {
         expect((error as Error).message).toContain('nope.ts not found');
     });
 
-    it('refuses a missing source entry', async () => {
+    it('is undefined without any entry file, so the command runs the default app', async () => {
+        await expect(resolveEntry({ cwd, kind: 'source' })).resolves.toBeUndefined();
+        await expect(resolveEntry({ cwd, kind: 'built' })).resolves.toBeUndefined();
+    });
+
+    it('refuses a missing chamvi.entry file', async () => {
+        await touch('package.json', JSON.stringify({ chamvi: { entry: 'lib/app.ts' } }));
         const error = await rejectionOf(resolveEntry({ cwd, kind: 'source' }));
         expect((error as ChamviError).code).toBe(CLI_USAGE_ERROR_CODE);
-        expect((error as Error).message).toContain('src/index.ts not found');
+        expect((error as Error).message).toContain('lib/app.ts (package.json chamvi.entry) not found');
     });
 
     it('refuses a chamvi.entry that is no non-empty string', async () => {
@@ -158,5 +166,28 @@ describe('loadApp', () => {
             return import(specifier);
         });
         expect(specifiers[0]).toMatch(/^file:\/\/.*\/fixtures\/app\/src\/index\.ts$/);
+    });
+});
+
+describe('loadEntryApp', () => {
+    it('loads the entry when there is one, writing nothing', async () => {
+        const written: string[] = [];
+        const app = await loadEntryApp(path.join(fixtures, 'app/src/index.ts'), {
+            importModule,
+            stderr: (text) => { written.push(text); },
+        });
+        expect(app.agents.map((agent) => agent.name)).toEqual(['echo']);
+        expect(written).toEqual([]);
+    });
+
+    it('without an entry builds the default app and says so', async () => {
+        const written: string[] = [];
+        const app = await loadEntryApp(undefined, {
+            importModule: () => Promise.reject(new Error('no import expected')),
+            stderr: (text) => { written.push(text); },
+        });
+        expect(isApp(app)).toBe(true);
+        expect(app.agents).toEqual([]);
+        expect(written).toEqual([DEFAULT_APP_NOTICE]);
     });
 });

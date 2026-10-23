@@ -29,9 +29,6 @@ export type AppConfig = {
         purgeIntervalMs: number;
     };
     engine: {
-        /** Empty in migrate mode without RESUME_SECRET (no engine is built there). */
-        resumeSecret: string;
-        resumeSecretGenerated: boolean;
         maxConcurrentRuns: number;
     };
     scheduler: {

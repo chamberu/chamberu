@@ -73,11 +73,10 @@ export function createApprovalEngine(
         OPENCLAW_HOOKS_TOKEN,
         OPENCLAW_CHANNEL,
         OPENCLAW_TO,
-        RESUME_SECRET,
         APP_URL,
     } = process.env;
-    if (!OPENCLAW_URL || !OPENCLAW_HOOKS_TOKEN || !OPENCLAW_CHANNEL || !OPENCLAW_TO || !RESUME_SECRET || !APP_URL) {
-        throw new Error('Set OPENCLAW_URL, OPENCLAW_HOOKS_TOKEN, OPENCLAW_CHANNEL, OPENCLAW_TO, RESUME_SECRET and APP_URL.');
+    if (!OPENCLAW_URL || !OPENCLAW_HOOKS_TOKEN || !OPENCLAW_CHANNEL || !OPENCLAW_TO || !APP_URL) {
+        throw new Error('Set OPENCLAW_URL, OPENCLAW_HOOKS_TOKEN, OPENCLAW_CHANNEL, OPENCLAW_TO and APP_URL.');
     }
 
     const openclaw = openclawChannel({
@@ -115,19 +114,18 @@ export function createApprovalEngine(
         store: new MemoryStore({ clock: options.clock }),
         agents: [deployer],
         channels: [openclaw],
-        resumeSecret: RESUME_SECRET,
         clock: options.clock,
     });
 }
 ```
 
-Every message becomes one `POST <baseUrl><hooksPath>/agent` with the body `{ message, name: 'chamvi', agentId?, deliver: true, channel, to, accountId? }`, the hooks token as bearer token and the message key as `Idempotency-Key` (`<runId>:<approvalId>` for an approval, the content-addressed emit key for a message). `channel` is `deliver.channel`; `to` is the address the tool passed, or `deliver.to` (the channel's `defaultAddress`) when the tool passed none. The text holds the message's title, its body (cut to 8 000 characters), the agent and the run id; for an approval also the expiry and the `approvalUrl` link when configured (without it, a line saying to answer in the chamvi UI or through `POST /runs/:id/approve`). The resume token is never in the request: neither the URL, the headers nor the body.
+Every message becomes one `POST <baseUrl><hooksPath>/agent` with the body `{ message, name: 'chamvi', agentId?, deliver: true, channel, to, accountId? }`, the hooks token as bearer token and the message key as `Idempotency-Key` (`<runId>:<approvalId>` for an approval, the content-addressed emit key for a message). `channel` is `deliver.channel`; `to` is the address the tool passed, or `deliver.to` (the channel's `defaultAddress`) when the tool passed none. The text holds the message's title, its body (cut to 8 000 characters), the agent and the run id; for an approval also the expiry and the `approvalUrl` link when configured (without it, a line saying to answer in the chamvi UI or through `POST /runs/:id/approve`).
 
 Any 2xx response counts as sent (OpenClaw answers `200 { ok: true, runId }` once it admitted the hook). Every other answer throws a `ChamviError` with code `openclaw_request` (`OpenClaw <status>: <response text>`, with `retry after <s>` for a `Retry-After`), as does a network failure (`OpenClaw request failed: <message> (<cause>)`, the cause naming e.g. `ECONNREFUSED` or `ENOTFOUND`) and a gateway that does not answer within `timeoutMs` (30 s); an aborted send (the run cancelled, the engine draining) rejects with the abort reason. A failed `emit()` is a tool error and records nothing, so the next identical emit sends again. A failed approval message goes to the engine's `onError`, and the engine sends again on the next poll, with the same key and a byte-identical body, until one send succeeds.
 
 ## Answering approvals
 
-The message carries no resume token and no `resume_run` call:
+The message carries no token and no MCP call, only the approval link:
 
 - **A link** (`approvalUrl({ runId, approvalId, agent })`), when configured, to the run's approval in the chamvi UI, e.g. `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`. The link holds ids only; the owner opens it, signs in and answers through the token-less `POST /runs/:id/approve`. The signed-in principal needs `agent:<agent>:approve` to answer and `run:read` or `agent:<agent>:run` for the UI to load the run and show its approval.
 - Without `approvalUrl`, the message says to answer in the chamvi UI or through `POST /runs/:id/approve`.

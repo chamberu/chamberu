@@ -11,7 +11,7 @@ A tool call can wait for a human. The tool calls `approve()`, the run pauses in 
 How it survives a restart:
 
 1. The first time, `approve()` has no decision for this call. It records the request and suspends the call; nothing is sent yet.
-2. The step ends. The engine saves the checkpoint with the suspended call **pending** (the assistant message keeps every tool call, the tool message keeps the results of the calls that finished), stores the **wait point** (`run.waiting`: `approvalId`, `toolName`, `toolCallId`, `title`, `body?`, `channel?`, `address?`, `expiresAt`, `tokenId`) and moves the run `running` to `waiting`, releasing its claim and slot. A run with a concurrency key keeps the key blocked while it waits.
+2. The step ends. The engine saves the checkpoint with the suspended call **pending** (the assistant message keeps every tool call, the tool message keeps the results of the calls that finished), stores the **wait point** (`run.waiting`: `approvalId`, `toolName`, `toolCallId`, `title`, `body?`, `channel?`, `address?`, `expiresAt`) and moves the run `running` to `waiting`, releasing its claim and slot. A run with a concurrency key keeps the key blocked while it waits.
 3. An answer records the decision, appends a `wait` step and moves the run to `queued`.
 4. The next execution first runs the pending calls (no model call): the tool starts again from the top, and this time `approve()` returns the recorded decision. Their results join the checkpoint, then the model loop goes on and the model sees the tool's result.
 
@@ -35,7 +35,7 @@ Other rules:
 
 <<< @/snippets/approvals.ts#channel
 
-Once the wait point is stored, the engine sends one message of kind `approval` through the channel's `out` (key `<runId>:<approvalId>`, with the title, body, `approvalId` and `expiresAt`) and records `waiting.notifiedAt`. A failed send leaves it unset and `tick()` re-sends on every poll until one succeeds, under a store lock per approval so replicas never send at once; a crash between storing the wait point and the send re-sends under the same key. The message never carries the resume token: channels link to the approval in the UI instead. On GitHub the request becomes a comment on the run's issue, on OpenClaw a chat message.
+Once the wait point is stored, the engine sends one message of kind `approval` through the channel's `out` (key `<runId>:<approvalId>`, with the title, body, `approvalId` and `expiresAt`) and records `waiting.notifiedAt`. A failed send leaves it unset and `tick()` re-sends on every poll until one succeeds, under a store lock per approval so replicas never send at once; a crash between storing the wait point and the send re-sends under the same key. Channels link to the approval in the UI. On GitHub the request becomes a comment on the run's issue, on OpenClaw a chat message.
 
 ## Gating tools you did not write
 
@@ -55,24 +55,15 @@ The coding tools, the GitHub tools and any third-party tool have an `execute` yo
 
 `engine.approve(runId, { approvalId, approved, reason?, approver? })` answers the run's current wait point, for a caller that authorized the approver itself (the `@chamvi/http` endpoint `POST /runs/:id/approve`, which the dashboard uses). An `approvalId` that is not the current one, an expired wait point (the next `tick()` denies it) or a run that is not `waiting` throws `InvalidRunStateError`.
 
-`engine.resume(token, decision)` answers with a signed resume token instead. It verifies the token against the run's current wait point and takes the same path; a token answers its wait point once (a second `resume()` throws `InvalidRunStateError`), and a forged, malformed, expired or superseded one throws `InvalidResumeTokenError`.
+An answer is single use: a second answer of the same wait point throws `InvalidRunStateError`.
 
 - `decision.approver` (an invoker: `{ id, kind, name?, permissions }`) is recorded on the `wait` step as `output.approver`. `@chamvi/http` sets it from the principal that answered. The model never sees the decision's details: it sees the tool's result, so a denial is the tool's (or hook's) to word.
 - If writing the answer fails, the run goes back to `waiting` and the answer can be sent again.
-- The engine throws `InvalidAgentDefinitionError` for an empty `resumeSecret` (anyone could mint tokens with it).
 
 ## Timeouts
 
 An approval not answered within its `timeoutMs` is denied with the reason `approval timed out`. The engine checks on every poll (`tick()`); `approve()` then returns `{ approved: false, reason: 'approval timed out' }`.
 
-## Token format
-
-```
-base64url(JSON { runId, approvalId, tokenId, exp }) + "." + base64url(HMAC-SHA256(resumeSecret, payload))
-```
-
-The signature is compared in constant time, and a token expires at the wait point's `expiresAt`. `createResumeToken(secret, { runId, approvalId, tokenId, expiresAt })` and `verifyResumeToken(secret, token, now)` are exported for transports that hand tokens out themselves; no shipped channel puts one into a message.
-
 ::: tip Where approvals are answered
-In core you call `engine.approve()` (by approval id) or `engine.resume()` (with a token) yourself. [`@chamvi/http`](/guide/http) adds the token-less `POST /runs/:id/approve` (needs `agent:<name>:approve`; the [`@chamvi/ui`](/guide/ui) inbox and its approval links answer through it), and the authenticated `POST /resume` endpoint and MCP `resume_run` tool (both need `agent:<name>:approve` besides the token).
+In core you call `engine.approve()` (by approval id) yourself. [`@chamvi/http`](/guide/http) adds `POST /runs/:id/approve` and the MCP tool `approve_run` (both need `agent:<name>:approve`; the [`@chamvi/ui`](/guide/ui) inbox and its approval links answer through the endpoint).
 :::

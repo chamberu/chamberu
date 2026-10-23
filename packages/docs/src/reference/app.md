@@ -23,7 +23,7 @@ function isApp(value: unknown): value is IApp;
 const APP_BRAND: unique symbol; // Symbol.for('chamvi.app')
 ```
 
-Synchronous and side-effect free. `agents` may be omitted or empty when `CHAMVI_AGENTS_DIR` names an [agents folder](/guide/agent-folders) (`start` and `runJob` refuse an app with neither); `app.agents` holds only the code agents, the live set is `engine.listAgents()`. Throws `InvalidAgentDefinitionError` for options that are no object or whose `agents` is no array, a module list entry that is no `IModule` and for two modules of one name (a built-in's name included: list one module to replace a built-in). `isApp` checks the brand, so an app of another installed copy matches.
+Synchronous and side-effect free. `agents` may be omitted or empty: the agents can come from an [agents folder](/guide/agent-folders), and an app with no agent at all still starts (a warning); `app.agents` holds only the code agents, the live set is `engine.listAgents()`. Throws `InvalidAgentDefinitionError` for options that are no object or whose `agents` is no array, a module list entry that is no `IModule` and for two modules of one name (a built-in's name included: list one module to replace a built-in). `isApp` checks the brand, so an app of another installed copy matches.
 
 <<< ../../../app/src/app/types.ts{ts}
 
@@ -62,10 +62,9 @@ Read by `readConfig(env, { mode, dev })` once per lifecycle; the optional module
 | `DATABASE_URL` | store | `postgres://...` | unset: `MemoryStore` (warned outside dev) | `migrate`; any multi-replica or CronJob deployment |
 | `CHAMVI_MIGRATE` | store | bool | `true` | never |
 | `CHAMVI_PURGE_INTERVAL_MS` | store | int, `0` disables | `3600000` (only with `TypeormStore`, on `engine.clock`) | never |
-| `RESUME_SECRET` | engine | string, at least 32 characters | none (dev: random per process, warned) | `start`, `run-job` |
 | `CHAMVI_MAX_CONCURRENT_RUNS` | engine | int >= 1 | `4` | never |
 | `CHAMVI_SCHEDULER` | scheduler | bool | `true`; `false` starts no in-process cron (CronJob mode; `cron.on()` subscriptions still validate) | never |
-| `CHAMVI_AGENTS_DIR` | agents | path of a directory, relative to the working directory | unset: no [agent folders](/guide/agent-folders) | `createApp()` has no agents |
+| `CHAMVI_AGENTS_DIR` | agents | path of a directory, relative to the working directory | unset: `./agents` when it is a directory, else no [agent folders](/guide/agent-folders) | |
 | `CHAMVI_AGENTS_POLL_MS` | agents | int 1..`TIMER_MAX_MS` | `5000` (`DEFAULT_AGENTS_POLL_MS`) | never |
 | `CHAMVI_READINESS_DELAY_MS` | http shutdown | int | `0` | never |
 | `CHAMVI_DRAIN_TIMEOUT_MS` | http shutdown | int | `30000` (dev 5000) | never |
@@ -117,7 +116,7 @@ function httpModule(options?: HttpModuleOptions): IModule;                // 'ch
 function consoleChannelModule(options?: ConsoleChannelModuleOptions): IModule; // 'chamvi:console' ('chamvi:console:<name>' with a name)
 ```
 
-Listing one of them in `createApp({ modules })` replaces the default instance. `agentsModule()` (no options) reads `CHAMVI_AGENTS_DIR`: in `start` and `job` mode its `onReady` loads every folder into the engine before any start step (a dir that is no directory is `InvalidAgentDefinitionError`), and in `start` mode a lifecycle hook polls the dir from `started` until `stopping`; it registers `AppToken.AGENT_ISSUES`, which the http module passes on as `agentIssues`. A folder agent passes `AppToken.MODEL_CHECK` and every `AppToken.AGENT_CHECKS` contribution (the scheduler module's `assertSchedulable`, the http module's `assertMcpRunTool` unless `mcp: false`) and the engine's channel check (every subscription names a registered channel) before it is registered; a refusal is a load issue, never a failed boot. Only `start` mode removes an agent whose marker has no folder; a job never does. Without a dir it only refuses an app without agents.
+Listing one of them in `createApp({ modules })` replaces the default instance. `agentsModule()` (no options) reads `CHAMVI_AGENTS_DIR`, else takes `./agents` when it is a directory: in `start` and `job` mode its `onReady` loads every folder into the engine before any start step (a dir that is no directory is `InvalidAgentDefinitionError`), and in `start` mode a lifecycle hook polls the dir from `started` until `stopping`; it registers `AppToken.AGENT_ISSUES`, which the http module passes on as `agentIssues`. A folder agent passes `AppToken.MODEL_CHECK` and every `AppToken.AGENT_CHECKS` contribution (the scheduler module's `assertSchedulable`, the http module's `assertMcpRunTool` unless `mcp: false`) and the engine's channel check (every subscription names a registered channel) before it is registered; a refusal is a load issue, never a failed boot. Only `start` mode removes an agent whose marker has no folder; a job never does. Without a dir it only refuses an app without agents.
 
 <<< ../../../app/src/modules/config/types.ts{ts}
 

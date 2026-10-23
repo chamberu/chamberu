@@ -8,13 +8,17 @@
 import type { Agent } from '@chamvi/core';
 import type { ProviderRegistryProvider, createProviderRegistry } from 'ai';
 import type { Env } from '../env/types.ts';
+import type { MODEL_SEPARATOR } from './constants.ts';
 
 /** createApp's `models`: providers by id, as `createProviderRegistry()` takes them. */
 export type ModelProviders = Parameters<typeof createProviderRegistry>[0];
 
+/** The registry model strings resolve through: `<provider>/<model>`. */
+export type ModelRegistry = ProviderRegistryProvider<ModelProviders, typeof MODEL_SEPARATOR>;
+
 /** A provider package `createModelRegistry()` discovers when it is installed. */
 export type BuiltinProvider = {
-    /** The registry id, the part of a model string before `:`. */
+    /** The registry id, the part of a model string before the first `/`. */
     id: string;
     /** The npm package. */
     package: string;
@@ -38,7 +42,7 @@ export type ModelRegistryOptions = {
 export type ModelCheck = (agent: Agent) => void;
 
 export type ResolvedModels = {
-    registry: ProviderRegistryProvider;
+    registry: ModelRegistry;
     /** The check every agent of `agents` passed, for agents registered later (folder agents). */
     check: ModelCheck;
 };

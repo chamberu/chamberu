@@ -9,15 +9,12 @@ import { describe, expect, it } from 'vitest';
 import { effectScope, ref, shallowRef } from 'vue';
 import { createMemoryHistory } from 'vue-router';
 import type { RunWire } from '../../../../app/api/types.ts';
-import { RESUME_STORAGE_KEY } from '../../../../app/approvals/constants.ts';
 import { useLinkedApproval } from '../../../../app/approvals/composables.ts';
 import {
     approvalLinkQuery,
     linkNotice,
     linkedApprovalState,
     readApprovalLink,
-    shadowedApprovalLink,
-    stripResumeToken,
 } from '../../../../app/approvals/helpers.ts';
 import type { ApprovalLink, DecidedApproval } from '../../../../app/approvals/types.ts';
 import { RETURN_STORAGE_KEY } from '../../../../app/auth/constants.ts';
@@ -51,7 +48,6 @@ const waitingRun = (approvalId = 'a1', overrides: Partial<RunWire> = {}) => wire
         toolCallId: 'call-1',
         title: 'Deploy prod?',
         expiresAt: '2026-10-22T10:00:00.000Z',
-        tokenId: 't1',
     },
     ...overrides,
 });
@@ -92,26 +88,6 @@ describe('readApprovalLink', () => {
         expect(readApprovalLink({ run: '' })).toBeUndefined();
         expect(readApprovalLink({ approval: 'a1' })).toBeUndefined();
         expect(readApprovalLink({ run: null })).toBeUndefined();
-    });
-});
-
-describe('shadowedApprovalLink', () => {
-    const claims = { runId: 'run-a', approvalId: 'appr-a' };
-
-    it('names a link to another run while a resume token is pending', () => {
-        expect(shadowedApprovalLink(claims, { runId: 'run-b', approvalId: 'appr-b' })).toEqual({ runId: 'run-b', approvalId: 'appr-b' });
-        expect(shadowedApprovalLink(claims, { runId: 'run-b' })).toEqual({ runId: 'run-b' });
-    });
-
-    it('names a link to another approval of the token\'s run', () => {
-        expect(shadowedApprovalLink(claims, { runId: 'run-a', approvalId: 'appr-x' })).toEqual({ runId: 'run-a', approvalId: 'appr-x' });
-    });
-
-    it('is undefined for the token\'s own approval, without a link or without a token', () => {
-        expect(shadowedApprovalLink(claims, { runId: 'run-a', approvalId: 'appr-a' })).toBeUndefined();
-        expect(shadowedApprovalLink(claims, { runId: 'run-a' })).toBeUndefined();
-        expect(shadowedApprovalLink(claims, undefined)).toBeUndefined();
-        expect(shadowedApprovalLink(undefined, { runId: 'run-b' })).toBeUndefined();
     });
 });
 
@@ -315,7 +291,7 @@ describe('the approval link across sign-in', () => {
         );
         const router = createUiRouter(
             DEV_CONFIG,
-            [(to) => stripResumeToken(to, storage), createAuthGuard(session)],
+            [createAuthGuard(session)],
             createMemoryHistory('/ui'),
         );
         return { router, session };
@@ -357,13 +333,5 @@ describe('the approval link across sign-in', () => {
         expect(router.currentRoute.value.name).toBe(RouteName.APPROVALS);
         expect(router.currentRoute.value.query).toEqual({ run: 'r1', approval: 'a1' });
         expect(session.principal.value).toEqual(ME);
-    });
-
-    it('keeps run and approval when a resume token is stripped beside them', async () => {
-        const storage = new MemoryStorage();
-        const { router } = setup(storage);
-        await router.push('/approvals?run=r1&approval=a1#token=abc.def');
-        expect(router.currentRoute.value.query.redirect).toBe('/approvals?run=r1&approval=a1');
-        expect(storage.getItem(RESUME_STORAGE_KEY)).toBe('abc.def');
     });
 });

@@ -16,7 +16,6 @@ export {
     DEFAULT_PURGE_INTERVAL_MS,
     DEFAULT_READINESS_DELAY_MS,
     DEV_DRAIN_TIMEOUT_MS,
-    RESUME_SECRET_MIN_LENGTH,
 } from './constants.ts';
 export { approvalUrlOf } from './helpers.ts';
 export * from './module.ts';

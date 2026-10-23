@@ -22,6 +22,7 @@ import {
     describe,
     expect,
     it,
+    vi,
 } from 'vitest';
 import {
     AgentsModule,
@@ -37,12 +38,12 @@ import {
 } from '@chamvi/app';
 import type { AppMode, IApp } from '@chamvi/app';
 import {
-    SECRET,
     TOKEN,
     TOKENS,
     hangingModel,
     rejectionOf,
 } from '../../../utils/app.ts';
+import { NO_AGENTS_MESSAGE } from '../../../../src/modules/agents/constants.ts';
 import { agentFile, cronTrigger } from '../../../utils/agents-dir.ts';
 import { createTempDir, writeTree } from '../../../utils/folder.ts';
 import { buildHarness } from '../../../utils/harness.ts';
@@ -72,7 +73,6 @@ async function queueRun(store: IStore, clock: ControllableClock, name: string): 
     const engine = new Engine({
         store,
         clock,
-        resumeSecret: SECRET,
         agents: [codeAgent(name)],
     });
     const { runId } = await engine.dispatch({
@@ -117,7 +117,6 @@ function build(options: {
     const harness = buildHarness({
         mode: options.mode,
         env: {
-            RESUME_SECRET: SECRET,
             CHAMVI_AGENTS_DIR: dir,
             CHAMVI_AGENTS_POLL_MS: String(POLL_MS),
             ...options.env,
@@ -254,8 +253,8 @@ describe('agentsModule', () => {
 
     it('an unknown model string is an issue, not a boot failure', async () => {
         await writeTree(root.path, {
-            'greeter/agent.ts': agentFile('v1', 'acme:model'),
-            'other/agent.ts': agentFile('v1', 'test:model', 'other'),
+            'greeter/agent.ts': agentFile('v1', 'acme/model'),
+            'other/agent.ts': agentFile('v1', 'test/model', 'other'),
         });
         const {
             harness, 
@@ -338,7 +337,7 @@ describe('agentsModule', () => {
     });
 
     it('the watcher applies a change only once it is stable for one poll', async () => {
-        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:hang') });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test/hang') });
         const {
             harness,
             engine,
@@ -381,7 +380,7 @@ describe('agentsModule', () => {
         await harness.setup();
         await watch();
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test/model', 'newcomer') });
         await poll();
         expect(engine().getAgent('newcomer')).toBeUndefined();
         await poll();
@@ -546,14 +545,14 @@ describe('agentsModule', () => {
         const current = engine();
         await runHooks(harness.container, 'stopping');
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test/model', 'newcomer') });
         await poll();
         await poll();
         expect(current.getAgent('newcomer')).toBeUndefined();
     });
 
     it('job mode loads the folder and runs a folder agent\'s cron trigger', async () => {
-        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:model', 'greeter', [cronTrigger('0 9 * * *')]) });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test/model', 'greeter', [cronTrigger('0 9 * * *')]) });
         const clock = new ControllableClock(START);
         const store = new MemoryStore({ clock });
         const app = createApp({
@@ -564,7 +563,6 @@ describe('agentsModule', () => {
 
         const result = await app.runJob({
             env: {
-                RESUME_SECRET: SECRET,
                 CHAMVI_AGENTS_DIR: root.path,
                 CHAMVI_DRAIN_TIMEOUT_MS: '1000',
             },
@@ -585,7 +583,7 @@ describe('agentsModule', () => {
         await harness.setup();
         await runHooks(harness.container, 'started');
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test/model', 'newcomer') });
         await poll();
         await poll();
         expect(engine().getAgent('greeter')).toBeDefined();
@@ -606,7 +604,6 @@ describe('agentsModule', () => {
         const port = await freePort();
         await app.start({
             env: {
-                RESUME_SECRET: SECRET,
                 HOST: '127.0.0.1',
                 PORT: String(port),
                 CHAMVI_TOKENS: TOKENS,
@@ -656,12 +653,39 @@ describe('agentsModule', () => {
         expect(harness.container.has(AppToken.AGENT_ISSUES)).toBe(false);
     });
 
-    it('without CHAMVI_AGENTS_DIR and code agents it refuses to start', async () => {
-        const { harness } = build({ env: { CHAMVI_AGENTS_DIR: '' } });
+    it('without CHAMVI_AGENTS_DIR, ./agents and code agents it starts empty and warns', async () => {
+        const cwd = await createTempDir();
+        const spy = vi.spyOn(process, 'cwd').mockReturnValue(cwd.path);
+        try {
+            const {
+                harness, 
+                engine, 
+                logger, 
+            } = build({ env: { CHAMVI_AGENTS_DIR: '' } });
+            await harness.setup();
 
-        const error = await rejectionOf(harness.setup());
+            expect(engine().listAgents()).toEqual([]);
+            expect(harness.container.has(AppToken.AGENT_ISSUES)).toBe(false);
+            expect(logger.entries).toContainEqual(expect.objectContaining({ level: 'warn', msg: NO_AGENTS_MESSAGE }));
+        } finally {
+            spy.mockRestore();
+            await cwd.remove();
+        }
+    });
 
-        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toBe('createApp needs at least one agent or CHAMVI_AGENTS_DIR.');
+    it('without CHAMVI_AGENTS_DIR it loads ./agents when that is a directory', async () => {
+        const cwd = await createTempDir();
+        await writeTree(cwd.path, { 'agents/greeter/agent.ts': agentFile('v1') });
+        const spy = vi.spyOn(process, 'cwd').mockReturnValue(cwd.path);
+        try {
+            const { harness, engine } = build({ env: { CHAMVI_AGENTS_DIR: '' } });
+            await harness.setup();
+
+            expect(engine().listAgents().map((agent) => agent.name)).toEqual(['greeter']);
+            expect(harness.container.has(AppToken.AGENT_ISSUES)).toBe(true);
+        } finally {
+            spy.mockRestore();
+            await cwd.remove();
+        }
     });
 });

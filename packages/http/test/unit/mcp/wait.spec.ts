@@ -67,7 +67,7 @@ describe('mcp run_<agent> with waitSeconds', () => {
         await setup.engine.drain();
     });
 
-    it('returns a waiting run without any resume token', async () => {
+    it('returns a waiting run with its pending approval', async () => {
         const setup = createRunTestApp();
         await setup.engine.start();
         const client = await connectMcp(setup.app, ADMIN_TOKEN);
@@ -80,11 +80,8 @@ describe('mcp run_<agent> with waitSeconds', () => {
                 body: 'release 1.2', 
             },
         });
-        const { runId } = result.structuredContent as { runId: string };
         const json = JSON.stringify(result);
         expect(json).not.toContain('resumeToken');
-        expect(json).not.toContain('tokenId');
-        expect(json).not.toContain(await setup.tokenOf(runId));
         await client.close();
         await setup.engine.drain();
     });
@@ -131,7 +128,6 @@ describe('mcp run_<agent> with waitSeconds', () => {
         const other = new Engine({
             store,
             agents,
-            resumeSecret: 'test-secret',
             clock,
             channels: testChannels(),
             owner: 'replica-b',
@@ -181,7 +177,6 @@ describe('waitForRun', () => {
         const engine = new Engine({
             store,
             agents,
-            resumeSecret: 's',
             clock,
             channels: testChannels(),
             onError: () => {},

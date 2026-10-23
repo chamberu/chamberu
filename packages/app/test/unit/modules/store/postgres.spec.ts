@@ -35,7 +35,6 @@ import { buildHarness } from '../../../utils/harness.ts';
 import { createRecordingLogger } from '../../../utils/logger.ts';
 import { createTestDatabaseUrl, describePostgres } from '../../../utils/database.ts';
 
-const SECRET = 'x'.repeat(32);
 
 function build(options: {
     mode?: AppMode;
@@ -46,7 +45,7 @@ function build(options: {
     const logger = createRecordingLogger(clock);
     const harness = buildHarness({
         mode: options.mode ?? 'start',
-        env: { RESUME_SECRET: SECRET, ...options.env },
+        env: { ...options.env },
         modules: [configModule({ clock, logger }), storeModule(options.store)],
     });
     return {
@@ -120,7 +119,7 @@ describe('storeModule on a database URL', () => {
             protected override connectTimeoutMs = 200;
         }
         const harness = buildHarness({
-            env: { RESUME_SECRET: SECRET, DATABASE_URL: `postgres://u:p@127.0.0.1:${port}/x` },
+            env: { DATABASE_URL: `postgres://u:p@127.0.0.1:${port}/x` },
             modules: [configModule({ logger: createRecordingLogger() }), new QuickStoreModule()],
         });
 

@@ -47,7 +47,7 @@ import { ControllableClock } from '@chamvi/test-kit';
 
 const clock = new ControllableClock();
 const store = new MemoryStore({ clock });
-const engine = new Engine({ store, agents: [], resumeSecret: 'secret', clock });
+const engine = new Engine({ store, agents: [], clock });
 
 clock.advance(60_000); // fires every timer due within the next minute, in order
 ```

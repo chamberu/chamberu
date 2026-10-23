@@ -7,7 +7,7 @@ export async function smokeTest(agents: Agent[], model: MockLanguageModelV4) {
     // #region testing
     const app = createApp({
         agents,
-        // 'anthropic:claude-sonnet-5-5' resolves to the mock: no package, no key, no request
+        // 'anthropic/claude-sonnet-5-5' resolves to the mock: no package, no key, no request
         models: { anthropic: customProvider({ languageModels: { 'claude-sonnet-5-5': model } }) },
     });
 
@@ -16,7 +16,6 @@ export async function smokeTest(agents: Agent[], model: MockLanguageModelV4) {
         env: {
             PORT: '3101',
             HOST: '127.0.0.1',
-            RESUME_SECRET: 'a-test-secret-of-at-least-32-chars',
             CHAMVI_TOKENS: JSON.stringify([{
                 value: 'test-token-0123456789',
                 id: 'test',

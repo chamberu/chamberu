@@ -10,16 +10,13 @@ import { useToast } from '@vuecs/overlays';
 import { computed, inject, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import type { RunWire } from '../api/types.ts';
-import { useApprovals, useDeepLinkApproval, useLinkedApproval } from '../approvals/composables.ts';
+import { useApprovals, useLinkedApproval } from '../approvals/composables.ts';
 import { INBOX, INBOX_POLL_MS  } from '../approvals/constants.ts';
 import {
-    clearResumeToken,
     linkNotice,
     linkedApprovalState,
     pendingApprovals,
     readApprovalLink,
-    readResumeToken,
-    shadowedApprovalLink,
 } from '../approvals/helpers.ts';
 import type { AnswerResult, DecidedApproval } from '../approvals/types.ts';
 import { hasPermission } from '../auth/helpers.ts';
@@ -32,16 +29,9 @@ import { useAppContext } from '../context/module.ts';
 import { RouteName } from '../router/constants.ts';
 import { shortId } from '../runs/helpers.ts';
 
-const {
-    client,
-    session,
-    storage,
-} = useAppContext();
+const { client, session } = useAppContext();
 const toast = useToast();
 const inbox = inject(INBOX, undefined) ?? useApprovals(client);
-
-const token = ref(readResumeToken(storage));
-const deepLink = useDeepLinkApproval(client, token, storage);
 
 const principalName = computed(() => session.principal.value?.name ?? session.principal.value?.id);
 
@@ -51,12 +41,9 @@ const canAnswer = (agent: string) => hasPermission(permissions.value, `agent:${a
 const decided = ref<DecidedApproval[]>([]);
 const busy = ref<string>();
 
-// the token-less link `?run=&approval=`; a pending resume token (#token=) takes the page,
-// and a link it hides gets a notice offering to discard the token
+// the approval link `?run=&approval=`
 const route = useRoute();
-const queryLink = computed(() => readApprovalLink(route.query));
-const approvalLink = computed(() => (deepLink.claims.value ? undefined : queryLink.value));
-const shadowedLink = computed(() => shadowedApprovalLink(deepLink.claims.value, queryLink.value));
+const approvalLink = computed(() => readApprovalLink(route.query));
 const linked = useLinkedApproval(client, approvalLink, inbox.runs);
 const linkedState = computed(() => (linked.link.value ?
     linkedApprovalState({
@@ -74,7 +61,7 @@ const linkedRun = computed(() => {
 });
 const notice = computed(() => (linkedState.value && linked.link.value ? linkNotice(linkedState.value, linked.link.value) : undefined));
 
-const linkRunId = computed(() => deepLink.claims.value?.runId ?? linkedRun.value?.id);
+const linkRunId = computed(() => linkedRun.value?.id);
 const pending = computed(() => pendingApprovals(inbox.runs.value, decided.value, linkRunId.value));
 
 const MESSAGES: Record<AnswerResult, (approved: boolean) => string> = {
@@ -108,32 +95,6 @@ async function answer(run: RunWire, approved: boolean, reason: string): Promise<
     }
 }
 
-const linkResult = ref<{ result: AnswerResult; approved: boolean }>();
-
-/** Drops the pending resume token, so the token-less link of the address bar opens. */
-function discardToken(): void {
-    clearResumeToken(storage);
-    token.value = undefined;
-    linkResult.value = undefined;
-}
-async function answerLink(approved: boolean, reason: string): Promise<void> {
-    busy.value = 'link';
-    try {
-        const result = await deepLink.answer(approved, reason);
-        linkResult.value = { result, approved };
-        if (result !== 'forbidden') token.value = undefined;
-        toast.add({ title: MESSAGES[result](approved), color: result === 'answered' ? 'success' : 'warning' });
-        void inbox.refresh();
-    } catch (e) {
-        toast.add({
-            title: 'The answer failed',
-            description: e instanceof Error ? e.message : String(e),
-            color: 'error',
-        });
-    } finally {
-        busy.value = undefined;
-    }
-}
 </script>
 
 <template>
@@ -145,96 +106,6 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
     </PageHead>
 
     <div class="callouts">
-        <div
-            v-if="shadowedLink && deepLink.claims.value"
-            class="card notice link-notice"
-            role="status"
-            data-testid="shadowed-link"
-        >
-            <span>
-                An earlier approval link (run <span class="mono">{{ shortId(deepLink.claims.value.runId) }}</span>, with a resume token)
-                is still pending in this tab and takes the page;
-                the link to run <span class="mono">{{ shortId(shadowedLink.runId) }}</span> opens once it is discarded.
-            </span>
-            <VCButton
-                class="btn"
-                data-testid="discard-token"
-                @click="discardToken"
-            >
-                Discard the earlier link
-            </VCButton>
-        </div>
-
-        <template v-if="token && deepLink.claims.value">
-            <ApprovalCallout
-                v-if="deepLink.run.value?.waiting && deepLink.run.value.waiting.approvalId === deepLink.claims.value.approvalId"
-                :run="deepLink.run.value"
-                :can-answer="true"
-                :busy="busy === 'link'"
-                data-testid="deep-link"
-                @answer="answerLink"
-            />
-            <article
-                v-else
-                class="callout"
-                data-testid="deep-link"
-            >
-                <div class="callout-head">
-                    <span class="callout-icon"><NavIcon name="hand" /></span>
-                    <div class="callout-title">
-                        <h2>Approval from a link</h2>
-                        <p class="mono">
-                            run {{ deepLink.claims.value.runId }} · approval {{ deepLink.claims.value.approvalId }}
-                        </p>
-                    </div>
-                </div>
-                <div class="callout-body single">
-                    <p class="hint">
-                        <template v-if="deepLink.run.value">
-                            This run is no longer waiting for this approval.
-                        </template>
-                        <template v-else>
-                            The run is not readable with your grants; the link's token still answers it.
-                        </template>
-                    </p>
-                </div>
-                <div class="callout-foot">
-                    <p>The link's token answers through the resume endpoint.</p>
-                    <div class="callout-actions">
-                        <VCButton
-                            class="btn"
-                            :disabled="busy === 'link'"
-                            @click="answerLink(false, '')"
-                        >
-                            Deny
-                        </VCButton>
-                        <VCButton
-                            class="btn btn-primary"
-                            :loading="busy === 'link'"
-                            @click="answerLink(true, '')"
-                        >
-                            <NavIcon name="check" />Approve
-                        </VCButton>
-                    </div>
-                </div>
-            </article>
-        </template>
-        <div
-            v-else-if="linkResult"
-            :class="['callout', 'decided', { denied: !(linkResult.result === 'answered' && linkResult.approved) }]"
-            data-testid="deep-link-result"
-        >
-            <div class="callout-head">
-                <span class="callout-icon"><NavIcon :name="linkResult.result === 'answered' && linkResult.approved ? 'check' : 'cross'" /></span>
-                <div class="callout-title">
-                    <h2>{{ MESSAGES[linkResult.result](linkResult.approved) }}</h2>
-                    <p v-if="linkResult.result === 'already-answered'">
-                        The link's token is expired or already used.
-                    </p>
-                </div>
-            </div>
-        </div>
-
         <div
             v-if="notice"
             class="card notice link-notice"
@@ -272,12 +143,7 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
             class="card notice"
         >
             Listing waiting runs needs <b class="mono">run:read</b>.
-            <template v-if="deepLink.claims.value">
-                The approval link's resume token still answers its approval.
-            </template>
-            <template v-else>
-                An approval link still opens a run of an agent you may run (<b class="mono">agent:&lt;name&gt;:run</b>).
-            </template>
+            An approval link still opens a run of an agent you may run (<b class="mono">agent:&lt;name&gt;:run</b>).
         </div>
 
         <div
@@ -333,7 +199,7 @@ async function answerLink(approved: boolean, reason: string): Promise<void> {
         />
 
         <div
-            v-if="!inbox.error.value && pending.length === 0 && !token && !linkedRun && !notice && linkedState?.kind !== 'loading'"
+            v-if="!inbox.error.value && pending.length === 0 && !linkedRun && !notice && linkedState?.kind !== 'loading'"
             class="card"
         >
             <EmptyState

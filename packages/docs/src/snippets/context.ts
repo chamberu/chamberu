@@ -51,7 +51,6 @@ export const ops = defineAgent({
 const engine = new Engine({
     store: new MemoryStore(),
     agents: [ops],
-    resumeSecret: 'change-me',
 });
 
 // by reference, once per key; a second value or undefined throws

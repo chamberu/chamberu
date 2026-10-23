@@ -29,5 +29,5 @@ export const IDEMPOTENCY_KEY_MAX_LENGTH = 256;
 /** Response text in a thrown error is cut to this many characters. */
 export const ERROR_TEXT_MAX_LENGTH = 500;
 
-/** An approval line without `approvalUrl`: how to answer; the message never carries the token. */
-export const NO_TOKEN_HINT = 'Answer it in the chamvi UI (or through POST /runs/:id/approve); this message carries no resume token.';
+/** An approval line without `approvalUrl`: how to answer. */
+export const APPROVAL_HINT = 'Answer it in the chamvi UI or through POST /runs/:id/approve.';

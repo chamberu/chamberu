@@ -8,7 +8,7 @@
 import { TIMER_MAX_MS, envInteger } from '@chamvi/app';
 import { defineCommand } from 'citty';
 import type { CommandDef } from 'citty';
-import { loadApp, resolveEntry } from '../entry/module.ts';
+import { loadEntryApp, resolveEntry } from '../entry/module.ts';
 import { EXIT_CODE } from '../run/constants.ts';
 import { assertKnownArgs, exitCodeOf } from '../run/helpers.ts';
 import type { CliContext } from '../run/types.ts';
@@ -55,7 +55,7 @@ export function createRunJobCommand(context: CliContext): CommandDef<typeof RUN_
                 entry: args.entry,
                 kind: 'built',
             });
-            const app = await loadApp(entry, context.importModule);
+            const app = await loadEntryApp(entry, context);
 
             // the job's own exit code; a signal's stop never lowers it (a failed run stays 1)
             let jobCode: number = EXIT_CODE.OK;

@@ -6,13 +6,10 @@
  */
 
 import {
-    afterEach,
     describe,
     expect,
     it,
-    vi,
 } from 'vitest';
-import { createResumeToken } from '@chamvi/core';
 import {
     ADMIN_TOKEN,
     call,
@@ -27,27 +24,32 @@ async function waitingGate() {
     const { runId } = await response.json() as { runId: string };
     await setup.engine.start();
     await setup.engine.idle();
-    expect((await setup.store.getRun(runId))?.status).toBe('waiting');
-    return { ...setup, runId };
+    const run = await setup.store.getRun(runId);
+    expect(run?.status).toBe('waiting');
+    return {
+        ...setup, 
+        runId, 
+        approvalId: run!.waiting!.approvalId, 
+    };
 }
 
-afterEach(() => {
-    vi.restoreAllMocks();
-});
-
-describe('mcp resume_run', () => {
-    it('resumes a waiting run', async () => {
+describe('mcp approve_run', () => {
+    it('answers the approval a waiting run waits on, once', async () => {
         const setup = await waitingGate();
         const client = await connectMcp(setup.app, tokenFor('agent:gate:approve'));
-        const token = await setup.tokenOf(setup.runId);
-        const result = await callTool(client, 'resume_run', { token, approved: true });
+        const args = {
+            runId: setup.runId, 
+            approvalId: setup.approvalId, 
+            approved: true, 
+        };
+        const result = await callTool(client, 'approve_run', args);
         expect(result.isError).toBeFalsy();
         expect(result.structuredContent).toEqual({ runId: setup.runId, status: 'queued' });
 
         await setup.engine.idle();
         expect((await setup.store.getRun(setup.runId))?.status).toBe('completed');
 
-        const again = await callTool(client, 'resume_run', { token, approved: true });
+        const again = await callTool(client, 'approve_run', args);
         expect(again.isError).toBe(true);
         await client.close();
         await setup.engine.drain();
@@ -56,7 +58,11 @@ describe('mcp resume_run', () => {
     it('needs agent:<agent>:approve', async () => {
         const setup = await waitingGate();
         const client = await connectMcp(setup.app, tokenFor('agent:echo:approve', 'run:read'));
-        const result = await callTool(client, 'resume_run', { token: await setup.tokenOf(setup.runId), approved: true });
+        const result = await callTool(client, 'approve_run', {
+            runId: setup.runId,
+            approvalId: setup.approvalId,
+            approved: true,
+        });
         expect(result.isError).toBe(true);
         expect(textOf(result)).toBe('Missing permission "agent:gate:approve".');
         expect((await setup.store.getRun(setup.runId))?.status).toBe('waiting');
@@ -64,20 +70,15 @@ describe('mcp resume_run', () => {
         await setup.engine.drain();
     });
 
-    it('rejects a forged token before any store lookup', async () => {
+    it('refuses another approval id than the run waits on', async () => {
         const setup = await waitingGate();
-        const run = await setup.store.getRun(setup.runId);
-        const forged = createResumeToken('other', {
-            runId: setup.runId,
-            approvalId: run!.waiting!.approvalId,
-            tokenId: run!.waiting!.tokenId,
-            expiresAt: run!.waiting!.expiresAt,
-        });
         const client = await connectMcp(setup.app, ADMIN_TOKEN);
-        const getRun = vi.spyOn(setup.store, 'getRun');
-        const result = await callTool(client, 'resume_run', { token: forged, approved: false });
+        const result = await callTool(client, 'approve_run', {
+            runId: setup.runId, 
+            approvalId: 'other', 
+            approved: false, 
+        });
         expect(result.isError).toBe(true);
-        expect(getRun).not.toHaveBeenCalled();
         expect((await setup.store.getRun(setup.runId))?.status).toBe('waiting');
         await client.close();
         await setup.engine.drain();
@@ -86,9 +87,15 @@ describe('mcp resume_run', () => {
     it('validates its arguments', async () => {
         const setup = createRunTestApp();
         const client = await connectMcp(setup.app, ADMIN_TOKEN);
-        expect((await callTool(client, 'resume_run', { token: 'x', approved: 'yes' })).isError).toBe(true);
-        expect((await callTool(client, 'resume_run', {
-            token: 'x',
+        expect((await callTool(client, 'approve_run', {
+            runId: 'r', 
+            approvalId: 'a', 
+            approved: 'yes', 
+        })).isError).toBe(true);
+        expect((await callTool(client, 'approve_run', { runId: 'r', approved: true })).isError).toBe(true);
+        expect((await callTool(client, 'approve_run', {
+            runId: 'r',
+            approvalId: 'a',
             approved: true,
             reason: 'r'.repeat(1_001),
         })).isError).toBe(true);

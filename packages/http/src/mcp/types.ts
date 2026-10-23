@@ -18,7 +18,7 @@ import type { Principal } from '../auth/types.ts';
 /** A run as `list_runs` lists it. */
 export type RunSummary = Pick<Run, 'id' | 'agent' | 'status' | 'createdAt' | 'finishedAt' | 'error'>;
 
-/** What `run_<agent>` answers; never carries a resume token. */
+/** What `run_<agent>` answers. */
 export type RunToolResult = {
     runId: string;
     status: RunStatusLiteral;

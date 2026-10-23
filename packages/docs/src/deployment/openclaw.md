@@ -8,7 +8,7 @@ Each chamvi app serves an MCP endpoint at `/mcp` (Streamable HTTP, from [`@chamv
 
 - one `run_<agent>` tool per agent with an `http.on()` subscription, which starts a run (channel `mcp`) and returns the run id (or, with `waitSeconds`, waits up to a minute and returns the output or the pending approval),
 - `get_run` and `list_runs` for status,
-- `resume_run` to answer an approval with its token and a decision.
+- `approve_run`, which needs `agent:<name>:approve`: OpenClaw's principal should not hold it (see below), so for OpenClaw it always fails.
 
 The endpoint uses the same bearer-token authentication as the REST API; give OpenClaw a principal with `agent:<name>:run`, which also lets it read the runs it starts. Never give it `agent:<name>:approve`: the owner answers approvals in the chamvi UI, signed in as a principal of their own. This is how the owner says "what's relevant in my mail today?" in a chat and gets a run started.
 
@@ -34,7 +34,7 @@ In the OpenClaw configuration:
 
 `deliver.channel` and `deliver.to` must name a concrete destination of your OpenClaw setup (OpenClaw refuses `channel: 'last'` and a partial destination for hooks); the examples use placeholders.
 
-For approvals the message includes how to answer: the `approvalUrl` link when configured, e.g. `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`, which opens the run's approval in the UI, where the signed-in owner answers it through the token-less `POST /runs/:id/approve` (the owner's principal needs `agent:<agent>:approve` to answer and `run:read` or `agent:<agent>:run` for the UI to show the run's approval); else a line saying to answer in the chamvi UI or through `POST /runs/:id/approve`. The message never carries a resume token or a `resume_run` call.
+For approvals the message includes how to answer: the `approvalUrl` link when configured, e.g. `https://<app>/ui/approvals?run=<runId>&approval=<approvalId>`, which opens the run's approval in the UI, where the signed-in owner answers it through `POST /runs/:id/approve` (the owner's principal needs `agent:<agent>:approve` to answer and `run:read` or `agent:<agent>:run` for the UI to show the run's approval); else a line saying to answer in the chamvi UI or through `POST /runs/:id/approve`.
 
 ::: warning The OpenClaw agent cannot approve
 The approval's title and body are what the tool wrote and may repeat untrusted text (an issue body, a mail). OpenClaw wraps hook content as external, but that does not take tools away. The message carries no token, so a relay agent whose principal holds only `agent:<name>:run` cannot approve, whatever an injected instruction says: only the owner, signed in to the UI, approves.

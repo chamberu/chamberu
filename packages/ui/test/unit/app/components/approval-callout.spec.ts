@@ -49,7 +49,6 @@ const waiting = {
     toolCallId: 'call-1',
     title: 'Deploy <prod>?',
     expiresAt: '2026-10-22T10:00:00.000Z',
-    tokenId: 't1',
 };
 
 describe('ApprovalCallout', () => {

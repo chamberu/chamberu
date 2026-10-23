@@ -54,7 +54,7 @@ import {
 const triage = defineAgent({
     name: 'triage',
     // resolved through the installed provider package (@ai-sdk/anthropic, ANTHROPIC_API_KEY)
-    model: 'anthropic:claude-sonnet-5-5',
+    model: 'anthropic/claude-sonnet-5-5',
     instructions: 'Triage the reported issue: label it and summarize the next step.',
     channels: [
         // POST /agents/triage/runs, the UI and MCP
@@ -97,7 +97,6 @@ Every variable is read once per lifecycle. An empty string counts as unset, inte
 | `DATABASE_URL` | store | `postgres://...` | unset: `MemoryStore` (warned outside `--dev`); required for `migrate` and any multi-replica or CronJob deployment |
 | `CHAMVI_MIGRATE` | store | bool | `true` (`start` and `run-job` migrate, advisory-locked) |
 | `CHAMVI_PURGE_INTERVAL_MS` | store | int, `0` disables | `3600000` (only with `TypeormStore`) |
-| `RESUME_SECRET` | engine | at least 32 characters | required for `start` and `run-job` (`--dev`: random per process, warned) |
 | `CHAMVI_MAX_CONCURRENT_RUNS` | engine | int >= 1 | `4` |
 | `CHAMVI_SCHEDULER` | scheduler | bool | `true`; `false` starts no in-process cron (CronJob mode; `cron.on()` subscriptions still validate) |
 | `CHAMVI_READINESS_DELAY_MS` | http shutdown | int | `0` |
@@ -234,7 +233,7 @@ import { configModule, engineModule, storeModule } from '@chamvi/app';
 import { createModuleHarness } from '@chamvi/app/testing';
 
 const harness = await createModuleHarness({
-    env: { RESUME_SECRET: secret },
+    env: {},
     agents: [agent],
     modules: [configModule(), storeModule(), engineModule(), auditLogModule(audit)],
 });
@@ -251,7 +250,7 @@ await harness.stop();
 
 ## Models
 
-A model string `'<provider>:<model>'` resolves through an AI SDK provider registry of every installed built-in provider (`BUILTIN_PROVIDERS`), overridden by `createApp({ models })`. Every string model is checked at `start` and `runJob`, so a string never falls through to the Vercel Gateway: a provider package that is not installed or an API key that is not set throws `InvalidAgentDefinitionError` naming the package or the variable (the CLI exits 2). Agents with a `LanguageModel` object are not checked.
+A model string `'<provider>/<model>'` (the AI SDK's own form, split at the first `/`) resolves through an AI SDK provider registry of every installed built-in provider (`BUILTIN_PROVIDERS`), overridden by `createApp({ models })`. Every string model is checked at `start` and `runJob`, so a string never falls through to the Vercel Gateway: a provider package that is not installed or an API key that is not set throws `InvalidAgentDefinitionError` naming the package or the variable (the CLI exits 2). Agents with a `LanguageModel` object are not checked.
 
 The registry is installed as `globalThis.AI_SDK_DEFAULT_PROVIDER`, which is process-wide: two apps in one process share the first one's registry until it stops. A default provider set before `start` is left alone, and chamvi then checks no model strings.
 

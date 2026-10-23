@@ -24,7 +24,7 @@ describe('exitCodeOf', () => {
     it.each([
         ['a citty CLIError', new CLIError('Unknown command x', 'E_UNKNOWN_COMMAND'), EXIT_CODE.USAGE],
         ['a cli_usage error', new ChamviError({ code: CLI_USAGE_ERROR_CODE, message: 'usage' }), EXIT_CODE.USAGE],
-        ['an InvalidAgentDefinitionError', new InvalidAgentDefinitionError('RESUME_SECRET is required.'), EXIT_CODE.USAGE],
+        ['an InvalidAgentDefinitionError', new InvalidAgentDefinitionError('DATABASE_URL is required.'), EXIT_CODE.USAGE],
         ['the app_stopped error', new ChamviError({ code: 'app_stopped', message: 'stopped' }), EXIT_CODE.OK],
         ['a plain Error', new Error('boom'), EXIT_CODE.FAILURE],
         ['a non-error value', 'boom', EXIT_CODE.FAILURE],

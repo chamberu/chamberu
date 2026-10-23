@@ -59,14 +59,13 @@ function setup(
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 's',
         clock,
         onError: (error) => {
             errors.push(error);
         },
     });
     engines.push(engine);
-    const notifier = recordApprovals(engine, 's');
+    const notifier = recordApprovals(engine);
     return {
         clock,
         store,
@@ -320,7 +319,7 @@ describe('attachments in the model prompt', () => {
         await ctx.engine.idle();
         expect((await ctx.store.getRun(runId))?.status).toBe('waiting');
 
-        await ctx.engine.resume(ctx.notifier.calls[0]!.resumeToken!, { approved: true });
+        await ctx.engine.approve(ctx.notifier.calls[0]!.runId, { approvalId: ctx.notifier.calls[0]!.approvalId, approved: true });
         await ctx.engine.idle();
 
         expect((await ctx.store.getRun(runId))?.status).toBe('completed');
