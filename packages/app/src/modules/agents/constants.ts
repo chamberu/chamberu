@@ -8,7 +8,11 @@
 /** The lifecycle hook that starts and stops the agents dir's watcher. */
 export const AGENTS_WATCHER_HOOK_NAME = 'chamvi:agents-watcher';
 
-export const NO_AGENTS_MESSAGE = 'createApp needs at least one agent or CHAMVI_AGENTS_DIR.';
+/** The agents dir without `CHAMVI_AGENTS_DIR`, used when it is a directory of the cwd. */
+export const DEFAULT_AGENTS_DIR = 'agents';
+
+/** Logged (warn) when the app starts without any agent: none in createApp and no agents dir. */
+export const NO_AGENTS_MESSAGE = `the app has no agents: pass them to createApp or add agent folders to ./${DEFAULT_AGENTS_DIR} (or CHAMVI_AGENTS_DIR)`;
 
 export const NO_DIRECTORY_MESSAGE = 'CHAMVI_AGENTS_DIR must name a directory.';
 

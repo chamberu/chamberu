@@ -10,6 +10,7 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { defineCommand } from 'citty';
 import type { CommandDef } from 'citty';
+import { SOURCE_ENTRY } from '../entry/constants.ts';
 import { resolveEntry } from '../entry/module.ts';
 import { assertKnownArgs, createUsageError, isRecord } from '../run/helpers.ts';
 import type { CliContext } from '../run/types.ts';
@@ -115,6 +116,9 @@ export function createBuildCommand(context: CliContext): CommandDef<typeof BUILD
                 entry: args.entry,
                 kind: 'source',
             });
+            if (entry === undefined) {
+                throw createUsageError(`${SOURCE_ENTRY} not found: nothing to build (without an entry, \`chamvi start\` runs the default app) or pass --entry <path>.`);
+            }
             const outDir = args['out-dir'] || BUILD_OUT_DIR;
             await assertOutDir(context.cwd, outDir, entry);
             const build = await importTsdown(context);

@@ -22,6 +22,7 @@ import {
     describe,
     expect,
     it,
+    vi,
 } from 'vitest';
 import {
     AgentsModule,
@@ -43,6 +44,7 @@ import {
     hangingModel,
     rejectionOf,
 } from '../../../utils/app.ts';
+import { NO_AGENTS_MESSAGE } from '../../../../src/modules/agents/constants.ts';
 import { agentFile, cronTrigger } from '../../../utils/agents-dir.ts';
 import { createTempDir, writeTree } from '../../../utils/folder.ts';
 import { buildHarness } from '../../../utils/harness.ts';
@@ -656,12 +658,39 @@ describe('agentsModule', () => {
         expect(harness.container.has(AppToken.AGENT_ISSUES)).toBe(false);
     });
 
-    it('without CHAMVI_AGENTS_DIR and code agents it refuses to start', async () => {
-        const { harness } = build({ env: { CHAMVI_AGENTS_DIR: '' } });
+    it('without CHAMVI_AGENTS_DIR, ./agents and code agents it starts empty and warns', async () => {
+        const cwd = await createTempDir();
+        const spy = vi.spyOn(process, 'cwd').mockReturnValue(cwd.path);
+        try {
+            const {
+                harness, 
+                engine, 
+                logger, 
+            } = build({ env: { CHAMVI_AGENTS_DIR: '' } });
+            await harness.setup();
 
-        const error = await rejectionOf(harness.setup());
+            expect(engine().listAgents()).toEqual([]);
+            expect(harness.container.has(AppToken.AGENT_ISSUES)).toBe(false);
+            expect(logger.entries).toContainEqual(expect.objectContaining({ level: 'warn', msg: NO_AGENTS_MESSAGE }));
+        } finally {
+            spy.mockRestore();
+            await cwd.remove();
+        }
+    });
 
-        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toBe('createApp needs at least one agent or CHAMVI_AGENTS_DIR.');
+    it('without CHAMVI_AGENTS_DIR it loads ./agents when that is a directory', async () => {
+        const cwd = await createTempDir();
+        await writeTree(cwd.path, { 'agents/greeter/agent.ts': agentFile('v1') });
+        const spy = vi.spyOn(process, 'cwd').mockReturnValue(cwd.path);
+        try {
+            const { harness, engine } = build({ env: { CHAMVI_AGENTS_DIR: '' } });
+            await harness.setup();
+
+            expect(engine().listAgents().map((agent) => agent.name)).toEqual(['greeter']);
+            expect(harness.container.has(AppToken.AGENT_ISSUES)).toBe(true);
+        } finally {
+            spy.mockRestore();
+            await cwd.remove();
+        }
     });
 });

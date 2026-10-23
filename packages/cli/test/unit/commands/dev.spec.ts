@@ -7,7 +7,12 @@
 
 import type { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { writeFile } from 'node:fs/promises';
+import {
+    mkdtemp,
+    rm,
+    writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
     beforeEach,
@@ -140,6 +145,19 @@ describe('dev', () => {
         expect(call.options.detached).toBe(true);
         child.end(0);
         await running;
+    });
+
+    it('without an entry file spawns start without --entry (the default app)', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'chamvi-cli-dev-'));
+        try {
+            const running = dev([], cwd);
+            const call = await spawned(running);
+            expect(call.args).toEqual(['--watch', '/opt/cli/dist/cli.mjs', 'start', '--dev']);
+            child.end(0);
+            await running;
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+        }
     });
 
     it('--entry', async () => {

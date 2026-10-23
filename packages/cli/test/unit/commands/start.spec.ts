@@ -6,6 +6,7 @@
  */
 
 import {
+    mkdir,
     mkdtemp,
     rm,
     writeFile,
@@ -105,9 +106,23 @@ describe('start', () => {
         expect(await isListening()).toBe(false);
     });
 
-    it('missing dist/index.mjs exits 2 with the hint', async () => {
+    it('without any entry file runs the default app and says so', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'chamvi-cli-start-'));
         try {
+            await start([], startEnv(port), cwd);
+            expect(fake.exitCodes).toEqual([]);
+            expect(await isListening()).toBe(true);
+            expect(fake.stderr.join('')).toContain('no entry file: running the default app');
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+        }
+    });
+
+    it('missing dist/index.mjs beside src/index.ts exits 2 with the hint', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'chamvi-cli-start-'));
+        try {
+            await mkdir(path.join(cwd, 'src'));
+            await writeFile(path.join(cwd, 'src/index.ts'), 'export default {};\n');
             await start([], startEnv(port), cwd);
             expect(fake.exitCodes).toEqual([2]);
             expect(fake.stderr.join('')).toContain('run `chamvi build` or pass --entry src/index.ts');

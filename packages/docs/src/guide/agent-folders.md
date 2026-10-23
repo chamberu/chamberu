@@ -19,10 +19,10 @@ Folder code runs in the app's process with the app's full access (store, secrets
 
 | Variable | Default | |
 |---|---|---|
-| `CHAMVI_AGENTS_DIR` | unset (no folder) | The agents dir, relative to the working directory or absolute |
+| `CHAMVI_AGENTS_DIR` | `./agents` when it is a directory, else none | The agents dir, relative to the working directory or absolute |
 | `CHAMVI_AGENTS_POLL_MS` | `5000` (`DEFAULT_AGENTS_POLL_MS`) | How often the dir is checked for changes, 1 to `TIMER_MAX_MS` |
 
-With `CHAMVI_AGENTS_DIR` set, `createApp()` may get no `agents` at all; without it, an app without agents fails to start (`createApp needs at least one agent or CHAMVI_AGENTS_DIR.`, exit 2). A value that names no directory fails `start` and `run-job` the same way. `chamvi migrate` ignores the folder.
+`createApp()` may get no `agents` at all, and the CLI needs no entry file: in a project holding only `agents/<name>/agent.ts`, `chamvi dev` and `chamvi start` run the default app with those agents. An app with no agent anywhere still starts and logs a warning. A `CHAMVI_AGENTS_DIR` that names no directory fails `start` and `run-job` (exit 2). `chamvi migrate` ignores the folder.
 
 The built-in module `chamvi:agents` (`agentsModule()`) does the work: `start` and `run-job` load every folder before the engine starts, so the first queued run already finds its agent, and `start` then watches the dir until the app stops. `run-job` loads once and does not watch, so `chamvi run-job <agent>` works for a folder agent too; it never removes an agent whose folder it does not see (only `start` does), so a job pod without the agents volume cannot cancel the replicas' runs.
 

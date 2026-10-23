@@ -122,14 +122,11 @@ describe('App.start', () => {
         expect(error.message).toContain('RESUME_SECRET');
     });
 
-    it('start refuses an app with no agents and no CHAMVI_AGENTS_DIR', async () => {
+    it('start runs an app with no agents and no agents dir', async () => {
         const app = track(createApp({ modules: [quiet()] }));
         const { env } = await envFor();
 
-        const error = await rejectionOf(app.start({ env }));
-
-        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toBe('createApp needs at least one agent or CHAMVI_AGENTS_DIR.');
+        await app.start({ env });
     });
 
     it('a second start rejects app_in_use', async () => {

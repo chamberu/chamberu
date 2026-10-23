@@ -8,11 +8,11 @@
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { isApp } from '@chamvi/app';
+import { createApp, isApp } from '@chamvi/app';
 import type { IApp } from '@chamvi/app';
 import { createUsageError, isRecord } from '../run/helpers.ts';
 import type { CliContext } from '../run/types.ts';
-import { BUILT_ENTRY, SOURCE_ENTRY } from './constants.ts';
+import { BUILT_ENTRY, DEFAULT_APP_NOTICE, SOURCE_ENTRY } from './constants.ts';
 import type { ResolveEntryInput } from './types.ts';
 
 async function isFile(file: string): Promise<boolean> {
@@ -55,10 +55,13 @@ async function readPackageEntry(cwd: string): Promise<string | undefined> {
  * The absolute entry path: `--entry`, else for a source command
  * `package.json` `chamvi.entry`, else `src/index.ts` (source) or
  * `dist/index.mjs` (built; the built commands never read `chamvi.entry`, so
- * an image built from a repo setting it still starts). A missing file, and
- * an `--entry` without a path, is a `cli_usage` error.
+ * an image built from a repo setting it still starts). Undefined when none
+ * of the defaults exists: the command runs the default app. A missing
+ * `--entry` or `chamvi.entry` file, an `--entry` without a path, and a
+ * missing `dist/index.mjs` beside a `src/index.ts` (not built yet) are a
+ * `cli_usage` error.
  */
-export async function resolveEntry(input: ResolveEntryInput): Promise<string> {
+export async function resolveEntry(input: ResolveEntryInput): Promise<string | undefined> {
     if (typeof input.entry !== 'undefined' && (typeof input.entry !== 'string' || input.entry.length === 0)) {
         throw createUsageError('--entry needs a path.');
     }
@@ -73,10 +76,13 @@ export async function resolveEntry(input: ResolveEntryInput): Promise<string> {
 
     if (input.kind === 'built') {
         const file = path.resolve(input.cwd, BUILT_ENTRY);
-        if (!(await isFile(file))) {
+        if (await isFile(file)) {
+            return file;
+        }
+        if (await isFile(path.resolve(input.cwd, SOURCE_ENTRY))) {
             throw createUsageError(`${BUILT_ENTRY} not found: run \`chamvi build\` or pass --entry ${SOURCE_ENTRY}.`);
         }
-        return file;
+        return undefined;
     }
 
     const configured = await readPackageEntry(input.cwd);
@@ -89,10 +95,7 @@ export async function resolveEntry(input: ResolveEntryInput): Promise<string> {
     }
 
     const file = path.resolve(input.cwd, SOURCE_ENTRY);
-    if (!(await isFile(file))) {
-        throw createUsageError(`${SOURCE_ENTRY} not found: pass --entry <path> or set chamvi.entry in package.json.`);
-    }
-    return file;
+    return await isFile(file) ? file : undefined;
 }
 
 /**
@@ -108,4 +111,21 @@ export async function loadApp(file: string, importModule: CliContext['importModu
     }
 
     return app;
+}
+
+/**
+ * The app of `entry` (see loadApp), or without one the default app
+ * `createApp({})`: no code agents, its agents from `./agents` or
+ * `CHAMVI_AGENTS_DIR`, configured by env alone; noted on stderr.
+ */
+export async function loadEntryApp(
+    entry: string | undefined,
+    context: Pick<CliContext, 'importModule' | 'stderr'>,
+): Promise<IApp> {
+    if (entry !== undefined) {
+        return loadApp(entry, context.importModule);
+    }
+
+    context.stderr(DEFAULT_APP_NOTICE);
+    return createApp({});
 }

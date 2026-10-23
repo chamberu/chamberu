@@ -13,7 +13,7 @@ npm install --save-dev tsdown   # only for chamvi build
 
 <<< @/snippets/app.ts#entry
 
-- The entry is `src/index.ts`. `dev`, `build` and `start --dev` take `--entry`, else the `package.json` field `"chamvi": { "entry": "<path>" }`, else `src/index.ts`. The built commands (`start`, `run-job`, `migrate`) default to `dist/index.mjs` and never read that field.
+- The entry is `src/index.ts`. `dev`, `build` and `start --dev` take `--entry`, else the `package.json` field `"chamvi": { "entry": "<path>" }`, else `src/index.ts`. The built commands (`start`, `run-job`, `migrate`) default to `dist/index.mjs` and never read that field. Without any entry file the commands run the default app, `createApp({})`, whose agents come from `./agents`: a folder of [agent folders](/guide/agent-folders) is a complete app.
 - `createApp()` is synchronous and side-effect free: no env read, no I/O, no provider import. Everything happens in `start()`, `runJob()` and `migrate()`, which the CLI calls.
 - An entry whose default export is not an app (checked with `isApp()`, which also recognizes an app of another installed copy) makes the CLI exit 2.
 - `@chamvi/app` re-exports `@chamvi/core` and the common part of `@chamvi/http` (`agentPermission`, `Permission` and the `Authenticator`, `Principal`, `HttpRoute*`, `StaticToken` types), so an agent repository imports one package.
@@ -51,7 +51,7 @@ Modules are [orkos](https://github.com/tada5hi/orkos) `IModule`s on an [eldin](h
 | `storeModule()` | A `TypeormStore` over `DATABASE_URL`, migrated unless `CHAMVI_MIGRATE=false`, plus the hourly `purgeExpired()`; without `DATABASE_URL` a `MemoryStore` (warned outside dev) |
 | `staticTokensModule()` | The `staticTokens()` authenticator from `CHAMVI_TOKENS` |
 | `engineModule()` | Checks the model strings, builds the `Engine` with every contributed channel (`AppToken.CHANNELS`) and starts it, which starts the channels |
-| `agentsModule()` | Without `CHAMVI_AGENTS_DIR`, refuses an app without agents; with it, loads the [agent folders](/guide/agent-folders) before the engine starts and watches them |
+| `agentsModule()` | Loads the [agent folders](/guide/agent-folders) of `CHAMVI_AGENTS_DIR` (else `./agents` when it exists) before the engine starts and watches them; an app with no agent at all starts with a warning |
 | `schedulerModule()` | The `cron` channel (`cronChannel()` from `@chamvi/channel-cron`); `CHAMVI_SCHEDULER=false` leaves firing to Kubernetes CronJobs and `chamvi run-job` (`cron.on()` subscriptions still validate) |
 | `httpModule()` | The `http`, `mcp` and `webhook` channels, `createHttpApp()` with every contributed route and authenticator, mounting every contributed channel with an `in` at `/channels/<name>`, the graceful shutdown, `serve()` on `HOST`:`PORT` |
 
