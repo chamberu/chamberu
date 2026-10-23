@@ -126,6 +126,6 @@ export async function approvalFlow(model: LanguageModel) {
     // #endregion answer
 
     await engine.idle();
-    engine.stop();
+    await engine.stop();
     return engine.getRun(runId);
 }

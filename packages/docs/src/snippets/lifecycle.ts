@@ -45,7 +45,7 @@ export async function watchRuns(model: LanguageModel) {
         payload: 'hello',
     });
     await engine.idle();
-    engine.stop();
+    await engine.stop();
 
     offRun();
     offStep();

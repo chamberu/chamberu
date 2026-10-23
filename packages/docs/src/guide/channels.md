@@ -5,6 +5,7 @@ A channel is anything a run can come from or talk to: a cron schedule, the REST 
 ```ts
 interface IChannel<TInput = ChannelRequest, TOutput = Response> {
     readonly name: string;
+    readonly defaultAddress?: string;            // where emit()/approve() send when no address is given
     start?(ctx: ChannelContext): Promise<void>;  // background intake: cron ticks, sockets, polling
     stop?(): Promise<void>;
     in?(input: TInput, ctx: ChannelContext): Promise<TOutput>;
@@ -28,7 +29,7 @@ type ChannelMessage = {
 type ChannelSendOptions = { signal: AbortSignal; trigger: TriggerEnvelope };
 ```
 
-The presence of `start`, `in` and `out` is a channel's only capability: `start`/`stop` run background intake (cron ticks, sockets, polling), `in` is the single inbound entry a transport feeds (the HTTP mount, tests), and `out` sends a message to an address the channel defines (`owner/repo#12` on GitHub, a chat recipient on OpenClaw). A channel's `name` follows the agent-name rule (`^[a-z0-9]+(-[a-z0-9]+)*$`) and is unique per engine.
+The presence of `start`, `in` and `out` is a channel's only capability: `start`/`stop` run background intake (cron ticks, sockets, polling), `in` is the single inbound entry a transport feeds (the HTTP mount, tests), and `out` sends a message to an address the channel defines (`owner/repo#12` on GitHub, a chat recipient on OpenClaw). A channel's `name` follows the agent-name rule (`^[a-z0-9]+(-[a-z0-9]+)*$`) and is unique per engine. An out-only channel that always talks to one recipient sets `defaultAddress` (a non-empty string): `consoleChannel()` uses its name, the OpenClaw channel its `deliver.to`.
 
 ## Registering channels
 
@@ -38,7 +39,7 @@ The engine holds the channel instances:
 
 - `new Engine({ channels })` refuses two channels with one name (`InvalidAgentDefinitionError`).
 - `engine.start()` recovers runs, then calls every channel's `start(ctx)` in registration order; a throwing `start` stops the channels already started and rejects `engine.start()`. `engine.start({ channels: false })` starts none (a one-shot [cron job](/guide/scheduler#one-shot-jobs) uses it).
-- `engine.drain()` and `engine.stop()` call every `stop()` **first** (no new intake), then drain; a throwing `stop` goes to `onError` and the drain goes on.
+- `engine.stop()` stops the poll and calls every `stop()`, resolving once all of them settled (await it before closing the store); `engine.drain()` does the same **first** (no new intake), then drains. A throwing `stop` goes to `onError` and the drain goes on.
 - `ctx.dispatch(envelope)` is `engine.dispatch()` with `channel` set to the channel's own name: a channel cannot dispatch as another.
 
 ## Subscriptions
@@ -76,7 +77,7 @@ The engine never sends a message of its own. A tool sends through a channel:
 
 - `injectChannel(ctx, name)` returns a handle on a registered channel with `out`; an unknown name, or a channel without `out`, throws `ChannelNotFoundError` (`channel_not_found`).
 - `replyChannel(ctx)` returns the run's source channel bound to its source address, or `undefined` when that channel has no `out` or the run has no address.
-- `handle.emit({ title?, body, key? }, address?)` sends through `out`. The address defaults to the source address on the source channel only; elsewhere a missing address is a `validation_error` tool error.
+- `handle.emit({ title?, body, key? }, address?)` sends through `out`. The address defaults to the source address on the source channel, else to the channel's `defaultAddress`; without either a missing address is a `validation_error` tool error.
 - An emit is an [effect](/guide/effect-tools): its key is `<runId>:emit:<channel>:<sha256 of address and message>` (or your `key`), recorded in the effect store, so identical emits of one step and a step redone after a crash send once. `out` gets the key as `message.key`, to dedupe on in the transport. A throwing `out` records nothing and is a tool error, so the next identical emit sends again.
 - `emit` outside a tool call (in the tools factory) throws `InvalidRunStateError`: the tool call is the unit of retry.
 - `handle.approve({ title, body?, timeoutMs?, address? })` asks the owner through the channel; see [Approvals](/guide/approvals).

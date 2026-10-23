@@ -15,7 +15,7 @@ How it survives a restart:
 3. An answer records the decision, appends a `wait` step and moves the run to `queued`.
 4. The next execution first runs the pending calls (no model call): the tool starts again from the top, and this time `approve()` returns the recorded decision. Their results join the checkpoint, then the model loop goes on and the model sees the tool's result.
 
-The approval id is `<toolCallId>:<n>`, `n` counting the `approve()` calls of one tool call, so a tool may ask twice (the second question pauses again after the first was answered).
+The approval id is `<stepIndex>:<toolCallId>:<n>`: the checkpoint index of the model step that made the call (so a provider that reuses a call id in a later step is asked again), the call id, and `n` counting the `approve()` calls of one tool call, so a tool may ask twice (the second question pauses again after the first was answered).
 
 ::: warning Code before approve() runs again
 On resume the tool runs from the start. Whatever it did before `approve()` happens twice, exactly like a step redone after a crash: keep it idempotent, or move side effects into [effect tools](/guide/effect-tools).

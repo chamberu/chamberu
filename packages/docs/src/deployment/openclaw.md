@@ -18,7 +18,7 @@ Messages and approval requests flow back through the OpenClaw [channel](/guide/c
 
 <<< @/snippets/channel-openclaw.ts#channel
 
-A tool sends through it with `injectChannel(ctx, 'openclaw')`: `emit()` for a message, `approve()` to pause the call until the owner answers. The address is the recipient; an empty one sends to `deliver.to`:
+A tool sends through it with `injectChannel(ctx, 'openclaw')`: `emit()` for a message, `approve()` to pause the call until the owner answers. The address is the recipient; without one the call sends to `deliver.to`, the channel's `defaultAddress`:
 
 <<< @/snippets/channel-openclaw.ts#tool
 

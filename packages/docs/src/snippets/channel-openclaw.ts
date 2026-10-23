@@ -38,10 +38,10 @@ export const deploy = defineTool({
     inputSchema: z.object({ env: z.enum(['staging', 'prod']) }),
     execute: async ({ env }, { context }) => {
         const openclaw = injectChannel(context, 'openclaw');
-        // an empty address sends to deliver.to
-        const { approved } = await openclaw.approve({ title: `Deploy to ${env}?`, address: '' });
+        // without an address both go to deliver.to (the channel's defaultAddress)
+        const { approved } = await openclaw.approve({ title: `Deploy to ${env}?` });
         if (!approved) return 'the owner said no';
-        await openclaw.emit({ body: `Deployed to ${env}.` }, '');
+        await openclaw.emit({ body: `Deployed to ${env}.` });
         return `deployed to ${env}`;
     },
 });
