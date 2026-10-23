@@ -9,11 +9,11 @@ import { createHash } from 'node:crypto';
 import { ChamviError, InvalidAgentDefinitionError, systemClock } from '@chamvi/core';
 import type { ChannelMessage } from '@chamvi/core';
 import {
+    APPROVAL_HINT,
     DEFAULT_HOOKS_PATH,
     ERROR_TEXT_MAX_LENGTH,
     IDEMPOTENCY_KEY_MAX_LENGTH,
     MESSAGE_BODY_MAX_LENGTH,
-    NO_TOKEN_HINT,
     OPENCLAW_CHANNEL_NAME,
     OPENCLAW_REQUEST_ERROR_CODE,
     OPENCLAW_TIMEOUT_MS,
@@ -146,7 +146,7 @@ export function renderMessage(
                 agent: message.agent,
             }) :
             undefined;
-        lines.push(link ? `Approve or deny: ${link}` : NO_TOKEN_HINT);
+        lines.push(link ? `Approve or deny: ${link}` : APPROVAL_HINT);
         sections.push(lines.join('\n'));
     }
     return sections.join('\n\n');

@@ -16,7 +16,6 @@ export async function smokeTest(agents: Agent[], model: MockLanguageModelV4) {
         env: {
             PORT: '3101',
             HOST: '127.0.0.1',
-            RESUME_SECRET: 'a-test-secret-of-at-least-32-chars',
             CHAMVI_TOKENS: JSON.stringify([{
                 value: 'test-token-0123456789',
                 id: 'test',

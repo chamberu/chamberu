@@ -128,7 +128,7 @@ export function waitForRun(ctx: HttpContext, runId: string, opts: WaitForRunOpti
     });
 }
 
-/** What `run_<agent>` answers for a run; never a resume token. */
+/** What `run_<agent>` answers for a run. */
 export function toRunToolResult(run: Run, deduplicated: boolean): RunToolResult {
     const result: RunToolResult = {
         runId: run.id,

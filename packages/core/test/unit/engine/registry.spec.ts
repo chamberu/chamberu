@@ -76,7 +76,6 @@ function make(opts: Partial<EngineOptions> & { store?: CountingStore; clock?: Co
         store,
         clock,
         agents: [triage],
-        resumeSecret: 's',
         onError: (error) => {
             errors.push(error);
         },
@@ -121,7 +120,6 @@ async function parkWaiting(store: MemoryStore, clock: ControllableClock, id: str
             toolCallId: 'c1',
             title: 'Run tool?',
             expiresAt: new Date(now.getTime() + 60_000),
-            tokenId: 'tok',
         },
         usage: { inputTokens: 0, outputTokens: 0 },
         createdAt: now,

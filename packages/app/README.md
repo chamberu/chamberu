@@ -97,7 +97,6 @@ Every variable is read once per lifecycle. An empty string counts as unset, inte
 | `DATABASE_URL` | store | `postgres://...` | unset: `MemoryStore` (warned outside `--dev`); required for `migrate` and any multi-replica or CronJob deployment |
 | `CHAMVI_MIGRATE` | store | bool | `true` (`start` and `run-job` migrate, advisory-locked) |
 | `CHAMVI_PURGE_INTERVAL_MS` | store | int, `0` disables | `3600000` (only with `TypeormStore`) |
-| `RESUME_SECRET` | engine | at least 32 characters | required for `start` and `run-job` (`--dev`: random per process, warned) |
 | `CHAMVI_MAX_CONCURRENT_RUNS` | engine | int >= 1 | `4` |
 | `CHAMVI_SCHEDULER` | scheduler | bool | `true`; `false` starts no in-process cron (CronJob mode; `cron.on()` subscriptions still validate) |
 | `CHAMVI_READINESS_DELAY_MS` | http shutdown | int | `0` |
@@ -234,7 +233,7 @@ import { configModule, engineModule, storeModule } from '@chamvi/app';
 import { createModuleHarness } from '@chamvi/app/testing';
 
 const harness = await createModuleHarness({
-    env: { RESUME_SECRET: secret },
+    env: {},
     agents: [agent],
     modules: [configModule(), storeModule(), engineModule(), auditLogModule(audit)],
 });

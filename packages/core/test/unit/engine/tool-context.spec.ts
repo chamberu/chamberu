@@ -109,14 +109,13 @@ function setup(s: Setup) {
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 'secret',
         clock: s.store ? undefined : clock,
         claimTtlMs: s.claimTtlMs ?? 30,
         owner: s.owner,
         onError: () => {},
     });
     engines.push(engine);
-    const notifier = recordApprovals(engine, 'secret');
+    const notifier = recordApprovals(engine);
     return {
         clock,
         store,
@@ -623,7 +622,7 @@ describe('tool context', () => {
         expect((await store.getRun(runId))?.status).toBe('waiting');
         expect(recorded).toHaveLength(0);
 
-        await engine.resume(notifier.calls[0]!.resumeToken!, { approved: true });
+        await engine.approve(notifier.calls[0]!.runId, { approvalId: notifier.calls[0]!.approvalId, approved: true });
         await engine.idle();
         expect((await store.getRun(runId))?.status).toBe('completed');
         expect(recorded).toEqual([{

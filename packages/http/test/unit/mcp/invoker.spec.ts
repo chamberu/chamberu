@@ -37,7 +37,7 @@ describe('mcp invoker', () => {
         await client.close();
     });
 
-    it('resume_run records the approver on the wait step', async () => {
+    it('approve_run records the approver on the wait step', async () => {
         const setup = createRunTestApp();
         const response = await call(setup.app, 'POST', '/agents/gate/runs', { token: tokenFor('agent:gate:run') });
         const { runId } = await response.json() as { runId: string };
@@ -45,8 +45,9 @@ describe('mcp invoker', () => {
         await setup.engine.idle();
 
         const client = await connectMcp(setup.app, tokenFor('agent:gate:approve'));
-        const result = await callTool(client, 'resume_run', {
-            token: await setup.tokenOf(runId), 
+        const result = await callTool(client, 'approve_run', {
+            runId,
+            approvalId: await setup.approvalIdOf(runId), 
             approved: false, 
             reason: 'no', 
         });

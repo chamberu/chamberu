@@ -36,7 +36,6 @@ import type { Harness } from '../../../utils/harness.ts';
 import { createRecordingLogger } from '../../../utils/logger.ts';
 import { textModel } from '../../../utils/model.ts';
 
-const SECRET = 'x'.repeat(32);
 
 function agentWith(model: Agent['definition']['model'], extra: Partial<Parameters<typeof defineAgent>[0]> = {}): Agent {
     return defineAgent({
@@ -77,7 +76,7 @@ function build(options: {
     const logger = createRecordingLogger(clock);
     const harness = buildHarness({
         mode: options.mode,
-        env: { RESUME_SECRET: SECRET, ...options.env },
+        env: { ...options.env },
         agents: options.agents,
         models: options.models,
         modules: [
@@ -148,7 +147,7 @@ describe('engineModule', () => {
         const { harness } = build({
             mode: 'migrate',
             agents: [agentWith('anthropic/m')],
-            env: { RESUME_SECRET: '', DATABASE_URL: 'postgres://u@127.0.0.1:1/x' },
+            env: { DATABASE_URL: 'postgres://u@127.0.0.1:1/x' },
             // a given store: the module never connects
             store: new MemoryStore(),
         });

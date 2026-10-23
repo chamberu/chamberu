@@ -32,7 +32,6 @@ describe('serializeRun', () => {
                 toolCallId: 'c1',
                 title: 'Deploy?',
                 expiresAt: now,
-                tokenId: 'tok',
             },
             claim: { owner: 'h-1', expiresAt: now },
             createdAt: now,
@@ -42,7 +41,7 @@ describe('serializeRun', () => {
         expect(view).not.toHaveProperty('claim');
         expect(view).toEqual({ ...run, claim: undefined });
         expect(Object.keys(view)).toEqual(Object.keys(run).filter((key) => key !== 'claim'));
-        expect(view.waiting?.tokenId).toBe('tok');
+        expect(view.waiting?.approvalId).toBe('a1');
     });
 
     it('drops the invoker permissions and keeps id, kind and name', () => {

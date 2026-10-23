@@ -48,7 +48,6 @@ function make(model: LanguageModel, tools?: () => ToolSet) {
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 's',
         onError: () => {},
     });
     engines.push(engine);
@@ -425,7 +424,6 @@ describe('streaming', () => {
                 instructions: 'You triage.',
                 model,
             })],
-            resumeSecret: 's',
             // a throwing error sink makes the listener failure escape emit
             onError: () => {
                 throw new Error('sink failed');

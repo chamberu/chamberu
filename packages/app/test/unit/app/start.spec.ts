@@ -33,7 +33,6 @@ import {
 } from '@chamvi/app';
 import type { IApp } from '@chamvi/app';
 import {
-    SECRET,
     TOKENS,
     recording,
     rejectionOf,
@@ -67,7 +66,6 @@ async function envFor(extra: Record<string, string> = {}) {
     return {
         port,
         env: {
-            RESUME_SECRET: SECRET,
             HOST: '127.0.0.1',
             PORT: String(port),
             CHAMVI_TOKENS: TOKENS,
@@ -110,16 +108,6 @@ describe('App.start', () => {
         expect((await fetch(`http://127.0.0.1:${port}/readyz`)).status).toBe(200);
         await app.stop();
         expect(await isFree(port)).toBe(true);
-    });
-
-    it('rejects InvalidAgentDefinitionError for a missing RESUME_SECRET', async () => {
-        const app = track(createApp({ agents: [agent], modules: [quiet()] }));
-        const { env } = await envFor();
-
-        const error = await rejectionOf(app.start({ env: { ...env, RESUME_SECRET: '' } }));
-
-        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toContain('RESUME_SECRET');
     });
 
     it('start runs an app with no agents and no agents dir', async () => {
@@ -243,7 +231,6 @@ describe('App.start', () => {
                 agents: [queued],
                 // names only: this replica serves nothing
                 channels: [{ name: 'http' }, { name: 'cron' }],
-                resumeSecret: SECRET,
             });
             const { runId } = await other.dispatch({
                 agent: 'queued',

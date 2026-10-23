@@ -13,7 +13,7 @@ A run has exactly one of seven statuses. `RunStatus` is an enum of them, and `Ru
 | `cancelled` | `CANCELLED` | `cancel()` ended it | yes |
 
 <div class="figure">
-    <img class="only-light" src="/run-lifecycle-light.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." />
+    <img class="only-light" src="/run-lifecycle-light.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting until it is answered; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." />
     <img class="only-dark" src="/run-lifecycle-dark.svg" alt="" aria-hidden="true" />
 </div>
 

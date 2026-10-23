@@ -120,7 +120,6 @@ export async function triageIssue(model: LanguageModel) {
                 lines.push(line);
             },
         })],
-        resumeSecret: 'change-me',
     });
     await engine.start();
 
@@ -221,14 +220,9 @@ const deployer = defineAgent({
     tools: { deploy },
 });
 
-// fail fast: the engine rejects an empty secret, which would let anyone mint tokens
-const resumeSecret = process.env.RESUME_SECRET;
-if (!resumeSecret) throw new Error('RESUME_SECRET is not set');
-
 const engine = new Engine({
     store,
     agents: [deployer],
-    resumeSecret,
 });
 
 // later, from the owner's answer to run.waiting
@@ -238,8 +232,7 @@ await engine.approve(runId, { approvalId, approved: true });
 - `approve(ctx, { title, body?, timeoutMs? })` runs inside a tool call (its `execute` or the agent's `hooks`). It puts the run in `waiting` (`run.waiting` names the approval, `<stepIndex>:<toolCallId>:<n>`) and frees its slot; the approval survives restarts. Once answered, the call runs again from the start and `approve()` returns `{ approved, reason?, approver? }`, so code before it must be idempotent. Other calls of the same step that finished keep their results.
 - `ctx.channels.findOneOrFail(name).approve({ title, address? })` is the same, with the request delivered through that channel.
 - To gate a tool you did not write, call `approve()` in the agent's `beforeToolExecution` hook and throw `ToolDeniedError` for a denial.
-- `engine.resume(token, decision)` answers with a resume token signed with `resumeSecret` (`createResumeToken`). A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
-- `engine.approve(runId, { approvalId, approved, reason? })` answers the current wait point without a token, for a caller that authorized the approver itself; it spends a token handed out earlier like `resume()`.
+- `engine.approve(runId, { approvalId, approved, reason?, approver? })` answers the current wait point, for a caller that authorized the approver itself. An answer is single use.
 - An approval not answered within its `timeoutMs` (default 24 hours) is denied with the reason `approval timed out`.
 
 ### Invokers and tool access
@@ -266,7 +259,7 @@ const ops = defineAgent({
     },
 });
 
-await engine.dispatch({
+const { runId } = await engine.dispatch({
     agent: 'ops',
     trigger: 'http',
     channel: 'http',
@@ -274,8 +267,9 @@ await engine.dispatch({
     invoker: { id: 'u-42', kind: 'user', permissions: ['tool:ops:deploy'] },
 });
 
-// the approver is recorded on the run's wait step
-await engine.resume(token, { approved: true, approver: { id: 'u-7', kind: 'user', permissions: [] } });
+// later, once the run waits: the approver is recorded on the run's wait step
+const { approvalId } = (await engine.getRun(runId))!.waiting!;
+await engine.approve(runId, { approvalId, approved: true, approver: { id: 'u-7', kind: 'user', permissions: [] } });
 ```
 
 - The invoker (`{ id, kind, name?, permissions }`) is a snapshot taken at dispatch. A run keeps it across approvals and restarts; revoking a grant later does not reach a run that already holds it.
@@ -344,7 +338,6 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 |---|---|---|---|
 | `store` | `IStore` | required | Where runs, steps, checkpoints and state live |
 | `agents` | `Agent[]` | required | The agents this engine runs |
-| `resumeSecret` | `string` | required | HMAC secret for resume tokens; must not be empty |
 | `channels` | `IChannel[]` | `[]` | Channels by unique name, started by `start()` and stopped first by `drain()`/`stop()`; tools reach them through `ctx.channels` |
 | `maxConcurrentRuns` | `number` | `4` | Runs executing at once in this process |
 | `claimTtlMs` | `number` | `60_000` | Lease on a running run, renewed every `claimTtlMs / 3`; the poll for new work, expired approvals and abandoned runs uses the same interval |
@@ -374,7 +367,7 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 |---|---|---|
 | `defineAgent` | function | Validates an agent definition and applies defaults |
 | `DEFAULT_MAX_STEPS`, `DEFAULT_TIMEOUT_MS` | constant | The default budget: `20` steps, `900_000` ms |
-| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `putAgent`, `removeAgent`, `getChannel`, `listChannels`, `provide`, `start`, `dispatch`, `getRun`, `on`, `resume`, `approve`, `inspectResumeToken`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
+| `Engine` | class | `store`, `clock`, `getAgent`, `listAgents`, `putAgent`, `removeAgent`, `getChannel`, `listChannels`, `provide`, `start`, `dispatch`, `getRun`, `on`, `approve`, `cancel`, `recover`, `tick`, `idle`, `stop`, `drain` |
 | `MemoryStore` | class | In-memory `IStore` |
 | `defineTool` | function | An AI SDK `tool()` whose `execute` gets the run's `ToolContext` as `context` |
 | `defineContextKey`, `inject`, `tryInject` | function | Typed context keys, and reading a value provided on the engine from a `ToolContext` |
@@ -384,7 +377,6 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `wrapToolsForRun` | function | `wrapToolsForRun(tools, ctx, store, { allow?, hooks? })`: applies effect recording and the agent hooks to a `ToolSet` outside the engine, with a `ToolContext`; an optional `allow(toolName)` re-checks each call (a refused call throws `ToolNotAllowedError`) |
 | `approve` | function | `approve(ctx, { title, body?, timeoutMs? })`: a durable approval from inside a tool call |
 | `DEFAULT_APPROVAL_TIMEOUT_MS`, `APPROVAL_TIMEOUT_MAX_MS` | constant | `86_400_000` (24 h), `2_147_483_647` |
-| `createResumeToken`, `verifyResumeToken` | function | Sign and check resume tokens |
 | `createAgentState`, `createStateTools` | function | State API over a store, and `createStateTools(schema)`, the generated state tools (they read `context.state`) |
 | `hasPermission`, `matchesPermission`, `toolPermission` | function | Permission matching and the `tool:<agent>:<tool>` permission |
 | `requireToolPermission` | function | A `toolPolicy` that checks the invoker's permissions |
@@ -392,7 +384,7 @@ A missing value throws `ContextNotProvidedError` (`context_not_provided`, naming
 | `assertTriggerKey`, `normalizeEnvelope` | function | The 255-character, no-NUL rule for envelope keys and addresses; the read-back of envelopes stored before channels (`source`, `thread`) for store implementations |
 | `isArtifactMediaType` | function | The media type rule for attachments and artifacts (`type/subtype`, no parameters) |
 | `ChamviError` | class | Base class of every error below |
-| `InvalidAgentDefinitionError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
+| `InvalidAgentDefinitionError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError` | class | Rejections of definitions and engine calls |
 | `BudgetExceededError`, `FatalToolError`, `IncompleteResponseError`, `LeaseLostError`, `TimeoutError`, `ValidationError` | class | Run failures and reported conditions; `ValidationError.issues` holds the validup issues |
 | `ContextNotProvidedError` | class | `inject()` found no value for the key (`context_not_provided`) |
 | `ChannelNotFoundError` | class | `ctx.channels.findOneOrFail()` named a channel the engine does not have or one without `out` (`channel_not_found`) |

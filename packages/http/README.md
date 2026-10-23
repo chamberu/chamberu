@@ -68,7 +68,6 @@ export async function createAgentServer(model: LanguageModel) {
     const engine = new Engine({
         store: new MemoryStore(),
         agents: [echo],
-        resumeSecret: 'change-me',
         // REST runs carry channel http, MCP runs channel mcp
         channels: [httpChannel(), mcpChannel()],
     });
@@ -119,7 +118,6 @@ Paths are relative to `basePath` (default none).
 | `GET /runs/:id/artifacts/:artifactId` | as `GET /runs/:id` | `200` the bytes: stored media type, `content-disposition: attachment` (RFC 5987 `filename*` when named), `nosniff`, `private, no-store`; `404 artifact_not_found` for an unknown artifact or one of another run |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /runs/:id/approve` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ approvalId, approved, reason? }`; answers the run's current wait point without a token (409 for another `approvalId`, an expired wait point or a run not waiting) |
-| `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
 | `POST /channels/<name>[/...]` | the channel's own | Whatever the channel's `in` answers; only for the channels in the `channels` option (see [Channels](#channels)) |
 | `GET /agents` | `run:read` | `200 { data: AgentSummary[], issues }`: subscriptions `{ channel, id, hook? }` (`hook`: the path of a subscription to a webhook channel this app mounts), budget, state collections; `issues` lists agents that failed to load |
 | `GET /schedules` | `run:read` | `200 { data: ScheduleSummary[] }`: every cron subscription (`@chamvi/channel-cron`'s `cron.on()`) with its channel and next fire time (from the definitions, not from a running scheduler) |
@@ -141,7 +139,7 @@ Bodies are JSON (`application/json` or `*+json`), at most `bodyLimit` bytes (413
 
 `GET /runs/:id` answers 404 before 403, so any authenticated principal can tell whether a run id exists; run ids are random UUIDs. Runs on the wire never carry the internal `claim` (owner and lease).
 
-`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`: `id`, `kind`, `permissions`, and a `name` from the `name` or `preferred_username` claim, never `email`, since every reader of the run sees it; static tokens have none), so tool code and a core `toolPolicy` can tell who started the run. `POST /runs/:id/approve`, `POST /resume` and MCP `resume_run` record the approver on the `wait` step (`output.approver`). Both come only from the authenticator, never from a body. Webhook runs have no invoker. The invoker and approver leave the package (REST, SSE, MCP) without their `permissions`, so a `run:read` holder never learns another principal's grants.
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`: `id`, `kind`, `permissions`, and a `name` from the `name` or `preferred_username` claim, never `email`, since every reader of the run sees it; static tokens have none), so tool code and a core `toolPolicy` can tell who started the run. `POST /runs/:id/approve` and MCP `approve_run` record the approver on the `wait` step (`output.approver`). Both come only from the authenticator, never from a body. Webhook runs have no invoker. The invoker and approver leave the package (REST, SSE, MCP) without their `permissions`, so a `run:read` holder never learns another principal's grants.
 
 The SSE stream follows the run through `engine.on` and polls the store every `stream.pollMs` (default 2 s), so it also sees a run executing on another replica. `delta` events (`data: { step, kind: 'text' | 'reasoning', text }`) forward the engine's `run.delta` while the model writes (`step` is the checkpoint step index of the `llm` step being generated (one per model call), not the `step.appended` `id`, which also counts `tool` and `wait` rows); they have no `id` (`Last-Event-ID` stays a step index), are never replayed and come only from the replica executing the run. `Last-Event-ID` resumes after a step index; the query `?after=<step index>` does the same for clients that cannot set the header (a non-negative integer, given once, else 400). When both are present a valid `Last-Event-ID` wins, since it carries the client's progress on a reconnect while the URL stays the one of the first connect; a malformed `Last-Event-ID` reads as absent and `?after` applies.
 
@@ -154,7 +152,7 @@ Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`
 | Permission | Grants |
 |---|---|
 | `agent:<name>:run` | Start runs of the agent (REST, `webhookChannel()` deliveries, MCP `run_<name>`) and read them |
-| `agent:<name>:approve` | Answer the agent's approvals (`POST /runs/:id/approve`, `POST /resume`, MCP `resume_run`) |
+| `agent:<name>:approve` | Answer the agent's approvals (`POST /runs/:id/approve`, MCP `approve_run`) |
 | `run:read` | Read and list every run, the agents and the schedules |
 | `run:cancel` | Cancel runs |
 | `state:read`, `state:write` | Read and write agent state |
@@ -162,7 +160,7 @@ Each app caps the open SSE streams plus the MCP `run_<agent>` calls that wait (`
 
 A `*` segment matches exactly one segment: `agent:*:run` grants `agent:triage:run` but not `agent:triage:approve`, and `agent:*` grants neither. Matching is case-sensitive. `agentPermission(agent, action)` is exported; to check a principal yourself, use `hasPermission(principal.permissions, permission)` from `@chamvi/core`, the matcher the routes use.
 
-`POST /resume` needs authentication **and** the approve permission: the resume token alone is not enough. The token's signature and expiry are checked before any store lookup (a forged or expired token answers 400 without touching the store). `POST /runs/:id/approve { approvalId, approved, reason? }` answers the current wait point without a token, with the approve permission alone; another `approvalId` than the run's current one, an expired wait point or a run that is not waiting is 409, and the notified token is spent either way.
+`POST /runs/:id/approve { approvalId, approved, reason? }` answers the current wait point with the approve permission alone; another `approvalId` than the run's current one, an expired wait point, a run that is not waiting and a second answer are 409.
 
 ## Authenticators
 
@@ -209,9 +207,9 @@ Agents subscribe to channels (`defineAgent({ channels: [...] })`, see `@chamvi/c
 | `run_<agent>` | `{ payload?, idempotencyKey?, address?, waitSeconds? }` | `{ runId, status, deduplicated, output?, error?, waiting? }` |
 | `get_run` | `{ runId }` | The run (as `GET /runs/:id`, without steps) |
 | `list_runs` | `{ agent?, status?, limit?, offset? }` | `{ data: RunSummary[], total }` |
-| `resume_run` | `{ token, approved, reason? }` | `{ runId, status: 'queued' }` |
+| `approve_run` | `{ runId, approvalId, approved, reason? }` | `{ runId, status: 'queued' }` |
 
-- `run_<agent>` is listed for each agent with an `http.on()` subscription the principal may run (runs carry channel `mcp`); its `payload` carries the subscription schema's JSON Schema (local `$ref`s re-rooted under `payload`). Tool definitions are built once in `createHttpApp`, which throws `InvalidAgentDefinitionError` for a payload schema the MCP validator cannot compile or a tool name above the 64 characters MCP allows (an agent name above 60; set `mcp: false` to keep it). `waitSeconds` (default 0) waits for `completed`, `failed`, `cancelled` or `waiting`, at most `mcp.maxWaitSeconds` (default 60; larger values are clamped). A wait holds one of the app's `stream.maxOpen` slots; with all taken the call answers at once with `{ runId, status, deduplicated }`, like `waitSeconds: 0`, and the run proceeds. The wait polls the store every second, so it sees a run executing on another replica, and stops when the client goes away. A `waiting` answer names the tool and the approval's `title` and `body`, never the resume token.
+- `run_<agent>` is listed for each agent with an `http.on()` subscription the principal may run (runs carry channel `mcp`); its `payload` carries the subscription schema's JSON Schema (local `$ref`s re-rooted under `payload`). Tool definitions are built once in `createHttpApp`, which throws `InvalidAgentDefinitionError` for a payload schema the MCP validator cannot compile or a tool name above the 64 characters MCP allows (an agent name above 60; set `mcp: false` to keep it). `waitSeconds` (default 0) waits for `completed`, `failed`, `cancelled` or `waiting`, at most `mcp.maxWaitSeconds` (default 60; larger values are clamped). A wait holds one of the app's `stream.maxOpen` slots; with all taken the call answers at once with `{ runId, status, deduplicated }`, like `waitSeconds: 0`, and the run proceeds. The wait polls the store every second, so it sees a run executing on another replica, and stops when the client goes away. A `waiting` answer names the tool and the approval's `title` and `body`.
 - Idempotency keys are scoped per agent, channel and principal: an MCP start dedupes under `<agent>:mcp:<kind>:<id>`, a REST start under `<agent>:http:<kind>:<id>` (the principal's `kind` and `id`, URI-encoded), so one key used over both transports, or by two principals, creates two runs. Webhook starts carry no invoker and dedupe under `<agent>:webhook`.
 - `get_run` and `list_runs` follow the REST read rule; denied permissions and unknown runs come back as tool errors (`isError`).
 

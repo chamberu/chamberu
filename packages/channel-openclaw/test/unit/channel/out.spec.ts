@@ -175,7 +175,7 @@ describe('openclawChannel out', () => {
             'Run: r1',
             '',
             'Expires: 2026-10-21T10:00:00.000Z',
-            'Answer it in the chamvi UI (or through POST /runs/:id/approve); this message carries no resume token.',
+            'Answer it in the chamvi UI or through POST /runs/:id/approve.',
         ].join('\n'));
         // the hint names no path that needs the token (MCP resume_run)
         expect(messageOf(fake.requests[0]!.body)).not.toMatch(/MCP|resume_run/);
@@ -186,7 +186,7 @@ describe('openclawChannel out', () => {
         ['with approvalUrl', { approvalUrl }],
         // the former notifier option is gone: nothing puts a token in again
         ['with a leftover resumeTool', { resumeTool: true } as Partial<OpenclawChannelOptions>],
-    ])('the message never holds a resume token %s', async (_label, patch) => {
+    ])('the message holds no token %s', async (_label, patch) => {
         const { fake, send } = setup(patch);
         await send(approval);
         const sent = JSON.stringify(fake.requests);
@@ -212,7 +212,7 @@ describe('openclawChannel out', () => {
         }]);
         const text = messageOf(fake.requests[0]!.body);
         expect(text.endsWith('Expires: 2026-10-21T10:00:00.000Z\nApprove or deny: https://app.example/ui/approvals?run=r1&approval=a1')).toBe(true);
-        expect(text).not.toContain('carries no resume token');
+        expect(text).not.toContain('Answer it in the chamvi UI');
     });
 
     it('renders the hint instead of a link for an approval without an approvalId', async () => {
@@ -229,7 +229,7 @@ describe('openclawChannel out', () => {
         expect(refs).toEqual([]);
         const text = messageOf(fake.requests[0]!.body);
         expect(text).not.toContain('Approve or deny');
-        expect(text).toContain('carries no resume token');
+        expect(text).toContain('Answer it in the chamvi UI or through POST /runs/:id/approve.');
     });
 
     it('renders a message without approval lines', async () => {

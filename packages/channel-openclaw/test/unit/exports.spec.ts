@@ -29,7 +29,7 @@ describe('public api', () => {
         'IDEMPOTENCY_KEY_MAX_LENGTH',
         'DEFAULT_NOTIFIER_NAME',
         'ERROR_TEXT_MAX_LENGTH',
-        'NO_TOKEN_HINT',
+        'APPROVAL_HINT',
         'resolveOptions',
         'openclawContextKey',
         'renderMessage',

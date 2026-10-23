@@ -14,7 +14,6 @@ import {
     vi,
 } from 'vitest';
 import { runCli } from '../../../src/run/module.ts';
-import { RESUME_SECRET } from '../../utils/env.ts';
 import { createFakeProcess } from '../../utils/process.ts';
 import type { FakeProcess } from '../../utils/process.ts';
 
@@ -29,7 +28,7 @@ describe('run-job', () => {
     });
 
     async function runJob(args: string[]) {
-        await runCli(['run-job', ...args], fake.context({ env: { RESUME_SECRET, CHAMVI_DRAIN_TIMEOUT_MS: '1000' } }));
+        await runCli(['run-job', ...args], fake.context({ env: { CHAMVI_DRAIN_TIMEOUT_MS: '1000' } }));
     }
 
     it('completed exits 0', async () => {

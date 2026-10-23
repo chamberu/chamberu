@@ -73,7 +73,6 @@ function make(opts: Partial<EngineOptions> = {}) {
     const engine = new GatedEngine({
         store: new MemoryStore(),
         agents: [agent],
-        resumeSecret: 's',
         onError: () => {},
         ...opts,
     });

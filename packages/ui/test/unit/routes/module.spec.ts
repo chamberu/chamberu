@@ -63,7 +63,7 @@ describe('uiRoutes', () => {
 
     it('falls back to index.html for a client route', async () => {
         const { app } = createUiTestApp({ routes: uiRoutes({ root: FIXTURE_BUILD }) });
-        for (const path of ['/ui/runs/abc', '/ui/approvals?token=x', '/ui/state/triage']) {
+        for (const path of ['/ui/runs/abc', '/ui/approvals?run=x', '/ui/state/triage']) {
             const response = await get(app, path);
             expect(response.status, path).toBe(200);
             expect(response.headers.get('content-type'), path).toBe('text/html; charset=utf-8');

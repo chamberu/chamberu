@@ -28,7 +28,7 @@ import {
     storeModule,
 } from '@chamvi/app';
 import type { IApp } from '@chamvi/app';
-import { SECRET, TOKEN, TOKENS } from '../../utils/app.ts';
+import { TOKEN, TOKENS } from '../../utils/app.ts';
 import { buildHarness } from '../../utils/harness.ts';
 import type { Harness } from '../../utils/harness.ts';
 import { createRecordingLogger } from '../../utils/logger.ts';
@@ -86,7 +86,6 @@ async function build(options: { agents?: Agent[]; modules?: IModule[] } = {}) {
     const logger = createRecordingLogger(clock);
     const harness = buildHarness({
         env: {
-            RESUME_SECRET: SECRET,
             HOST: '127.0.0.1',
             PORT: String(port),
             CHAMVI_TOKENS: TOKENS,
@@ -230,7 +229,7 @@ describe('channels', () => {
         });
         apps.push(app);
 
-        const result = await app.runJob({ env: { RESUME_SECRET: SECRET }, agent: 'sweep' });
+        const result = await app.runJob({ env: {}, agent: 'sweep' });
 
         expect(result).toMatchObject({ status: 'completed', exitCode: 0 });
         expect(events).toEqual([]);

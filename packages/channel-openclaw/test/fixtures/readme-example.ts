@@ -18,11 +18,10 @@ export function createApprovalEngine(
         OPENCLAW_HOOKS_TOKEN,
         OPENCLAW_CHANNEL,
         OPENCLAW_TO,
-        RESUME_SECRET,
         APP_URL,
     } = process.env;
-    if (!OPENCLAW_URL || !OPENCLAW_HOOKS_TOKEN || !OPENCLAW_CHANNEL || !OPENCLAW_TO || !RESUME_SECRET || !APP_URL) {
-        throw new Error('Set OPENCLAW_URL, OPENCLAW_HOOKS_TOKEN, OPENCLAW_CHANNEL, OPENCLAW_TO, RESUME_SECRET and APP_URL.');
+    if (!OPENCLAW_URL || !OPENCLAW_HOOKS_TOKEN || !OPENCLAW_CHANNEL || !OPENCLAW_TO || !APP_URL) {
+        throw new Error('Set OPENCLAW_URL, OPENCLAW_HOOKS_TOKEN, OPENCLAW_CHANNEL, OPENCLAW_TO and APP_URL.');
     }
 
     const openclaw = openclawChannel({
@@ -60,7 +59,6 @@ export function createApprovalEngine(
         store: new MemoryStore({ clock: options.clock }),
         agents: [deployer],
         channels: [openclaw],
-        resumeSecret: RESUME_SECRET,
         clock: options.clock,
     });
 }

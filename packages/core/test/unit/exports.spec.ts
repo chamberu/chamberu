@@ -21,11 +21,8 @@ describe('public api', () => {
         'defineEffectTool',
         'defineTool',
         'effectMarker',
-        'createResumeToken',
         'approve',
-        'verifyResumeToken',
         'ChamviError',
-        'InvalidResumeTokenError',
         'BudgetExceededError',
         'ArtifactNotFoundError',
         'ToolNotAllowedError',
@@ -92,6 +89,13 @@ describe('public api', () => {
         expect(core).not.toHaveProperty('consoleNotifier');
     });
 
+    it('removes the resume tokens', () => {
+        expect(core).not.toHaveProperty('createResumeToken');
+        expect(core).not.toHaveProperty('verifyResumeToken');
+        expect(core).not.toHaveProperty('InvalidResumeTokenError');
+        expect(core.ErrorCode).not.toHaveProperty('INVALID_RESUME_TOKEN');
+    });
+
     it('exports the channel types', () => {
         expectTypeOf<core.ChannelRequest>().toEqualTypeOf<{ request: Request; subpath: string }>();
         expectTypeOf<core.ChannelDispatchEnvelope>().toEqualTypeOf<Omit<core.DispatchEnvelope, 'channel'>>();
@@ -156,6 +160,11 @@ describe('public api', () => {
     });
 
     it('exports the ApprovalAnswer type', () => {
-        expectTypeOf<core.ApprovalAnswer>().toEqualTypeOf<core.ResumeDecision & { approvalId: string }>();
+        expectTypeOf<core.ApprovalAnswer>().toEqualTypeOf<{
+            approvalId: string;
+            approved: boolean;
+            reason?: string;
+            approver?: core.Invoker;
+        }>();
     });
 });

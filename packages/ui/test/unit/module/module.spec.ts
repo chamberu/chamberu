@@ -26,7 +26,6 @@ import type { ModuleHarness } from '@chamvi/app/testing';
 import { uiModule } from '@chamvi/ui/module';
 import { textModel } from '../../utils/model.ts';
 import {
-    SECRET,
     TOKENS,
     createRecordingLogger,
     freePort,
@@ -46,7 +45,6 @@ async function served(env: Record<string, string> = {}, basePath = '') {
     const port = await freePort();
     const harness = await createModuleHarness({
         env: {
-            RESUME_SECRET: SECRET,
             CHAMVI_TOKENS: TOKENS,
             HOST: '127.0.0.1',
             PORT: String(port),

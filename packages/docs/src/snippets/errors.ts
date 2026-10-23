@@ -8,12 +8,11 @@ import type { Agent, IStore } from '@chamvi/core';
 
 declare const logger: { error(fields: object, message: string): void };
 
-export function createEngine(store: IStore, agents: Agent[], resumeSecret: string) {
+export function createEngine(store: IStore, agents: Agent[]) {
     // #region on-error
     const engine = new Engine({
         store,
         agents,
-        resumeSecret,
         onError: (error, run) => {
             if (error instanceof LeaseLostError) {
                 // another replica carries the run on; nothing to do

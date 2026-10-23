@@ -177,7 +177,6 @@ describe('stream.maxOpen', () => {
         const engine = new Engine({
             store,
             agents,
-            resumeSecret: 'test-secret',
             clock,
             channels: testChannels(),
             onError: () => {},

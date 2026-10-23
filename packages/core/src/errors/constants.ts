@@ -14,7 +14,6 @@ export const ErrorCode = {
     FATAL_TOOL: 'FatalToolError',
     INCOMPLETE_RESPONSE: 'incomplete_response',
     INVALID_AGENT_DEFINITION: 'invalid_agent_definition',
-    INVALID_RESUME_TOKEN: 'invalid_resume_token',
     INVALID_RUN_STATE: 'invalid_run_state',
     LEASE_LOST: 'lease_lost',
     RUN_NOT_FOUND: 'run_not_found',

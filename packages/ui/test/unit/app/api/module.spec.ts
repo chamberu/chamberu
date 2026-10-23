@@ -207,17 +207,6 @@ describe('createApiClient', () => {
         ]);
     });
 
-    it('resumes with the token in the body', async () => {
-        const { fetch, requests } = createFakeFetch([json({ runId: 'r1', status: 'queued' }, 202)]);
-        const client = createApiClient({
-            apiBase: '',
-            token: async () => 't',
-            fetch,
-        });
-        expect(await client.resume({ token: 'resume.sig', approved: true })).toEqual({ runId: 'r1', status: 'queued' });
-        expect(JSON.parse(requests[0]!.body!)).toEqual({ token: 'resume.sig', approved: true });
-    });
-
     it('opens the run stream with the last event id', async () => {
         const controller = new AbortController();
         const { fetch, requests } = createFakeFetch([new Response('', { status: 200 })]);

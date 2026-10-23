@@ -44,7 +44,6 @@ function setup(model: LanguageModel, tools: AgentDefinition['tools']) {
             model,
             tools,
         })],
-        resumeSecret: 'test-secret',
         clock,
         onError: (error) => {
             errors.push(error);

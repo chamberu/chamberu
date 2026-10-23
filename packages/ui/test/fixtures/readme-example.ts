@@ -5,7 +5,6 @@ import { uiRoutes } from '@chamvi/ui';
 const engine = new Engine({
     store: new MemoryStore(),
     agents: [],
-    resumeSecret: process.env.RESUME_SECRET ?? 'change-me',
 });
 
 const admin = {

@@ -7,14 +7,11 @@
 
 import type { Env } from '@chamvi/app';
 
-export const RESUME_SECRET = 'a-resume-secret-of-at-least-32-characters';
-
 export const TOKEN = 'a-static-token-of-16+';
 
 /** The env a production start needs, on a loopback port. */
 export function startEnv(port: number, extra: Env = {}): Env {
     return {
-        RESUME_SECRET,
         CHAMVI_TOKENS: JSON.stringify([{
             value: TOKEN,
             id: 'ops',

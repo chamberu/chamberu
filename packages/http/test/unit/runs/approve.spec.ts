@@ -29,7 +29,6 @@ async function pausedGate(overrides: TestAppOverrides = {}) {
     return {
         ...ctx,
         runId,
-        token: await ctx.tokenOf(runId),
         waiting: run!.waiting!,
     };
 }
@@ -196,24 +195,6 @@ describe('POST /runs/:id/approve', () => {
         const response = await call(app, 'POST', `/runs/${runId}/approve`, { token: ADMIN_TOKEN, body });
         expect(response.status).toBe(400);
         expect((await store.getRun(runId))?.status).toBe('waiting');
-        await engine.drain();
-    });
-
-    it('the notified resume token is spent after approve', async () => {
-        const {
-            app,
-            engine,
-            runId,
-            token,
-            waiting,
-        } = await pausedGate();
-        await call(app, 'POST', `/runs/${runId}/approve`, {
-            token: ADMIN_TOKEN,
-            body: { approvalId: waiting.approvalId, approved: true },
-        });
-        await engine.idle();
-        const response = await call(app, 'POST', '/resume', { token: ADMIN_TOKEN, body: { token, approved: true } });
-        expect(response.status).toBe(409);
         await engine.drain();
     });
 });

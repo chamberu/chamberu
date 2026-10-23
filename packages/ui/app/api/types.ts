@@ -76,12 +76,6 @@ export type StartRunBody = {
 
 export type StartRunResult = { runId: string; deduplicated: boolean };
 
-export type ResumeBody = {
-    token: string;
-    approved: boolean;
-    reason?: string
-};
-
 /** Options of `createApiClient()`. */
 export type ApiClientOptions = {
     apiBase: string;
@@ -102,7 +96,6 @@ export interface IApiClient {
     getRun(id: string): Promise<RunDetail>;
     cancelRun(id: string): Promise<void>;
     approve(id: string, body: ApproveBody): Promise<void>;
-    resume(body: ResumeBody): Promise<{ runId: string }>;
     listKv(agent: string, page?: PageQuery): Promise<KvEntry[]>;
     listDocs(agent: string, collection: string, page?: PageQuery): Promise<DocEntry[]>;
     /** The raw SSE response of `GET /runs/:id/stream` (an ApiError for a non-2xx answer). */

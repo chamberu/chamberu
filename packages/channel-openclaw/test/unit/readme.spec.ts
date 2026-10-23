@@ -27,7 +27,6 @@ function stubEnv() {
     vi.stubEnv('OPENCLAW_HOOKS_TOKEN', TOKEN);
     vi.stubEnv('OPENCLAW_CHANNEL', 'telegram');
     vi.stubEnv('OPENCLAW_TO', '12345');
-    vi.stubEnv('RESUME_SECRET', 'readme-resume-secret');
     vi.stubEnv('APP_URL', 'https://chamvi.example');
 }
 

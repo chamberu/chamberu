@@ -40,7 +40,6 @@ export async function triageIssue(model: LanguageModel) {
                 lines.push(line);
             },
         })],
-        resumeSecret: 'change-me',
     });
     await engine.start();
 

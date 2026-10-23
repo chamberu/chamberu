@@ -220,7 +220,6 @@ describe('useAgentDetail', () => {
                     toolCallId: 'call-1',
                     title: 'Deploy prod?',
                     expiresAt: now,
-                    tokenId: 't1',
                 },
             }),
             wireRun({

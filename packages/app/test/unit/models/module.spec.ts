@@ -348,7 +348,6 @@ describe('installDefaultProvider', () => {
         const engine = new Engine({
             store: new MemoryStore({ clock }),
             agents: [agent],
-            resumeSecret: 's',
             clock,
         });
         try {

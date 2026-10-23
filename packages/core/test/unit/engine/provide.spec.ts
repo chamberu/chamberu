@@ -61,7 +61,6 @@ function setup(model: LanguageModel, tools: AgentDefinition['tools']) {
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 'secret',
         clock,
         claimTtlMs: 30,
         onError: (error) => {

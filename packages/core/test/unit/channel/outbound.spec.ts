@@ -108,7 +108,6 @@ function setup(
             tools,
         })],
         channels: opts.channels ?? [slack.channel, web],
-        resumeSecret: 'secret',
         clock,
         claimTtlMs: 30,
         onError: (error) => {

@@ -5,7 +5,6 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { RESUME_STORAGE_KEY } from '../approvals/constants.ts';
 import { AUTHUP_STORAGE_PREFIX, STORAGE_PREFIX } from './constants.ts';
 
 /** `path` when it is a path of this app (`/...`, never `//host` or a URL), else `fallback`. */
@@ -14,17 +13,12 @@ export function safeReturnPath(path: unknown, fallback = '/'): string {
     return path;
 }
 
-/**
- * Removes every `chamvi.` key (the token, the return path, the authup
- * session) but a pending deep-link token (`chamvi.resume`): a principal
- * the server refused (403) can sign out and answer it as another one in
- * the same tab. Answering it, or a 400/409, removes it.
- */
+/** Removes every `chamvi.` key (the token, the return path, the authup session). */
 export function clearStorage(storage: Storage): void {
     const keys: string[] = [];
     for (let i = 0; i < storage.length; i++) {
         const key = storage.key(i);
-        if (key?.startsWith(STORAGE_PREFIX) && key !== RESUME_STORAGE_KEY) keys.push(key);
+        if (key?.startsWith(STORAGE_PREFIX)) keys.push(key);
     }
     for (const key of keys) storage.removeItem(key);
 }

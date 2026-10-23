@@ -14,7 +14,6 @@ import {
     expect,
     it,
 } from 'vitest';
-import { SECRET } from '../../../utils/app.ts';
 import {
     START,
     agentFile,
@@ -43,7 +42,6 @@ function otherEngine(store: MemoryStore, clock: ControllableClock): Engine {
         store,
         clock,
         agents: [],
-        resumeSecret: SECRET,
         onError: () => {},
     });
 }

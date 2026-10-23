@@ -35,7 +35,6 @@ An agent without `http.on()` answers 404 on REST and gets no MCP tool; the engin
 | `GET /runs/:id/artifacts/:artifactId` | as `GET /runs/:id` | The bytes, as a download |
 | `POST /runs/:id/cancel` | `run:cancel` | `202 { runId, status }` |
 | `POST /runs/:id/approve` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ approvalId, approved, reason? }`; answers the run's current wait point without a token (409 for another `approvalId`, an expired wait point or a run not waiting) |
-| `POST /resume` | `agent:<run.agent>:approve` | `202 { runId, status: 'queued' }`; body `{ token, approved, reason? }` |
 | `POST /channels/<name>[/...]` | the channel's own | Whatever the channel's `in` answers; only for the channels in `channels` |
 | `GET /agents`, `GET /schedules` | `run:read` | `{ data, issues }`: agent summaries and the [agent folders](/guide/agent-folders) that failed to load (`{ agent, message, at }`); agent summaries list their subscriptions `{ channel, id, hook? }`; cron subscriptions with their channel and next fire time |
 | `GET /agents/:name/state/kv` | `state:read` | `200 { data: Array<{ key, value }> }` in key code-point order; `page[limit]` (default 50, at most 100), `page[offset]` |
@@ -80,7 +79,7 @@ An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_
 | Permission | Grants |
 |---|---|
 | `agent:<name>:run` | Start the agent's runs and read them |
-| `agent:<name>:approve` | Answer the agent's approvals (`POST /runs/:id/approve`, `POST /resume`, MCP `resume_run`) |
+| `agent:<name>:approve` | Answer the agent's approvals (`POST /runs/:id/approve`, MCP `approve_run`) |
 | `run:read` | Read and list every run, agents and schedules |
 | `run:cancel` | Cancel runs |
 | `state:read`, `state:write` | Agent state |
@@ -89,11 +88,11 @@ An app holds at most `stream.maxOpen` (1000) open streams plus waiting MCP `run_
 
 A `*` segment matches exactly one segment (`agent:*:run`). A client that may start an agent's runs can follow them without `run:read`, but to list runs it must filter to that agent.
 
-`POST /resume` needs the approve permission for the run's agent as well as the [resume token](/guide/approvals): a leaked token alone does nothing. The token's signature and expiry are checked before any store lookup. `POST /runs/:id/approve` needs only the approve permission (no token, no read permission); it loads the run (404), checks the permission (403) and only then reads the body, and passes the `approvalId` it was shown, so a stale or concurrent answer is a 409 rather than an answer to a newer call. Either way the other one is spent.
+`POST /runs/:id/approve` needs the approve permission for the run's agent (no read permission); it loads the run (404), checks the permission (403) and only then reads the body, and passes the `approvalId` it was shown, so a stale or concurrent answer is a 409 rather than an answer to a newer call.
 
 ## Invoker
 
-`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name` or `preferred_username` claim (never `email`, since every reader of the run sees the name; static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /runs/:id/approve`, `POST /resume` and MCP `resume_run` record the principal that answered as the `wait` step's `output.approver`. Webhook and GitHub runs have no invoker, and neither ever comes from a request body.
+`POST /agents/:name/runs` and MCP `run_<agent>` record the authenticated principal as the run's invoker (`run.trigger.invoker`): its `id`, `kind`, `permissions` and a `name` from the `name` or `preferred_username` claim (never `email`, since every reader of the run sees the name; static tokens have no name). An agent's [`toolPolicy`](/guide/tools#restricting-tools-per-invoker) and tool code read it. `POST /runs/:id/approve` and MCP `approve_run` record the principal that answered as the `wait` step's `output.approver`. Webhook and GitHub runs have no invoker, and neither ever comes from a request body.
 
 The invoker is a snapshot: a run keeps the grants it was started with, even when a grant is revoked while it waits on an approval. Responses (REST, SSE, MCP) carry the invoker and the approver without their `permissions`, so a `run:read` holder never learns another principal's grants.
 
@@ -101,9 +100,9 @@ The invoker is a snapshot: a run keeps the grants it was started with, even when
 
 `/mcp` is a streamable HTTP endpoint (MCP TypeScript SDK v2; 2025-era clients are served statelessly), authenticated like REST. Each client sees the tools its principal may use:
 
-- `run_<agent>` for each agent with `http.on()` it may run (runs carry channel `mcp`): `{ payload?, idempotencyKey?, address?, waitSeconds? }`. With `waitSeconds` (capped by `mcp.maxWaitSeconds`, default 60) it waits for `completed`, `failed`, `cancelled` or `waiting` and returns the output, the error or the pending approval, never the resume token. A wait counts against `stream.maxOpen`: over the cap the call does not wait and answers at once with `{ runId, status, deduplicated }`, as with `waitSeconds: 0`; the run is already dispatched and goes on.
+- `run_<agent>` for each agent with `http.on()` it may run (runs carry channel `mcp`): `{ payload?, idempotencyKey?, address?, waitSeconds? }`. With `waitSeconds` (capped by `mcp.maxWaitSeconds`, default 60) it waits for `completed`, `failed`, `cancelled` or `waiting` and returns the output, the error or the pending approval. A wait counts against `stream.maxOpen`: over the cap the call does not wait and answers at once with `{ runId, status, deduplicated }`, as with `waitSeconds: 0`; the run is already dispatched and goes on.
 - `get_run`, `list_runs`: the REST read rule applies.
-- `resume_run`: `{ token, approved, reason? }`, with the approve permission.
+- `approve_run`: `{ runId, approvalId, approved, reason? }` (the `approvalId` of the run's `waiting`, from `get_run`), with the approve permission.
 
 An MCP start dedupes its `idempotencyKey` under `<agent>:mcp:<kind>:<id>`, a REST start under `<agent>:http:<kind>:<id>` (the principal's `kind` and `id`, URI-encoded): one key used over both transports, or by two principals, creates two runs. A client registers the endpoint like any HTTP MCP server:
 

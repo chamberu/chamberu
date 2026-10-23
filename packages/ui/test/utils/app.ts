@@ -26,7 +26,6 @@ export function createUiTestApp(options: Partial<Omit<HttpAppOptions, 'engine' |
     const engine = new Engine({
         store: new MemoryStore({ clock }),
         agents: [],
-        resumeSecret: 'test-secret',
         clock,
         onError: () => {},
     });

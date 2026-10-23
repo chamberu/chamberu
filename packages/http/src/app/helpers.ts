@@ -45,7 +45,6 @@ type ErrorBody = {
 
 const CORE_STATUS: Record<string, number> = {
     [ErrorCode.VALIDATION]: 400,
-    [ErrorCode.INVALID_RESUME_TOKEN]: 400,
     [ErrorCode.AGENT_NOT_FOUND]: 404,
     [ErrorCode.RUN_NOT_FOUND]: 404,
     [ErrorCode.ARTIFACT_NOT_FOUND]: 404,

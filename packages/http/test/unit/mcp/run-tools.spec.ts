@@ -230,7 +230,6 @@ describe('mcp run_<agent>', () => {
         const engine = new Engine({
             store: new MemoryStore(), 
             agents: [], 
-            resumeSecret: 's', 
             channels: [httpChannel()],
         });
         await engine.putAgent(long, { revision: 'h1' });

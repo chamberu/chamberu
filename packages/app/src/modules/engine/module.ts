@@ -76,7 +76,6 @@ export class EngineModule implements IModule {
             store: container.resolve(AppToken.STORE),
             agents: [...context.agents],
             channels: container.resolveAll(AppToken.CHANNELS),
-            resumeSecret: config.engine.resumeSecret,
             maxConcurrentRuns: config.engine.maxConcurrentRuns,
             clock: container.resolve(AppToken.CLOCK),
             ...(this.options.owner !== undefined && { owner: this.options.owner }),

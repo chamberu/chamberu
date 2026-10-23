@@ -24,7 +24,6 @@ describe('README example', () => {
         const engine = new Engine({
             store: new MemoryStore(),
             agents: [],
-            resumeSecret: 'readme-resume-secret',
         });
         const manager = createWorkspaces(createFakeProvider(), engine);
         expect(Object.keys(manager.tools()).sort()).toEqual(['create_workspace', 'dispose_workspace']);

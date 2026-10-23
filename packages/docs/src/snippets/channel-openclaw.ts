@@ -25,7 +25,6 @@ export function createEngine(agents: Agent[]) {
         agents,
         // tools reach it with ctx.channels.findOneOrFail('openclaw')
         channels: [openclaw],
-        resumeSecret: process.env.RESUME_SECRET ?? '',
     });
     // #endregion channel
     return engine;

@@ -37,7 +37,6 @@ describe('README example', () => {
         const port = await freePort();
         await app.start({
             env: {
-                RESUME_SECRET: 'a-resume-secret-of-at-least-32-characters',
                 CHAMVI_TOKENS: JSON.stringify([{
                     value: 'a-static-token-of-16+',
                     id: 'ops',

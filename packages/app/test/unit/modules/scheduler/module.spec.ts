@@ -30,7 +30,6 @@ import type { Harness } from '../../../utils/harness.ts';
 import { createRecordingLogger } from '../../../utils/logger.ts';
 import { mockModel } from '../../../utils/model.ts';
 
-const SECRET = 'x'.repeat(32);
 
 function sweep(): Agent {
     return defineAgent({
@@ -70,7 +69,7 @@ async function setup(options: { mode?: AppMode; env?: Record<string, string> } =
     const logger = createRecordingLogger();
     const harness = await createHarness({
         mode: options.mode,
-        env: { RESUME_SECRET: SECRET, ...options.env },
+        env: { ...options.env },
         agents: [sweep()],
         modules: [
             configModule({ logger }),

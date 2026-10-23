@@ -25,14 +25,12 @@ import {
     assertCanListRuns,
     contentDisposition,
     createApproveContainer,
-    createResumeContainer,
     createStartRunContainer,
     loadApprovableRun,
     loadReadableRun,
     loadRunArtifact,
     parseRunListQuery,
     requireHttpSubscription,
-    resolveResumeTarget,
     serializeRun,
     serializeStep,
     toBody,
@@ -50,11 +48,10 @@ async function readableRun(event: IAppEvent, ctx: HttpContext, id: string): Prom
 
 /**
  * `POST /agents/:name/runs`, `GET /runs`, `GET /runs/:id`, `GET /runs/:id/stream`,
- * `GET /runs/:id/artifacts`, `GET /runs/:id/artifacts/:artifactId`, `POST /runs/:id/cancel`, `POST /runs/:id/approve`, `POST /resume`.
+ * `GET /runs/:id/artifacts`, `GET /runs/:id/artifacts/:artifactId`, `POST /runs/:id/cancel`, `POST /runs/:id/approve`.
  */
 export function registerRunRoutes(app: App, ctx: HttpContext): void {
     const startContainer = createStartRunContainer();
-    const resumeContainer = createResumeContainer();
     const approveContainer = createApproveContainer();
 
     app.post('/agents/:name/runs', defineCoreHandler(async (event) => {
@@ -141,20 +138,6 @@ export function registerRunRoutes(app: App, ctx: HttpContext): void {
         const body = await validateBody(approveContainer, await readJsonBody(event, ctx.bodyLimit), { required: true });
         await ctx.engine.approve(run.id, {
             approvalId: body.approvalId,
-            approved: body.approved,
-            ...(body.reason !== undefined ? { reason: body.reason } : {}),
-            approver: toInvoker(principal),
-        });
-        event.response.status = 202;
-        return { runId: run.id, status: 'queued' };
-    }));
-
-    app.post('/resume', defineCoreHandler(async (event) => {
-        // the permission depends on the token: authenticate before reading the body
-        const principal = await authenticate(event, ctx);
-        const body = await validateBody(resumeContainer, await readJsonBody(event, ctx.bodyLimit), { required: true });
-        const run = await resolveResumeTarget(ctx, principal, body.token);
-        await ctx.engine.resume(body.token, {
             approved: body.approved,
             ...(body.reason !== undefined ? { reason: body.reason } : {}),
             approver: toInvoker(principal),

@@ -84,9 +84,7 @@ class Engine {
     readonly isDraining: boolean;
 
     cancel(runId: string): Promise<void>;
-    resume(token: string, decision: ResumeDecision): Promise<void>;
     approve(runId: string, answer: ApprovalAnswer): Promise<void>;
-    inspectResumeToken(token: string): ResumeTokenClaims;
     tick(): Promise<void>;
     recover(): Promise<number>;
 }
@@ -108,9 +106,7 @@ class Engine {
 | `drain` | Stops every channel first (a throwing `stop` goes to `onError`), waits for in-flight runs (default 30 s), then marks the rest `interrupted` | [Recovery](/guide/recovery#drain) |
 | `idle` | Resolves when nothing runs and nothing more can start | |
 | `cancel` | Cancels locally, in the store, or requests it from the owning replica | [Recovery](/guide/recovery#cancel) |
-| `resume` | Answers the approval a waiting run waits on, with a resume token | [Approvals](/guide/approvals#answering) |
-| `approve` | Answers the current wait point by `approvalId`, without a token | [Approvals](/guide/approvals#answering) |
-| `inspectResumeToken` | Checks a token's signature and expiry and returns its claims, without touching the store | |
+| `approve` | Answers the current wait point by `approvalId`, once | [Approvals](/guide/approvals#answering) |
 | `tick` | Denies expired approvals and re-sends approval messages a channel has not delivered; runs every poll | [Approvals](/guide/approvals#asking-through-a-channel) |
 | `recover` | Requeues abandoned runs; runs on start and every poll | [Recovery](/guide/recovery#recovery) |
 
@@ -216,16 +212,13 @@ See [Effect Tools & Reconciliation](/guide/effect-tools).
 ```ts
 function approve(ctx: ToolContext, request: ApprovalRequestInput): Promise<ApprovalDecision>; // inside a tool call only
 
-function createResumeToken(secret: string, p: ResumeTokenClaims & { expiresAt: Date }): string;
-function verifyResumeToken(secret: string, token: string, now: Date): ResumeTokenClaims;
-
 const DEFAULT_APPROVAL_TIMEOUT_MS: 86_400_000; // 24 hours
 const APPROVAL_TIMEOUT_MAX_MS: 2_147_483_647;
 ```
 
 <<< ../../../core/src/approval/types.ts{ts}
 
-`approve()` outside a tool call, or in a streaming tool's body, throws `InvalidRunStateError`; a `timeoutMs` that is no positive integer up to `APPROVAL_TIMEOUT_MAX_MS` is a `ValidationError`. `ChannelHandle.approve()` is the same with the request delivered through the channel. `verifyResumeToken` throws `InvalidResumeTokenError` for every failure. The agent hooks (`AgentHooks`, `ToolCallInfo`) are on `AgentDefinition` above. See [Approvals & Hooks](/guide/approvals).
+`approve()` outside a tool call, or in a streaming tool's body, throws `InvalidRunStateError`; a `timeoutMs` that is no positive integer up to `APPROVAL_TIMEOUT_MAX_MS` is a `ValidationError`. `ChannelHandle.approve()` is the same with the request delivered through the channel. The agent hooks (`AgentHooks`, `ToolCallInfo`) are on `AgentDefinition` above. See [Approvals & Hooks](/guide/approvals).
 
 ## State
 
@@ -255,7 +248,7 @@ const systemClock: IClock;
 
 ## Errors
 
-`ChamviError`, `InvalidAgentDefinitionError`, `AgentNotFoundError`, `ChannelNotFoundError`, `ContextNotProvidedError`, `InvalidResumeTokenError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `ToolDeniedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
+`ChamviError`, `InvalidAgentDefinitionError`, `AgentNotFoundError`, `ChannelNotFoundError`, `ContextNotProvidedError`, `InvalidRunStateError`, `RunNotFoundError`, `ArtifactNotFoundError`, `BudgetExceededError`, `TimeoutError`, `FatalToolError`, `IncompleteResponseError`, `ToolNotAllowedError`, `ToolDeniedError`, `LeaseLostError`, `SandboxError`, `ValidationError` and `ErrorCode`:
 
 <<< ../../../core/src/errors/constants.ts{ts}
 

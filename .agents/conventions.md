@@ -52,7 +52,7 @@ The `@tada5hi/*` config packages are the source of truth for lint, TS and commit
 ## Naming
 
 - **`interface` is for behavior contracts and always carries the `I` prefix**: `IStore`, `IRunStore`, `IClock`, `IChannel`, `IAgentState`. A class implements it (`MemoryStore implements IStore`), or a factory returns it.
-- **Data shapes are `type` aliases without a prefix**: `Run`, `Step`, `TriggerEnvelope`, `EngineOptions`, `ResumeTokenClaims`.
+- **Data shapes are `type` aliases without a prefix**: `Run`, `Step`, `TriggerEnvelope`, `EngineOptions`, `ApprovalAnswer`.
 - Files are kebab-case.
 
 ## Helpers and Dependencies

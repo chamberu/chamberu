@@ -17,7 +17,6 @@ import {
 import {
     AgentNotFoundError,
     Engine,
-    InvalidAgentDefinitionError,
     TRIGGER_KEY_MAX_LENGTH,
     ValidationError,
     defineAgent,
@@ -95,7 +94,6 @@ function make(opts: Partial<EngineOptions> & { store?: MemoryStore } = {}) {
     const engine = new GatedEngine({
         store,
         agents: [agent],
-        resumeSecret: 's',
         onError: () => {},
         ...opts,
     });
@@ -163,16 +161,7 @@ describe('Engine.dispatch', () => {
         expect(() => new Engine({
             store: new MemoryStore(),
             agents: [agent, other],
-            resumeSecret: 's',
         })).toThrow(/"triage" is used more than once/);
-    });
-
-    it('rejects an empty resumeSecret', () => {
-        expect(() => new Engine({
-            store: new MemoryStore(),
-            agents: [agent],
-            resumeSecret: '',
-        })).toThrow(InvalidAgentDefinitionError);
     });
 
     it('a redelivery heals an idempotency key whose run was never created', async () => {

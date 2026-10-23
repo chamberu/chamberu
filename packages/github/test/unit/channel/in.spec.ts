@@ -351,7 +351,6 @@ describe('github channel in', () => {
                 }),
             ],
             channels: [enterprise, githubChannel({ app: gh, clock })],
-            resumeSecret: 'test-secret',
             clock,
         });
         const app = createHttpApp({

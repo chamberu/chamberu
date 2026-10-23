@@ -18,7 +18,7 @@ import {
 } from 'vitest';
 import { configModule, createApp, schedulerModule } from '@chamvi/app';
 import type { IApp } from '@chamvi/app';
-import { SECRET, TOKEN, TOKENS } from '../../../utils/app.ts';
+import { TOKEN, TOKENS } from '../../../utils/app.ts';
 import {
     HTTP_TRIGGER,
     START,
@@ -70,7 +70,6 @@ describe('the checks a folder agent passes before it is registered', () => {
 
         await app.start({
             env: {
-                RESUME_SECRET: SECRET,
                 HOST: '127.0.0.1',
                 PORT: String(port),
                 CHAMVI_TOKENS: TOKENS,

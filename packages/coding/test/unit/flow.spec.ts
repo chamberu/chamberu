@@ -66,7 +66,6 @@ describe('coding flow (local)', () => {
         const engine = new Engine({
             store,
             agents: [agent],
-            resumeSecret: 'secret',
             onError: () => {},
         });
         cleanups.push(() => engine.stop());

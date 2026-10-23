@@ -40,7 +40,6 @@ import type { ILifecycleHook, IModule } from '@chamvi/app';
 import { githubModule } from '@chamvi/github/module';
 import { mockModel, textModel } from '../../utils/model.ts';
 import {
-    SECRET,
     TOKENS,
     createRecordingLogger,
     freePort,
@@ -152,7 +151,7 @@ describe('githubModule', () => {
 
     it('contributes the github channel and no route', async () => {
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             modules: [configModule({ logger: createRecordingLogger() }), githubModule({ env: githubEnv() })],
         });
         harnesses.push(harness);
@@ -165,7 +164,7 @@ describe('githubModule', () => {
 
     it('takes the channel options', async () => {
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             modules: [
                 configModule({ logger: createRecordingLogger() }),
                 githubModule({ env: githubEnv(), channel: { name: 'github-ent' } }),
@@ -188,7 +187,7 @@ describe('githubModule', () => {
         });
         fake.issues.set('octo/demo#7', { number: 7, state: 'open' });
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET, CHAMVI_PUBLIC_URL: 'https://chamvi.example' },
+            env: { CHAMVI_PUBLIC_URL: 'https://chamvi.example' },
             modules: [configModule({ logger: createRecordingLogger() }), githubModule({ app: gh, env: {} })],
         });
         harnesses.push(harness);
@@ -227,7 +226,6 @@ describe('githubModule', () => {
         });
         const harness = await createModuleHarness({
             env: {
-                RESUME_SECRET: SECRET,
                 CHAMVI_TOKENS: TOKENS,
                 HOST: '127.0.0.1',
                 PORT: String(port),
@@ -276,7 +274,6 @@ describe('githubModule', () => {
         });
         const harness = await createModuleHarness({
             env: {
-                RESUME_SECRET: SECRET,
                 CHAMVI_TOKENS: TOKENS,
                 HOST: '127.0.0.1',
                 PORT: String(port),
@@ -336,7 +333,7 @@ describe('githubModule', () => {
             tools: { probe },
         });
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             agents: [agent],
             modules: [
                 configModule({ logger: createRecordingLogger() }),
@@ -375,7 +372,7 @@ describe('githubModule', () => {
             },
         };
         const harness = await createModuleHarness({
-            env: { RESUME_SECRET: SECRET },
+            env: {},
             agents: [defineAgent({
                 name: 'probe',
                 model: textModel('ok'),

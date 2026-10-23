@@ -97,7 +97,6 @@ function make(
     const engine = new Engine({
         store,
         agents: [agent],
-        resumeSecret: 's',
         onError: (error) => {
             errors.push(error);
         },

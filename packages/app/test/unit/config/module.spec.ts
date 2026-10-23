@@ -9,7 +9,6 @@ import { InvalidAgentDefinitionError } from '@chamvi/core';
 import { describe, expect, it } from 'vitest';
 import { TIMER_MAX_MS, readConfig } from '@chamvi/app';
 
-const SECRET = 'x'.repeat(32);
 
 function errorOf(fn: () => unknown): Error {
     try {
@@ -21,12 +20,12 @@ function errorOf(fn: () => unknown): Error {
 }
 
 function start(env: Record<string, string | undefined>) {
-    return readConfig({ RESUME_SECRET: SECRET, ...env }, { mode: 'start' });
+    return readConfig({ ...env }, { mode: 'start' });
 }
 
 describe('readConfig', () => {
     it('defaults', () => {
-        expect(readConfig({ RESUME_SECRET: SECRET }, { mode: 'start' })).toEqual({
+        expect(readConfig({}, { mode: 'start' })).toEqual({
             dev: false,
             logLevel: 'info',
             http: {
@@ -41,11 +40,7 @@ describe('readConfig', () => {
                 migrate: true,
                 purgeIntervalMs: 3_600_000,
             },
-            engine: {
-                resumeSecret: SECRET,
-                resumeSecretGenerated: false,
-                maxConcurrentRuns: 4,
-            },
+            engine: { maxConcurrentRuns: 4 },
             scheduler: { enabled: true },
             agents: { pollMs: 5_000 },
         });
@@ -53,7 +48,6 @@ describe('readConfig', () => {
 
     it('reads every variable', () => {
         const config = readConfig({
-            RESUME_SECRET: SECRET,
             PORT: '8080',
             HOST: '127.0.0.1',
             CHAMVI_BASE_PATH: '/api',
@@ -88,40 +82,10 @@ describe('readConfig', () => {
                 migrate: false,
                 purgeIntervalMs: 60_000,
             },
-            engine: {
-                resumeSecret: SECRET,
-                resumeSecretGenerated: false,
-                maxConcurrentRuns: 8,
-            },
+            engine: { maxConcurrentRuns: 8 },
             scheduler: { enabled: false },
             agents: { dir: './agents', pollMs: 2000 },
         });
-    });
-
-    it('RESUME_SECRET is required for start and job, not for migrate', () => {
-        expect(() => readConfig({}, { mode: 'start' })).toThrow('RESUME_SECRET is required.');
-        expect(() => readConfig({}, { mode: 'job' })).toThrow('RESUME_SECRET is required.');
-        expect(() => readConfig({ DATABASE_URL: 'postgres://db/chamvi' }, { mode: 'migrate' })).not.toThrow();
-    });
-
-    it('RESUME_SECRET shorter than 32 throws', () => {
-        const error = errorOf(() => readConfig({ RESUME_SECRET: 'x'.repeat(31) }, { mode: 'start' }));
-
-        expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toBe('RESUME_SECRET must be at least 32 characters.');
-    });
-
-    it('dev generates a random 43-character secret', () => {
-        const a = readConfig({}, { mode: 'start', dev: true });
-        const b = readConfig({}, { mode: 'start', dev: true });
-
-        expect(a.dev).toBe(true);
-        expect(a.engine.resumeSecret).toHaveLength(43);
-        expect(a.engine.resumeSecretGenerated).toBe(true);
-        expect(a.engine.resumeSecret).not.toBe(b.engine.resumeSecret);
-
-        const given = readConfig({ RESUME_SECRET: SECRET }, { mode: 'start', dev: true });
-        expect(given.engine).toMatchObject({ resumeSecret: SECRET, resumeSecretGenerated: false });
     });
 
     it('dev drain default is 5000, an explicit CHAMVI_DRAIN_TIMEOUT_MS wins', () => {

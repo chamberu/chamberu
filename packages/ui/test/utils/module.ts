@@ -10,7 +10,6 @@ import type { IClock } from '@chamvi/core';
 import { createLogger } from '@chamvi/app';
 import type { ILogger } from '@chamvi/app';
 
-export const SECRET = 'x'.repeat(32);
 export const TOKEN = 'a-static-token-of-length';
 export const TOKENS = JSON.stringify([{
     value: TOKEN,

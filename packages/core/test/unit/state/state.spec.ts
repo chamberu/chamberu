@@ -69,7 +69,6 @@ async function runOnce(store: MemoryStore, agent: Parameters<typeof defineAgent>
     const engine = new Engine({
         store,
         agents: [defineAgent(agent)],
-        resumeSecret: 's',
         onError: () => {},
     });
     engines.push(engine);

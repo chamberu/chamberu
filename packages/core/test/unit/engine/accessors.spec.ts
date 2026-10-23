@@ -30,7 +30,6 @@ describe('engine accessors', () => {
         const engine = new Engine({
             store,
             agents: [triage],
-            resumeSecret: 's',
             clock,
         });
         expect(engine.store).toBe(store);
@@ -41,7 +40,6 @@ describe('engine accessors', () => {
         const engine = new Engine({
             store: new MemoryStore(), 
             agents: [], 
-            resumeSecret: 's', 
         });
         expect(engine.clock).toBe(systemClock);
     });
@@ -50,7 +48,6 @@ describe('engine accessors', () => {
         const engine = new Engine({
             store: new MemoryStore(), 
             agents: [triage, digest], 
-            resumeSecret: 's', 
         });
         expect(engine.listAgents()).toEqual([triage, digest]);
         expect(engine.listAgents()[0]).toBe(triage);
@@ -60,7 +57,6 @@ describe('engine accessors', () => {
         const engine = new Engine({
             store: new MemoryStore(), 
             agents: [triage], 
-            resumeSecret: 's', 
         });
         const agents = engine.listAgents();
         agents.push(digest);
@@ -72,7 +68,6 @@ describe('engine accessors', () => {
         const engine = new Engine({
             store: new MemoryStore(), 
             agents: [triage, digest], 
-            resumeSecret: 's', 
         });
         expect(engine.getAgent('digest')).toBe(digest);
         expect(engine.getAgent('unknown')).toBeUndefined();

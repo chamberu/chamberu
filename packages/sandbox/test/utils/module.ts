@@ -9,7 +9,6 @@ import { createLogger } from '@chamvi/app';
 import type { ILogger } from '@chamvi/app';
 import type { ControllableClock } from './clock.ts';
 
-export const SECRET = 'x'.repeat(32);
 
 export type LogEntry = {
     level: string;

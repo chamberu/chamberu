@@ -48,7 +48,6 @@ import { uiRoutes } from '@chamvi/ui';
 const engine = new Engine({
     store: new MemoryStore(),
     agents: [],
-    resumeSecret: process.env.RESUME_SECRET ?? 'change-me',
 });
 
 const admin = {
@@ -82,8 +81,6 @@ The 24 h figures are counted from the newest 100 runs (the API has no time filte
 
 A channel's approval message links an approval by run: `/ui/approvals?run=<runId>&approval=<approvalId>` (`approval` optional, then the run's current one). The link carries no token. Signed out, it goes through sign-in (token form or authup) and comes back to the same URL; signed in, the dashboard scrolls to that run's approval card, highlights and focuses it, and the answer goes through `POST /runs/:id/approve` as the signed-in principal. A run that no longer waits on that approval (answered, expired, moved on to another one) shows a notice linking the run; the link needs read access to the run (`run:read` or `agent:<name>:run`) besides `agent:<name>:approve`: without the approve grant the card shows read-only under a 403 notice, without read access only a 403 notice shows. The run page and the agent page link waiting runs the same way.
 
-The resume-token deep link `/ui/approvals#token=<resume token>` still opens the approval of that token (the fragment never reaches the server or a proxy log; `?token=` works too). The SPA moves the token out of the address bar before anything renders (into the tab's `sessionStorage`, kept across a sign-out so another principal can answer it, removed once answered or refused as spent) and answers it through `POST /resume`, so it works with only `agent:<name>:approve`. While such a token is pending in the tab it takes the page; a token-less link opened meanwhile shows a notice with a button that discards the pending token.
-
 ## Sign-in
 
 - **Token** (default): paste a static bearer token (`staticTokens()` of `@chamvi/http`). `GET /me` checks it before it is kept, in `sessionStorage` of the tab only; a reload while the API is unreachable keeps it.
@@ -107,7 +104,7 @@ Invalid options throw `InvalidAgentDefinitionError` of `@chamvi/core`. A missing
 - Every `GET` below `basePath`: a file of the build, else `index.html` for a path without an extension (client routes), else 404. `index.html` gets `<base href="<uiBase>/">` and the config as a JSON block.
 - Hashed files under `assets/` are `cache-control: public, max-age=31536000, immutable`, everything else `no-cache`.
 - Paths are decoded once and refused on `..`, `.`, empty segments, backslashes, NUL and double encoding: nothing outside the build is ever read.
-- Every answer carries `Content-Security-Policy` (`default-src 'self'`, scripts only from the app, `connect-src` and `form-action` add the authup origin, `frame-ancestors 'none'`), `referrer-policy: no-referrer` (a deep link's token never leaves as a referrer), `x-content-type-options: nosniff` and `x-frame-options: DENY`.
+- Every answer carries `Content-Security-Policy` (`default-src 'self'`, scripts only from the app, `connect-src` and `form-action` add the authup origin, `frame-ancestors 'none'`), `referrer-policy: no-referrer` (an approval link's ids never leave as a referrer), `x-content-type-options: nosniff` and `x-frame-options: DENY`.
 - The route is unauthenticated (the app holds no secret; every API call carries the signed-in bearer token) and skips the rate limiter.
 
 Behind a proxy that mounts the app under a prefix, set the app's `basePath`; the dashboard follows it.

@@ -76,7 +76,6 @@ describe('README example', () => {
         const engine = new Engine({
             store: new MemoryStore(), 
             agents: [agent], 
-            resumeSecret: 'secret', 
         });
         await engine.start();
 

@@ -18,10 +18,9 @@ export async function createTriageServer(
         GITHUB_PRIVATE_KEY,
         GITHUB_WEBHOOK_SECRET,
         CHAMVI_TOKEN,
-        RESUME_SECRET,
     } = process.env;
-    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !CHAMVI_TOKEN || !RESUME_SECRET) {
-        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, CHAMVI_TOKEN and RESUME_SECRET.');
+    if (!GITHUB_APP_ID || !GITHUB_PRIVATE_KEY || !GITHUB_WEBHOOK_SECRET || !CHAMVI_TOKEN) {
+        throw new Error('Set GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET and CHAMVI_TOKEN.');
     }
 
     const gh = createGithubApp({
@@ -58,7 +57,6 @@ export async function createTriageServer(
         store: new MemoryStore(),
         agents: [triage],
         channels: [channel],
-        resumeSecret: RESUME_SECRET,
     });
 
     const shutdown = createShutdown({ engine });

@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ToolDeniedError, approve, createResumeToken } from '@chamvi/core';
+import { ToolDeniedError, approve } from '@chamvi/core';
 import type { AgentHooks, Engine } from '@chamvi/core';
 
 export type IssuedApproval = {
@@ -13,34 +13,28 @@ export type IssuedApproval = {
     approvalId: string;
     toolName: string;
     title: string;
-    resumeToken: string;
     expiresAt: Date;
 };
 
 /**
- * Records each new wait point the engine emits with its resume token (what
- * the owner would get), in order: `calls[i].resumeToken`.
+ * Records each new wait point the engine emits (what the owner would be
+ * asked), in order: `calls[i].approvalId`.
  */
-export function recordApprovals(engine: Engine, resumeSecret: string): { calls: IssuedApproval[] } {
+export function recordApprovals(engine: Engine): { calls: IssuedApproval[] } {
     const calls: IssuedApproval[] = [];
     const seen = new Set<string>();
     engine.on('run.updated', (event) => {
         if (event.type !== 'run.updated') return;
         const { run } = event;
         const { waiting } = run;
-        if (run.status !== 'waiting' || !waiting || seen.has(waiting.tokenId)) return;
-        seen.add(waiting.tokenId);
+        const key = waiting ? `${run.id}:${waiting.approvalId}` : '';
+        if (run.status !== 'waiting' || !waiting || seen.has(key)) return;
+        seen.add(key);
         calls.push({
             runId: run.id,
             approvalId: waiting.approvalId,
             toolName: waiting.toolName,
             title: waiting.title,
-            resumeToken: createResumeToken(resumeSecret, {
-                runId: run.id,
-                approvalId: waiting.approvalId,
-                tokenId: waiting.tokenId,
-                expiresAt: waiting.expiresAt,
-            }),
             expiresAt: waiting.expiresAt,
         });
     });

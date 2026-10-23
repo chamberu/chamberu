@@ -74,10 +74,10 @@ describe('env readers', () => {
     });
 
     it('required throws naming the variable', () => {
-        const error = errorOf(() => envString({}, 'RESUME_SECRET', { required: true }));
+        const error = errorOf(() => envString({}, 'API_SECRET', { required: true }));
 
         expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
-        expect(error.message).toBe('RESUME_SECRET is required.');
+        expect(error.message).toBe('API_SECRET is required.');
         expect(() => envInteger({ N: '' }, 'N', { required: true })).toThrow('N is required.');
         expect(() => envBoolean({}, 'B', { required: true })).toThrow('B is required.');
         expect(() => envUrl({}, 'U', { required: true })).toThrow('U is required.');
@@ -87,9 +87,9 @@ describe('env readers', () => {
     });
 
     it('envString minLength', () => {
-        expect(errorOf(() => envString({ RESUME_SECRET: 'short' }, 'RESUME_SECRET', { minLength: 32 })).message)
-            .toBe('RESUME_SECRET must be at least 32 characters.');
-        expect(envString({ RESUME_SECRET: 'x'.repeat(32) }, 'RESUME_SECRET', { minLength: 32 })).toBe('x'.repeat(32));
+        expect(errorOf(() => envString({ API_SECRET: 'short' }, 'API_SECRET', { minLength: 32 })).message)
+            .toBe('API_SECRET must be at least 32 characters.');
+        expect(envString({ API_SECRET: 'x'.repeat(32) }, 'API_SECRET', { minLength: 32 })).toBe('x'.repeat(32));
     });
 
     it('envUrl rejects a relative URL and a ftp: URL when protocols are http(s)', () => {

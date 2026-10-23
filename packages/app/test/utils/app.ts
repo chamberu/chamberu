@@ -9,7 +9,6 @@ import type { IContainer } from 'eldin';
 import type { IModule } from 'orkos';
 import { MockLanguageModelV4 } from 'ai/test';
 
-export const SECRET = 'x'.repeat(32);
 export const TOKEN = 'a-static-token-of-length';
 export const TOKENS = JSON.stringify([{
     value: TOKEN,

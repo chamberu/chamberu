@@ -78,7 +78,6 @@ function setup(
         store,
         agents: [agent],
         channels,
-        resumeSecret: 's',
         clock,
     });
     return {
@@ -205,7 +204,6 @@ describe('runJob', () => {
             store,
             agents: [agent],
             channels,
-            resumeSecret: 's',
             clock,
             owner: 'pod-2',
         });
@@ -237,7 +235,6 @@ describe('runJob', () => {
             store,
             agents: [agent],
             channels,
-            resumeSecret: 's',
             clock,
         });
         const second = await runJob({
@@ -268,7 +265,6 @@ describe('runJob', () => {
             store,
             agents: [agent],
             channels,
-            resumeSecret: 's',
             clock,
         });
         const drain = vi.spyOn(pod2, 'drain');
@@ -295,7 +291,6 @@ describe('runJob', () => {
             store,
             agents: [agent],
             channels,
-            resumeSecret: 's',
             clock,
             owner: 'a',
             maxConcurrentRuns: 0,
@@ -304,7 +299,6 @@ describe('runJob', () => {
             store,
             agents: [agent],
             channels,
-            resumeSecret: 's',
             clock,
             owner: 'b',
         });
@@ -428,7 +422,6 @@ describe('runJob', () => {
             store,
             agents: [agent],
             channels: [eu],
-            resumeSecret: 's',
             clock,
         });
 

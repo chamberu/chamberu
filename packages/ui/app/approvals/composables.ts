@@ -17,7 +17,6 @@ import type { IApiClient, RunDetail, RunWire } from '../api/types.ts';
 import { createPoller } from '../polling/module.ts';
 import { asApiError, retryDelayOf } from '../api/helpers.ts';
 import { INBOX_PAGE_SIZE, INBOX_POLL_MS } from './constants.ts';
-import { clearResumeToken, decodeResumeToken } from './helpers.ts';
 import type { AnswerResult, ApprovalLink } from './types.ts';
 
 function reasonOf(reason: string | undefined): { reason?: string } {
@@ -75,58 +74,6 @@ export function useApprovals(client: IApiClient) {
         runs,
         error,
         refresh: () => poller.refresh(),
-        answer,
-    };
-}
-
-/**
- * The approval a channel message's deep link names: its run when readable (else
- * only the ids decoded from the token), answered through `POST /resume`
- * with the token; any final answer clears the stored token. An invalid,
- * expired or spent token (400) and a run that moved on (409) are
- * `already-answered`; 403 keeps the token for another principal.
- */
-export function useDeepLinkApproval(client: IApiClient, token: Ref<string | undefined>, storage: Storage) {
-    const run = shallowRef<RunWire>();
-    const error = shallowRef<ApiError>();
-    const claims = computed(() => (token.value ? decodeResumeToken(token.value) : undefined));
-
-    watch(claims, async (value) => {
-        run.value = undefined;
-        if (!value) return;
-        try {
-            const detail: Partial<RunDetail> = { ...await client.getRun(value.runId) };
-            delete detail.steps;
-            run.value = detail as RunWire;
-        } catch (e) {
-            error.value = asApiError(e);
-        }
-    }, { immediate: true });
-
-    async function answer(approved: boolean, reason?: string): Promise<AnswerResult> {
-        if (!token.value) return 'already-answered';
-        try {
-            await client.resume({
-                token: token.value,
-                approved,
-                ...reasonOf(reason),
-            });
-            clearResumeToken(storage);
-            return 'answered';
-        } catch (e) {
-            if (e instanceof ApiError && (e.status === 400 || e.status === 409)) {
-                clearResumeToken(storage);
-                return 'already-answered';
-            }
-            if (e instanceof ApiError && e.status === 403) return 'forbidden';
-            throw e;
-        }
-    }
-
-    return {
-        run,
-        error,
-        claims,
         answer,
     };
 }

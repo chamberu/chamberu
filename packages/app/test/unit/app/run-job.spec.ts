@@ -30,7 +30,7 @@ import {
     storeModule,
 } from '@chamvi/app';
 import type { IApp } from '@chamvi/app';
-import { SECRET, hangingModel, rejectionOf } from '../../utils/app.ts';
+import { hangingModel, rejectionOf } from '../../utils/app.ts';
 import { createRecordingLogger } from '../../utils/logger.ts';
 import { failingModel, textModel } from '../../utils/model.ts';
 
@@ -68,7 +68,7 @@ function build(agents: Agent[], modules: IModule[] = []) {
         clock,
         logger,
         store,
-        env: { RESUME_SECRET: SECRET, CHAMVI_DRAIN_TIMEOUT_MS: String(DRAIN_MS) },
+        env: { CHAMVI_DRAIN_TIMEOUT_MS: String(DRAIN_MS) },
     };
 }
 

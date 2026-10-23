@@ -62,7 +62,6 @@ Read by `readConfig(env, { mode, dev })` once per lifecycle; the optional module
 | `DATABASE_URL` | store | `postgres://...` | unset: `MemoryStore` (warned outside dev) | `migrate`; any multi-replica or CronJob deployment |
 | `CHAMVI_MIGRATE` | store | bool | `true` | never |
 | `CHAMVI_PURGE_INTERVAL_MS` | store | int, `0` disables | `3600000` (only with `TypeormStore`, on `engine.clock`) | never |
-| `RESUME_SECRET` | engine | string, at least 32 characters | none (dev: random per process, warned) | `start`, `run-job` |
 | `CHAMVI_MAX_CONCURRENT_RUNS` | engine | int >= 1 | `4` | never |
 | `CHAMVI_SCHEDULER` | scheduler | bool | `true`; `false` starts no in-process cron (CronJob mode; `cron.on()` subscriptions still validate) | never |
 | `CHAMVI_AGENTS_DIR` | agents | path of a directory, relative to the working directory | unset: `./agents` when it is a directory, else no [agent folders](/guide/agent-folders) | |

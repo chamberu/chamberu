@@ -22,7 +22,7 @@ import {
     runHooks,
     storeModule,
 } from '@chamvi/app';
-import { SECRET, hangingModel } from './app.ts';
+import { hangingModel } from './app.ts';
 import { buildHarness } from './harness.ts';
 import type { Harness } from './harness.ts';
 import { createRecordingLogger } from './logger.ts';
@@ -69,7 +69,6 @@ export async function queueRun(store: IStore, clock: ControllableClock, name: st
     const engine = new Engine({
         store,
         clock,
-        resumeSecret: SECRET,
         agents: [codeAgent(name)],
     });
     const { runId } = await engine.dispatch({
@@ -101,7 +100,6 @@ export function buildAgentsDirHarness(options: AgentsDirHarnessOptions) {
     const harness: Harness = buildHarness({
         mode: options.mode,
         env: {
-            RESUME_SECRET: SECRET,
             CHAMVI_AGENTS_DIR: options.root,
             CHAMVI_AGENTS_POLL_MS: String(POLL_MS),
             ...options.env,

@@ -29,7 +29,6 @@ export async function createEngine(model: LanguageModel) {
     const engine = new Engine({
         store,
         agents: [triage],
-        resumeSecret: process.env.RESUME_SECRET!,
     });
     // #endregion setup
 

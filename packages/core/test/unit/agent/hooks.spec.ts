@@ -64,7 +64,6 @@ async function runOnce(
             model,
             ...definition,
         })],
-        resumeSecret: 'secret',
         clock,
         onError: () => {},
     });

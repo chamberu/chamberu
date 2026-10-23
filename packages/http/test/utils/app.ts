@@ -10,7 +10,6 @@ import {
     Engine,
     MemoryStore,
     approve,
-    createResumeToken,
     defineAgent,
     defineTool,
 } from '@chamvi/core';
@@ -34,7 +33,6 @@ import type { HttpAppOptions, Principal } from '@chamvi/http';
 import type { App } from 'routup';
 import { approvalModel, textModel } from './model.ts';
 
-export const RESUME_SECRET = 'test-secret';
 
 export const ADMIN_TOKEN = 'admin-token-0123456789';
 export const READER_TOKEN = 'reader-token-0123456789';
@@ -89,7 +87,6 @@ export function createTestApp(overrides: TestAppOverrides = {}) {
                 channels: [http.on()],
             }),
         ],
-        resumeSecret: RESUME_SECRET,
         clock,
         channels: [...channels, ...engineChannels],
         onError: () => {},
@@ -172,16 +169,11 @@ export function deployTool() {
     });
 }
 
-/** The resume token of the run's current wait point (no channel message carries it). */
-export async function resumeTokenOf(store: IStore, runId: string): Promise<string> {
+/** The approval id the run's current wait point waits on. */
+export async function approvalIdOf(store: IStore, runId: string): Promise<string> {
     const waiting = (await store.getRun(runId))?.waiting;
     if (!waiting) throw new Error(`run ${runId} is not waiting`);
-    return createResumeToken(RESUME_SECRET, {
-        runId,
-        approvalId: waiting.approvalId,
-        tokenId: waiting.tokenId,
-        expiresAt: waiting.expiresAt,
-    });
+    return waiting.approvalId;
 }
 
 /**
@@ -218,13 +210,13 @@ export function createRunAgents(): Agent[] {
     ];
 }
 
-/** `createTestApp` over `createRunAgents()`, with `tokenOf(runId)` for paused runs. */
+/** `createTestApp` over `createRunAgents()`, with `approvalIdOf(runId)` for paused runs. */
 export function createRunTestApp(overrides: TestAppOverrides = {}) {
     const setup = createTestApp({
         agents: createRunAgents(),
         ...overrides,
     });
-    return { ...setup, tokenOf: (runId: string) => resumeTokenOf(setup.store, runId) };
+    return { ...setup, approvalIdOf: (runId: string) => approvalIdOf(setup.store, runId) };
 }
 
 /** An authenticator that maps `Bearer p:<a>,<b>` to a principal with those permissions. */

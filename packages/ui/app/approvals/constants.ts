@@ -8,9 +8,6 @@
 import type { InjectionKey } from 'vue';
 import type { useApprovals } from './composables.ts';
 
-/** A deep link's resume token between the address bar and the answer. */
-export const RESUME_STORAGE_KEY = 'chamvi.resume';
-
 export const INBOX_POLL_MS = 5000;
 
 export const INBOX_PAGE_SIZE = 100;

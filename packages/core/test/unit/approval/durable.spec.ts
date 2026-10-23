@@ -97,7 +97,6 @@ function createEngine(
             model,
             ...definition,
         })],
-        resumeSecret: 'secret',
         channels,
         clock,
         claimTtlMs: 30,
@@ -165,7 +164,6 @@ describe('durable approve()', () => {
             body: 'release 1.2',
             expiresAt: new Date(START + DAY),
         });
-        expect(run?.waiting?.tokenId).toMatch(/^[0-9a-f-]{36}$/);
         expect(run?.waiting).not.toHaveProperty('input');
         expect(recorder.deployed).toEqual([]);
 
@@ -284,7 +282,7 @@ describe('durable approve()', () => {
         const second = await store.getRun(runId);
         expect(second?.status).toBe('waiting');
         expect(second?.waiting).toMatchObject({ approvalId: '0:c2:0', title: 'Deploy eu?' });
-        expect(second?.waiting?.tokenId).not.toBe(run?.waiting?.tokenId);
+        expect(second?.waiting?.approvalId).not.toBe(run?.waiting?.approvalId);
         // paused again without a model call
         expect(model.doStreamCalls).toHaveLength(1);
         expect(recorder.deployed).toEqual(['prod']);

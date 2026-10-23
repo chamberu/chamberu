@@ -62,7 +62,6 @@ function setup(channels: IChannel<any, any>[], mounted: IChannel<any, any>[] = c
             instructions: 'Echo.',
             channels: [http.on()],
         })],
-        resumeSecret: 'test-secret',
         clock,
         channels: [httpChannel(), ...channels],
         onError: () => {},

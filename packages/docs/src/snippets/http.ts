@@ -52,7 +52,7 @@ export function authenticators(verifier: ITokenVerifier): Authenticator[] {
     // #endregion auth
 }
 
-export async function start(store: IStore, agents: Agent[], resumeSecret: string, verifier: ITokenVerifier) {
+export async function start(store: IStore, agents: Agent[], verifier: ITokenVerifier) {
     // #region app
     const auth = authenticators(verifier);
     // POST /channels/webhook/<agent><path>, authenticated with the same chain
@@ -60,7 +60,6 @@ export async function start(store: IStore, agents: Agent[], resumeSecret: string
     const engine = new Engine({
         store,
         agents,
-        resumeSecret,
         // the channels read the store, agents and clock from the engine
         channels: [httpChannel(), mcpChannel(), webhooks, cronChannel()],
     });

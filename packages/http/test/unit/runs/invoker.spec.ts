@@ -141,14 +141,17 @@ describe('run invoker over REST', () => {
             app,
             engine,
             store,
-            tokenOf,
+            approvalIdOf,
         } = setup();
         const runId = await startRun(app, ALICE_TOKEN);
         await engine.start();
         await engine.idle();
         expect((await store.getRun(runId))?.status).toBe('waiting');
 
-        const response = await call(app, 'POST', '/resume', { token: ALICE_TOKEN, body: { token: await tokenOf(runId), approved: true } });
+        const response = await call(app, 'POST', `/runs/${runId}/approve`, {
+            token: ALICE_TOKEN,
+            body: { approvalId: await approvalIdOf(runId), approved: true },
+        });
         expect(response.status).toBe(202);
         await engine.idle();
 

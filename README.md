@@ -42,7 +42,7 @@ chamvi is that layer as a library, with no orchestrator server and no Redis:
 | **Concurrency** | Two webhooks for the same issue race each other | One run at a time per `concurrencyKey`, enforced through the store across replicas |
 | **Durability** | A crash loses the conversation | A checkpoint after every step; a recovered run continues from the latest one |
 | **Side effects** | A retried tool call posts again | `defineEffectTool()` records each result per effect key and can check the remote system before acting |
-| **Approvals** | You build the pause, the storage and the callback | The run waits in `waiting` with a signed resume token; `resume(token, decision)` continues it |
+| **Approvals** | You build the pause, the storage and the callback | The run waits in `waiting`; `approve(runId, { approvalId, approved })` continues it |
 | **Limits** | `stopWhen` per call | `maxSteps`, `maxTokens` and `timeoutMs` per run, settled as `completed` or `failed` |
 | **Shutdown** | Runs die with the process | `drain()` waits for in-flight runs, then marks the rest `interrupted` for another replica |
 | **Running code** | Model-written commands run wherever your process runs | `create_workspace` gives the run a disposable container or pod with the repository checked out; the coding tools work inside it, and it is removed when the run settles |
@@ -50,7 +50,7 @@ chamvi is that layer as a library, with no orchestrator server and no Redis:
 Models, messages and tools stay AI SDK types: `defineAgent()` takes a `LanguageModel` and plain AI SDK tools (`tool()`, or `defineTool()` for tools that read the run context), and nothing is wrapped in a chamvi type.
 
 <p align="center">
-    <img src="./.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
+    <img src="./.github/assets/run-lifecycle.svg" alt="dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting until it is answered; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint." width="100%" />
 </p>
 
 A run moves from `queued` to `running` and settles `completed`, `failed` or `cancelled`. A tool that awaits `approve()` parks it in `waiting` until the answer requeues it (the call then runs again with the decision); `drain()` or a crash leaves it `interrupted` (or with a lapsed claim) until `recover()` requeues it. Every requeued run continues from its latest checkpoint.
@@ -142,7 +142,6 @@ const engine = new Engine({
     agents: [triage],
     // channels are what runs come from and talk to: cron, HTTP, GitHub, OpenClaw, ...
     channels: [consoleChannel()],
-    resumeSecret: process.env.RESUME_SECRET ?? 'change-me',
 });
 await engine.start();
 

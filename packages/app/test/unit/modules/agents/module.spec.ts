@@ -38,7 +38,6 @@ import {
 } from '@chamvi/app';
 import type { AppMode, IApp } from '@chamvi/app';
 import {
-    SECRET,
     TOKEN,
     TOKENS,
     hangingModel,
@@ -74,7 +73,6 @@ async function queueRun(store: IStore, clock: ControllableClock, name: string): 
     const engine = new Engine({
         store,
         clock,
-        resumeSecret: SECRET,
         agents: [codeAgent(name)],
     });
     const { runId } = await engine.dispatch({
@@ -119,7 +117,6 @@ function build(options: {
     const harness = buildHarness({
         mode: options.mode,
         env: {
-            RESUME_SECRET: SECRET,
             CHAMVI_AGENTS_DIR: dir,
             CHAMVI_AGENTS_POLL_MS: String(POLL_MS),
             ...options.env,
@@ -566,7 +563,6 @@ describe('agentsModule', () => {
 
         const result = await app.runJob({
             env: {
-                RESUME_SECRET: SECRET,
                 CHAMVI_AGENTS_DIR: root.path,
                 CHAMVI_DRAIN_TIMEOUT_MS: '1000',
             },
@@ -608,7 +604,6 @@ describe('agentsModule', () => {
         const port = await freePort();
         await app.start({
             env: {
-                RESUME_SECRET: SECRET,
                 HOST: '127.0.0.1',
                 PORT: String(port),
                 CHAMVI_TOKENS: TOKENS,

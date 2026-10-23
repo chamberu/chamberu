@@ -11,7 +11,6 @@ import {
     expect,
     it,
 } from 'vitest';
-import { RESUME_SECRET } from '../../utils/env.ts';
 import { fixtureEntry, spawnCli } from '../../utils/spawn.ts';
 import type { CliProcess } from '../../utils/spawn.ts';
 
@@ -24,13 +23,13 @@ describe('bin run-job', () => {
     });
 
     it('run-job echo exits 0', async () => {
-        cli = spawnCli(['run-job', 'echo', '--entry', fixtureEntry('app')], { env: { RESUME_SECRET } });
+        cli = spawnCli(['run-job', 'echo', '--entry', fixtureEntry('app')], { env: {} });
         expect(await cli.exited()).toEqual({ code: 0, signal: null });
         expect(cli.stdout()).toContain('echo: completed');
     });
 
     it('run-job of an unknown agent exits 2', async () => {
-        cli = spawnCli(['run-job', 'nope', '--entry', fixtureEntry('app')], { env: { RESUME_SECRET } });
+        cli = spawnCli(['run-job', 'nope', '--entry', fixtureEntry('app')], { env: {} });
         expect((await cli.exited()).code).toBe(2);
     });
 });

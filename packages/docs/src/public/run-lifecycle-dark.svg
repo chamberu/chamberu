@@ -29,7 +29,7 @@
         .s-interrupted { stroke: var(--interrupted); }
         .f-accent { fill: var(--accent); }
     </style>
-    <desc id="rl-desc">dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting with a signed resume token; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint.</desc>
+    <desc id="rl-desc">dispatch() stores a queued run, deduplicated by idempotency key. The engine claims it and runs it: every LLM or tool step is followed by a checkpoint in the store. A run ends completed, failed or cancelled. A tool call that needs approval pauses the run in waiting until it is answered; approving or denying it requeues the run. drain() or a crashed process leaves a run interrupted or with an expired claim; recover() requeues it, and the next execution continues from the latest checkpoint.</desc>
 
 
     <defs>
@@ -69,7 +69,7 @@
     <rect class="card s-waiting" x="464" y="196" width="220" height="84" rx="12" stroke="#9A6A12" stroke-width="1.5"/>
     <text class="title" x="480" y="224">waiting</text>
     <text class="code muted" x="480" y="246" font-size="12">approval request</text>
-    <text class="code muted" x="480" y="264" font-size="12">signed resume token</text>
+    <text class="code muted" x="480" y="264" font-size="12">answered by approval id</text>
 
     <!-- interrupted -->
     <rect class="card s-interrupted" x="728" y="196" width="196" height="84" rx="12" stroke="#5C5B60" stroke-width="1.5"/>

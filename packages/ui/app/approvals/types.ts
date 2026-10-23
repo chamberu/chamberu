@@ -23,9 +23,6 @@ export type DecidedApproval = {
 /** The callout's "notified" line. */
 export type NotifiedLine = { text: string; warn: boolean };
 
-/** The ids a resume token names, for display only: the server verifies the token. */
-export type ResumeClaims = { runId: string; approvalId: string };
-
 /** A token-less approval link: `/approvals?run=<runId>&approval=<approvalId>` (approval optional). */
 export type ApprovalLink = { runId: string; approvalId?: string };
 
