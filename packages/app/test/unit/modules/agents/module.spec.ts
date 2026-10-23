@@ -254,8 +254,8 @@ describe('agentsModule', () => {
 
     it('an unknown model string is an issue, not a boot failure', async () => {
         await writeTree(root.path, {
-            'greeter/agent.ts': agentFile('v1', 'acme:model'),
-            'other/agent.ts': agentFile('v1', 'test:model', 'other'),
+            'greeter/agent.ts': agentFile('v1', 'acme/model'),
+            'other/agent.ts': agentFile('v1', 'test/model', 'other'),
         });
         const {
             harness, 
@@ -338,7 +338,7 @@ describe('agentsModule', () => {
     });
 
     it('the watcher applies a change only once it is stable for one poll', async () => {
-        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:hang') });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test/hang') });
         const {
             harness,
             engine,
@@ -381,7 +381,7 @@ describe('agentsModule', () => {
         await harness.setup();
         await watch();
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test/model', 'newcomer') });
         await poll();
         expect(engine().getAgent('newcomer')).toBeUndefined();
         await poll();
@@ -546,14 +546,14 @@ describe('agentsModule', () => {
         const current = engine();
         await runHooks(harness.container, 'stopping');
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test/model', 'newcomer') });
         await poll();
         await poll();
         expect(current.getAgent('newcomer')).toBeUndefined();
     });
 
     it('job mode loads the folder and runs a folder agent\'s cron trigger', async () => {
-        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test:model', 'greeter', [cronTrigger('0 9 * * *')]) });
+        await writeTree(root.path, { 'greeter/agent.ts': agentFile('v1', 'test/model', 'greeter', [cronTrigger('0 9 * * *')]) });
         const clock = new ControllableClock(START);
         const store = new MemoryStore({ clock });
         const app = createApp({
@@ -585,7 +585,7 @@ describe('agentsModule', () => {
         await harness.setup();
         await runHooks(harness.container, 'started');
 
-        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test:model', 'newcomer') });
+        await writeTree(root.path, { 'newcomer/agent.ts': agentFile('v1', 'test/model', 'newcomer') });
         await poll();
         await poll();
         expect(engine().getAgent('greeter')).toBeDefined();

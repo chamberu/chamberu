@@ -16,7 +16,7 @@ import {
 import { listAgentFolders, loadAgents } from '@chamvi/app';
 import { createTempDir, writeTree } from '../../utils/folder.ts';
 
-const agent = (name: string) => `export default { name: '${name}', definition: { model: 'test:model', instructions: 'x' } };\n`;
+const agent = (name: string) => `export default { name: '${name}', definition: { model: 'test/model', instructions: 'x' } };\n`;
 
 describe('loadAgents', () => {
     let root: { path: string; remove: () => Promise<void> };

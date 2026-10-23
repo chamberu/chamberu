@@ -10,7 +10,7 @@ import { createApp, defineAgent, http } from '@chamvi/app';
 // a model string of a provider whose API key is not set
 const triage = defineAgent({
     name: 'triage',
-    model: 'anthropic:claude-sonnet-5-5',
+    model: 'anthropic/claude-sonnet-5-5',
     instructions: 'Triage the issue.',
     channels: [http.on()],
 });

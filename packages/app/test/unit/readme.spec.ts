@@ -32,7 +32,7 @@ describe('README example', () => {
 
     it('starts and stops', async () => {
         // a preset default provider: chamvi leaves model strings to it
-        globalThis.AI_SDK_DEFAULT_PROVIDER = customProvider({ languageModels: { 'anthropic:claude-sonnet-5-5': textModel() } }) as never;
+        globalThis.AI_SDK_DEFAULT_PROVIDER = customProvider({ languageModels: { 'anthropic/claude-sonnet-5-5': textModel() } }) as never;
 
         const port = await freePort();
         await app.start({

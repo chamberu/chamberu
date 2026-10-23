@@ -39,7 +39,7 @@ npm install --save-dev tsdown   # only for chamvi build
 
 ## Model strings
 
-An agent's `model` may be a string `'<provider>:<model>'`. It resolves through an AI SDK provider registry of every installed provider package (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/mistral`, `@ai-sdk/xai`) with its key from env (`ANTHROPIC_API_KEY`, ...), overridden per provider by `createApp({ models })`. `start` and `runJob` check every string model first: a provider package that is not installed or a key that is not set throws `InvalidAgentDefinitionError` naming the package or the variable, and the CLI exits 2. A string never reaches the Vercel Gateway. A `LanguageModel` object is used as is.
+An agent's `model` may be a string `'<provider>/<model>'`, the AI SDK's own form (`'openai/gpt-5'`); the provider is the part before the first `/`, so a model id may hold one (`'openrouter/meta-llama/llama-3.1'`). It resolves through an AI SDK provider registry of every installed provider package (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/mistral`, `@ai-sdk/xai`) with its key from env (`ANTHROPIC_API_KEY`, ...), overridden per provider by `createApp({ models })`. `start` and `runJob` check every string model first: a provider package that is not installed or a key that is not set throws `InvalidAgentDefinitionError` naming the package or the variable, and the CLI exits 2. A string never reaches the Vercel Gateway. A `LanguageModel` object is used as is.
 
 ## Modules
 

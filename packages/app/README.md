@@ -54,7 +54,7 @@ import {
 const triage = defineAgent({
     name: 'triage',
     // resolved through the installed provider package (@ai-sdk/anthropic, ANTHROPIC_API_KEY)
-    model: 'anthropic:claude-sonnet-5-5',
+    model: 'anthropic/claude-sonnet-5-5',
     instructions: 'Triage the reported issue: label it and summarize the next step.',
     channels: [
         // POST /agents/triage/runs, the UI and MCP
@@ -251,7 +251,7 @@ await harness.stop();
 
 ## Models
 
-A model string `'<provider>:<model>'` resolves through an AI SDK provider registry of every installed built-in provider (`BUILTIN_PROVIDERS`), overridden by `createApp({ models })`. Every string model is checked at `start` and `runJob`, so a string never falls through to the Vercel Gateway: a provider package that is not installed or an API key that is not set throws `InvalidAgentDefinitionError` naming the package or the variable (the CLI exits 2). Agents with a `LanguageModel` object are not checked.
+A model string `'<provider>/<model>'` (the AI SDK's own form, split at the first `/`) resolves through an AI SDK provider registry of every installed built-in provider (`BUILTIN_PROVIDERS`), overridden by `createApp({ models })`. Every string model is checked at `start` and `runJob`, so a string never falls through to the Vercel Gateway: a provider package that is not installed or an API key that is not set throws `InvalidAgentDefinitionError` naming the package or the variable (the CLI exits 2). Agents with a `LanguageModel` object are not checked.
 
 The registry is installed as `globalThis.AI_SDK_DEFAULT_PROVIDER`, which is process-wide: two apps in one process share the first one's registry until it stops. A default provider set before `start` is left alone, and chamvi then checks no model strings.
 

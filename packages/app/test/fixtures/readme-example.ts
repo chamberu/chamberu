@@ -9,7 +9,7 @@ import {
 const triage = defineAgent({
     name: 'triage',
     // resolved through the installed provider package (@ai-sdk/anthropic, ANTHROPIC_API_KEY)
-    model: 'anthropic:claude-sonnet-5-5',
+    model: 'anthropic/claude-sonnet-5-5',
     instructions: 'Triage the reported issue: label it and summarize the next step.',
     channels: [
         // POST /agents/triage/runs, the UI and MCP

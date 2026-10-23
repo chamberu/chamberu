@@ -7,7 +7,7 @@ export async function smokeTest(agents: Agent[], model: MockLanguageModelV4) {
     // #region testing
     const app = createApp({
         agents,
-        // 'anthropic:claude-sonnet-5-5' resolves to the mock: no package, no key, no request
+        // 'anthropic/claude-sonnet-5-5' resolves to the mock: no package, no key, no request
         models: { anthropic: customProvider({ languageModels: { 'claude-sonnet-5-5': model } }) },
     });
 

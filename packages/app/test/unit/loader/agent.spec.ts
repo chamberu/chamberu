@@ -17,7 +17,7 @@ import { writeFile } from 'node:fs/promises';
 import { InvalidAgentDefinitionError, loadAgent } from '@chamvi/app';
 import { createTempDir, writeTree } from '../../utils/folder.ts';
 
-const agentTs = (body = 'model: \'test:model\', instructions: \'x\'', name = 'triage') =>
+const agentTs = (body = 'model: \'test/model\', instructions: \'x\'', name = 'triage') =>
     `import { defineAgent } from '@chamvi/core';\nexport default defineAgent({ name: '${name}', ${body} });\n`;
 
 describe('loadAgent', () => {
@@ -49,7 +49,7 @@ describe('loadAgent', () => {
                 '',
                 'export default defineAgent({',
                 '    name: \'triage\',',
-                '    model: \'test:model\',',
+                '    model: \'test/model\',',
                 '    instructions: readFileSync(new URL(\'./prompt.md\', import.meta.url), \'utf8\'),',
                 '    tools,',
                 '    channels: [cron.on(\'0 9 * * *\', { timezone: \'Europe/Berlin\' })],',
@@ -70,7 +70,7 @@ describe('loadAgent', () => {
         expect(loaded.hash).toMatch(/^[0-9a-f]{64}$/);
         expect(loaded.agent.name).toBe('triage');
         expect(loaded.agent.definition.instructions).toBe('Sort the inbox.\n');
-        expect(loaded.agent.definition.model).toBe('test:model');
+        expect(loaded.agent.definition.model).toBe('test/model');
         expect(loaded.agent.definition.budget.maxSteps).toBe(3);
         expect(Object.keys(loaded.agent.definition.tools as object)).toEqual(['say_hi']);
         expect(loaded.agent.definition.channels?.map((s) => s.id)).toEqual(['cron:0 9 * * *']);
@@ -78,7 +78,7 @@ describe('loadAgent', () => {
 
     it('applies the budget defaults of defineAgent to a structural agent', async () => {
         const dir = join(root.path, 'triage');
-        await writeTree(dir, { 'agent.ts': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\' } };\n' });
+        await writeTree(dir, { 'agent.ts': 'export default { name: \'triage\', definition: { model: \'test/model\', instructions: \'x\' } };\n' });
 
         const loaded = await loadAgent(dir);
 
@@ -102,7 +102,7 @@ describe('loadAgent', () => {
 
     it('a plain config object is refused', async () => {
         await expectRefused(
-            { 'agent.ts': 'export default { model: \'test:model\', instructions: \'x\' };\n' },
+            { 'agent.ts': 'export default { model: \'test/model\', instructions: \'x\' };\n' },
             /^triage\/agent\.ts: the default export must be defineAgent\(\.\.\.\)'s result\.$/,
         );
     });
@@ -116,7 +116,7 @@ describe('loadAgent', () => {
     });
 
     it('an agent definition defineAgent refuses is refused', async () => {
-        await expectRefused({ 'agent.ts': 'export default { name: \'triage\', definition: { model: \'test:model\', instructions: \'x\', channels: [{ channel: \'http\', id: \'http\', options: {} }, { channel: \'http\', id: \'http\', options: {} }] } };\n' }, /duplicate subscription id/);
+        await expectRefused({ 'agent.ts': 'export default { name: \'triage\', definition: { model: \'test/model\', instructions: \'x\', channels: [{ channel: \'http\', id: \'http\', options: {} }, { channel: \'http\', id: \'http\', options: {} }] } };\n' }, /duplicate subscription id/);
     });
 
     it('a folder name that is no agent name is refused', async () => {
@@ -140,7 +140,7 @@ describe('loadAgent', () => {
         const loaded = await loadAgent(dir, {
             load: async (path) => {
                 seen.push(path);
-                return { default: { name: 'triage', definition: { model: 'test:model', instructions: 'x' } } };
+                return { default: { name: 'triage', definition: { model: 'test/model', instructions: 'x' } } };
             },
         });
 
@@ -155,7 +155,7 @@ describe('loadAgent', () => {
         const promise = loadAgent(dir, {
             load: async (path) => {
                 await writeFile(path, 'export default { name: \'triage\', definition: { model: \'test:other\', instructions: \'x\' } };\n');
-                return { default: { name: 'triage', definition: { model: 'test:model', instructions: 'x' } } };
+                return { default: { name: 'triage', definition: { model: 'test/model', instructions: 'x' } } };
             },
         });
 

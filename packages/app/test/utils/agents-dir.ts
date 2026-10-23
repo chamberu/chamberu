@@ -36,7 +36,7 @@ export const POLL_MS = 1_000;
  * fixture does not depend on the built @chamvi/core); `channels` are
  * subscription source expressions (`HTTP_TRIGGER`, `cronTrigger()`).
  */
-export function agentFile(instructions: string, model = 'test:model', name = 'greeter', channels: string[] = []): string {
+export function agentFile(instructions: string, model = 'test/model', name = 'greeter', channels: string[] = []): string {
     const list = channels.length > 0 ? `, channels: [${channels.join(', ')}]` : '';
     return `export default { name: '${name}', definition: { model: '${model}', instructions: '${instructions}'${list} } };\n`;
 }
@@ -50,7 +50,7 @@ export function cronTrigger(expression: string, timezone?: string): string {
     return `{ channel: 'cron', id: 'cron:${expression}', options: { expression: '${expression}'${zone}, overlap: 'skip' } }`;
 }
 
-/** The `test` provider: `test:model` answers 'from folder', `test:hang` never answers. */
+/** The `test` provider: `test/model` answers 'from folder', `test/hang` never answers. */
 export function provider() {
     const answers = Array.from({ length: 20 }, () => ({ parts: [{ type: 'text' as const, text: 'from folder' }] }));
     return customProvider({ languageModels: { model: mockModel(answers), hang: hangingModel() } });

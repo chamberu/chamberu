@@ -147,7 +147,7 @@ describe('engineModule', () => {
     it('migrate mode builds nothing', async () => {
         const { harness } = build({
             mode: 'migrate',
-            agents: [agentWith('anthropic:m')],
+            agents: [agentWith('anthropic/m')],
             env: { RESUME_SECRET: '', DATABASE_URL: 'postgres://u@127.0.0.1:1/x' },
             // a given store: the module never connects
             store: new MemoryStore(),
@@ -227,7 +227,7 @@ describe('engineModule', () => {
     });
 
     it('a string model is checked at setup', async () => {
-        const agent = agentWith('anthropic:m');
+        const agent = agentWith('anthropic/m');
         const { harness } = build({ agents: [agent] });
         const error = await rejectionOf(harness.setup());
         expect(error).toBeInstanceOf(InvalidAgentDefinitionError);
@@ -254,10 +254,10 @@ describe('engineModule', () => {
 
     it('a preset global provider skips the checks', async () => {
         const model = textModel('from global');
-        const preset = customProvider({ languageModels: { 'anthropic:m': model } });
+        const preset = customProvider({ languageModels: { 'anthropic/m': model } });
         globalThis.AI_SDK_DEFAULT_PROVIDER = preset;
 
-        const { harness, logger } = build({ agents: [agentWith('anthropic:m')] });
+        const { harness, logger } = build({ agents: [agentWith('anthropic/m')] });
         await harness.setup();
 
         expect(logger.entries.some((entry) => entry.level === 'debug' && entry.msg.includes('default provider'))).toBe(true);

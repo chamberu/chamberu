@@ -11,7 +11,7 @@ import {
 const digest = defineAgent({
     name: 'digest',
     // resolved through @ai-sdk/anthropic and ANTHROPIC_API_KEY, never the Vercel Gateway
-    model: 'anthropic:claude-sonnet-5-5',
+    model: 'anthropic/claude-sonnet-5-5',
     instructions: 'Summarize what happened since the last digest.',
     channels: [
         // POST /agents/digest/runs, the dashboard and MCP
