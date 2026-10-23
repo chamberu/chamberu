@@ -54,7 +54,11 @@ export type ExecuteContext = {
 
 /** What a suspended approve() asks for: the run pauses on it (`Run.waiting`). */
 export type ApprovalRequest = {
-    /** `<toolCallId>:<n>`, n the 0-based ordinal of the approve() within its tool call. */
+    /**
+     * `<stepIndex>:<toolCallId>:<n>`: the checkpoint step index of the model
+     * step that made the call, its call id, n the 0-based ordinal of the
+     * approve() within the call.
+     */
     approvalId: string;
     toolName: string;
     toolCallId: string;

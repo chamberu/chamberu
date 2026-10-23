@@ -11,6 +11,7 @@ import { ToolNotAllowedError } from '../errors/index.ts';
 import type { IEffectStore } from '../store/types.ts';
 import type { ToolContext } from '../tool/types.ts';
 import { SUSPENDED_RESULT } from '../approval/constants.ts';
+import { SuspendSignal } from '../approval/request.ts';
 import { EFFECT, EFFECT_HOOKS } from './constants.ts';
 import { currentToolCall, runToolCall } from './frame.ts';
 import { stableHash, validateToolInput } from './helpers.ts';
@@ -88,8 +89,9 @@ export function wrapToolsForRun(
 ): ToolSet {
     const {
         allow, 
-        hooks = {}, 
-        onSuspend, 
+        hooks = {},
+        onSuspend,
+        stepIndex,
     } = options;
     const inflight = new Map<string, Promise<unknown>>();
     const wrapped: ToolSet = {};
@@ -106,6 +108,7 @@ export function wrapToolsForRun(
                 runId: ctx.run.runId,
                 toolCallId: toolCallIdOf(callOptions),
                 toolName: name,
+                stepIndex: stepIndex?.() ?? 0,
                 approvals: 0,
                 effects: store,
             };
@@ -247,7 +250,19 @@ export function wrapToolsForRun(
                     pending = apply(key, final, callOptions).finally(() => inflight.delete(key));
                     inflight.set(key, pending);
                 }
-                return after(final, await pending, callOptions);
+                let result: unknown;
+                try {
+                    result = await pending;
+                } catch (error) {
+                    // an approve() in the shared application suspended the first call's
+                    // frame: this call waits on the same approval and stays pending too
+                    const frame = currentToolCall();
+                    if (error instanceof SuspendSignal && frame && !frame.suspended) {
+                        frame.suspended = { ...error.request, toolCallId: frame.toolCallId };
+                    }
+                    throw error;
+                }
+                return after(final, result, callOptions);
             }),
         } as ToolSet[string];
     }

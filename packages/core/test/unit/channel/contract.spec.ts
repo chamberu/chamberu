@@ -216,12 +216,37 @@ describe('channels on the engine', () => {
         expect(log.filter((l) => l.startsWith('stop:'))).toEqual(['stop:a', 'stop:b']);
     });
 
-    it('stop() stops the started channels', async () => {
+    it('stop() stops the started channels and resolves once they stopped', async () => {
         const log: string[] = [];
-        const engine = make({ channels: [recording('a', log)] });
+        let finish: (() => void) | undefined;
+        const slow: IChannel = {
+            name: 'slow',
+            start: async () => {},
+            stop: () => new Promise<void>((resolve) => {
+                finish = () => {
+                    log.push('stopped:slow');
+                    resolve();
+                };
+            }),
+        };
+        const engine = make({ channels: [recording('a', log), slow] });
         await engine.start();
-        engine.stop();
-        await vi.waitFor(() => expect(log).toEqual(['start:a', 'stop:a']));
+        let resolved = false;
+        const stopping = engine.stop().then(() => {
+            resolved = true;
+        });
+        await vi.waitFor(() => expect(finish).toBeDefined());
+        expect(log).toContain('stop:a');
+        expect(resolved).toBe(false);
+        finish!();
+        await stopping;
+        expect(log).toContain('stopped:slow');
+    });
+
+    it('refuses a defaultAddress that is no non-empty string', () => {
+        expect(() => make({ channels: [{ name: 'a', defaultAddress: '' }] })).toThrow(InvalidAgentDefinitionError);
+        expect(() => make({ channels: [{ name: 'a', defaultAddress: 7 as never }] })).toThrow(/defaultAddress/);
+        expect(() => make({ channels: [{ name: 'a', defaultAddress: 'C1' }] })).not.toThrow();
     });
 
     it('ctx.dispatch sets channel to the channel\'s name', async () => {

@@ -134,7 +134,7 @@ export async function triageIssue(model: LanguageModel) {
     });
 
     await engine.idle();
-    engine.stop();
+    await engine.stop();
 
     return {
         run: await engine.getRun(runId), 
@@ -165,8 +165,8 @@ tools: { search: searchTool },
 toolsContext: { search: { apiKey: process.env.SEARCH_KEY } },
 ```
 
-- A channel (`IChannel`: `name`, optional `start`, `stop`, `in`, `out`) is anything a run comes from or talks to; `new Engine({ channels })` registers them (names follow the agent-name rule, unique per engine). `start()` starts every channel after the first recovery (`start({ channels: false })` starts none), `drain()` and `stop()` stop them first. An agent subscribes through `channels: ChannelSubscription[]`, each naming a registered channel (an unknown one is refused). A channel dispatches through its `ChannelContext`, which sets `channel` to its own name; `readRequestBody(request, { limit })` reads a bounded body (`payload_too_large` above the limit).
-- Outbound is tool-driven: the engine never sends a message of its own. Inside a tool, `injectChannel(ctx, name)` returns a handle on a registered channel with `out` (else `ChannelNotFoundError`, `channel_not_found`), and `replyChannel(ctx)` the run's source channel bound to its source address (`undefined` when that channel has no `out` or the run no address). `handle.emit({ title?, body, key? }, address?)` sends through the channel's `out`; the address defaults to the source address on the source channel only (else a `validation_error` tool error). An emit is an effect: its key (`<runId>:emit:<channel>:<sha256 of address and message>`, or your `key`) is recorded in the effect store, so identical emits of one step and a step redone after a crash send once, and `out` gets it as `message.key` to dedupe on; a throwing `out` records nothing and is a tool error. `emit` outside a tool call (in the tools factory) throws `InvalidRunStateError`.
+- A channel (`IChannel`: `name`, optional `defaultAddress`, `start`, `stop`, `in`, `out`) is anything a run comes from or talks to; `new Engine({ channels })` registers them (names follow the agent-name rule, unique per engine). `start()` starts every channel after the first recovery (`start({ channels: false })` starts none), `drain()` and `stop()` stop them first. An agent subscribes through `channels: ChannelSubscription[]`, each naming a registered channel (an unknown one is refused). A channel dispatches through its `ChannelContext`, which sets `channel` to its own name; `readRequestBody(request, { limit })` reads a bounded body (`payload_too_large` above the limit).
+- Outbound is tool-driven: the engine never sends a message of its own. Inside a tool, `injectChannel(ctx, name)` returns a handle on a registered channel with `out` (else `ChannelNotFoundError`, `channel_not_found`), and `replyChannel(ctx)` the run's source channel bound to its source address (`undefined` when that channel has no `out` or the run no address). `handle.emit({ title?, body, key? }, address?)` sends through the channel's `out`; the address defaults to the source address on the source channel, else to the channel's `defaultAddress` (`consoleChannel()` has its name, the OpenClaw channel its `deliver.to`); without either it is a `validation_error` tool error. An emit is an effect: its key (`<runId>:emit:<channel>:<sha256 of address and message>`, or your `key`) is recorded in the effect store, so identical emits of one step and a step redone after a crash send once, and `out` gets it as `message.key` to dedupe on; a throwing `out` records nothing and is a tool error. `emit` outside a tool call (in the tools factory) throws `InvalidRunStateError`.
 - `consoleChannel({ name?, write? })` is the development channel (out only, default name `console`, default `write` `console.log`): one header line per message, the body lines and, for an approval, until when it waits; it never throws.
 - The trigger envelope (channel, subscription id, payload; `address` is where the run came from on the channel) becomes the run's first user message, as a JSON block.
 - `dispatch({ ..., attachments: [{ mediaType, filename?, data }] })` starts a run with files: each is stored as an artifact of the run before the run is created (a deduplicated dispatch stores nothing), its metadata lands on `run.trigger.attachments` (ids `<runId>.0000`, `<runId>.0001`, ..., so a listing keeps the input order), and the model gets the bytes as file parts of the first message. Checkpoints keep a reference, never the bytes; a missing artifact fails the run with code `artifact_not_found`.
@@ -236,7 +236,7 @@ const engine = new Engine({
 await engine.approve(runId, { approvalId, approved: true });
 ```
 
-- `approve(ctx, { title, body?, timeoutMs? })` runs inside a tool call (its `execute` or the agent's `hooks`). It puts the run in `waiting` (`run.waiting` names the approval, `<toolCallId>:<n>`) and frees its slot; the approval survives restarts. Once answered, the call runs again from the start and `approve()` returns `{ approved, reason?, approver? }`, so code before it must be idempotent. Other calls of the same step that finished keep their results.
+- `approve(ctx, { title, body?, timeoutMs? })` runs inside a tool call (its `execute` or the agent's `hooks`). It puts the run in `waiting` (`run.waiting` names the approval, `<stepIndex>:<toolCallId>:<n>`) and frees its slot; the approval survives restarts. Once answered, the call runs again from the start and `approve()` returns `{ approved, reason?, approver? }`, so code before it must be idempotent. Other calls of the same step that finished keep their results.
 - `injectChannel(ctx, name).approve({ title, address? })` is the same, with the request delivered through that channel.
 - To gate a tool you did not write, call `approve()` in the agent's `beforeToolExecution` hook and throw `ToolDeniedError` for a denial.
 - `engine.resume(token, decision)` answers with a resume token signed with `resumeSecret` (`createResumeToken`). A token answers its wait point once. A forged, expired or superseded token throws `InvalidResumeTokenError`.
@@ -416,7 +416,7 @@ Test helpers (`ControllableClock`, `describeStoreContract`) live in [`@chamvi/te
 - **Effects are recorded after they happen.** A crash between a tool's side effect and the store write repeats the effect on resume, unless `alreadyApplied` finds it.
 - **Several approvals in one step are handled one at a time.** The run waits on the first in call order; the other suspended calls stay pending and ask again after the resume, before any further model call.
 - **`MemoryStore` is not durable.** Everything is gone with the process; use a persistent store to survive restarts or to run replicas.
-- **`stop()` only stops polling.** Runs in progress continue; use `drain()` to shut down.
+- **`stop()` stops polling and the channels.** It resolves once every channel stopped; runs in progress continue, so use `drain()` to shut down.
 
 ## License
 

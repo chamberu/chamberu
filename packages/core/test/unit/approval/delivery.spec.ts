@@ -151,7 +151,7 @@ describe('approval delivery', () => {
             agent: 'release',
             title: 'Close #12?',
             body: 'stale for 90 days',
-            approvalId: 'c1:0',
+            approvalId: '0:c1:0',
             expiresAt: waiting.expiresAt,
         });
         expect(opts.trigger).toEqual(run!.trigger);

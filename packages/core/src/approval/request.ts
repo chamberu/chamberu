@@ -56,7 +56,9 @@ function assertRequest(request: unknown): asserts request is ApprovalRequestInpu
 
 /**
  * The approval logic behind approve() and ChannelHandle.approve(): the n-th
- * request of the current tool call has the id `<toolCallId>:<n>`; a decision
+ * request of the current tool call has the id `<stepIndex>:<toolCallId>:<n>`
+ * (the step index of the model step that made the call, so a call id a
+ * provider reuses in a later step is another approval); a decision
  * recorded for it is returned, otherwise the call is suspended (the request
  * is stashed on the frame and a SuspendSignal thrown). Sends nothing.
  */
@@ -75,7 +77,7 @@ export async function requestApproval(
     }
     assertRequest(request);
     // taken before any await, so the ordinals follow the order of the calls
-    const approvalId = `${frame.toolCallId}:${frame.approvals++}`;
+    const approvalId = `${frame.stepIndex}:${frame.toolCallId}:${frame.approvals++}`;
     const recorded = await frame.effects.getEffect(approvalDecisionKey(frame.runId, approvalId));
     if (recorded) return toApprovalDecision(recorded.result);
 

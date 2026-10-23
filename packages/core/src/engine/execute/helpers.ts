@@ -123,7 +123,8 @@ export function toRunError(error: unknown): { code: string; message: string } {
  * agent's toolPolicy allows, undefined without a policy) is what the model is
  * offered. wrapToolsForRun memoizes effects and re-checks the policy per call,
  * so a refused call is a tool error, and runs the agent's hooks around every
- * call; a call approve() suspended is reported to `onSuspend`. `toolsContext`
+ * call; a call approve() suspended is reported to `onSuspend`, and
+ * `stepIndex` names the step whose calls run (part of the approval id). `toolsContext`
  * maps every chamvi tool
  * (policy-hidden ones included) to the execution's one ToolContext, plus the
  * agent's own `toolsContext` entries for the other tools, by reference.
@@ -134,6 +135,7 @@ export function assembleTools(
     ctx: ExecuteContext,
     runContext: RunContext,
     onSuspend?: (request: ApprovalRequest) => void,
+    stepIndex?: () => number,
 ): {
     tools: ToolSet;
     activeTools?: string[];
@@ -175,13 +177,23 @@ export function assembleTools(
         for (const [name, value] of Object.entries(agentToolsContext)) toolsContext[name] = value;
     }
 
-    if (!toolPolicy) return { tools: wrapToolsForRun(tools, toolContext, ctx.store, { hooks, onSuspend }), toolsContext };
+    if (!toolPolicy) {
+        return {
+            tools: wrapToolsForRun(tools, toolContext, ctx.store, {
+                hooks,
+                onSuspend,
+                stepIndex,
+            }),
+            toolsContext,
+        };
+    }
     const allow = (name: string) => toolPolicy(name, { run: runContext });
     return {
         tools: wrapToolsForRun(tools, toolContext, ctx.store, {
             allow,
             hooks,
             onSuspend,
+            stepIndex,
         }),
         activeTools: Object.keys(tools).filter(allow),
         toolsContext,

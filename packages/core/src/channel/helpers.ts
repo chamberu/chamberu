@@ -33,6 +33,14 @@ export function createChannelContext(engine: Engine, channel: Pick<IChannel, 'na
 }
 
 /** Refuses a channel name that breaks the agent-name rules. */
+/** Refuses a `defaultAddress` that is given but no non-empty string (InvalidAgentDefinitionError). */
+export function assertDefaultAddress(channel: { name: string; defaultAddress?: unknown }): void {
+    const { defaultAddress } = channel;
+    if (defaultAddress !== undefined && (typeof defaultAddress !== 'string' || defaultAddress.length === 0)) {
+        throw new InvalidAgentDefinitionError(`Channel "${channel.name}" has a defaultAddress that is no non-empty string.`);
+    }
+}
+
 export function assertChannelName(name: unknown): asserts name is string {
     if (typeof name !== 'string' || name.length > NAME_MAX_LENGTH || !NAME_PATTERN.test(name)) {
         throw new InvalidAgentDefinitionError(
@@ -58,7 +66,8 @@ function assertEmitMessage(message: unknown): asserts message is EmitMessage {
  * to. `emit` is an effect: recorded under its key in the effect store, so a
  * redone step (or a parallel identical call) sends once; a throwing `out`
  * records nothing. `approve` is approve() with the request delivered
- * through this channel to `address` (default: the bound address).
+ * through this channel to `address` (default: the bound address, else the
+ * channel's `defaultAddress`).
  */
 export function createChannelHandle(
     ctx: ToolContext,
@@ -67,6 +76,10 @@ export function createChannelHandle(
     address?: string,
 ): ChannelHandle {
     const { name } = channel;
+    const fallback = address ?? channel.defaultAddress;
+    const missing = () => new ValidationError(
+        `Channel "${name}" needs an address: only the run's source channel and a channel with a defaultAddress have a default one.`,
+    );
     const send = async (effectKey: string, key: string, message: EmitMessage, target: string) => {
         const stored = await binding.effects.getEffect(effectKey);
         if (stored) return;
@@ -96,10 +109,8 @@ export function createChannelHandle(
             throw new InvalidRunStateError(`emit() on channel "${name}" runs inside a tool call, not in the tools factory.`);
         }
         assertEmitMessage(message);
-        const target = to ?? address;
-        if (target === undefined) {
-            throw new ValidationError(`Channel "${name}" needs an address: only the run's source channel has a default one.`);
-        }
+        const target = to ?? fallback;
+        if (target === undefined) throw missing();
         if (typeof target !== 'string' || target.length === 0) {
             throw new ValidationError('The address must be a non-empty string.');
         }
@@ -122,10 +133,8 @@ export function createChannelHandle(
 
     const approve = async (request: ApprovalRequestInput & { address?: string }): Promise<ApprovalDecision> => {
         const { address: to, ...rest }: ApprovalRequestInput & { address?: string } = isObject(request) ? request : { title: '' };
-        const target = to ?? address;
-        if (target === undefined) {
-            throw new ValidationError(`Channel "${name}" needs an address: only the run's source channel has a default one.`);
-        }
+        const target = to ?? fallback;
+        if (target === undefined) throw missing();
         if (typeof target !== 'string' || target.length === 0) {
             throw new ValidationError('The address must be a non-empty string.');
         }
@@ -134,7 +143,7 @@ export function createChannelHandle(
 
     return {
         name,
-        ...(address !== undefined ? { address } : {}),
+        ...(fallback !== undefined ? { address: fallback } : {}),
         emit,
         approve,
     };

@@ -10,7 +10,6 @@ import type {
     ModelMessage,
     StepResult,
     StopCondition,
-    ToolResultPart,
     ToolSet,
 } from 'ai';
 import { hydrateMessages } from '../../artifact/helpers.ts';
@@ -127,11 +126,13 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
 
     // the calls approve() suspended in this execution, in the order they suspended
     const suspended: ApprovalRequest[] = [];
+    // while the pending calls run they belong to the checkpoint's step, later ones to the step being made
+    let replaying = pending.length > 0;
     let assembled: ReturnType<typeof assembleTools>;
     try {
         assembled = assembleTools(ctx, runContext, (request) => {
             suspended.push(request);
-        });
+        }, () => (replaying ? checkpoint!.stepIndex : stepIndex));
     } catch (error) {
         local.abort();
         timeout?.clear();
@@ -264,16 +265,21 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         }
     };
 
+    // the write of the pending call that finished last; an abort waits for it before settling
+    let pendingWrite: Promise<void> = Promise.resolve();
+
     /**
-     * Runs the pending calls in call order, appends a tool step and a result
-     * each and saves the checkpoint under its own index (replacing it).
-     * Resolves `paused` when a call suspended again (the results before it are
-     * kept), `failed` on a FatalToolError result.
+     * Runs the pending calls in call order. After each finished call the
+     * checkpoint (under its own index, replacing it) gets the call's result
+     * before its tool step is appended, so a drain, crash or lost lease
+     * after that call never runs it again. Stops before the next call once
+     * the execution was aborted. Resolves `paused` when a call suspended
+     * again (the results before it are kept), `failed` on a FatalToolError
+     * result.
      */
     const runPending = async (): Promise<'paused' | 'failed' | 'done'> => {
-        const parts: ToolResultPart[] = [];
-        let outcome: 'paused' | 'failed' | 'done' = 'done';
         for (const call of pending) {
+            if (signal.aborted) return 'done';
             const startedAt = clock.now();
             const result = await executePendingCall({
                 call,
@@ -283,38 +289,35 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
                 messages: prompt,
                 signal,
             });
-            if (suspended.length > 0) {
-                outcome = 'paused';
-                break;
-            }
+            if (suspended.length > 0) return 'paused';
             const finishedAt = clock.now();
-            await append({
-                kind: 'tool',
-                name: call.toolName,
-                input: call.input,
-                ...('error' in result ? { error: toRunError(result.error) } : { output: result.output }),
-                startedAt,
-                finishedAt,
-            });
-            parts.push(await toToolResultPart(call, Object.hasOwn(tools, call.toolName) ? tools[call.toolName] : undefined, result));
+            pendingWrite = (async () => {
+                const part = await toToolResultPart(call, Object.hasOwn(tools, call.toolName) ? tools[call.toolName] : undefined, result);
+                initial = withToolResults(initial, [part]);
+                prompt = withToolResults(prompt, [part]);
+                await guarded(() => store.saveCheckpoint({
+                    runId: run.id,
+                    stepIndex: checkpoint!.stepIndex,
+                    messages: initial,
+                    ...(checkpoint!.finishReason !== undefined ? { finishReason: checkpoint!.finishReason } : {}),
+                    createdAt: finishedAt,
+                }));
+                await append({
+                    kind: 'tool',
+                    name: call.toolName,
+                    input: call.input,
+                    ...('error' in result ? { error: toRunError(result.error) } : { output: result.output }),
+                    startedAt,
+                    finishedAt,
+                });
+            })();
+            await pendingWrite;
             if ('error' in result && result.error instanceof FatalToolError) {
                 fatal ??= { error: result.error };
-                outcome = 'failed';
-                break;
+                return 'failed';
             }
         }
-        if (parts.length > 0) {
-            initial = withToolResults(initial, parts);
-            prompt = withToolResults(prompt, parts);
-            await guarded(() => store.saveCheckpoint({
-                runId: run.id,
-                stepIndex: checkpoint!.stepIndex,
-                messages: initial,
-                ...(checkpoint!.finishReason !== undefined ? { finishReason: checkpoint!.finishReason } : {}),
-                createdAt: clock.now(),
-            }));
-        }
-        return outcome;
+        return 'done';
     };
 
     const onStepEnd = (step: StepResult<ToolSet>): Promise<void> => {
@@ -331,6 +334,12 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
         } catch (error) {
             local.abort();
             timeout?.clear();
+            // the write of a call that finished before the abort lands before the run settles, never after
+            let settled: Promise<void>;
+            do {
+                settled = pendingWrite;
+                await settled.catch(() => {});
+            } while (settled !== pendingWrite);
             abandoned = true;
             if (ctx.signal.aborted) {
                 await ctx.finish({ status: RunStatus.CANCELLED, usage });
@@ -349,6 +358,7 @@ export async function executeRun(ctx: ExecuteContext): Promise<void> {
             }
             return;
         }
+        replaying = false;
         if (outcome !== 'done') {
             local.abort();
             timeout?.clear();

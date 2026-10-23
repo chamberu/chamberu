@@ -154,6 +154,8 @@ export class RunQueue {
             owner,
             claimTtlMs,
         } = this.opts;
+        // still finishing its previous execution here: the pump after it ends starts it
+        if (this.running.has(run.id)) return undefined;
         if (group !== undefined) {
             if (this.running.values().toArray().includes(group)) return undefined;
             const { total } = await store.listRuns({

@@ -37,7 +37,7 @@ export type RunContext = {
 /** The approval a `waiting` run waits on, as approve() requested it. */
 export type WaitPoint = {
     kind: 'approval';
-    /** `<toolCallId>:<n>` of the stored checkpoint's pending call: never changes after the pause. */
+    /** `<stepIndex>:<toolCallId>:<n>` of the stored checkpoint's pending call: never changes after the pause. */
     approvalId: string;
     toolName: string;
     toolCallId: string;

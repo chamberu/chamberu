@@ -58,6 +58,12 @@ export type ChannelSendOptions = {
  */
 export interface IChannel<TInput = ChannelRequest, TOutput = Response> {
     readonly name: string;
+    /**
+     * Where `emit()` and `approve()` send when the tool names no address and
+     * the run did not come from this channel (e.g. OpenClaw's `deliver.to`);
+     * a non-empty string. Without it such a call needs an address.
+     */
+    readonly defaultAddress?: string;
     /** Background inbound (cron ticks, sockets, polling); called by engine.start() after the first recover. */
     start?(ctx: ChannelContext): Promise<void>;
     /** Called first by engine.drain() and engine.stop(): no new inbound. */
@@ -96,7 +102,8 @@ export type EmitMessage = {
 
 /**
  * A channel bound to the run (`injectChannel`, `replyChannel`). `address` is
- * the run's source address when this is the run's source channel.
+ * the run's source address when this is the run's source channel, else the
+ * channel's `defaultAddress`.
  */
 export type ChannelHandle = {
     readonly name: string;

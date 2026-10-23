@@ -13,7 +13,7 @@ import { approvalDecisionKey } from '../approval/helpers.ts';
 import { verifyResumeToken } from '../approval/module.ts';
 import { assertArtifactInput } from '../artifact/helpers.ts';
 import { attachmentIds, storeArtifact } from '../artifact/module.ts';
-import { assertChannelName, createChannelContext } from '../channel/helpers.ts';
+import { assertChannelName, assertDefaultAddress, createChannelContext } from '../channel/helpers.ts';
 import type { IChannel } from '../channel/types.ts';
 import type { ResumeTokenClaims } from '../approval/types.ts';
 import { systemClock } from '../clock/index.ts';
@@ -114,6 +114,13 @@ export class Engine implements IContextProvider {
         stop?: 'cancel' | 'drain' | 'lease-lost';
     }>();
 
+    /**
+     * Approval deliveries started by a pause, detached from the execution so
+     * a slow channel holds neither the slot nor the executions entry (a resume
+     * meanwhile starts the next execution); idle() and drain() wait for them.
+     */
+    protected readonly deliveries = new Set<Promise<void>>();
+
     protected started = false;
 
     protected draining = false;
@@ -130,6 +137,7 @@ export class Engine implements IContextProvider {
         this.channels = new Map();
         for (const channel of channels) {
             assertChannelName(channel.name);
+            assertDefaultAddress(channel);
             if (this.channels.has(channel.name)) {
                 throw new InvalidAgentDefinitionError(`The channel "${channel.name}" is registered more than once.`);
             }
@@ -383,14 +391,15 @@ export class Engine implements IContextProvider {
     }
 
     /**
-     * Stops the channels started last (their stop errors go to onError) and
-     * the poll for newly runnable work; dispatch and running runs are
-     * unaffected.
+     * Stops the poll for newly runnable work at once, and the channels
+     * started last (their stop errors go to onError); resolves once every
+     * channel stopped (e.g. the cron ticks in flight finished). Dispatch and
+     * running runs are unaffected.
      */
-    stop(): void {
-        void this.stopChannels();
+    stop(): Promise<void> {
         this.started = false;
         this.queue.stopPolling();
+        return this.stopChannels();
     }
 
     protected async startChannels(): Promise<void> {
@@ -401,8 +410,7 @@ export class Engine implements IContextProvider {
             try {
                 await channel.start(createChannelContext(this, channel));
             } catch (error) {
-                this.stop();
-                await this.stopChannels();
+                await this.stop();
                 throw error;
             }
             this.startedChannels.push(channel);
@@ -478,9 +486,8 @@ export class Engine implements IContextProvider {
      */
     async drain(opts: { timeoutMs?: number } = {}): Promise<void> {
         this.draining = true;
-        this.stop();
         // no new inbound before the wait
-        await this.stopChannels();
+        await this.stop();
         await this.queue.halt();
 
         let timer: { clear(): void } | undefined;
@@ -500,11 +507,16 @@ export class Engine implements IContextProvider {
             }
             await Promise.all(pending.map((execution) => execution.done));
         }
-        await this.queue.idle();
+        await this.idle();
     }
 
-    idle(): Promise<void> {
-        return this.queue.idle();
+    /** Resolves when nothing runs, nothing more can be started and no approval delivery is in flight. */
+    async idle(): Promise<void> {
+        await this.queue.idle();
+        while (this.deliveries.size > 0) {
+            await Promise.all(this.deliveries);
+            await this.queue.idle();
+        }
     }
 
     /**
@@ -773,7 +785,14 @@ export class Engine implements IContextProvider {
             });
             return;
         }
-        if (!waiting.notifiedAt) await this.deliverApproval(updated, waiting);
+        if (!waiting.notifiedAt) {
+            // detached: the execution ends with the waiting write, so a resume
+            // during a slow send starts the next execution cleanly
+            const delivery: Promise<void> = this.deliverApproval(updated, waiting)
+                .catch((error: unknown) => this.onError(error, updated))
+                .finally(() => this.deliveries.delete(delivery));
+            this.deliveries.add(delivery);
+        }
     }
 
     /**
@@ -922,7 +941,10 @@ export class Engine implements IContextProvider {
     /** A throwing execution fails the run (and releases its claim) instead of leaking. */
     protected guardedExecute(run: Run): Promise<void> {
         const controller = new AbortController();
-        const done = (async () => {
+        const { promise: done, resolve: release } = Promise.withResolvers<void>();
+        const entry = { controller, done };
+        this.executions.set(run.id, entry);
+        return (async () => {
             try {
                 await this.execute(run, controller.signal);
             } catch (error) {
@@ -931,11 +953,11 @@ export class Engine implements IContextProvider {
                 await this.finish(run.id, { status: RunStatus.FAILED, error: toRunError(error) });
                 this.onError(error, run);
             } finally {
-                this.executions.delete(run.id);
+                // a later execution of the same run may hold the entry by now
+                if (this.executions.get(run.id) === entry) this.executions.delete(run.id);
+                release();
             }
         })();
-        this.executions.set(run.id, { controller, done: done.catch(() => {}) });
-        return done;
     }
 
     /**

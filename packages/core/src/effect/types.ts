@@ -28,6 +28,12 @@ export type ToolCallFrame = {
     runId: string;
     toolCallId: string;
     toolName: string;
+    /**
+     * The checkpoint step index of the model step that made the call: part of
+     * the approval id, so a provider reusing a call id in a later step never
+     * reads an earlier step's decision.
+     */
+    stepIndex: number;
     /** How many approve() calls this tool call made so far. */
     approvals: number;
     /** Where approve() reads the recorded decisions. */
@@ -49,4 +55,6 @@ export type WrapToolsOptions = {
      * checkpoint.
      */
     onSuspend?: (request: ApprovalRequest) => void;
+    /** The checkpoint step index of the step whose calls run now (read per call); default 0. */
+    stepIndex?: () => number;
 };

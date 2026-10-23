@@ -18,6 +18,7 @@ import {
     ChannelNotFoundError,
     Engine,
     InvalidRunStateError,
+    consoleChannel,
     defineAgent,
     defineTool,
     injectChannel,
@@ -283,6 +284,39 @@ describe('channel outbound', () => {
         expect(stored?.status).toBe('completed');
         expect(ctx.slack.calls).toHaveLength(0);
         expect(steps.find((s) => s.kind === 'tool')?.error).toMatchObject({ code: 'validation_error' });
+    });
+
+    it('emit and approve without an address on a channel with a defaultAddress send there', async () => {
+        const owner = recorder('owner');
+        const chat: IChannel = { ...owner.channel, defaultAddress: 'me' };
+        const tools: ToolSet = {
+            notify: emitTool(async (ctx, { body }) => {
+                await injectChannel(ctx, 'owner').emit({ body });
+                return injectChannel(ctx, 'owner').approve({ title: 'ok?' });
+            }),
+        };
+        const ctx = setup(mockModel([call('notify', { body: 'b' }), text('done')]), tools, { channels: [chat, web] });
+        const { run: stored } = await run(ctx);
+        await ctx.engine.idle();
+        expect(stored?.status).toBe('waiting');
+        expect(stored?.waiting?.address).toBe('me');
+        expect(owner.calls.map((c) => [c.message.kind, c.address])).toEqual([['message', 'me'], ['approval', 'me']]);
+    });
+
+    it('consoleChannel takes emits without an address', async () => {
+        const lines: string[] = [];
+        const tools: ToolSet = { notify: emitTool((ctx, { body }) => injectChannel(ctx, 'console').emit({ body })) };
+        const ctx = setup(mockModel([call('notify', { body: 'hello' }), text('done')]), tools, {
+            channels: [consoleChannel({
+                write: (line) => {
+                    lines.push(line);
+                },
+            }), web],
+        });
+        const { run: stored, steps } = await run(ctx);
+        expect(stored?.status).toBe('completed');
+        expect(steps.find((s) => s.kind === 'tool')?.output).toBe('sent');
+        expect(lines).toContain('hello');
     });
 
     it('emit without an address on the source channel uses trigger.address', async () => {

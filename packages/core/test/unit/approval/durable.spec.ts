@@ -159,7 +159,7 @@ describe('durable approve()', () => {
         expect(run?.claim).toBeUndefined();
         expect(run?.waiting).toMatchObject({
             kind: 'approval',
-            approvalId: 'c1:0',
+            approvalId: '0:c1:0',
             toolCallId: 'c1',
             toolName: 'deploy',
             title: 'Deploy prod?',
@@ -185,7 +185,7 @@ describe('durable approve()', () => {
         const { runId } = await dispatch(engine, store);
 
         await engine.approve(runId, {
-            approvalId: 'c1:0',
+            approvalId: '0:c1:0',
             approved: true,
             approver,
         });
@@ -203,7 +203,7 @@ describe('durable approve()', () => {
         expect(steps[1]).toMatchObject({
             name: 'deploy',
             output: {
-                approvalId: 'c1:0',
+                approvalId: '0:c1:0',
                 approved: true,
                 approver,
             },
@@ -224,7 +224,7 @@ describe('durable approve()', () => {
         const { runId } = await dispatch(engine, store);
 
         await engine.approve(runId, {
-            approvalId: 'c1:0',
+            approvalId: '0:c1:0',
             approved: false,
             reason: 'not today',
         });
@@ -253,12 +253,12 @@ describe('durable approve()', () => {
         const { store, engine } = setup(model, { tools: { quick, deploy: createDeploy(recorder) } });
         const { runId, run } = await dispatch(engine, store);
 
-        expect(run?.waiting?.approvalId).toBe('c2:0');
+        expect(run?.waiting?.approvalId).toBe('0:c2:0');
         expect(fast).toBe(1);
         expect((await store.listSteps(runId)).map((s) => s.name ?? s.kind)).toEqual(['mock-model-id', 'quick']);
         expect(resultIds((await store.latestCheckpoint(runId))!.messages)).toEqual(['c1']);
 
-        await engine.approve(runId, { approvalId: 'c2:0', approved: true });
+        await engine.approve(runId, { approvalId: '0:c2:0', approved: true });
         await engine.idle();
 
         expect(await store.getRun(runId)).toMatchObject({ status: 'completed', output: 'done' });
@@ -278,20 +278,20 @@ describe('durable approve()', () => {
         ]);
         const { store, engine } = setup(model, { tools: { deploy: createDeploy(recorder) } });
         const { runId, run } = await dispatch(engine, store);
-        expect(run?.waiting).toMatchObject({ approvalId: 'c1:0', title: 'Deploy prod?' });
+        expect(run?.waiting).toMatchObject({ approvalId: '0:c1:0', title: 'Deploy prod?' });
 
-        await engine.approve(runId, { approvalId: 'c1:0', approved: true });
+        await engine.approve(runId, { approvalId: '0:c1:0', approved: true });
         await engine.idle();
         const second = await store.getRun(runId);
         expect(second?.status).toBe('waiting');
-        expect(second?.waiting).toMatchObject({ approvalId: 'c2:0', title: 'Deploy eu?' });
+        expect(second?.waiting).toMatchObject({ approvalId: '0:c2:0', title: 'Deploy eu?' });
         expect(second?.waiting?.tokenId).not.toBe(run?.waiting?.tokenId);
         // paused again without a model call
         expect(model.doStreamCalls).toHaveLength(1);
         expect(recorder.deployed).toEqual(['prod']);
         expect(resultIds((await store.latestCheckpoint(runId))!.messages)).toEqual(['c1']);
 
-        await engine.approve(runId, { approvalId: 'c2:0', approved: true });
+        await engine.approve(runId, { approvalId: '0:c2:0', approved: true });
         await engine.idle();
         expect(await store.getRun(runId)).toMatchObject({ status: 'completed', output: 'both done' });
         expect(recorder.deployed).toEqual(['prod', 'eu']);
@@ -300,7 +300,7 @@ describe('durable approve()', () => {
         expect(steps.map((s) => s.kind)).toEqual(['llm', 'wait', 'tool', 'wait', 'tool', 'llm']);
     });
 
-    it('a second approve() in the same call after the first was approved gets id <toolCallId>:1', async () => {
+    it('a second approve() in the same call after the first was approved gets id <stepIndex>:<toolCallId>:1', async () => {
         const twice = defineTool({
             inputSchema: z.object({}),
             execute: async (_input, { context }) => {
@@ -312,14 +312,14 @@ describe('durable approve()', () => {
         const model = mockModel([turn(call('twice', {}, 'c1')), text('done')]);
         const { store, engine } = setup(model, { tools: { twice } });
         const { runId, run } = await dispatch(engine, store);
-        expect(run?.waiting).toMatchObject({ approvalId: 'c1:0', title: 'first' });
+        expect(run?.waiting).toMatchObject({ approvalId: '0:c1:0', title: 'first' });
 
-        await engine.approve(runId, { approvalId: 'c1:0', approved: true });
+        await engine.approve(runId, { approvalId: '0:c1:0', approved: true });
         await engine.idle();
-        expect((await store.getRun(runId))?.waiting).toMatchObject({ approvalId: 'c1:1', title: 'second' });
+        expect((await store.getRun(runId))?.waiting).toMatchObject({ approvalId: '0:c1:1', title: 'second' });
         expect(model.doStreamCalls).toHaveLength(1);
 
-        await engine.approve(runId, { approvalId: 'c1:1', approved: false });
+        await engine.approve(runId, { approvalId: '0:c1:1', approved: false });
         await engine.idle();
         expect((await store.getRun(runId))?.status).toBe('completed');
         const tools = (await store.listSteps(runId)).filter((s) => s.kind === 'tool');
@@ -354,19 +354,19 @@ describe('durable approve()', () => {
         });
         const { runId, run } = await dispatch(engine, store);
         expect(run?.waiting).toMatchObject({
-            approvalId: 'c1:0',
+            approvalId: '0:c1:0',
             toolName: 'bash',
             title: 'Run ls?',
         });
         expect(commands).toEqual([]);
 
-        await engine.approve(runId, { approvalId: 'c1:0', approved: true });
+        await engine.approve(runId, { approvalId: '0:c1:0', approved: true });
         await engine.idle();
         expect(commands).toEqual(['ls']);
-        expect((await store.getRun(runId))?.waiting).toMatchObject({ approvalId: 'c2:0', title: 'Run rm -rf /?' });
+        expect((await store.getRun(runId))?.waiting).toMatchObject({ approvalId: '1:c2:0', title: 'Run rm -rf /?' });
 
         await engine.approve(runId, {
-            approvalId: 'c2:0',
+            approvalId: '1:c2:0',
             approved: false,
             reason: 'no',
         });
@@ -393,7 +393,7 @@ describe('durable approve()', () => {
             tools: { deploy: createDeploy(recorder) },
             toolPolicy: () => false,
         });
-        await tightened.approve(runId, { approvalId: 'c1:0', approved: true });
+        await tightened.approve(runId, { approvalId: '0:c1:0', approved: true });
         await tightened.start();
         await tightened.idle();
 
@@ -417,7 +417,7 @@ describe('durable approve()', () => {
         engine.stop();
 
         const { engine: changed } = createEngine(store, clock, model, { tools: { deploy: createDeploy(recorder, z.object({ env: z.number() })) } });
-        await changed.approve(runId, { approvalId: 'c1:0', approved: true });
+        await changed.approve(runId, { approvalId: '0:c1:0', approved: true });
         await changed.start();
         await changed.idle();
 
@@ -521,7 +521,7 @@ describe('durable approve()', () => {
         const fresh = newRecorder();
         const { engine: restarted } = createEngine(store, clock, model, { tools: { deploy: createDeploy(fresh) } });
         await restarted.start();
-        await restarted.approve(runId, { approvalId: 'c1:0', approved: true });
+        await restarted.approve(runId, { approvalId: '0:c1:0', approved: true });
         await restarted.idle();
 
         expect(await store.getRun(runId)).toMatchObject({ status: 'completed', output: 'done after restart' });
@@ -538,7 +538,7 @@ describe('durable approve()', () => {
         });
         const { runId } = await dispatch(engine, store);
 
-        await engine.approve(runId, { approvalId: 'c1:0', approved: true });
+        await engine.approve(runId, { approvalId: '0:c1:0', approved: true });
         await engine.idle();
         expect(recorder.deployed).toEqual(['prod']);
         expect(await store.getRun(runId)).toMatchObject({ status: 'completed', output: 'done' });
@@ -567,13 +567,13 @@ describe('durable approve()', () => {
         const { engine } = createEngine(store, clock, model, { tools: { ask } }, [slack]);
         const { runId, run } = await dispatch(engine, store);
         expect(run?.waiting).toMatchObject({
-            approvalId: 'c1:0',
+            approvalId: '0:c1:0',
             title: 'Close #12?',
             channel: 'slack',
             address: 'C0OPS',
         });
 
-        await engine.approve(runId, { approvalId: 'c1:0', approved: true });
+        await engine.approve(runId, { approvalId: '0:c1:0', approved: true });
         await engine.idle();
         const tools = (await store.listSteps(runId)).filter((s) => s.kind === 'tool');
         expect(tools[0]?.output).toEqual(['validation_error', true]);
@@ -606,11 +606,11 @@ describe('durable approve()', () => {
             hooks,
         });
         const { runId, run } = await dispatch(engine, store);
-        expect(run?.waiting?.approvalId).toBe('c1:0');
+        expect(run?.waiting?.approvalId).toBe('0:c1:0');
         engine.stop();
 
         const { engine: changed } = createEngine(store, clock, model, { tools: { third }, hooks });
-        await changed.approve(runId, { approvalId: 'c1:0', approved: true });
+        await changed.approve(runId, { approvalId: '0:c1:0', approved: true });
         await changed.start();
         await changed.idle();
         const failed = await store.getRun(runId);

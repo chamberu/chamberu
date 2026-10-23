@@ -54,7 +54,7 @@ export async function triageIssue(model: LanguageModel) {
     });
 
     await engine.idle();
-    engine.stop();
+    await engine.stop();
 
     return {
         run: await engine.getRun(runId), 
